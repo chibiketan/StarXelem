@@ -1,0 +1,54 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:StarXelem.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
+        xmlns:local="clr-namespace:StarXelem"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="StarXelem.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/xelem-logo.ico"
+        d:DataContext="{x:Static local:DesignData.MainWindowViewModel}"
+        Title="StarXelem">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <ComboBox Width="150" ItemsSource="{Binding InstalledEnvs^, FallbackValue='Loading...'}" SelectedItem="{Binding SelectedP4kFile}">
+            <ComboBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding DisplayVersion}"></TextBlock>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+        <ui:NavigationView
+            Grid.Row="1"
+            AlwaysShowHeader="False"
+            MenuItemsSource="{Binding Pages}"
+            SelectedItem="{Binding CurrentPage}"
+            PaneDisplayMode="Left"
+            IsBackEnabled="False"
+            IsSettingsVisible="False"
+            IsPaneToggleButtonVisible="True"
+            IsBackButtonVisible="False"
+            OpenPaneLength="150">
+            <ui:NavigationView.MenuItemTemplate>
+                <DataTemplate DataType="vm:PageViewModelBase">
+                    <ui:NavigationViewItem
+                        Content="{Binding Name}"
+                        IconSource="{Binding Icon}" />
+                </DataTemplate>
+            </ui:NavigationView.MenuItemTemplate>
+            <ContentControl Content="{Binding CurrentPage}" />
+        </ui:NavigationView>
+
+    </Grid>
+
+
+</Window>

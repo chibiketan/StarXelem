@@ -1,0 +1,37 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels"
+             xmlns:local="clr-namespace:StarXelem"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:DataType="vm:ShipTabViewModel"
+             d:DataContext="{x:Static local:DesignData.ShipTabViewModel}"
+             x:Class="StarXelem.Views.ShipTabView">
+    <Grid RowDefinitions="50,*">
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Command="{Binding LoadShipListCommand}">Récupérer liste vaisseau</Button>
+            <Label Grid.Column="1" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" Content="{Binding TreatmentStatus}" />
+        </Grid>
+        <Grid Grid.Row="1">
+            <DataGrid  ItemsSource="{Binding Spaceships^}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="All">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Nom" Binding="{Binding Name}" />
+                    <DataGridTextColumn Header="Modèle" Binding="{Binding Shipname}" />
+                    <DataGridTextColumn Header="Package source" Binding="{Binding PackageSource}" />
+                    <DataGridCheckBoxColumn Header="Achat Réel" Binding="{Binding IsRealPurchase}" />
+                    <DataGridTextColumn Header="Statut" Binding="{Binding DisplayState}" />
+                    <DataGridTextColumn Header="Emplacement" Binding="{Binding ReadableLocation}" />
+                    <DataGridTextColumn Header="Shard" Binding="{Binding Shard}" />
+                    <DataGridTextColumn Header="Entity Type" Binding="{Binding ItemType}" IsVisible="False" />
+                    <DataGridTextColumn Header="Entity sous type" Binding="{Binding ItemSubType}" IsVisible="False" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+    </Grid>
+</UserControl>

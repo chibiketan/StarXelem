@@ -1,0 +1,80 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels"
+             xmlns:local="clr-namespace:StarXelem"
+             xmlns:conv="clr-namespace:StarXelem.Converters"
+             xmlns:comp="clr-namespace:StarXelem.Comparer"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:DataType="vm:ItemsTabViewModel"
+             d:DataContext="{x:Static local:DesignData.ItemsTabViewModel}"
+             x:Class="StarXelem.Views.ItemsTabView">
+    <UserControl.Resources>
+        <conv:MicroScuConverter x:Key="MicroScuConverter" />
+        <comp:TaskStringComparer x:Key="TaskStringComparer" />
+        <comp:ItemViewModelName x:Key="ItemViewModelName" />
+    </UserControl.Resources>
+    <Grid RowDefinitions="Auto,Auto,30,*">
+        <Expander Grid.Row="0" IsExpanded="True">
+            <Expander.Header>Rechercher</Expander.Header>
+            <Grid ColumnDefinitions="*,*,*,*,*,*" RowDefinitions="40,40,40,40,40,40">
+                <CheckBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Right" FlowDirection="RightToLeft" IsChecked="{Binding UseConnectedProfilAsOwner}" IsVisible="{Binding IsInDebugMode}" >Utiliser le compte connecté</CheckBox>
+                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" IsVisible="{Binding IsInDebugMode}">id possesseur</TextBlock>
+                <TextBox Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Text="{Binding OwnerId}" IsEnabled="{Binding !UseConnectedProfilAsOwner}" IsVisible="{Binding IsInDebugMode}" />
+                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center">id</TextBlock>
+                <TextBox Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Id}" />
+                <Button Grid.Row="5" Grid.Column="5" HorizontalAlignment="Center" Command="{Binding LoadItemListCommand}">Chercher</Button>
+                
+                <ListBox Grid.Row="1" Grid.Column="2" Grid.RowSpan="4" ItemsSource="{Binding AvailableTypeList}" SelectedItem="{Binding SelectedAvailableType}"></ListBox>
+                <Button Grid.Row="2" Grid.Column="3" HorizontalAlignment="Center" Command="{Binding AvailableToSelectedTypeCommand}" >>></Button>
+                <Button Grid.Row="3" Grid.Column="3" HorizontalAlignment="Center" Command="{Binding SelectedToAvailableTypeCommand}" >&lt;&lt;</Button>
+                <ListBox Grid.Row="1" Grid.Column="4" Grid.RowSpan="4" ItemsSource="{Binding SelectedTypeList}" SelectedItem="{Binding SelectedSelectedType}"></ListBox>
+                <CheckBox Grid.Row="5" Grid.Column="4" Content="Debug mode" IsChecked="{Binding IsInDebugMode}" />
+                <CheckBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Right" FlowDirection="RightToLeft" IsChecked="{Binding UseUserInventoryList}" >Utiliser les inventaires du compte</CheckBox>
+            </Grid>
+        </Expander>
+        <Expander Grid.Row="1">
+            <Expander.Header>Filtrer</Expander.Header>
+            <StackPanel Orientation="Horizontal" Margin="0,5" Spacing="10">
+                <TextBlock VerticalAlignment="Center">Filtrer par nom:</TextBlock>
+                <TextBox Text="{Binding NameFilter}" Width="300" Watermark="Entrez un nom à filtrer..." Height="30" />
+                <TextBlock VerticalAlignment="Center">Type:</TextBlock>
+                <ScrollViewer Height="125">
+                    <ItemsControl ItemsSource="{Binding FilterTypeList}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Vertical"  />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Margin="0,0,8,0" Content="{Binding Type}" IsChecked="{Binding IsSelected}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+        </Expander>
+        <Label Grid.Row="2" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" Content="{Binding TreatmentStatus}" Margin="30,0,0,0" />
+        <DataGrid Grid.Row="3" ItemsSource="{Binding ItemList^}" SelectedItem="{Binding SelectedItem}" Margin="0,5,0,0">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="id" Binding="{Binding Id}" />
+                <DataGridTextColumn Header="ownerId" Binding="{Binding OwnerId}" IsVisible="{Binding IsInDebugMode}" />
+                <DataGridTextColumn Header="Nom" CustomSortComparer="{StaticResource ItemViewModelName}" CanUserSort="True" Binding="{Binding Name^}" />
+                <DataGridTextColumn Header="Type technique" Binding="{Binding LocalTypeName}" IsVisible="{Binding IsInDebugMode}" />
+                <DataGridTextColumn Header="parentUrn" Binding="{Binding ParentUrn}"  IsVisible="{Binding IsInDebugMode}" />
+                <DataGridTextColumn Header="Stockage" CustomSortComparer="{StaticResource TaskStringComparer}" CanUserSort="True" Binding="{Binding Location^}"  />
+                <DataGridTextColumn Header="Nombre élément" Binding="{Binding StackSize}"  />
+                <DataGridTextColumn Header="Taille occupée" Binding="{Binding EdgeOccupancy, Converter={StaticResource MicroScuConverter}}"  />
+                <!-- <DataGridTextColumn Header="classe" Binding="{Binding TypeGuid}"  IsVisible="{Binding IsInDebugMode}" /> -->
+                <DataGridTextColumn Header="type" Binding="{Binding ItemType}" />
+                <DataGridTextColumn Header="sous-type" Binding="{Binding ItemSubType}" />
+                <DataGridTextColumn Header="Location id" Binding="{Binding LocationId}"  IsVisible="{Binding IsInDebugMode}" />
+                <DataGridTextColumn Header="Location stockage" Binding="{Binding StowLocation}"  IsVisible="{Binding IsInDebugMode}" />
+                <DataGridTextColumn Header="location stockage shard" Binding="{Binding StowShard}"  IsVisible="{Binding IsInDebugMode}" />
+                <DataGridTextColumn Header="EDGE Location id" Binding="{Binding EdgeLocation}"  IsVisible="{Binding IsInDebugMode}" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>
