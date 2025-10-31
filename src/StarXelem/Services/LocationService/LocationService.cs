@@ -59,9 +59,10 @@ public class LocationService : ILocationService
         CHECKMATE = 810966700,
         STANTON_GATEWAY = 639835600,
         ROD_S_FUEL_N_SUPPLIES = 2421159735,
-        ENDGAME = 4067808819
-
-
+        ENDGAME = 4067808819,
+        GASLIGHT = 3531251586,
+        DUDLEY_AND_DAUGHTERS = 1309454298,
+        RAT_S_NEST = 660982239
     }
     
     enum ELocationType

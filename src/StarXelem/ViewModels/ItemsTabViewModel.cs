@@ -24,6 +24,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
             Type = type;
         }
     }
+    
     private readonly IGrpcClientService  _clientService;
     private readonly IP4kService _p4KService;
     private readonly ILocationService _locationService;
@@ -37,15 +38,14 @@ public partial class ItemsTabViewModel : PageViewModelBase
     [ObservableProperty] private bool _useUserInventoryList = true;
     [ObservableProperty] private string _ownerId = "";
     [ObservableProperty] private string _id = "";
-    [ObservableProperty] private ObservableCollection<EItemType> _availableTypeList;
-    [ObservableProperty] private ObservableCollection<EItemType> _selectedTypeList = new ObservableCollection<EItemType>();
-    [ObservableProperty] private EItemType? _selectedAvailableType;
-    [ObservableProperty] private EItemType? _selectedSelectedType;
     [ObservableProperty] private bool _isInDebugMode = false;
     [ObservableProperty] private string _nameFilter = "";
     [ObservableProperty] private ObservableCollection<FilterTypeOption> _filterTypeList = new ObservableCollection<FilterTypeOption>();
     [ObservableProperty] private ObservableCollection<EItemType> _selectedFilterTypes = new ObservableCollection<EItemType>();
 
+    [ObservableProperty] private ObservableCollection<FilterTypeOption> _availableTypeList2 = new ObservableCollection<FilterTypeOption>();
+
+    
     // Sorting state for Name column
     [ObservableProperty] private bool _isNameSortAscending = true;
     [ObservableProperty] private string _nameSortLabel = "Trier par Nom A→Z";
@@ -65,7 +65,6 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
         _p4KService.SelectedP4KFileChanged += OnSelectedP4KFileChanged;
         _clientService.OnConnectedChanged += (sender, b) => loadItemListCommand?.NotifyCanExecuteChanged();
-        _availableTypeList = new ObservableCollection<EItemType>(Enum.GetValues<EItemType>());
         // Initialize filter options for multi-select type filter
         _filterTypeList = new ObservableCollection<FilterTypeOption>(
             Enum.GetValues<EItemType>().Select(t =>
@@ -75,10 +74,19 @@ public partial class ItemsTabViewModel : PageViewModelBase
                 return opt;
             })
         );
-        // TODO remove debug only
-        _selectedAvailableType = EItemType.RemovableChip;
-        //_selectedAvailableType = EItemType.Char_Armor_Helmet;
-        AvailableToSelectedType();
+        
+        // Initialize options for multi-select type
+        _availableTypeList2 = new ObservableCollection<FilterTypeOption>(
+            Enum.GetValues<EItemType>().Select(t =>
+            {
+                var opt = new FilterTypeOption(t);
+                opt.PropertyChanged += OnTypeOptionPropertyChanged;
+                return opt;
+            })
+        );
+        
+        // TODO for testing purpose
+        AvailableTypeList2.First(t => t.Type == EItemType.Drink).IsSelected = true;
     }
     
     private void OnFilterTypeOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -99,7 +107,17 @@ public partial class ItemsTabViewModel : PageViewModelBase
             ApplyFilters();
         }
     }
+
+    private void OnTypeOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        ResetSelectedTypesCommand.NotifyCanExecuteChanged();
+    }
     
+    public bool CanLoadItemList()
+    {
+        return _clientService.IsConnected && !IsLoading;
+    }
+
     [RelayCommand(CanExecute = nameof(CanLoadItemList))]
     public async Task LoadItemList()
     {
@@ -111,7 +129,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         searchQuery.useConnectedUserOwner = _useConnectedProfilAsOwner;
         searchQuery.ownerId = _ownerId;
         searchQuery.Id = _id;
-        searchQuery.TypeList = _selectedTypeList.ToList();
+        searchQuery.TypeList = AvailableTypeList2.Where(i => i.IsSelected).Select(i => i.Type).ToList();
         
         // Si on utilise la liste des conteneurs, on la charge et on désactive le filtrage par owner
         if (UseUserInventoryList)
@@ -127,62 +145,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement de la liste des objets");
 
         var itemList = await _clientService.QueryGraphBySearch(searchQuery);
-        // TODO load item infos from game files
-        await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement p4k");
-        await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement traduction");
-        // var globalEntry = _p4KService.P4KFileSystem.OpenRead(@"Data\Localization\english\global.ini");
-        // Dictionary<string, string> lang = new Dictionary<string, string>(500);
-        // string iniFile;
-        // using (var sr = new StreamReader(globalEntry, Encoding.UTF8, true))
-        // {
-        //     while (await sr.ReadLineAsync() is { } line) {
-        //
-        //         if (!String.IsNullOrEmpty(line))
-        //         {
-        //             var parts = line.Split('=', 2, StringSplitOptions.TrimEntries);
-        //             var key = parts[0];
-        //             var value = parts[1];
-        //             
-        //             if (key.EndsWith(",P"))
-        //                 key = key[..^2];
-        //             lang.Add($"@{key}", value);
-        //         }
-        //     }
-        // }
-        // await globalEntry.DisposeAsync();
-        
-        // Chargement des informations de classes sur les vaisseaux
-        await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement classes des vaisseaux");
-        // var entry = _p4KService.P4KFileSystem.OpenRead(dataCorePath);
-        // var dcb = new DataCoreDatabase(entry);
-        // var df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
-        // await entry.DisposeAsync();
-        //
-        // foreach (var spaceship in spaceships)
-        // {
-        //     var record = df.GetFromRecord(new CigGuid(spaceship.Entitlement.EntityClassGuid));
-        //
-        //     if (null != record)
-        //     {
-        //         spaceship.EntityClassDefinition = record.Data as EntityClassDefinition;
-        //         var toto = (record.Data as EntityClassDefinition).Components.FirstOrDefault(t => t is SCItemPurchasableParams) as SCItemPurchasableParams;
-        //
-        //         if (null != toto)
-        //         {
-        //             try
-        //             {
-        //                 spaceship.Shipname = lang[toto.displayName];
-        //             }
-        //             catch (Exception)
-        //             {
-        //                 // Ignore for now
-        //             }
-        //         }
-        //     }
-        // }
         
         // récupérer les instances de vaisseaux
-        await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Récupération des instances de vaisseaux");
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Terminé");
         var result = new List<ItemViewModel>();
         foreach (var item in itemList)
@@ -195,61 +159,26 @@ public partial class ItemsTabViewModel : PageViewModelBase
         ApplyFilters();
         IsLoading = false;
     }
-
-    public bool CanLoadItemList()
+    
+    [RelayCommand(CanExecute = nameof(CanResetSelectedTypes))]
+    public void ResetSelectedTypes()
     {
-        return _clientService.IsConnected && !IsLoading;
+        foreach (var filterTypeOption in AvailableTypeList2)
+        {
+            filterTypeOption.IsSelected = false;
+        }
     }
 
-    [RelayCommand(CanExecute = nameof(CanAvailableToSelectedType))]
-    public void AvailableToSelectedType()
+    public bool CanResetSelectedTypes()
     {
-        if (null == SelectedAvailableType)
-            // On ne fait rien si rien de sélectionné
-            return;
-
-        SelectedTypeList.Add(SelectedAvailableType.Value);
-        AvailableTypeList.Remove(SelectedAvailableType.Value);
-        SelectedAvailableType = null;
+        return AvailableTypeList2.Any(t => t.IsSelected);
     }
 
-    public bool CanAvailableToSelectedType()
-    {
-        return null != SelectedAvailableType;
-    }
-
-    [RelayCommand(CanExecute = nameof(CanSelectedToAvailableType))]
-    public void SelectedToAvailableType()
-    {
-        if (null == SelectedSelectedType)
-            // On ne fait rien si rien de sélectionné
-            return;
-
-        AvailableTypeList.Add(SelectedSelectedType.Value);
-        SelectedTypeList.Remove(SelectedSelectedType.Value);
-        SelectedSelectedType = null;
-    }
-
-    public bool CanSelectedToAvailableType()
-    {
-        return null != SelectedSelectedType;
-    }
 
     private void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)
     {
         // Le fichier a été modifié, on change tout, reconnexion en prime
-        LoadItemListCommand.NotifyCanExecuteChanged();
         _clientService.InitClient(e);
-    }
-
-    partial void OnSelectedAvailableTypeChanged(EItemType? value)
-    {
-        AvailableToSelectedTypeCommand.NotifyCanExecuteChanged();
-    }
-
-    partial void OnSelectedSelectedTypeChanged(EItemType? value)
-    {
-        SelectedToAvailableTypeCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnNameFilterChanged(string value)

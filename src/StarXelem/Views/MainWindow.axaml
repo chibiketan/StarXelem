@@ -5,6 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:ui="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
         xmlns:local="clr-namespace:StarXelem"
+        MinWidth="800"
+        MinHeight="600"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="StarXelem.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
