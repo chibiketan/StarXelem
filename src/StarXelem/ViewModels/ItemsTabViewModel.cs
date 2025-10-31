@@ -40,12 +40,19 @@ public partial class ItemsTabViewModel : PageViewModelBase
     [ObservableProperty] private string _id = "";
     [ObservableProperty] private bool _isInDebugMode = false;
     [ObservableProperty] private string _nameFilter = "";
-    [ObservableProperty] private ObservableCollection<FilterTypeOption> _filterTypeList = new ObservableCollection<FilterTypeOption>();
-    [ObservableProperty] private ObservableCollection<EItemType> _selectedFilterTypes = new ObservableCollection<EItemType>();
+    [ObservableProperty] private ObservableCollection<FilterTypeOption> _filterTypeList;
+    [ObservableProperty] private ObservableCollection<EItemType> _selectedFilterTypes;
 
-    [ObservableProperty] private ObservableCollection<FilterTypeOption> _availableTypeList2 = new ObservableCollection<FilterTypeOption>();
+    [ObservableProperty] private ObservableCollection<FilterTypeOption> _searchTypeList;
 
-    
+    // Vue triée: éléments sélectionnés d'abord (A→Z), puis non sélectionnés (A→Z)
+    public IEnumerable<FilterTypeOption> SearchTypeListSorted => _searchTypeList
+        .OrderByDescending(o => o.IsSelected)
+        .ThenBy(o => o.Type.ToString(), StringComparer.CurrentCultureIgnoreCase);
+    public IEnumerable<FilterTypeOption> FilterTypeListSorted => _filterTypeList
+        .OrderByDescending(o => o.IsSelected)
+        .ThenBy(o => o.Type.ToString(), StringComparer.CurrentCultureIgnoreCase);
+
     // Sorting state for Name column
     [ObservableProperty] private bool _isNameSortAscending = true;
     [ObservableProperty] private string _nameSortLabel = "Trier par Nom A→Z";
@@ -76,7 +83,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         );
         
         // Initialize options for multi-select type
-        _availableTypeList2 = new ObservableCollection<FilterTypeOption>(
+        _searchTypeList = new ObservableCollection<FilterTypeOption>(
             Enum.GetValues<EItemType>().Select(t =>
             {
                 var opt = new FilterTypeOption(t);
@@ -84,15 +91,21 @@ public partial class ItemsTabViewModel : PageViewModelBase
                 return opt;
             })
         );
+        _searchTypeList.CollectionChanged += (_, __) => OnPropertyChanged(nameof(SearchTypeListSorted));
+        _filterTypeList.CollectionChanged += (_, __) => OnPropertyChanged(nameof(FilterTypeListSorted));
+
         
         // TODO for testing purpose
-        AvailableTypeList2.First(t => t.Type == EItemType.Drink).IsSelected = true;
+        SearchTypeList.First(t => t.Type == EItemType.Drink).IsSelected = true;
     }
     
     private void OnFilterTypeOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(FilterTypeOption.IsSelected) && sender is FilterTypeOption opt)
         {
+            // Rafraîchir la vue triée quand une sélection change
+            OnPropertyChanged(nameof(FilterTypeListSorted));
+
             // Keep SelectedFilterTypes in sync
             if (opt.IsSelected)
             {
@@ -104,6 +117,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
                 if (SelectedFilterTypes.Contains(opt.Type))
                     SelectedFilterTypes.Remove(opt.Type);
             }
+            
             ApplyFilters();
         }
     }
@@ -111,6 +125,11 @@ public partial class ItemsTabViewModel : PageViewModelBase
     private void OnTypeOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         ResetSelectedTypesCommand.NotifyCanExecuteChanged();
+        if (e.PropertyName == nameof(FilterTypeOption.IsSelected))
+        {
+            // Rafraîchir la vue triée quand une sélection change
+            OnPropertyChanged(nameof(SearchTypeListSorted));
+        }
     }
     
     public bool CanLoadItemList()
@@ -129,7 +148,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         searchQuery.useConnectedUserOwner = _useConnectedProfilAsOwner;
         searchQuery.ownerId = _ownerId;
         searchQuery.Id = _id;
-        searchQuery.TypeList = AvailableTypeList2.Where(i => i.IsSelected).Select(i => i.Type).ToList();
+        searchQuery.TypeList = SearchTypeList.Where(i => i.IsSelected).Select(i => i.Type).ToList();
         
         // Si on utilise la liste des conteneurs, on la charge et on désactive le filtrage par owner
         if (UseUserInventoryList)
@@ -163,7 +182,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     [RelayCommand(CanExecute = nameof(CanResetSelectedTypes))]
     public void ResetSelectedTypes()
     {
-        foreach (var filterTypeOption in AvailableTypeList2)
+        foreach (var filterTypeOption in SearchTypeList)
         {
             filterTypeOption.IsSelected = false;
         }
@@ -171,7 +190,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     public bool CanResetSelectedTypes()
     {
-        return AvailableTypeList2.Any(t => t.IsSelected);
+        return SearchTypeList.Any(t => t.IsSelected);
     }
 
 

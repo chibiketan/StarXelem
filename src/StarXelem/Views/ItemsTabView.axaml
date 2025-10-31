@@ -29,7 +29,7 @@
                 
                 <TextBlock Grid.Column="2" VerticalAlignment="Center">Type:</TextBlock>
                 <ScrollViewer Grid.Row="1" Grid.Column="2" Grid.RowSpan="4" >
-                    <ItemsControl ItemsSource="{Binding AvailableTypeList2}" Margin="5 0 0 0 ">
+                    <ItemsControl ItemsSource="{Binding SearchTypeListSorted}" Margin="5 0 0 0 ">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel Orientation="Vertical"  />
@@ -59,7 +59,7 @@
                 <TextBox Text="{Binding NameFilter}" Width="300" Watermark="Entrez un nom à filtrer..." Height="30" />
                 <TextBlock VerticalAlignment="Center">Type:</TextBlock>
                 <ScrollViewer Height="125">
-                    <ItemsControl ItemsSource="{Binding FilterTypeList}">
+                    <ItemsControl ItemsSource="{Binding FilterTypeListSorted}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel Orientation="Vertical"  />
