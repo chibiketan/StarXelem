@@ -211,7 +211,7 @@ public class GrpcClientService : IGrpcClientService
             }
         };
 
-        if (itemQueryModel.useConnectedUserOwner || !String.IsNullOrEmpty(itemQueryModel.ownerId))
+        if ((itemQueryModel.useConnectedUserOwner && (itemQueryModel.InventoryIdList?.Count ?? 0) == 0)  || !String.IsNullOrEmpty(itemQueryModel.ownerId))
         {
             ulong ownerId = itemQueryModel.useConnectedUserOwner ? _playerInfo.Player.Geid : ulong.Parse(itemQueryModel.ownerId);
             // filtre par owner
@@ -259,6 +259,16 @@ public class GrpcClientService : IGrpcClientService
                 EdgeType = "STOWED_IN",
             };
             inventoryIdListFilter.Values.AddRange(itemQueryModel.InventoryIdList?.Select(t => new ScalarValue { StringValue = t }));
+
+
+            // // filtre par stowedContext pour faire un or
+            // var stowContextFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
+            // {
+            //     Operator = ComparisonOperator.Match,
+            //     Property = "stowId"
+            // };
+            //
+            // stowContextFilter.Values.AddRange(itemQueryModel.InventoryIdList?.Select(t => new ScalarValue { StringValue = t }));
             
             // filtre par owner pour faire un or
             ulong ownerId = _playerInfo.Player.Geid;
@@ -275,7 +285,13 @@ public class GrpcClientService : IGrpcClientService
                 Operator = LogicalOperator.Or
             };
             orFilter.Filters.Add(new EntityFilter { EdgeFilter = inventoryIdListFilter });
-            orFilter.Filters.Add(new EntityFilter { PropertyFilter = ownerFilter });
+            // orFilter.Filters.Add(new EntityFilter { PropertyFilter = stowContextFilter });
+            // Si on filtre par owner, on ajoute en OR l'id du owner pour avoir une vue d'ensemble
+            if (itemQueryModel.useConnectedUserOwner)
+            {
+                orFilter.Filters.Add(new EntityFilter { PropertyFilter = ownerFilter });
+            }
+
             filter.Filters.Add(new EntityFilter { CompositeFilter = orFilter });
         }
 
@@ -333,9 +349,21 @@ public class GrpcClientService : IGrpcClientService
                     {
                         Tree = new EntityTreeProjection
                         {
-                            Enabled = false,
+                            Enabled = itemQueryModel.UseProjection,
                             IncludeInventoryNodes = false,
-                            PathMode = false
+                            PathMode = true,
+                            // Prune = new EntityPruneConstraint
+                            // {
+                            //     InventoryFilter = new InventoryFilter
+                            //     {
+                            //         PropertyFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
+                            //         {
+                            //             Operator = ComparisonOperator.Equal,
+                            //             Property = "ownerId",
+                            //         
+                            //         }
+                            //     }
+                            // }
                         },
                         OutgoingEdges = true,
                         Snapshots = true,
@@ -349,22 +377,25 @@ public class GrpcClientService : IGrpcClientService
                     },
                     Sort = new EntitySortingArguments
                     {
-                        // EntityProperty = new EntitySortingByProperty
-                        // {
-                        //     Property = "geid",
-                        //     SortComparator = SortComparator.Numerical
-                        // },
-                        EdgeProperty = new EntitySortingByEdgeProperty
+                        EntityProperty = new EntitySortingByProperty
                         {
-                            Property = "rank",
-                            SortComparator = SortComparator.Lexicographic,
-                            EdgeType = "STOWED_IN"
+                            Property = "geid",
+                            SortComparator = SortComparator.Numerical
                         },
+                        // EdgeProperty = new EntitySortingByEdgeProperty
+                        // {
+                        //     Property = "rank",
+                        //     SortComparator = SortComparator.Lexicographic,
+                        //     EdgeType = "STOWED_IN"
+                        // },
                         Order = PaginationOrder.Ascending
                     }
                 }
             }
         };
+        // TODO remove
+        // request.Body.Query.Projection.Tree.Prune.InventoryFilter.PropertyFilter.Values.Add(new ScalarValue { UnsignedBigintValue = _playerInfo.Player.Geid });
+        
         var classDict = new Dictionary<uint, EntityClassProperties>(500);
         var edgeDict = new Dictionary<ulong, EntityEdge>(500);
         var nodes = new List<Node>(800);

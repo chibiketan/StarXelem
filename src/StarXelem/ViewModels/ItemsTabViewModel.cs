@@ -24,6 +24,21 @@ public partial class ItemsTabViewModel : PageViewModelBase
             Type = type;
         }
     }
+
+    public partial class FilterLocationOptionModel : ObservableObject
+    {
+        public Task<String?> Name { get; }
+        public string Location { get; }
+        [ObservableProperty]
+        private bool _isSelected;
+
+        public FilterLocationOptionModel(string location, Task<String?> name)
+        {
+            Name = name;
+            Location = location;
+            IsSelected = true;
+        }
+    }
     
     private readonly IGrpcClientService  _clientService;
     private readonly IP4kService _p4KService;
@@ -36,6 +51,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     [ObservableProperty] private string _treatmentStatus = "";
     [ObservableProperty] private bool _useConnectedProfilAsOwner = true;
     [ObservableProperty] private bool _useUserInventoryList = true;
+    [ObservableProperty] private bool _useTreeProjection = false;
     [ObservableProperty] private string _ownerId = "";
     [ObservableProperty] private string _id = "";
     [ObservableProperty] private bool _isInDebugMode = false;
@@ -44,6 +60,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
     [ObservableProperty] private ObservableCollection<EItemType> _selectedFilterTypes;
 
     [ObservableProperty] private ObservableCollection<FilterTypeOption> _searchTypeList;
+    [ObservableProperty] private Task<IList<FilterLocationOptionModel>?>? _locationList = Task.FromResult<IList<FilterLocationOptionModel>?>(null);
+    [ObservableProperty] private bool? _selectAllLocation = false;
 
     // Vue triée: éléments sélectionnés d'abord (A→Z), puis non sélectionnés (A→Z)
     public IEnumerable<FilterTypeOption> SearchTypeListSorted => _searchTypeList
@@ -103,8 +121,6 @@ public partial class ItemsTabViewModel : PageViewModelBase
     {
         if (e.PropertyName == nameof(FilterTypeOption.IsSelected) && sender is FilterTypeOption opt)
         {
-            // Rafraîchir la vue triée quand une sélection change
-            OnPropertyChanged(nameof(FilterTypeListSorted));
 
             // Keep SelectedFilterTypes in sync
             if (opt.IsSelected)
@@ -119,6 +135,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
             }
             
             ApplyFilters();
+            // Rafraîchir la vue triée quand une sélection change
+            OnPropertyChanged(nameof(FilterTypeListSorted));
         }
     }
 
@@ -142,23 +160,24 @@ public partial class ItemsTabViewModel : PageViewModelBase
     {
         IsLoading = true;
         TreatmentStatus = "Appel RSI";
-        // TODO load item list
-
+     
         var searchQuery = new ItemQueryModel();
         searchQuery.useConnectedUserOwner = _useConnectedProfilAsOwner;
         searchQuery.ownerId = _ownerId;
         searchQuery.Id = _id;
+        searchQuery.UseProjection = UseTreeProjection;
         searchQuery.TypeList = SearchTypeList.Where(i => i.IsSelected).Select(i => i.Type).ToList();
-        
+
+        var inventoryList = (await LocationList ?? new List<FilterLocationOptionModel>())
+            .Where(i => i.IsSelected)
+            .Select(i => i.Location)
+            .ToList();
         // Si on utilise la liste des conteneurs, on la charge et on désactive le filtrage par owner
-        if (UseUserInventoryList)
+        if (inventoryList.Count > 0)
         {
-            await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement de la liste des conteneurs");
-            var containerList = await _clientService.QueryInventories();
-            
-            searchQuery.useConnectedUserOwner = false;
+            //searchQuery.useConnectedUserOwner = false;
             searchQuery.ownerId = null;
-            searchQuery.InventoryIdList = new List<string>(containerList.Select(i => i.Id));
+            searchQuery.InventoryIdList = inventoryList;
         }
         
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement de la liste des objets");
@@ -193,6 +212,34 @@ public partial class ItemsTabViewModel : PageViewModelBase
         return SearchTypeList.Any(t => t.IsSelected);
     }
 
+    [RelayCommand(CanExecute = nameof(CanReloadLocationList))]
+    public void ReloadLocationList()
+    {
+        LocationList = LoadLocationList().ContinueWith((t) =>
+        {
+            Dispatcher.UIThread.InvokeAsync(() => ReloadLocationListCommand.NotifyCanExecuteChanged());
+            return t.Result;
+        })!;
+        refreshSelectAllLocation();
+    }
+
+    private async Task<IList<FilterLocationOptionModel>> LoadLocationList()
+    {
+        var locations = await _clientService.QueryInventories();
+
+        return locations.Select(l =>
+        {
+            var filterModel = new FilterLocationOptionModel(l.Id, _locationService.ResolveEntityLocation(l.Name));
+            
+            filterModel.PropertyChanged += (_, __) => refreshSelectAllLocation();
+            return filterModel;
+        }).ToList();
+    }
+
+    public bool CanReloadLocationList()
+    {
+        return LocationList == null || LocationList.IsCompleted;
+    }
 
     private void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)
     {
@@ -205,12 +252,9 @@ public partial class ItemsTabViewModel : PageViewModelBase
         ApplyFilters();
     }
 
-    [RelayCommand]
-    private void ToggleNameSort()
+    partial void OnLocationListChanged(Task<IList<FilterLocationOptionModel>?>? value)
     {
-        IsNameSortAscending = !IsNameSortAscending;
-        NameSortLabel = IsNameSortAscending ? "Trier par Nom A→Z" : "Trier par Nom Z→A";
-        ApplyFilters();
+        ReloadLocationListCommand.NotifyCanExecuteChanged();
     }
 
     private async void ApplyFilters()
@@ -238,5 +282,67 @@ public partial class ItemsTabViewModel : PageViewModelBase
         }
 
         ItemList = Task.FromResult<IList<ItemViewModel>>(filtered.ToList());
+    }
+
+    private async void refreshSelectAllLocation()
+    {
+        if (null == LocationList || null == await LocationList || (await _locationList).Count == 0)
+        {
+            _selectAllLocation = false;
+        }
+        else
+        {
+            var allFound = false;
+            var anyFound = (await LocationList).Any(s => s.IsSelected);
+
+            if (anyFound)
+            {
+                allFound = (await LocationList).All(s => s.IsSelected);
+            }
+
+            if (allFound)
+            {
+                _selectAllLocation = true;
+            }
+            else if (anyFound)
+            {
+                _selectAllLocation = null;
+            }
+            else
+            {
+                _selectAllLocation = false;
+            }
+        }
+        
+        OnPropertyChanged(nameof(SelectAllLocation));
+    }
+
+    partial void OnSelectAllLocationChanged(bool? oldValue, bool? newValue)
+    {
+        if (null == LocationList || null == LocationList.Result || LocationList.Result.Count == 0)
+        {
+            _selectAllLocation = false;
+            return;
+        }
+        
+        if (!oldValue.HasValue || oldValue.Value == false)
+        {
+            // go to true
+            _selectAllLocation = true;
+            foreach (var filterLocationOptionModel in LocationList.Result)
+            {
+                filterLocationOptionModel.IsSelected = true;
+            }
+        }
+        
+        if (oldValue.HasValue && oldValue == true)
+        {
+            // go to false
+            _selectAllLocation = false;
+            foreach (var filterLocationOptionModel in LocationList.Result)
+            {
+                filterLocationOptionModel.IsSelected = false;
+            }
+        }
     }
 }

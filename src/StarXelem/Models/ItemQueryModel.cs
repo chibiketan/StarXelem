@@ -9,4 +9,5 @@ public class ItemQueryModel
     public string? Id { get; set; }
     public List<EItemType> TypeList { get; set; }
     public List<String> InventoryIdList { get; set; }
+    public bool UseProjection { get; set; } = false;
 }

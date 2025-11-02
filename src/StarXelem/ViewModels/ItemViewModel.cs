@@ -27,9 +27,12 @@ public class ItemViewModel : ViewModelBase
     public string? LocalTypeName => _entityClassProperties?.RecordName;
     public Task<String?> Location => _locationService.ResolveLocation(_entityNodeProperties);
     
-    public string? EdgeLocation => _entityNodeProperties.EntityEdge?.End.InventoryId;
+    public EntityEdge? Edge => _entityNodeProperties.EntityEdge;
+    public EntityEdgeType? EdgeType => _entityNodeProperties.EntityEdge?.Type;
+    public string? EdgeLocation => _entityNodeProperties.EntityEdge?.End.HasInventoryId ?? false ? _entityNodeProperties.EntityEdge?.End.InventoryId : _entityNodeProperties.EntityEdge?.End.EntityId.ToString();
     public uint? EdgeOccupancy => _entityNodeProperties.EntityEdge?.Properties?.Physical?.Occupancy;
     public uint? StackSize => _entityNodeProperties.EntityNodeProperties?.StackSize;
+    public AttachmentType? EdgeAttachmentType => _entityNodeProperties.EntityEdge?.Properties?.AttachmentType;
 
 //    public string? TypeGuid => _entityClassProperties?.Guid;
 //    public string? TypeName => _entityClassProperties?.ClassName;
