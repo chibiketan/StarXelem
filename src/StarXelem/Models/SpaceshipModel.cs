@@ -15,15 +15,15 @@ public class SpaceshipModel
     public bool IsRealPurchase => Entitlement.RealMoney;
     public SpaceshipState State => GetState();
     public string? DisplayState => GetState().GetDisplayName();
-    public string? Location => EntityProperties?.StowCtx?.Inv;
+    public string? Location => EntityProperties?.EntityNodeProperties?.StowCtx?.Inv;
     public string? ReadableLocation { get; set; }
-    public string? Shard => EntityProperties?.StowCtx?.Shd;
-    public EItemType ItemType => (EItemType)(EntityProperties?.ItemTypeEnum ?? -1);
-    public EItemSubType ItemSubType => (EItemSubType)(EntityProperties?.ItemSubTypeEnum ?? -1);
+    public string? Shard => EntityProperties?.EntityNodeProperties?.StowCtx?.Shd;
+    public EItemType ItemType => (EItemType)(EntityProperties?.EntityNodeProperties?.ItemTypeEnum ?? -1);
+    public EItemSubType ItemSubType => (EItemSubType)(EntityProperties?.EntityNodeProperties?.ItemSubTypeEnum ?? -1);
 
     public Entitlement Entitlement { get; }
     public EntityClassDefinition? EntityClassDefinition { get; set; }
-    public EntityNodeProperties? EntityProperties { get; set; }
+    public EntityItemQueryResult? EntityProperties { get; set; }
 
     public SpaceshipModel(Entitlement entitlement)
     {
@@ -43,7 +43,7 @@ public class SpaceshipModel
             }
             
             // TODO Comment détecter un vaisseau en unknown ? (F7A)
-            if (EntityProperties.StowCtx.Shd != "")
+            if (EntityProperties.EntityNodeProperties?.StowCtx.Shd != "")
             {
                 // Le vaisseau est associé à une shard, du coup il est dans la nature
                 return SpaceshipState.UNSTOWED;

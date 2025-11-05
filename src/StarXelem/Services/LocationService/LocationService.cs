@@ -1,14 +1,25 @@
-﻿using StarXelem.Models;
+﻿using Sc.External.Services.Entitygraph.V1;
+using StarBreaker.DataCoreGenerated;
+using StarXelem.Models;
 
 namespace StarXelem.Services.LocationService;
 
 public class LocationService : ILocationService
 {
-    public Task<string?> ResolveEntityLocation(string? entityLocation)
+    private readonly IGrpcClientService _grpcClientService;
+    private readonly IP4kService _p4KService;
+
+    public LocationService(IGrpcClientService grpcClientService, IP4kService p4KService)
+    {
+        _grpcClientService = grpcClientService;
+        _p4KService = p4KService;
+    }
+    
+    public async Task<string?> ResolveEntityLocation(string? entityLocation)
     {
         if (string.IsNullOrWhiteSpace(entityLocation))
         {
-            return Task.FromResult<string?>(null);
+            return null;
         }
         var split = entityLocation.Split(":", 3, StringSplitOptions.None);
 
@@ -17,12 +28,12 @@ public class LocationService : ILocationService
 
         if (type == ELocationType.UNKNOWN)
         {
-            return Task.FromResult<string?>(entityLocation);
+            return entityLocation;
         }
 
         if (type == ELocationType.PlayerInventory)
         {
-            return Task.FromResult<string?>("Porté");       
+            return "Porté";       
         }
 
         var id = ulong.Parse(split[2]);
@@ -31,15 +42,121 @@ public class LocationService : ILocationService
         {
             var loc = (ELocation)id;
             
-            return Task.FromResult(loc.ToString());
+            return $"[INVENTAIRE] {loc}";
+        }
+
+        if (type == ELocationType.Hangar)
+        {
+            var loc = (ELocation)id;
+            
+            return $"[HANGAR] {loc}";
+        }
+
+        if (type == ELocationType.Container)
+        {
+            var containerId = ulong.Parse(split[0]);
+
+            var queryProp = new ItemQueryModel();
+            queryProp.Id = split[0];
+            queryProp.useConnectedUserOwner = false;
+            queryProp.UseProjection = false;
+            var results = await _grpcClientService.QueryGraphBySearch(queryProp);
+
+            if (results.Count == 0)
+            {
+                return $"Entité non trouvée ({split[0]})";
+            }
+
+            var entityType = await _p4KService.GetEntityType(results[0].EntityNodeProperties.ClassGuidCrc);
+            var typeName = entityType.RecordName;
+            var c = (entityType?.Data as EntityClassDefinition)?.Components
+                .OfType<SAttachableComponentParams>().FirstOrDefault();
+
+            if (null != c)
+            {
+                if (c.AttachDef.Localization.Name == "@LOC_PLACEHOLDER")
+                {
+                    // C'est un placeholder, on va chercher son possesseur
+                    return await ResolveLocation(results[0]);
+                }
+                
+                var tmpeName = await _p4KService.GetLocaleValue(c.AttachDef.Localization.Name);
+
+                if (!string.IsNullOrEmpty(tmpeName))
+                {
+                    typeName = tmpeName;
+                }
+            }
+            
+            return $"[{split[0]}] {typeName}";
         }
         
-        return Task.FromResult(entityLocation);
+        return entityLocation;
     }
 
     public Task<string?> ResolveLocation(EntityItemQueryResult entity)
     {
-        return ResolveEntityLocation(entity.EntityEdge?.End.InventoryId ?? entity.EntityNodeProperties?.StowCtx.Inv);
+        if (entity.EntityEdge != null)
+        {
+            // On a un edge à traiter, on va chercher la destination
+            switch (entity.EntityEdge.Type)
+            {
+                case EntityEdgeType.AttachedTo:
+                    // Attaché à une autre entité
+                    //return Task.FromResult("[EDGE] attached to traiter")!;
+                return ResolveEntityLocation(entity.EntityEdge.End.EntityId);
+                case EntityEdgeType.StowedIn:
+                    // Rangé dans un conteneur
+                    return this.ResolveEntityLocation(entity.EntityEdge.End.InventoryId);
+                case EntityEdgeType.References:
+                    // Lié à une référence ?
+                    return Task.FromResult("[EDGE] Référence à traiter")!;
+            }
+        }
+
+        if (!String.IsNullOrEmpty(entity.EntityNodeProperties?.StowCtx?.Inv))
+        {
+            ResolveEntityLocation(entity.EntityNodeProperties.StowCtx.Inv);
+        }
+        
+        return Task.FromResult("pas de données")!;
+    }
+
+    public async Task<String?> ResolveEntityLocation(ulong guid)
+    {
+        var queryProp = new ItemQueryModel();
+        queryProp.Id = guid.ToString();
+        queryProp.useConnectedUserOwner = false;
+        queryProp.UseProjection = false;
+        var results = await _grpcClientService.QueryGraphBySearch(queryProp);
+
+        if (results.Count == 0)
+        {
+            return $"Entité non trouvée ({guid})";
+        }
+
+        var entityType = await _p4KService.GetEntityType(results[0].EntityNodeProperties.ClassGuidCrc);
+        var typeName = entityType.RecordName;
+        var c = (entityType?.Data as EntityClassDefinition)?.Components
+            .OfType<SAttachableComponentParams>().FirstOrDefault();
+
+        if (null != c)
+        {
+            if (c.AttachDef.Localization.Name == "@LOC_PLACEHOLDER")
+            {
+                // C'est un placeholder, on va chercher son possesseur
+                return await ResolveLocation(results[0]);
+            }
+                
+            var tmpeName = await _p4KService.GetLocaleValue(c.AttachDef.Localization.Name);
+
+            if (!string.IsNullOrEmpty(tmpeName))
+            {
+                typeName = tmpeName;
+            }
+        }
+            
+        return $"[{guid}] {typeName}";
     }
 
     enum ELocation:ulong

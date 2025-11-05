@@ -15,6 +15,7 @@ public class ItemViewModel : ViewModelBase
     private readonly ItemsTabViewModel _parent;
     private readonly EntityItemQueryResult _entityNodeProperties;
     private readonly DataCoreTypedRecord? _entityClassProperties;
+    private readonly System.Lazy<Task<string?>> _location;
 
     public ulong Id => _entityNodeProperties.EntityNodeProperties.Geid;
     public ulong OwnerId => _entityNodeProperties.EntityNodeProperties.OwnerId;
@@ -25,7 +26,7 @@ public class ItemViewModel : ViewModelBase
     public string? StowLocation => _entityNodeProperties.EntityNodeProperties.StowCtx?.Inv;
     public string? StowShard => _entityNodeProperties.EntityNodeProperties.StowCtx?.Shd;
     public string? LocalTypeName => _entityClassProperties?.RecordName;
-    public Task<String?> Location => _locationService.ResolveLocation(_entityNodeProperties);
+    public Task<string?> Location => _location.Value;
     
     public EntityEdge? Edge => _entityNodeProperties.EntityEdge;
     public EntityEdgeType? EdgeType => _entityNodeProperties.EntityEdge?.Type;
@@ -45,6 +46,9 @@ public class ItemViewModel : ViewModelBase
         _parent = parent;
         _entityNodeProperties = entityItemResult;
         _entityClassProperties = entityClassProperties;
+        _location = new System.Lazy<Task<string?>>(
+            () => _locationService.ResolveLocation(_entityNodeProperties)
+        );
     }
 
     private async Task<string?> GetLocaleValue()

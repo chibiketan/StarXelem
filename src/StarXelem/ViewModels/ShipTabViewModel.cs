@@ -110,11 +110,20 @@ public partial class ShipTabViewModel : PageViewModelBase
         // récupérer les instances de vaisseaux
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Récupération des instances de vaisseaux");
         var spaceshipUrnList = spaceships.Select(v => v.Entitlement.Urn).ToList();
-        var spaceshipEntityList = await _clientService.QueryGraphByParentUrnList(spaceshipUrnList);
+
+        var queryParameters = new ItemQueryModel
+        {
+            ParentUrnList = spaceshipUrnList,
+            useConnectedUserOwner = true,
+            TypeList = [EItemType.NOITEM_Vehicle]
+        };
+        
+        //var spaceshipEntityList = await _clientService.QueryGraphByParentUrnList(spaceshipUrnList);
+        var spaceshipEntityList = await _clientService.QueryGraphBySearch(queryParameters);
 
         foreach (var spaceship in spaceships)
         {
-            var spaceshipEntity = spaceshipEntityList.FirstOrDefault(e => e.ParentUrn == spaceship.Entitlement.Urn);
+            var spaceshipEntity = spaceshipEntityList.FirstOrDefault(e => e.EntityNodeProperties!.ParentUrn == spaceship.Entitlement.Urn);
             
             if (null != spaceshipEntity)
             {
@@ -125,7 +134,14 @@ public partial class ShipTabViewModel : PageViewModelBase
         // // TODO récupérer les emplacements des vaisseaux
         foreach (var spaceship in spaceships)
         {
-            spaceship.ReadableLocation = await _locationService.ResolveEntityLocation(spaceship.Location);
+            if (null == spaceship.EntityProperties)
+            {
+                spaceship.ReadableLocation = await _locationService.ResolveEntityLocation(spaceship.Location);
+            }
+            else
+            {
+                spaceship.ReadableLocation = await _locationService.ResolveLocation(spaceship.EntityProperties);
+            }
         }
         
         // var locationGeidList = spaceships.Where(s => s.EntityProperties?.StowCtx?.Inv != null).Select(s => StowLocationToGeid(s.EntityProperties.StowCtx.Inv)).ToList();

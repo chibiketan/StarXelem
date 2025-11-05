@@ -57,7 +57,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     [ObservableProperty] private bool _isInDebugMode = false;
     [ObservableProperty] private string _nameFilter = "";
     [ObservableProperty] private ObservableCollection<FilterTypeOption> _filterTypeList;
-    [ObservableProperty] private ObservableCollection<EItemType> _selectedFilterTypes;
+    [ObservableProperty] private ObservableCollection<EItemType> _selectedFilterTypes = new ObservableCollection<EItemType>();
 
     [ObservableProperty] private ObservableCollection<FilterTypeOption> _searchTypeList;
     [ObservableProperty] private Task<IList<FilterLocationOptionModel>?>? _locationList = Task.FromResult<IList<FilterLocationOptionModel>?>(null);
@@ -114,7 +114,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
         
         // TODO for testing purpose
-        SearchTypeList.First(t => t.Type == EItemType.Drink).IsSelected = true;
+        //SearchTypeList.First(t => t.Type == EItemType.Drink).IsSelected = true;
     }
     
     private void OnFilterTypeOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)

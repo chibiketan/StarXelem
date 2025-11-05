@@ -295,6 +295,19 @@ public class GrpcClientService : IGrpcClientService
             filter.Filters.Add(new EntityFilter { CompositeFilter = orFilter });
         }
 
+        if ((itemQueryModel.ParentUrnList?.Count ?? 0) > 0)
+        {
+            // Liste des parentUrn
+            var parentUrnListFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
+            {
+                Operator = ComparisonOperator.In,
+                Property = "parentUrn"
+            };
+            parentUrnListFilter.Values.AddRange(itemQueryModel.ParentUrnList!.Select(x => new ScalarValue { StringValue = x }));
+            filter.Filters.Add(new EntityFilter { PropertyFilter = parentUrnListFilter });
+        }
+
+
         // // Liste des parentUrn
         // var geidListFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
         // {
