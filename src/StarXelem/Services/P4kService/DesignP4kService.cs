@@ -67,6 +67,25 @@ public class DesignP4kService : IP4kService
         });
     }
 
+    public Task<P4kFileModel?> GetInstallationInfo(string p4kPath)
+    {
+        return Task.FromResult(new P4kFileModel
+        {
+            ChannelName = "TestChannel 1",
+            Path = "un/chemin/de/test 1",
+            Manifest = new BuildManifestModel
+            {
+                Data = new BuildManifestDataModel
+                {
+                    Branch = "TestBranch",
+                    Config = "Config 1",
+                    Platform = "PC",
+                    Version = "1.0.0.0"
+                }
+            }
+        })!;
+    }
+
     public Task<string?> GetLocaleValue(string? key)
     {
         return Task.FromResult(key);

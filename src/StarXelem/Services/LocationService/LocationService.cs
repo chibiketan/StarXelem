@@ -166,6 +166,7 @@ public class LocationService : ILocationService
         BAIJINI = 3490636373,
         EVERUS_HARBOR = 308639451,
         LORVILLE = 4005457614,
+        NEW_BABBAGE = 3170699229,
         ARC_L2 = 4129327548,
         STARLIGHT = 844538234,
         PORT_TRESLER = 2147648880,
@@ -179,7 +180,9 @@ public class LocationService : ILocationService
         ENDGAME = 4067808819,
         GASLIGHT = 3531251586,
         DUDLEY_AND_DAUGHTERS = 1309454298,
-        RAT_S_NEST = 660982239
+        RAT_S_NEST = 660982239,
+        RUIN_STATION = 2026442305,
+        CRU_L1 = 1510935576
     }
     
     enum ELocationType

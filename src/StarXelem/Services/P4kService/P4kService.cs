@@ -85,33 +85,12 @@ public class P4kService : IP4kService
 
         foreach (var p4k in p4ks)
         {
-            var directoryName = Path.GetDirectoryName(p4k);
-            if (directoryName is null)
+            var install = await GetInstallationInfo(p4k);
+            
+            if (null != install)
             {
-                _logger.LogError("Failed to get directory name for {Path}", p4k);
-                continue;
+                installations.Add(install);
             }
-
-            BuildManifestModel? manifest = null;
-            try
-            {
-                if (File.Exists(Path.Combine(directoryName, BuildManifest)))
-                {
-                    await using var fileStream = File.Open(Path.Combine(directoryName, BuildManifest), FileMode.Open, FileAccess.Read);
-                    manifest = await JsonSerializer.DeserializeAsync<BuildManifestModel>(fileStream);
-                }
-            }
-            catch
-            {
-                //fine to ignore
-            }
-
-            installations.Add(new P4kFileModel
-            {
-                ChannelName = new DirectoryInfo(directoryName).Name,
-                Path = p4k,
-                Manifest = manifest
-            });
         }
 
         return installations;
@@ -168,6 +147,38 @@ public class P4kService : IP4kService
     public Task<IList<P4kFileModel>> FindInstalledFiles()
     {
         return LoadDefaultP4kLocations();
+    }
+
+    public async Task<P4kFileModel?> GetInstallationInfo(string p4kPath)
+    {
+        var directoryName = Path.GetDirectoryName(p4kPath);
+        if (directoryName is null)
+        {
+            _logger.LogError("Failed to get directory name for {Path}", p4kPath);
+            return null;
+        }
+
+        BuildManifestModel? manifest = null;
+        try
+        {
+            if (File.Exists(Path.Combine(directoryName, BuildManifest)))
+            {
+                await using var fileStream = File.Open(Path.Combine(directoryName, BuildManifest), FileMode.Open, FileAccess.Read);
+                manifest = await JsonSerializer.DeserializeAsync<BuildManifestModel>(fileStream);
+            }
+        }
+        catch
+        {
+            //fine to ignore
+        }
+
+        return new P4kFileModel
+        {
+            ChannelName = new DirectoryInfo(directoryName).Name,
+            Path = p4kPath,
+            Manifest = manifest
+        };
+
     }
 
     private Task LoadLangFileIfNeeded()

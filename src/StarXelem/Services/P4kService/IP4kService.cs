@@ -15,6 +15,13 @@ public interface IP4kService
     
     Task OpenP4k(string path, IProgress<double> p4kProgress, IProgress<double> fileSystemProgress);
     Task<IList<P4kFileModel>> FindInstalledFiles();
+    
+    /// <summary>
+    /// Récupère les informations sur une installation de SC via le chemin de son fichier data.p4k
+    /// </summary>
+    /// <param name="p4kPath">Chemin vers le fichier</param>
+    /// <returns>les informations ou null si ce n'est pas une installation valide</returns>
+    Task<P4kFileModel?> GetInstallationInfo(string p4kPath);
 
     /// <summary>
     /// Retourne la valeur texte qui correspond à la clé passée en paramètre

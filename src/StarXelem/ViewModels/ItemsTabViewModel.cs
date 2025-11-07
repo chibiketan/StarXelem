@@ -89,7 +89,11 @@ public partial class ItemsTabViewModel : PageViewModelBase
         }
 
         _p4KService.SelectedP4KFileChanged += OnSelectedP4KFileChanged;
-        _clientService.OnConnectedChanged += (sender, b) => loadItemListCommand?.NotifyCanExecuteChanged();
+        _clientService.OnConnectedChanged += (sender, b) =>
+        {
+            ReloadLocationListCommand?.NotifyCanExecuteChanged();
+            loadItemListCommand?.NotifyCanExecuteChanged();
+        };
         // Initialize filter options for multi-select type filter
         _filterTypeList = new ObservableCollection<FilterTypeOption>(
             Enum.GetValues<EItemType>().Select(t =>
@@ -238,7 +242,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     public bool CanReloadLocationList()
     {
-        return LocationList == null || LocationList.IsCompleted;
+        return _clientService.IsConnected && (LocationList == null || LocationList.IsCompleted);
     }
 
     private void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)
