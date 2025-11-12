@@ -1,5 +1,8 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
+using System.Text;
+using ClosedXML.Excel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -8,6 +11,10 @@ using StarBreaker.DataCoreGenerated;
 using StarXelem.Models;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
+using DateTime = System.DateTime;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Platform.Storage;
 
 namespace StarXelem.ViewModels;
 
@@ -207,8 +214,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
         }
 
         _unfilteredItemList = Task.FromResult<IList<ItemViewModel>>(result);
-        ApplyFilters();
         IsLoading = false;
+        ApplyFilters();
     }
     
     [RelayCommand(CanExecute = nameof(CanResetSelectedTypes))]
@@ -231,6 +238,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         LocationList = LoadLocationList().ContinueWith((t) =>
         {
             Dispatcher.UIThread.InvokeAsync(() => ReloadLocationListCommand.NotifyCanExecuteChanged());
+            Dispatcher.UIThread.InvokeAsync(() => ExportToExcelCommand.NotifyCanExecuteChanged());
             return t.Result;
         })!;
         refreshSelectAllLocation();
@@ -289,6 +297,201 @@ public partial class ItemsTabViewModel : PageViewModelBase
         }
 
         ItemList = Task.FromResult<IList<ItemViewModel>>(filtered.ToList());
+    }
+
+    // Active/désactive le bouton d'export lorsqu'on change la liste
+    partial void OnItemListChanged(Task<IList<ItemViewModel>>? value)
+    {
+        ExportToExcelCommand.NotifyCanExecuteChanged();
+    }
+
+    public bool CanExportToExcel()
+    {
+        try
+        {
+            return !IsLoading && ItemList is { IsCompletedSuccessfully: true, Result.Count: > 0 };
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExportToExcel))]
+    public async Task ExportToExcel()
+    {
+        try
+        {
+            TreatmentStatus = "Export en cours...";
+            var items = ItemList != null ? await ItemList : new List<ItemViewModel>();
+
+            // En-têtes alignés avec les colonnes de la DataGrid
+            string[] headers =
+            [
+                "id",
+                "ownerId",
+                "Nom",
+                "Type technique",
+                "parentUrn",
+                "Stockage",
+                "Nombre élément",
+                "Taille occupée",
+                "Possède une entrée Edge",
+                "type",
+                "sous-type",
+                "Location id",
+                "Location stockage",
+                "location stockage shard",
+                "EDGE Type",
+                "EDGE Location id",
+                "EDGE AttachmentType"
+            ];
+
+            // Préparer la boîte de dialogue "Enregistrer sous"
+            var suggestedName = $"Items_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            string? selectedPath = null;
+
+            var lifetime = Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+            var storageProvider = lifetime?.MainWindow?.StorageProvider;
+
+            if (storageProvider != null)
+            {
+                var fileType = new FilePickerFileType("Classeur Excel")
+                {
+                    Patterns = new[] { "*.xlsx" },
+                    AppleUniformTypeIdentifiers = new[] { "org.openxmlformats.spreadsheetml.sheet" },
+                    MimeTypes = new[] { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
+                };
+
+                var saveResult = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+                {
+                    Title = "Exporter la liste des objets",
+                    SuggestedFileName = suggestedName,
+                    FileTypeChoices = new List<FilePickerFileType> { fileType }
+                });
+
+                if (saveResult == null)
+                {
+                    TreatmentStatus = "Export annulé";
+                    return;
+                }
+
+                // Selon la plateforme, TryGetLocalPath peut être null (ex: sandboxed). On utilisera le stream alors.
+                selectedPath = saveResult.TryGetLocalPath();
+
+                using (var stream = await saveResult.OpenWriteAsync())
+                {
+                    using (var workbook = new XLWorkbook())
+                    {
+                        var ws = workbook.AddWorksheet("Items");
+                        // Write headers
+                        for (int i = 0; i < headers.Length; i++)
+                        {
+                            var cell = ws.Cell(1, i + 1);
+                            cell.Value = headers[i];
+                            cell.Style.Font.Bold = true;
+                            cell.Style.Fill.BackgroundColor = XLColor.FromArgb(242, 242, 242);
+                        }
+
+                        // Write rows
+                        var rowIndex = 2;
+                        foreach (var it in items)
+                        {
+                            var name = await it.Name ?? string.Empty;
+                            var storage = await it.Location ?? string.Empty;
+
+                            ws.Cell(rowIndex, 1).Value = it.Id.ToString();
+                            ws.Cell(rowIndex, 2).Value = it.OwnerId.ToString();
+                            ws.Cell(rowIndex, 3).Value = name;
+                            ws.Cell(rowIndex, 4).Value = it.LocalTypeName ?? string.Empty;
+                            ws.Cell(rowIndex, 5).Value = it.ParentUrn ?? string.Empty;
+                            ws.Cell(rowIndex, 6).Value = storage;
+                            ws.Cell(rowIndex, 7).Value = it.StackSize?.ToString() ?? string.Empty;
+                            ws.Cell(rowIndex, 8).Value = it.EdgeOccupancy?.ToString() ?? string.Empty;
+                            ws.Cell(rowIndex, 9).Value = (it.Edge != null).ToString();
+                            ws.Cell(rowIndex, 10).Value = it.ItemType.ToString();
+                            ws.Cell(rowIndex, 11).Value = it.ItemSubType.ToString();
+                            ws.Cell(rowIndex, 12).Value = it.LocationId.ToString();
+                            ws.Cell(rowIndex, 13).Value = it.StowLocation ?? string.Empty;
+                            ws.Cell(rowIndex, 14).Value = it.StowShard ?? string.Empty;
+                            ws.Cell(rowIndex, 15).Value = it.EdgeType?.ToString() ?? string.Empty;
+                            ws.Cell(rowIndex, 16).Value = it.EdgeLocation ?? string.Empty;
+                            ws.Cell(rowIndex, 17).Value = it.EdgeAttachmentType?.ToString() ?? string.Empty;
+
+                            rowIndex++;
+                        }
+
+                        // Format: auto filter + auto fit columns
+                        var range = ws.Range(1, 1, Math.Max(1, ws.LastRowUsed()?.RowNumber() ?? 1), headers.Length);
+                        range.SetAutoFilter();
+                        ws.Columns(1, headers.Length).AdjustToContents();
+
+                        workbook.SaveAs(stream);
+                    }
+                }
+
+                TreatmentStatus = selectedPath != null ? $"Exporté: {selectedPath}" : "Export terminé";
+                return;
+            }
+
+            // Fallback: enregistrer automatiquement dans Documents si StorageProvider indisponible (rare)
+            var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            var path = Path.Combine(documents, suggestedName);
+
+            using (var workbook = new XLWorkbook())
+            {
+                var ws = workbook.AddWorksheet("Items");
+                // Write headers
+                for (int i = 0; i < headers.Length; i++)
+                {
+                    var cell = ws.Cell(1, i + 1);
+                    cell.Value = headers[i];
+                    cell.Style.Font.Bold = true;
+                    cell.Style.Fill.BackgroundColor = XLColor.FromArgb(242, 242, 242);
+                }
+
+                // Write rows
+                var rowIndex = 2;
+                foreach (var it in items)
+                {
+                    var name = await it.Name ?? string.Empty;
+                    var storage = await it.Location ?? string.Empty;
+
+                    ws.Cell(rowIndex, 1).Value = it.Id.ToString();
+                    ws.Cell(rowIndex, 2).Value = it.OwnerId.ToString();
+                    ws.Cell(rowIndex, 3).Value = name;
+                    ws.Cell(rowIndex, 4).Value = it.LocalTypeName ?? string.Empty;
+                    ws.Cell(rowIndex, 5).Value = it.ParentUrn ?? string.Empty;
+                    ws.Cell(rowIndex, 6).Value = storage;
+                    ws.Cell(rowIndex, 7).Value = it.StackSize?.ToString() ?? string.Empty;
+                    ws.Cell(rowIndex, 8).Value = it.EdgeOccupancy?.ToString() ?? string.Empty;
+                    ws.Cell(rowIndex, 9).Value = (it.Edge != null).ToString();
+                    ws.Cell(rowIndex, 10).Value = it.ItemType.ToString();
+                    ws.Cell(rowIndex, 11).Value = it.ItemSubType.ToString();
+                    ws.Cell(rowIndex, 12).Value = it.LocationId.ToString();
+                    ws.Cell(rowIndex, 13).Value = it.StowLocation ?? string.Empty;
+                    ws.Cell(rowIndex, 14).Value = it.StowShard ?? string.Empty;
+                    ws.Cell(rowIndex, 15).Value = it.EdgeType?.ToString() ?? string.Empty;
+                    ws.Cell(rowIndex, 16).Value = it.EdgeLocation ?? string.Empty;
+                    ws.Cell(rowIndex, 17).Value = it.EdgeAttachmentType?.ToString() ?? string.Empty;
+
+                    rowIndex++;
+                }
+
+                // Format: auto filter + auto fit columns
+                var range = ws.Range(1, 1, Math.Max(1, ws.LastRowUsed()?.RowNumber() ?? 1), headers.Length);
+                range.SetAutoFilter();
+                ws.Columns(1, headers.Length).AdjustToContents();
+
+                workbook.SaveAs(path);
+            }
+
+            TreatmentStatus = $"Exporté: {path}";
+        }
+        catch (Exception ex)
+        {
+            TreatmentStatus = $"Erreur export: {ex.Message}";
+        }
     }
 
     private async void refreshSelectAllLocation()

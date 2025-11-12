@@ -102,7 +102,10 @@
             </StackPanel>
         </Expander>
         <Label Grid.Row="2" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" Content="{Binding TreatmentStatus}" Margin="30,0,0,0" />
-        <Label Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Right" Content="{Binding ItemList^.Count, FallbackValue='Vide', StringFormat='{}{0} élément(s) trouvé(s)'}" Margin="0,0,30,0" />
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0" Spacing="10">
+            <Label Content="{Binding ItemList^.Count, FallbackValue='Vide', StringFormat='{}{0} élément(s) trouvé(s)'}"/>
+            <Button Command="{Binding ExportToExcelCommand}">Exporter Excel</Button>
+        </StackPanel>
         <DataGrid Grid.Row="3" ItemsSource="{Binding ItemList^}" SelectedItem="{Binding SelectedItem}" Margin="0,5,0,0">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="id" Binding="{Binding Id}" />
