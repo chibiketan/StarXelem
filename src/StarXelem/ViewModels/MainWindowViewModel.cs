@@ -12,6 +12,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
 using StarXelem.Models;
 using StarXelem.Services;
 
@@ -22,6 +23,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IP4kService _p4kService;
     private readonly IGrpcClientService _grpcClientService;
+    private const string RegistryBasePath = "Software\\StarXelem";
+    private const string RegistryValueName = "P4KFolder";
 
     [ObservableProperty]
     private Task<IList<P4kFileModel>> _installedEnvs;
@@ -38,10 +41,13 @@ public partial class MainWindowViewModel : ViewModelBase
         InstalledEnvs = p4kService.FindInstalledFiles();
         InstalledEnvs.ContinueWith(async x =>
         {
+            // Charge le chemin depuis le registre au démarrage
+            await LoadP4kFromRegistryAsync();
+
             var list = await x;
 
             await Dispatcher.UIThread.InvokeAsync(() =>
-            {
+            {   
                 SelectedP4kFile = list?.FirstOrDefault();
             });
         });
@@ -131,6 +137,80 @@ public partial class MainWindowViewModel : ViewModelBase
                     newList.Add(infos);
                     InstalledEnvs = Task.FromResult<IList<P4kFileModel>>(newList);
                     SelectedP4kFile = infos;
+                    // Sauvegarde du dossier dans le registre
+                    SaveP4kFolderToRegistry(Path.GetFullPath(infos.Path));
+                }
+                else
+                {
+                    SelectedP4kFile = existing;
+                }
+
+            }
+            catch
+            {
+                var list = await InstalledEnvs;
+                list ??= new List<P4kFileModel>();
+
+                var newList = list.ToList();
+                newList.Add(infos);
+                InstalledEnvs = Task.FromResult<IList<P4kFileModel>>(newList);
+                SelectedP4kFile = infos;
+                // Sauvegarde du dossier dans le registre
+                SaveP4kFolderToRegistry(Path.GetFullPath(infos.Path));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erreur lors de la sélection du fichier Data.p4k");
+        }
+    }
+    
+    private void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)
+    {
+        // Le fichier a été modifié, reconnexion
+        _grpcClientService.InitClient(e);
+    }
+
+    private void SaveP4kFolderToRegistry(string folderPath)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(RegistryBasePath);
+            key?.SetValue(RegistryValueName, folderPath, RegistryValueKind.String);
+        }
+        catch (Exception ex)
+        {
+            // Ignorer les erreurs d'accès au registre pour ne pas bloquer l'utilisateur
+            _logger.LogWarning(ex, "Impossible de charger le dossier P4K depuis le registre");
+
+        }
+    }
+
+    private async Task LoadP4kFromRegistryAsync()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RegistryBasePath);
+            var dataP4kPath = key?.GetValue(RegistryValueName) as string;
+            if (string.IsNullOrWhiteSpace(dataP4kPath))
+                return;
+
+            var infos = await _p4kService.GetInstallationInfo(dataP4kPath);
+            if (infos == null || infos.Manifest == null)
+                return;
+
+            try
+            {
+                var list = await InstalledEnvs;
+                list ??= new List<P4kFileModel>();
+
+                var existing = list.FirstOrDefault(x => string.Equals(Path.GetFullPath(x.Path), Path.GetFullPath(infos.Path), StringComparison.OrdinalIgnoreCase));
+                if (existing == null)
+                {
+                    var newList = list.ToList();
+                    newList.Add(infos);
+                    InstalledEnvs = Task.FromResult<IList<P4kFileModel>>(newList);
+                    SelectedP4kFile = infos;
                 }
                 else
                 {
@@ -144,13 +224,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Erreur lors de la sélection du fichier Data.p4k");
+            _logger.LogWarning(ex, "Impossible de charger le dossier P4K depuis le registre");
         }
-    }
-    
-    private void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)
-    {
-        // Le fichier a été modifié, reconnexion
-        _grpcClientService.InitClient(e);
     }
 }
