@@ -14,6 +14,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="AsyncImageLoader.Avalonia" Version="3.4.3" />
         <PackageReference Include="Avalonia" Version="11.3.6"/>
         <PackageReference Include="Avalonia.Desktop" Version="11.3.6"/>
         <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.6"/>
@@ -43,6 +44,10 @@
     <ItemGroup>
       <Compile Update="Views\ContainerTabView.axaml.cs">
         <DependentUpon>ContainerTabView.axaml</DependentUpon>
+        <SubType>Code</SubType>
+      </Compile>
+      <Compile Update="Views\FriendListTabView.axaml.cs">
+        <DependentUpon>FriendListTabView.axaml</DependentUpon>
         <SubType>Code</SubType>
       </Compile>
     </ItemGroup>

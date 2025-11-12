@@ -1,0 +1,47 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels"
+             xmlns:local="clr-namespace:StarXelem"
+             xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:DataType="vm:FriendListTabViewModel"
+             d:DataContext="{x:Static local:DesignData.FriendListTabViewModel}"
+             x:Class="StarXelem.Views.FriendListTabView">
+    <Grid RowDefinitions="50,*">
+        <Grid Grid.Row="0" ColumnSpacing="15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Command="{Binding LoadShipListCommand}">Récupérer la liste des amis</Button>
+            <CheckBox Grid.Column="1" IsChecked="{Binding OnlyConnected}" >Afficher uniquement les amis connectés</CheckBox>
+            <Label Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" IsVisible="{Binding IsLoading}" Content="{Binding TreatmentStatus}" />
+        </Grid>
+        <Grid Grid.Row="1">
+            <DataGrid  ItemsSource="{Binding FilteredFriendList}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="All" >
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="Avatar">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Image asyncImageLoader:ImageLoader.Source="{Binding AvatarUrl}" MaxWidth="150" MaxHeight="150"></Image>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Pseudo" Binding="{Binding DisplayName}" />
+                    <DataGridTextColumn Header="Nom du compte" Binding="{Binding TokenName}" />
+                    <DataGridCheckBoxColumn Header="Est connecté" Binding="{Binding IsConnected}"  />
+                    <!-- <DataGridCheckBoxColumn Header="Est en jeu" Binding="{Binding IsInGame}" /> -->
+                    <DataGridTextColumn Header="Status" Binding="{Binding  Activity}" />
+                    <DataGridTextColumn Header="Shard" Binding="{Binding ShardId^, FallbackValue=Chargement}" />
+                    <DataGridTextColumn Header="Nb joueur" Binding="{Binding ShardPlayerCount^}" />
+                    <DataGridTextColumn Header="Nb joueur Total" Binding="{Binding ShardTotalPlayers^}" />
+                    <!-- <DataGridTextColumn Header="Shard lieu" Binding="{Binding ShardLocation^}" /> -->
+                    
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+    </Grid>
+</UserControl>

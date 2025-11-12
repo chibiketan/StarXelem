@@ -1,5 +1,7 @@
-﻿using Sc.External.Services.Entitlement.V1;
+﻿using Sc.External.Common.Shard.V1;
+using Sc.External.Services.Entitlement.V1;
 using Sc.External.Services.Entitygraph.V1;
+using Sc.External.Services.Friends.V1;
 using StarXelem.Models;
 using StarXelem.Services;
 
@@ -72,4 +74,26 @@ public class DesignGrpcClientService : IGrpcClientService
     }
 
     public bool IsConnected => true;
+    public Task<IList<Friend>> GetFriendList()
+    {
+        return Task.FromResult<IList<Friend>>(new List<Friend>
+        {
+            new()
+            {
+                Account = new()
+                {
+                    AccountId = 1,
+                    AvatarUrl = "",
+                    DisplayName = "Test 1",
+                    Nickname = "Nick 1",
+                    PlayerId = 1
+                }
+            }
+        });
+    }
+
+    public Task<ShardInfo> GetShardInfo(uint accountId)
+    {
+        return Task.FromResult(new ShardInfo());
+    }
 }

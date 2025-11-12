@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ShipTabViewModel>();
         services.AddTransient<ItemsTabViewModel>();
         services.AddTransient<ContainerTabViewModel>();
+        services.AddTransient<FriendListTabViewModel>();
 
         if (isDesignMode)
         {

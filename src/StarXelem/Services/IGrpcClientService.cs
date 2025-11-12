@@ -1,4 +1,6 @@
-﻿using Sc.External.Services.Entitygraph.V1;
+﻿using Sc.External.Common.Shard.V1;
+using Sc.External.Services.Entitygraph.V1;
+using Sc.External.Services.Friends.V1;
 using StarXelem.Models;
 
 namespace StarXelem.Services;
@@ -19,4 +21,6 @@ public interface IGrpcClientService
     Task<IList<InventoryNodeProperties>> QueryInventories();
     Task TestRequest();
     bool IsConnected { get; }
+    Task<IList<Friend>> GetFriendList();
+    Task<ShardInfo> GetShardInfo(uint accountId);
 }

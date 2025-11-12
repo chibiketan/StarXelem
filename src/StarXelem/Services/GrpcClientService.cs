@@ -3,8 +3,10 @@ using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using Sc.External.Common.Api.V1;
+using Sc.External.Common.Shard.V1;
 using Sc.External.Services.Entitlement.V1;
 using Sc.External.Services.Entitygraph.V1;
+using Sc.External.Services.Friends.V1;
 using Sc.External.Services.Identity.V1;
 using Sc.Internal.Services.Entitlement.V1;
 using Sc.Internal.Services.MissionLocation.V1;
@@ -1032,6 +1034,29 @@ public class GrpcClientService : IGrpcClientService
     }
     
     public bool IsConnected { get; private set; }
+
+    public async Task<IList<Friend>> GetFriendList()
+    {
+        var service = new FriendService.FriendServiceClient(_channel);
+        
+        var response = await service.GetFriendListAsync(new GetFriendListRequest(), _authHeaders);
+
+        return response.Friends;
+    }
+
+    public async Task<ShardInfo> GetShardInfo(uint accountId)
+    {
+        var request = new GetShardInfoRequest();
+        
+        request.AccountId = accountId;
+        
+        var service = new FriendService.FriendServiceClient(_channel);
+        
+        var response = await service.GetShardInfoAsync(request, _authHeaders);
+
+        return response.ShardInfo;
+    }
+    
 
     private void CleanWatch()
     {
