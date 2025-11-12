@@ -1,4 +1,5 @@
-﻿using Sc.External.Services.Entitygraph.V1;
+﻿using System.Collections.Concurrent;
+using Sc.External.Services.Entitygraph.V1;
 using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarBreaker.P4k;
@@ -12,13 +13,16 @@ public class ItemViewModel : ViewModelBase
 {
     private readonly IP4kService _p4KFileService;
     private readonly ILocationService _locationService;
+    private readonly IGrpcClientService _grpcClientService;
     private readonly ItemsTabViewModel _parent;
     private readonly EntityItemQueryResult _entityNodeProperties;
     private readonly DataCoreTypedRecord? _entityClassProperties;
     private readonly System.Lazy<Task<string?>> _location;
+    public readonly Lazy<Task<string>> _owner;
 
     public ulong Id => _entityNodeProperties.EntityNodeProperties.Geid;
     public ulong OwnerId => _entityNodeProperties.EntityNodeProperties.OwnerId;
+    public Task<string> Owner => _owner.Value;
     public string ParentUrn => _entityNodeProperties.EntityNodeProperties.ParentUrn;
     public EItemType ItemType => (EItemType)_entityNodeProperties.EntityNodeProperties.ItemTypeEnum;
     public EItemSubType ItemSubType => (EItemSubType)_entityNodeProperties.EntityNodeProperties.ItemSubTypeEnum;
@@ -39,16 +43,18 @@ public class ItemViewModel : ViewModelBase
 //    public string? TypeName => _entityClassProperties?.ClassName;
     public Task<string?> Name => GetLocaleValue();
     
-    public ItemViewModel(IP4kService p4kFileService, ILocationService locationService, ItemsTabViewModel parent, EntityItemQueryResult entityItemResult, DataCoreTypedRecord? entityClassProperties = null)
+    public ItemViewModel(IP4kService p4kFileService, ILocationService locationService, IGrpcClientService grpcClientService, ItemsTabViewModel parent, EntityItemQueryResult entityItemResult, DataCoreTypedRecord? entityClassProperties = null)
     {
         _p4KFileService = p4kFileService;
         _locationService = locationService;
+        _grpcClientService = grpcClientService;
         _parent = parent;
         _entityNodeProperties = entityItemResult;
         _entityClassProperties = entityClassProperties;
-        _location = new System.Lazy<Task<string?>>(
+        _location = new Lazy<Task<string?>>(
             () => _locationService.ResolveLocation(_entityNodeProperties)
         );
+        _owner = new Lazy<Task<string>>(() => _playerNames.GetOrAdd(OwnerId, GetOwner));
     }
 
     private async Task<string?> GetLocaleValue()
@@ -63,4 +69,30 @@ public class ItemViewModel : ViewModelBase
 
         return null;
     }
+
+    private async Task<string> GetOwner(ulong ownerId)
+    {
+        if (0 == ownerId)
+        {
+            return "Aucun [0]";
+        }
+
+        // CancellationTokenSource cts = new();
+        // cts.CancelAfter(TimeSpan.FromSeconds(5));
+        //var name = await _grpcClientService.GetPlayerName(ownerId).WaitAsync(cts.Token);
+        try
+        {
+            CancellationTokenSource cts = new();
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            var name = await _grpcClientService.GetPlayerName(ownerId).WaitAsync(TimeSpan.FromSeconds(5), cts.Token);
+
+            return $"{(String.IsNullOrEmpty(name) ? "Inconnu" : name)} [{ownerId}]";
+        }
+        catch
+        {
+            return $"ERREUR [{ownerId}]";
+        }
+    }
+    
+    private static ConcurrentDictionary<ulong, Task<string?>> _playerNames = new();
 }

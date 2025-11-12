@@ -210,7 +210,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         foreach (var item in itemList)
         {
             var claddType = await _p4KService.GetEntityType(item.EntityNodeProperties.ClassGuidCrc);
-            result.Add(new ItemViewModel(_p4KService, _locationService, this, item, claddType));
+            result.Add(new ItemViewModel(_p4KService, _locationService, _clientService, this, item, claddType));
         }
 
         _unfilteredItemList = Task.FromResult<IList<ItemViewModel>>(result);
@@ -329,7 +329,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
             string[] headers =
             [
                 "id",
-                "ownerId",
+                "Possesseur",
                 "Nom",
                 "Type technique",
                 "parentUrn",
@@ -399,9 +399,10 @@ public partial class ItemsTabViewModel : PageViewModelBase
                         {
                             var name = await it.Name ?? string.Empty;
                             var storage = await it.Location ?? string.Empty;
+                            var owner = await it.Owner;
 
                             ws.Cell(rowIndex, 1).Value = it.Id.ToString();
-                            ws.Cell(rowIndex, 2).Value = it.OwnerId.ToString();
+                            ws.Cell(rowIndex, 2).Value = owner;
                             ws.Cell(rowIndex, 3).Value = name;
                             ws.Cell(rowIndex, 4).Value = it.LocalTypeName ?? string.Empty;
                             ws.Cell(rowIndex, 5).Value = it.ParentUrn ?? string.Empty;
@@ -456,9 +457,10 @@ public partial class ItemsTabViewModel : PageViewModelBase
                 {
                     var name = await it.Name ?? string.Empty;
                     var storage = await it.Location ?? string.Empty;
+                    var owner = await it.Owner;
 
                     ws.Cell(rowIndex, 1).Value = it.Id.ToString();
-                    ws.Cell(rowIndex, 2).Value = it.OwnerId.ToString();
+                    ws.Cell(rowIndex, 2).Value = owner;
                     ws.Cell(rowIndex, 3).Value = name;
                     ws.Cell(rowIndex, 4).Value = it.LocalTypeName ?? string.Empty;
                     ws.Cell(rowIndex, 5).Value = it.ParentUrn ?? string.Empty;

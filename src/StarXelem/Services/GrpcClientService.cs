@@ -55,7 +55,10 @@ public class GrpcClientService : IGrpcClientService
         var currentPlayer = await identityClient.GetCurrentPlayerAsync(new GetCurrentPlayerRequest(), new Metadata { { "Authorization", $"Bearer {loginData.AuthToken}" } });
         
         _playerInfo = currentPlayer;
-        _authHeaders = new Metadata { { "Authorization", $"Bearer {currentPlayer.Jwt}" } };
+        _authHeaders = new Metadata { 
+            { "Authorization", $"Bearer {currentPlayer.Jwt}" },
+            { "grpc-timeout", "10S" }
+        };
         _logger.LogDebug("player jwt : {jwt}", currentPlayer.Jwt);
         IsConnected = true;
         OnConnectedChanged?.Invoke(this, IsConnected);
@@ -191,7 +194,7 @@ public class GrpcClientService : IGrpcClientService
             
         // Appel réel
         Console.WriteLine($"{DateTime.Now} avant la requête");
-        var response = await entitlementServiceClient.QueryAsync(request, _authHeaders);
+        var response = await entitlementServiceClient.QueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
             Console.WriteLine($"{DateTime.Now} après la requête, {response.Results.Count} résultats");
 
         var results = response.Results.Select(r => new SpaceshipModel(r)).ToList();
@@ -424,7 +427,7 @@ public class GrpcClientService : IGrpcClientService
                 request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
             }
 
-            response = await service.EntityQueryAsync(request, _authHeaders);
+            response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
             
             // foreach (var entityClass in response.Body.EntityClasses)
             // {
@@ -560,7 +563,7 @@ public class GrpcClientService : IGrpcClientService
                 }
             }
         };
-        var response = await service.EntityQueryAsync(request, _authHeaders);
+        var response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
 
         return response.Body.Results.Nodes.Select(n => n.Properties.EntityProperties).ToList();
     }
@@ -626,7 +629,7 @@ public class GrpcClientService : IGrpcClientService
                 }
             }
         };
-        var response = await service.EntityQueryAsync(request, _authHeaders);
+        var response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
 
         return response.Body.Results.Nodes.Select(n => n.Properties.EntityProperties).ToList();
     }
@@ -680,7 +683,7 @@ public class GrpcClientService : IGrpcClientService
             }
         };
         
-        var response = await service.GetEntityStowContextsAsync(request, _authHeaders);
+        var response = await service.GetEntityStowContextsAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
 
         return response.Body.Results;
     }
@@ -715,7 +718,7 @@ public class GrpcClientService : IGrpcClientService
             }
         };
         
-        var response = await service.GetEntityStowContextsAsync(request, _authHeaders);
+        var response = await service.GetEntityStowContextsAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
 
         return response.Body.Results;
     }
@@ -777,7 +780,7 @@ public class GrpcClientService : IGrpcClientService
                 request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
             }
             
-            response = await service.InventoryQueryAsync(request, _authHeaders);
+            response = await service.InventoryQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
             result.AddRange(response.Body.Results);
         } while (response.Body.PageInfo.HasNextPage);
 
@@ -796,7 +799,7 @@ public class GrpcClientService : IGrpcClientService
         };
         
         var service = new EntityGraphService.EntityGraphServiceClient(_channel);
-        var response = await service.GetInventoriesAsync(request, _authHeaders);
+        var response = await service.GetInventoriesAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
 
         return response.Body.Inventories.Select( n => n.Properties.InventoryProperties).ToList();
     }
@@ -857,7 +860,7 @@ public class GrpcClientService : IGrpcClientService
         
       
         var service = new EntityGraphService.EntityGraphServiceClient(_channel);
-        var responseContainer = await service.ContainerQueryAsync(requestContainer, _authHeaders);
+        var responseContainer = await service.ContainerQueryAsync(requestContainer, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
         return;
         //responseContainer.Body.Results.Nodes.First().Properties.
         
@@ -1001,12 +1004,44 @@ public class GrpcClientService : IGrpcClientService
         };
         
 
-        var responseStow = await service.GetEntityStowContextsAsync(stowRequest, _authHeaders);
+        var responseStow = await service.GetEntityStowContextsAsync(stowRequest, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
         
         Console.Write("hello");
     }
 
-    
+
+    public async Task<string?> GetPlayerName(ulong playerId)
+    {
+        var request = new GetPlayersNamesRequest
+        {
+            PlayerGeids = { playerId }
+        };
+        
+        
+        using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var service = new IdentityService.IdentityServiceClient(_channel);
+        var response = service.GetPlayersNamesAsync(request, headers: _authHeaders, cancellationToken: cts.Token, deadline: DateTime.UtcNow.AddSeconds(1));
+        using var cancelTask = Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
+
+        try
+        {
+            _ = await Task.WhenAny(cancelTask, response.ResponseAsync).ConfigureAwait(false);
+            if (!response.ResponseAsync.IsCompletedSuccessfully)
+            {
+                // On a timeout, retour de null
+                return null;
+            }
+
+            await cts.CancelAsync();
+            var names = await response;
+            return (names.Names.FirstOrDefault() ?? new GetPlayersNamesResponse.Types.PlayerName()).Name;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error while getting player name");
+            return null;
+        }
+    }
     
     public async Task<IList<Node>> QueryInventoryBisById(String id)
     {
@@ -1028,7 +1063,7 @@ public class GrpcClientService : IGrpcClientService
         };
         
         
-        var response = await service.GetInventoriesAsync(request, _authHeaders);
+        var response = await service.GetInventoriesAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
 
         return response.Body.Inventories;
     }
@@ -1039,7 +1074,7 @@ public class GrpcClientService : IGrpcClientService
     {
         var service = new FriendService.FriendServiceClient(_channel);
         
-        var response = await service.GetFriendListAsync(new GetFriendListRequest(), _authHeaders);
+        var response = await service.GetFriendListAsync(new GetFriendListRequest(), _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
 
         return response.Friends;
     }
@@ -1052,7 +1087,7 @@ public class GrpcClientService : IGrpcClientService
         
         var service = new FriendService.FriendServiceClient(_channel);
         
-        var response = await service.GetShardInfoAsync(request, _authHeaders);
+        var response = await service.GetShardInfoAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
 
         return response.ShardInfo;
     }

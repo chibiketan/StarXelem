@@ -17,6 +17,7 @@ public interface IGrpcClientService
     Task<IList<EntityStowContext>> QueryStowContextByGeidList(IList<ulong> geidList);
     Task<IList<EntityStowContext>> QueryStowContextByOwnerId(ulong ownerId);
     Task<IList<Inventory>> QueryInventoryById(String id);
+    Task<string?> GetPlayerName(ulong playerId);
     Task<IList<Node>> QueryInventoryBisById(String id);
     Task<IList<InventoryNodeProperties>> QueryInventories();
     Task TestRequest();

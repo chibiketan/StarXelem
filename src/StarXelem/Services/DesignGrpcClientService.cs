@@ -58,6 +58,11 @@ public class DesignGrpcClientService : IGrpcClientService
         return Task.FromResult<IList<Inventory>>(new List<Inventory>());
     }
 
+    public Task<string?> GetPlayerName(ulong playerId)
+    {
+        return Task.FromResult($"TestPlayer:{playerId}");
+    }
+
     public Task<IList<Node>> QueryInventoryBisById(String id)
     {
         return Task.FromResult<IList<Node>>(new List<Node>());
