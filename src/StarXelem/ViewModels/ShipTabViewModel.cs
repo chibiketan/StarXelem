@@ -33,11 +33,6 @@ public partial class ShipTabViewModel : PageViewModelBase
         _p4KService = p4kService;
         _locationService = locationService;
 
-        if (null != _p4KService.SelectedP4KFile)
-        {
-            _clientService.InitClient(_p4KService.SelectedP4KFile);
-        }
-
         _p4KService.SelectedP4KFileChanged += OnSelectedP4KFileChanged;
         _clientService.OnConnectedChanged += (sender, b) => loadShipListCommand?.NotifyCanExecuteChanged();
     }
@@ -181,6 +176,5 @@ public partial class ShipTabViewModel : PageViewModelBase
     {
         // Le fichier a été modifié, on change tout, reconnexion en prime
         LoadShipListCommand.NotifyCanExecuteChanged();
-        _clientService.InitClient(e);
     }
 }

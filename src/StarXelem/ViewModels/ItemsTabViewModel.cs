@@ -83,12 +83,6 @@ public partial class ItemsTabViewModel : PageViewModelBase
         _p4KService = p4kService;
         _locationService = locationService;
 
-        if (null != _p4KService.SelectedP4KFile)
-        {
-            _clientService.InitClient(_p4KService.SelectedP4KFile);
-        }
-
-        _p4KService.SelectedP4KFileChanged += OnSelectedP4KFileChanged;
         _clientService.OnConnectedChanged += (sender, b) =>
         {
             ReloadLocationListCommand?.NotifyCanExecuteChanged();
@@ -243,12 +237,6 @@ public partial class ItemsTabViewModel : PageViewModelBase
     public bool CanReloadLocationList()
     {
         return _clientService.IsConnected && (LocationList == null || LocationList.IsCompleted);
-    }
-
-    private void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)
-    {
-        // Le fichier a été modifié, on change tout, reconnexion en prime
-        _clientService.InitClient(e);
     }
 
     partial void OnNameFilterChanged(string value)

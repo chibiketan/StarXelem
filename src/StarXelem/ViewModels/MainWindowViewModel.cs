@@ -21,6 +21,8 @@ public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IP4kService _p4kService;
+    private readonly IGrpcClientService _grpcClientService;
+
     [ObservableProperty]
     private Task<IList<P4kFileModel>> _installedEnvs;
     [ObservableProperty]
@@ -28,10 +30,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public IAsyncRelayCommand OpenDataP4kCommand { get; }
     
-    public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IP4kService p4kService)
+    public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IP4kService p4kService, IGrpcClientService grpcClientService)
     {
         _logger = logger;
         _p4kService = p4kService;
+        _grpcClientService = grpcClientService;
         InstalledEnvs = p4kService.FindInstalledFiles();
         InstalledEnvs.ContinueWith(async x =>
         {
@@ -53,6 +56,13 @@ public partial class MainWindowViewModel : ViewModelBase
         CurrentPage = _pages.First();
 
         OpenDataP4kCommand = new AsyncRelayCommand<object?>(OpenDataP4kAsync);
+        if (null != _p4kService.SelectedP4KFile)
+        {
+            _grpcClientService.InitClient(_p4kService.SelectedP4KFile);
+        }
+
+        _p4kService.SelectedP4KFileChanged += OnSelectedP4KFileChanged;
+
     }
     
     [ObservableProperty]
@@ -136,5 +146,11 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             _logger.LogError(ex, "Erreur lors de la sélection du fichier Data.p4k");
         }
+    }
+    
+    private void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)
+    {
+        // Le fichier a été modifié, reconnexion
+        _grpcClientService.InitClient(e);
     }
 }

@@ -182,7 +182,8 @@ public class LocationService : ILocationService
         DUDLEY_AND_DAUGHTERS = 1309454298,
         RAT_S_NEST = 660982239,
         RUIN_STATION = 2026442305,
-        CRU_L1 = 1510935576
+        CRU_L1 = 1510935576,
+        WICKELO_MICROTECH = 48776985
     }
     
     enum ELocationType
