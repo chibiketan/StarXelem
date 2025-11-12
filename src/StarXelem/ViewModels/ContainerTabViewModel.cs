@@ -40,12 +40,6 @@ public partial class ContainerTabViewModel : PageViewModelBase
         IsLoading = false;
     }
 
-    private ulong StowLocationToGeid(string urn)
-    {
-        var parts = urn.Split("Location:", 2, StringSplitOptions.TrimEntries);
-        return ulong.Parse(parts[1]);
-    }
-
     public bool CanLoadShipList()
     {
         return _clientService.IsConnected && !IsLoading;

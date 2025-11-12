@@ -87,6 +87,16 @@ public partial class ItemsTabViewModel : PageViewModelBase
         {
             ReloadLocationListCommand?.NotifyCanExecuteChanged();
             loadItemListCommand?.NotifyCanExecuteChanged();
+            if (b)
+            {
+                ReloadLocationList();
+            }
+            else
+            {
+                // Perte de connexion, on efface la liste des conteneurs
+                LocationList = Task.FromResult<IList<FilterLocationOptionModel>?>(new List<FilterLocationOptionModel>());
+                refreshSelectAllLocation();
+            }
         };
         // Initialize filter options for multi-select type filter
         _filterTypeList = new ObservableCollection<FilterTypeOption>(
@@ -113,6 +123,11 @@ public partial class ItemsTabViewModel : PageViewModelBase
         
         // TODO for testing purpose
         //SearchTypeList.First(t => t.Type == EItemType.Drink).IsSelected = true;
+
+        if (clientService.IsConnected)
+        {
+            ReloadLocationList();
+        }
     }
     
     private void OnFilterTypeOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)
