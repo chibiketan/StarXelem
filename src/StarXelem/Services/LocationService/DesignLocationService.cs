@@ -13,4 +13,8 @@ public class DesignLocationService : ILocationService
     {
         return Task.FromResult<string?>("ResolveLocation");
     }
+
+    public void ClearCache()
+    {
+    }
 }

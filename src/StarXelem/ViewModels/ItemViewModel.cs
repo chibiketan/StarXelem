@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using CommunityToolkit.Mvvm.ComponentModel;
 using Sc.External.Services.Entitygraph.V1;
 using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
@@ -9,7 +10,7 @@ using StarXelem.ViewModels;
 
 namespace StarXelem.Models;
 
-public class ItemViewModel : ViewModelBase
+public partial class ItemViewModel : ViewModelBase
 {
     private readonly IP4kService _p4KFileService;
     private readonly ILocationService _locationService;
@@ -51,9 +52,11 @@ public class ItemViewModel : ViewModelBase
         _parent = parent;
         _entityNodeProperties = entityItemResult;
         _entityClassProperties = entityClassProperties;
-        _location = new Lazy<Task<string?>>(
-            () => _locationService.ResolveLocation(_entityNodeProperties)
-        );
+        _location = new Lazy<Task<string?>>(() => GetLocation().ContinueWith(t =>
+        {
+            OnPropertyChanged(nameof(Location));
+            return t.Result;
+        }));
         _owner = new Lazy<Task<string>>(() => _playerNames.GetOrAdd(OwnerId, GetOwner));
     }
 
@@ -77,9 +80,6 @@ public class ItemViewModel : ViewModelBase
             return "Aucun [0]";
         }
 
-        // CancellationTokenSource cts = new();
-        // cts.CancelAfter(TimeSpan.FromSeconds(5));
-        //var name = await _grpcClientService.GetPlayerName(ownerId).WaitAsync(cts.Token);
         try
         {
             CancellationTokenSource cts = new();
@@ -92,6 +92,12 @@ public class ItemViewModel : ViewModelBase
         {
             return $"ERREUR [{ownerId}]";
         }
+    }
+
+    private async Task<string?> GetLocation()
+    {
+        return await _locationService.ResolveLocation(_entityNodeProperties).ConfigureAwait(false);
+        
     }
     
     private static ConcurrentDictionary<ulong, Task<string?>> _playerNames = new();

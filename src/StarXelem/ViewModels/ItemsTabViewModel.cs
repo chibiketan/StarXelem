@@ -179,6 +179,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     public async Task LoadItemList()
     {
         IsLoading = true;
+        _locationService.ClearCache();
         TreatmentStatus = "Appel RSI";
      
         var searchQuery = new ItemQueryModel();

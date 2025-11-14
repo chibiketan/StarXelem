@@ -120,3 +120,55 @@ public sealed class MicroScuConverter : IValueConverter
         return s;
     }
 }
+
+public sealed class TaskIsFinishedConverter : IValueConverter
+{
+    // Converts a Task to a boolean indicating whether it has completed successfully.
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var task = value as Task;
+        if (task == null)
+            return null;
+
+        try
+        {
+            return task.IsCompleted;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+
+}
+
+public sealed class TaskIsNotFinishedConverter : IValueConverter
+{
+    // Converts a Task to a boolean indicating whether it has completed successfully.
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var task = value as Task;
+        if (task == null)
+            return null;
+
+        try
+        {
+            return !task.IsCompleted;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+
+}

@@ -18,11 +18,13 @@ using EntitlementItemType = Sc.External.Services.Entitlement.V1.EntitlementItemT
 using EntityFilter = Sc.External.Services.Entitygraph.V1.EntityFilter;
 using PropertyFilter = Sc.External.Common.Api.V1.PropertyFilter;
 using QueryRequest = Sc.Internal.Services.Entitlement.V1.QueryRequest;
+using QueryResponse = Sc.Internal.Services.Entitlement.V1.QueryResponse;
 
 namespace StarXelem.Services;
 
 public class GrpcClientService : IGrpcClientService
 {
+    private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1, 1);
     private readonly ILogger<GrpcClientService> _logger;
     private StarCitizenClientWatcher? _watcher;
     private GetCurrentPlayerResponse? _playerInfo;
@@ -194,8 +196,19 @@ public class GrpcClientService : IGrpcClientService
             
         // Appel réel
         Console.WriteLine($"{DateTime.Now} avant la requête");
-        var response = await entitlementServiceClient.QueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
-            Console.WriteLine($"{DateTime.Now} après la requête, {response.Results.Count} résultats");
+        await semaphoreSlim.WaitAsync();
+        QueryResponse response;
+        try
+        {
+            response = await entitlementServiceClient.QueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        }
+        finally
+        {
+            semaphoreSlim.Release();
+        }
+        
+        Console.WriteLine($"{DateTime.Now} après la requête, {response.Results.Count} résultats");
+
 
         var results = response.Results.Select(r => new SpaceshipModel(r)).ToList();
         
@@ -417,41 +430,50 @@ public class GrpcClientService : IGrpcClientService
         var classDict = new Dictionary<uint, EntityClassProperties>(500);
         var edgeDict = new Dictionary<ulong, EntityEdge>(500);
         var nodes = new List<Node>(800);
-        EntityQueryResponse response = null;
-
-        do
+        EntityQueryResponse? response = null;
+        await semaphoreSlim.WaitAsync();
+        try
         {
-
-            if (null != response)
+            do
             {
-                request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
-            }
 
-            response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+                if (null != response)
+                {
+                    request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
+                }
+
+                response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
             
-            // foreach (var entityClass in response.Body.EntityClasses)
-            // {
-            //     if (!classDict.ContainsKey(entityClass.Properties.GuidHashCrc))
-            //     {
-            //         classDict.Add(entityClass.Properties.GuidHashCrc, entityClass.Properties);
-            //     }
-            // }
+                // foreach (var entityClass in response.Body.EntityClasses)
+                // {
+                //     if (!classDict.ContainsKey(entityClass.Properties.GuidHashCrc))
+                //     {
+                //         classDict.Add(entityClass.Properties.GuidHashCrc, entityClass.Properties);
+                //     }
+                // }
 
-            foreach (var entityClass in response.Body.Results.Edges)
-            {
-                if (entityClass.Start.HasEntityId)
+                foreach (var entityClass in response.Body.Results.Edges)
                 {
-                    edgeDict.Add(entityClass.Start.EntityId, entityClass);
+                    if (entityClass.Start.HasEntityId)
+                    {
+                        // TODO ça ce n'est pas terrible, voir si on a toujours la même quantité du coup y aller par index ?
+                        edgeDict.TryAdd(entityClass.Start.EntityId, entityClass);
+                    }
+                    else
+                    {
+                        _logger.LogInformation($"Edge start pas de type Entity : {entityClass.Start.Type}");
+                    }
                 }
-                else
-                {
-                    Console.WriteLine($"Edge start pas de type Entity : {entityClass.Start.Type}");
-                }
-            }
 
-            nodes.AddRange(response.Body.Results.Nodes);
-            // Tant qu'il y a une nextPage, on continue;
-        } while (response.Body.PageInfo.HasNextPage);
+                nodes.AddRange(response.Body.Results.Nodes);
+                // Tant qu'il y a une nextPage, on continue;
+            } while (response.Body.PageInfo.HasNextPage);
+
+        }
+        finally
+        {
+            semaphoreSlim.Release();
+        }
 
         //return nodes.Select(n => new EntityItemQueryResult {EntityNodeProperties = n.Properties.EntityProperties, EntityClassProperties = GetFromDict(classDict, n.Properties.EntityProperties.ClassGuidCrc)}).ToList();
         return nodes.Select(n => new EntityItemQueryResult {EntityNodeProperties = n.Properties.EntityProperties, EntityEdge = GetFromDict(edgeDict, n.Properties.EntityProperties.Geid), EntityClassProperties = null}).ToList();
@@ -563,7 +585,16 @@ public class GrpcClientService : IGrpcClientService
                 }
             }
         };
-        var response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        await semaphoreSlim.WaitAsync();
+        EntityQueryResponse response;
+        try
+        {
+            response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        }
+        finally
+        {
+            semaphoreSlim.Release();
+        }
 
         return response.Body.Results.Nodes.Select(n => n.Properties.EntityProperties).ToList();
     }
@@ -629,7 +660,16 @@ public class GrpcClientService : IGrpcClientService
                 }
             }
         };
-        var response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        await semaphoreSlim.WaitAsync();
+        EntityQueryResponse response;
+        try
+        {
+            response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        }
+        finally
+        {
+            semaphoreSlim.Release();
+        }
 
         return response.Body.Results.Nodes.Select(n => n.Properties.EntityProperties).ToList();
     }
@@ -682,8 +722,17 @@ public class GrpcClientService : IGrpcClientService
                 }
             }
         };
-        
-        var response = await service.GetEntityStowContextsAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+
+        await semaphoreSlim.WaitAsync();
+        GetEntityStowContextsResponse response;
+        try
+        {
+            response = await service.GetEntityStowContextsAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        }
+        finally
+        {
+            semaphoreSlim.Release();
+        }
 
         return response.Body.Results;
     }
@@ -718,7 +767,16 @@ public class GrpcClientService : IGrpcClientService
             }
         };
         
-        var response = await service.GetEntityStowContextsAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        await semaphoreSlim.WaitAsync();
+        GetEntityStowContextsResponse response;
+        try
+        {
+            response = await service.GetEntityStowContextsAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        }
+        finally
+        {
+            semaphoreSlim.Release();
+        }
 
         return response.Body.Results;
     }
@@ -770,19 +828,27 @@ public class GrpcClientService : IGrpcClientService
             }
         };
 
+        await semaphoreSlim.WaitAsync();
         var result = new List<Inventory>(1024);
-        InventoryQueryResponse response = null;
-
-        do
+        InventoryQueryResponse? response = null;
+        try
         {
-            if (null != response)
+            do
             {
-                request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
-            }
-            
-            response = await service.InventoryQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
-            result.AddRange(response.Body.Results);
-        } while (response.Body.PageInfo.HasNextPage);
+                if (null != response)
+                {
+                    request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
+                }
+                
+                response = await service.InventoryQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+                result.AddRange(response.Body.Results);
+            } while (response.Body.PageInfo.HasNextPage);
+        }
+        finally
+        {
+            semaphoreSlim.Release();
+        }
+
 
         return result;
     }
@@ -799,7 +865,16 @@ public class GrpcClientService : IGrpcClientService
         };
         
         var service = new EntityGraphService.EntityGraphServiceClient(_channel);
-        var response = await service.GetInventoriesAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        await semaphoreSlim.WaitAsync();
+        GetInventoriesResponse response;
+        try
+        {
+            response = await service.GetInventoriesAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        }
+        finally
+        {
+            semaphoreSlim.Release();
+        }
 
         return response.Body.Inventories.Select( n => n.Properties.InventoryProperties).ToList();
     }
@@ -1020,26 +1095,34 @@ public class GrpcClientService : IGrpcClientService
         
         using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         var service = new IdentityService.IdentityServiceClient(_channel);
-        var response = service.GetPlayersNamesAsync(request, headers: _authHeaders, cancellationToken: cts.Token, deadline: DateTime.UtcNow.AddSeconds(1));
-        using var cancelTask = Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
-
+        await semaphoreSlim.WaitAsync(cts.Token);
         try
         {
-            _ = await Task.WhenAny(cancelTask, response.ResponseAsync).ConfigureAwait(false);
-            if (!response.ResponseAsync.IsCompletedSuccessfully)
+            var response = service.GetPlayersNamesAsync(request, headers: _authHeaders, cancellationToken: cts.Token, deadline: DateTime.UtcNow.AddSeconds(1));
+            using var cancelTask = Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
+
+            try
             {
-                // On a timeout, retour de null
+                _ = await Task.WhenAny(cancelTask, response.ResponseAsync).ConfigureAwait(false);
+                if (!response.ResponseAsync.IsCompletedSuccessfully)
+                {
+                    // On a timeout, retour de null
+                    return null;
+                }
+
+                await cts.CancelAsync();
+                var names = await response;
+                return (names.Names.FirstOrDefault() ?? new GetPlayersNamesResponse.Types.PlayerName()).Name;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Error while getting player name");
                 return null;
             }
-
-            await cts.CancelAsync();
-            var names = await response;
-            return (names.Names.FirstOrDefault() ?? new GetPlayersNamesResponse.Types.PlayerName()).Name;
         }
-        catch (Exception e)
+        finally
         {
-            _logger.LogError(e, "Error while getting player name");
-            return null;
+            semaphoreSlim.Release();
         }
     }
     
@@ -1062,10 +1145,17 @@ public class GrpcClientService : IGrpcClientService
             }
         };
         
-        
-        var response = await service.GetInventoriesAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        await semaphoreSlim.WaitAsync();
+        try
+        {
+            var response = await service.GetInventoriesAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
 
-        return response.Body.Inventories;
+            return response.Body.Inventories;
+        }
+        finally
+        {
+            semaphoreSlim.Release();
+        }
     }
     
     public bool IsConnected { get; private set; }
@@ -1073,10 +1163,17 @@ public class GrpcClientService : IGrpcClientService
     public async Task<IList<Friend>> GetFriendList()
     {
         var service = new FriendService.FriendServiceClient(_channel);
-        
-        var response = await service.GetFriendListAsync(new GetFriendListRequest(), _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        await semaphoreSlim.WaitAsync();
+        try
+        {
+            var response = await service.GetFriendListAsync(new GetFriendListRequest(), _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
 
-        return response.Friends;
+            return response.Friends;
+        }
+        finally
+        {
+            semaphoreSlim.Release();
+        }
     }
 
     public async Task<ShardInfo> GetShardInfo(uint accountId)
@@ -1086,10 +1183,17 @@ public class GrpcClientService : IGrpcClientService
         request.AccountId = accountId;
         
         var service = new FriendService.FriendServiceClient(_channel);
-        
-        var response = await service.GetShardInfoAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        await semaphoreSlim.WaitAsync();
+        try
+        {
+            var response = await service.GetShardInfoAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
 
-        return response.ShardInfo;
+            return response.ShardInfo;
+        }
+        finally
+        {
+            semaphoreSlim.Release();
+        }
     }
     
 

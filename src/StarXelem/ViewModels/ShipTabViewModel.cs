@@ -41,6 +41,7 @@ public partial class ShipTabViewModel : PageViewModelBase
     public async Task LoadShipList()
     {
         IsLoading = true;
+        _locationService.ClearCache();
         TreatmentStatus = "Appel RSI";
         var spaceships = await _clientService.GetSpaceships();
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement p4k");

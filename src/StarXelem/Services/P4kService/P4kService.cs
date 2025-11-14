@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -187,6 +188,7 @@ public class P4kService : IP4kService
         {
             _loadingLocalTask = Task.Run(async () =>
             {
+                var sw = Stopwatch.StartNew();
                 // chargement du fichier p4k
                 await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>());
                 //  chargement de la traduction
@@ -209,6 +211,8 @@ public class P4kService : IP4kService
                         }
                     }
                 }
+                sw.Stop();
+                _logger.LogTrace("Extracted all locale values in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
                 
                 await globalEntry.DisposeAsync();
             });
@@ -242,19 +246,24 @@ public class P4kService : IP4kService
                 var dcb = new DataCoreDatabase(entry);
                 var df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
                 await entry.DisposeAsync();
-                
+
+                var sw = Stopwatch.StartNew();
                 var allRecords = df.DataCore.Database.MainRecords
                     .AsParallel()
                     .Select(x => df.GetFromRecord(x))
-                    .ToList();
+                    ;
+                sw.Stop();
+                _logger.LogTrace("Extracted all records in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
 
-
-                foreach (var record in allRecords.Where(r => r.Data is EntityClassDefinition))
+                sw = Stopwatch.StartNew();
+                foreach (var record in allRecords.Where(r => r.Data is EntityClassDefinition or StarMapObject))
                 {
                     var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record.RecordId]));
 
                     _EntityClassDict.Add(crc, record);
                 }
+                sw.Stop();
+                _logger.LogTrace("Extracted all entity classes in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
             });
         }
         

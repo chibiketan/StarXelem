@@ -12,8 +12,12 @@ public static class ServiceCollectionExtensions
     {
         services.AddLogging(b =>
         {
-            b.SetMinimumLevel(LogLevel.Debug);
+#if DEBUG
+            b.SetMinimumLevel(LogLevel.Trace);
             b.AddDebug();
+#else
+            b.SetMinimumLevel(LogLevel.Warning);
+#endif
             b.AddConsole();
         });
         services.AddTransient<MainWindowViewModel>();

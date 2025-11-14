@@ -12,6 +12,8 @@
              x:Class="StarXelem.Views.ItemsTabView">
     <UserControl.Resources>
         <conv:MicroScuConverter x:Key="MicroScuConverter" />
+        <conv:TaskIsFinishedConverter x:Key="TaskIsFinishedConverter" />
+        <conv:TaskIsNotFinishedConverter x:Key="TaskIsNotFinishedConverter" />
         <comp:TaskStringComparer x:Key="TaskStringComparer" />
         <comp:ItemViewModelName x:Key="ItemViewModelName" />
         <comp:ItemViewModelOwnerComparer x:Key="ItemViewModelOwnerComparer" />
@@ -68,7 +70,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <CheckBox Margin="0,0,8,0" HorizontalAlignment="Stretch" Content="{Binding Name^}" IsChecked="{Binding IsSelected}" />
+                                <CheckBox Margin="0,0,8,0" HorizontalAlignment="Stretch" Content="{Binding Name^, FallbackValue=Chargement}" IsChecked="{Binding IsSelected}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -111,11 +113,20 @@
             <DataGrid.Columns>
                 <DataGridTextColumn Header="id" Binding="{Binding Id}" />
                 <!-- <DataGridTextColumn Header="ownerId" Binding="{Binding OwnerId}" IsVisible="{Binding IsInDebugMode}" /> -->
-                <DataGridTextColumn Header="Possesseur" Binding="{Binding Owner^}" CustomSortComparer="{StaticResource ItemViewModelOwnerComparer}" CanUserSort="True" IsVisible="{Binding IsInDebugMode}" />
-                <DataGridTextColumn Header="Nom" CustomSortComparer="{StaticResource ItemViewModelName}" CanUserSort="True" Binding="{Binding Name^}" />
+                <DataGridTextColumn Header="Possesseur" Binding="{Binding Owner^, FallbackValue=Chargement}" CustomSortComparer="{StaticResource ItemViewModelOwnerComparer}" CanUserSort="True" IsVisible="{Binding IsInDebugMode}" />
+                <DataGridTextColumn Header="Nom" CustomSortComparer="{StaticResource ItemViewModelName}" CanUserSort="True" Binding="{Binding Name^, FallbackValue=Chargement}" />
                 <DataGridTextColumn Header="Type technique" Binding="{Binding LocalTypeName}" IsVisible="{Binding IsInDebugMode}" />
                 <DataGridTextColumn Header="parentUrn" Binding="{Binding ParentUrn}"  IsVisible="{Binding IsInDebugMode}" />
-                <DataGridTextColumn Header="Stockage" CustomSortComparer="{StaticResource TaskStringComparer}" CanUserSort="True" Binding="{Binding Location^}"  />
+                <DataGridTemplateColumn Header="Stockage template">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                <TextBlock VerticalAlignment="Stretch" HorizontalAlignment="Stretch" TextAlignment="Left"  IsVisible="{Binding Location, Converter={StaticResource TaskIsFinishedConverter}}" Text="{Binding Location^}" />
+                                <TextBlock VerticalAlignment="Stretch" HorizontalAlignment="Stretch" TextAlignment="Left" IsVisible="{Binding Location, Converter={StaticResource TaskIsNotFinishedConverter}}" >Chargement</TextBlock>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Nombre élément" Binding="{Binding StackSize}"  />
                 <DataGridTextColumn Header="Taille occupée" Binding="{Binding EdgeOccupancy, Converter={StaticResource MicroScuConverter}}"  />
                 <DataGridTextColumn Header="Possède une entrée Edge" Binding="{Binding Edge, Converter={x:Static ObjectConverters.IsNotNull }}"  />

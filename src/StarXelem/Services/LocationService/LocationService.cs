@@ -1,4 +1,5 @@
-﻿using Sc.External.Services.Entitygraph.V1;
+﻿using System.Collections.Concurrent;
+using Sc.External.Services.Entitygraph.V1;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Models;
 
@@ -38,22 +39,15 @@ public class LocationService : ILocationService
 
         var id = ulong.Parse(split[2]);
 
-        if (type == ELocationType.Location)
+        if (type == ELocationType.Location || type == ELocationType.Hangar)
         {
-            var loc = (ELocation)id;
-            
-            return $"[INVENTAIRE] {loc}";
-        }
-
-        if (type == ELocationType.Hangar)
-        {
-            var loc = (ELocation)id;
-            
-            return $"[HANGAR] {loc}";
+            return await ResolveLocationId((uint)id, type);
         }
 
         if (type == ELocationType.Container)
         {
+            // TODO remove
+            //return $"Entité non trouvée ({split[0]})";
             var containerId = ulong.Parse(split[0]);
 
             var queryProp = new ItemQueryModel();
@@ -93,7 +87,7 @@ public class LocationService : ILocationService
         
         return entityLocation;
     }
-
+    
     public Task<string?> ResolveLocation(EntityItemQueryResult entity)
     {
         if (entity.EntityEdge != null)
@@ -104,7 +98,21 @@ public class LocationService : ILocationService
                 case EntityEdgeType.AttachedTo:
                     // Attaché à une autre entité
                     //return Task.FromResult("[EDGE] attached to traiter")!;
-                return ResolveEntityLocation(entity.EntityEdge.End.EntityId);
+                    if (entity.EntityEdge.End.HasEntityId)
+                    {
+                        return ResolveEntityLocation(entity.EntityEdge.End.EntityId);
+                    }
+
+                    if (entity.EntityEdge.End.HasInventoryId)
+                    {
+                        return Task.FromResult($"[ATTACHED_TO][INVENTORY] {entity.EntityEdge.End.InventoryId}");
+                    }
+
+                    if (entity.EntityEdge.End.HasShardId)
+                    {
+                        return Task.FromResult($"[SHARD] {entity.EntityEdge.End.ShardId}");
+                    }
+                    break;
                 case EntityEdgeType.StowedIn:
                     // Rangé dans un conteneur
                     return this.ResolveEntityLocation(entity.EntityEdge.End.InventoryId);
@@ -116,7 +124,7 @@ public class LocationService : ILocationService
 
         if (!String.IsNullOrEmpty(entity.EntityNodeProperties?.StowCtx?.Inv))
         {
-            ResolveEntityLocation(entity.EntityNodeProperties.StowCtx.Inv);
+            return ResolveEntityLocation(entity.EntityNodeProperties.StowCtx.Inv);
         }
         
         return Task.FromResult("pas de données")!;
@@ -124,19 +132,28 @@ public class LocationService : ILocationService
 
     public async Task<String?> ResolveEntityLocation(ulong guid)
     {
-        var queryProp = new ItemQueryModel();
-        queryProp.Id = guid.ToString();
-        queryProp.useConnectedUserOwner = false;
-        queryProp.UseProjection = false;
-        var results = await _grpcClientService.QueryGraphBySearch(queryProp);
+        // TODO remove
+        var results = await _entityCache.GetOrAdd(guid, entityId =>
+        {
+            var queryProp = new ItemQueryModel();
+            queryProp.Id = entityId.ToString();
+            queryProp.useConnectedUserOwner = false;
+            queryProp.UseProjection = false;
+            return _grpcClientService.QueryGraphBySearch(queryProp);
+        });
+        // var queryProp = new ItemQueryModel();
+        // queryProp.Id = guid.ToString();
+        // queryProp.useConnectedUserOwner = false;
+        // queryProp.UseProjection = false;
+        // var results = await _grpcClientService.QueryGraphBySearch(queryProp);
 
         if (results.Count == 0)
         {
             return $"Entité non trouvée ({guid})";
         }
 
-        var entityType = await _p4KService.GetEntityType(results[0].EntityNodeProperties.ClassGuidCrc);
-        var typeName = entityType.RecordName;
+        var entityType = await _p4KService.GetEntityType(results[0].EntityNodeProperties!.ClassGuidCrc);
+        var typeName = entityType!.RecordName;
         var c = (entityType?.Data as EntityClassDefinition)?.Components
             .OfType<SAttachableComponentParams>().FirstOrDefault();
 
@@ -159,6 +176,43 @@ public class LocationService : ILocationService
         return $"[{guid}] {typeName}";
     }
 
+    private async Task<string> ResolveLocationId(uint id, ELocationType type)
+    {
+        // l'id correspond au hash CRC du type
+        // Donc recherche du type par son hash dans les données => Lecture du champ StarMapObject.name => récupération de la traduction, enjoy \o/
+        var locationName = await _locationCache.GetOrAdd(id, async (guid) =>
+        {
+            var tmp = await _p4KService.GetEntityType(guid);
+
+            if (null == tmp)
+            {
+                var loc = (ELocation)guid;
+                
+                return $"[{type.ToString().ToUpperInvariant()}] {loc}";
+            }
+            var localKey = ((StarMapObject)tmp.Data).name;
+            var locationName = await _p4KService.GetLocaleValue(localKey);
+
+            return locationName;
+        });
+
+        if (String.IsNullOrEmpty(locationName))
+        {
+            return $"[{type.ToString().ToUpperInvariant()}] INCONNU ({id})";
+        }
+
+        return $"[{type.ToString().ToUpperInvariant()}] {locationName}";        
+    }
+
+    public void ClearCache()
+    {
+        _entityCache.Clear();
+    }
+    
+    private readonly ConcurrentDictionary<ulong, Task<IList<EntityItemQueryResult>>> _entityCache = new();
+
+    private readonly ConcurrentDictionary<uint, Task<string?>> _locationCache = new();
+    
     enum ELocation:ulong
     {
         UNKNOWN = 0,
