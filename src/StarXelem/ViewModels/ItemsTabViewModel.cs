@@ -15,6 +15,9 @@ using DateTime = System.DateTime;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
+using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.Extensions.DependencyInjection;
+using StarXelem.ViewModels.Popup;
 
 namespace StarXelem.ViewModels;
 
@@ -240,6 +243,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
         {
             Dispatcher.UIThread.InvokeAsync(() => ReloadLocationListCommand.NotifyCanExecuteChanged());
             Dispatcher.UIThread.InvokeAsync(() => ExportToExcelCommand.NotifyCanExecuteChanged());
+            Dispatcher.UIThread.InvokeAsync(() => CompareDataFromImportCommand.NotifyCanExecuteChanged());
+        
             return t.Result;
         })!;
         refreshSelectAllLocation();
@@ -304,6 +309,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     partial void OnItemListChanged(Task<IList<ItemViewModel>>? value)
     {
         ExportToExcelCommand.NotifyCanExecuteChanged();
+        CompareDataFromImportCommand.NotifyCanExecuteChanged();
     }
 
     public bool CanExportToExcel()
@@ -321,9 +327,13 @@ public partial class ItemsTabViewModel : PageViewModelBase
     [RelayCommand(CanExecute = nameof(CanExportToExcel))]
     public async Task ExportToExcel()
     {
+        var vm = App.Current.Services.GetRequiredService<LoadingPopupContentViewModel>();
+        vm.ShowLoading = true;
+        vm.Message = "Export en cours...";
+        WeakReferenceMessenger.Default.Send(new ShowPopupMessage(showCloseButton:false, viewModel: vm));
         try
         {
-            TreatmentStatus = "Export en cours...";
+            await Task.Delay(TimeSpan.FromSeconds(10));
             var items = ItemList != null ? await ItemList : new List<ItemViewModel>();
 
             // En-têtes alignés avec les colonnes de la DataGrid
@@ -495,6 +505,33 @@ public partial class ItemsTabViewModel : PageViewModelBase
         {
             TreatmentStatus = $"Erreur export: {ex.Message}";
         }
+        finally
+        {
+            WeakReferenceMessenger.Default.Send(new ClosePopupMessage());
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCompareDataFromImport))]
+    public Task CompareDataFromImportAsync()
+    {
+        var vm = App.Current.Services.GetRequiredService<LoadingPopupContentViewModel>();
+        vm.ShowLoading = false;
+        vm.Message = "Ceci est un test";
+        WeakReferenceMessenger.Default.Send(new ShowPopupMessage(showCloseButton:true, viewModel: vm));
+        return Task.CompletedTask;
+    }
+
+    public bool CanCompareDataFromImport()
+    {
+        try
+        {
+            return !IsLoading && ItemList is { IsCompletedSuccessfully: true, Result.Count: > 0 };
+        }
+        catch
+        {
+            return false;
+        }
+
     }
 
     private async void refreshSelectAllLocation()

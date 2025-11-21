@@ -1,0 +1,18 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels.Popup"
+             x:DataType="vm:PopupViewModel"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="StarXelem.Views.Popup.MainPopup"
+             IsVisible="{Binding IsVisible}">
+    <Border Background="#50CCCCCC">
+        <Border Background="Gray" Margin="10" CornerRadius="15" Padding="5" HorizontalAlignment="Center" VerticalAlignment="Center" >
+            <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <Button HorizontalAlignment="Right" CornerRadius="20" Command="{Binding CloseCommand}" IsVisible="{Binding IsCloseButtonVisible}" >X</Button>
+                <ContentControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Content="{Binding ContentViewModel}" />
+            </StackPanel>
+        </Border>
+    </Border>
+</UserControl>

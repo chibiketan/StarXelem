@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
 using StarXelem.ViewModels;
+using StarXelem.ViewModels.Popup;
 
 namespace StarXelem.Extensions;
 
@@ -25,6 +26,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ItemsTabViewModel>();
         services.AddTransient<ContainerTabViewModel>();
         services.AddTransient<FriendListTabViewModel>();
+        services.AddTransient<PopupViewModel>();
+        services.AddTransient<LoadingPopupContentViewModel>();
 
         if (isDesignMode)
         {

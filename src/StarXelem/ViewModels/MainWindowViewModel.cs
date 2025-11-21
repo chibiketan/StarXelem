@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using StarXelem.Models;
 using StarXelem.Services;
+using StarXelem.ViewModels.Popup;
 
 namespace StarXelem.ViewModels;
 
@@ -31,13 +32,17 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private P4kFileModel? selectedP4kFile;
 
+    [ObservableProperty]
+    private PopupViewModel _popupViewModel;
+
     public IAsyncRelayCommand OpenDataP4kCommand { get; }
     
-    public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IP4kService p4kService, IGrpcClientService grpcClientService)
+    public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IP4kService p4kService, IGrpcClientService grpcClientService, PopupViewModel popupViewModel)
     {
         _logger = logger;
         _p4kService = p4kService;
         _grpcClientService = grpcClientService;
+        PopupViewModel = popupViewModel;
         InstalledEnvs = p4kService.FindInstalledFiles();
         InstalledEnvs.ContinueWith(async x =>
         {
@@ -47,7 +52,7 @@ public partial class MainWindowViewModel : ViewModelBase
             var list = await x;
 
             await Dispatcher.UIThread.InvokeAsync(() =>
-            {   
+            {
                 SelectedP4kFile = list?.FirstOrDefault();
             });
         });

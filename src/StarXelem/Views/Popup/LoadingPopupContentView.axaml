@@ -1,0 +1,13 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels.Popup"
+             x:DataType="vm:LoadingPopupContentViewModel"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="StarXelem.Views.Popup.LoadingPopupContentView">
+    <StackPanel Margin="10 10 10 10">
+        <ProgressBar IsIndeterminate="True" IsVisible="{Binding ShowLoading}" Margin="10 0 10 10" MinWidth="100" />
+        <TextBlock VerticalAlignment="Top" HorizontalAlignment="Center" Text="{Binding Message}" />
+    </StackPanel>
+</UserControl>

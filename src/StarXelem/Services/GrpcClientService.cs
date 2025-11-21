@@ -59,7 +59,7 @@ public class GrpcClientService : IGrpcClientService
         _playerInfo = currentPlayer;
         _authHeaders = new Metadata { 
             { "Authorization", $"Bearer {currentPlayer.Jwt}" },
-            { "grpc-timeout", "10S" }
+            { "grpc-timeout", "60S" }
         };
         _logger.LogDebug("player jwt : {jwt}", currentPlayer.Jwt);
         IsConnected = true;
@@ -442,7 +442,7 @@ public class GrpcClientService : IGrpcClientService
                     request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
                 }
 
-                response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+                response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(60));
             
                 // foreach (var entityClass in response.Body.EntityClasses)
                 // {
