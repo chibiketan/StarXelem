@@ -102,4 +102,9 @@ public class DesignGrpcClientService : IGrpcClientService
     {
         return Task.FromResult(new ShardInfo());
     }
+
+    public Task<IList<EntityStowContext>> GetEntityStowContextByParentUrnList(IList<string> urnList, List<uint> list)
+    {
+        return Task.FromResult<IList<EntityStowContext>>(new List<EntityStowContext>());
+    }
 }

@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using Google.Protobuf.Collections;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
@@ -480,6 +481,26 @@ public class GrpcClientService : IGrpcClientService
         //return nodes.Select(n => new EntityItemQueryResult {EntityNodeProperties = n.Properties.EntityProperties, EntityClassProperties = GetFromDict(classDict, n.Properties.EntityProperties.ClassGuidCrc)}).ToList();
         return nodes.Select(n => new EntityItemQueryResult {EntityNodeProperties = n.Properties.EntityProperties, EntityEdge = GetFromDict(edgeDict, n.Properties.EntityProperties.Geid), EntityClassProperties = null}).ToList();
         
+        
+    }
+
+    public async Task<IList<EntityStowContext>> GetEntityStowContextByParentUrnList(IList<string> urnList, List<uint> crcTypeList)
+    {
+        var service = new EntityGraphService.EntityGraphServiceClient(_channel);
+
+        var request = new GetEntityStowContextsByParentUrnsRequest
+        {
+            Body = new GetEntityStowContextsByParentUrnsRequestBody
+            {
+                OwnerId = _playerInfo.Player.Geid,
+                ParentUrns = {urnList},
+                EntityClassCrcs = { crcTypeList }
+            }
+        };
+        
+        var result = await service.GetEntityStowContextsByParentUrnsAsync(request, _authHeaders, DateTime.UtcNow.AddSeconds(30)).ConfigureAwait(false);
+        
+        return result.Body.Results;
         
     }
 

@@ -25,4 +25,5 @@ public interface IGrpcClientService
     bool IsConnected { get; }
     Task<IList<Contact>> GetFriendList();
     Task<ShardInfo> GetShardInfo(int accountId);
+    Task<IList<EntityStowContext>> GetEntityStowContextByParentUrnList(IList<string> urnList, List<uint> crcTypeList);
 }

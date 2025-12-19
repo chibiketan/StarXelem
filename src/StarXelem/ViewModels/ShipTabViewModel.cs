@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Text;
 using Avalonia.Threading;
 using Cig.Protocols.Common;
@@ -127,7 +128,7 @@ public partial class ShipTabViewModel : PageViewModelBase
             }
         }
         
-        // // TODO récupérer les emplacements des vaisseaux
+        // TODO récupérer les emplacements des vaisseaux, à virer ?
         foreach (var spaceship in spaceships)
         {
             if (null == spaceship.EntityProperties)
@@ -137,6 +138,18 @@ public partial class ShipTabViewModel : PageViewModelBase
             else
             {
                 spaceship.ReadableLocation = await _locationService.ResolveLocation(spaceship.EntityProperties);
+            }
+        }
+        
+        var stowContextList = await _clientService.GetEntityStowContextByParentUrnList(spaceshipUrnList, spaceships.Select(s => Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([new CigGuid(s.Entitlement.EntityClassGuid)]))).ToList());
+
+        foreach (var stowContext in stowContextList)
+        {
+            var ss = spaceships.FirstOrDefault(s => s.Entitlement.Urn == stowContext.ParentUrn);
+
+            if (null != ss)
+            {
+                ss.StowContext = stowContext;
             }
         }
         

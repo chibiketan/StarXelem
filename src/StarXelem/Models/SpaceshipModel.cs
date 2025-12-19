@@ -15,19 +15,21 @@ public class SpaceshipModel
     public bool IsRealPurchase => Entitlement.RealMoney;
     public SpaceshipState State => GetState();
     public string? DisplayState => GetState().GetDisplayName();
-    public string? Location => "MISSING_DATA:MISSING_DATA"; //EntityProperties?.EntityNodeProperties?.StowCtx?.Inv;
+    public string? Location => EntityProperties?.EntityEdge?.End?.InventoryId;
     public string? ReadableLocation { get; set; }
-    public string? Shard => "MISSING_DATA";//EntityProperties?.EntityNodeProperties?.StowCtx?.Shd;
+    public string? Shard => StowContext?.ShardId;
     public EItemType ItemType => (EItemType)(EntityProperties?.EntityNodeProperties?.ItemTypeEnum ?? -1);
     public EItemSubType ItemSubType => (EItemSubType)(EntityProperties?.EntityNodeProperties?.ItemSubTypeEnum ?? -1);
 
     public Entitlement Entitlement { get; }
     public EntityClassDefinition? EntityClassDefinition { get; set; }
     public EntityItemQueryResult? EntityProperties { get; set; }
+    public EntityStowContext? StowContext { get; set; }
 
     public SpaceshipModel(Entitlement entitlement)
     {
         Entitlement = entitlement;
+        Shipname = "";
     }
 
     private SpaceshipState GetState()
@@ -36,22 +38,20 @@ public class SpaceshipModel
             return SpaceshipState.UNCLAIMED;
         if (Entitlement.Status == EntitlementStatus.Fulfilled)
         {
-            if (null == EntityProperties)
+            if (null == StowContext)
             {
                 // Pas d'entité, le vaisseau est détruit
                 return SpaceshipState.DESTROYED;
             }
+
+            if (StowContext.IsStowed)
+            {
+                return SpaceshipState.STOWED;
+            }
             
-            // TODO Comment détecter un vaisseau en unknown ? (F7A)
-            // Voir l'attachement ? ou si un objet existe ?
-            // if (EntityProperties.EntityNodeProperties?.StowCtx.Shd != "")
-            // {
-            //     // Le vaisseau est associé à une shard, du coup il est dans la nature
-            //     return SpaceshipState.UNSTOWED;
-            // }
-            
-            return SpaceshipState.STOWED;
+            return SpaceshipState.UNSTOWED;
         }
+        
         return SpaceshipState.UNKNOWN;
     }
 }
