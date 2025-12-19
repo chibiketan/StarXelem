@@ -21,7 +21,7 @@
             <Label Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" IsVisible="{Binding IsLoading}" Content="{Binding TreatmentStatus}" />
         </Grid>
         <Grid Grid.Row="1">
-            <DataGrid  ItemsSource="{Binding FilteredFriendList}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="All" >
+            <DataGrid RowHeight="150" ItemsSource="{Binding FilteredFriendList}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="All" >
                 <DataGrid.Columns>
                     <DataGridTemplateColumn Header="Avatar">
                         <DataGridTemplateColumn.CellTemplate>

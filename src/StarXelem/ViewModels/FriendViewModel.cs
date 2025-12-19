@@ -18,7 +18,7 @@ public class FriendViewModel : ViewModelBase
     private readonly IGrpcClientService _grpcClientService;
     private readonly System.Lazy<Task<ShardInfo?>> _shardInfo;
 
-    public string? AvatarUrl => String.IsNullOrEmpty(_friend.Account?.AvatarUrl) ? "https://cdn.robertsspaceindustries.com/static/images/account/avatar_default_big.jpg" : _friend.Account.AvatarUrl;
+    public string? AvatarUrl => IsAvatarUrlValid(_friend.Account?.AvatarUrl) ? _friend.Account.AvatarUrl : "https://cdn.robertsspaceindustries.com/static/images/account/avatar_default_big.jpg";
     public string DisplayName => _friend.Account?.DisplayName ?? "Unknown";
     public string TokenName => _friend.Account?.Nickname ?? "Unknown";
     public bool IsConnected => null != _friend.Presence;
@@ -36,6 +36,28 @@ public class FriendViewModel : ViewModelBase
         _grpcClientService = grpcClientService;
 
         _shardInfo = new Lazy<Task<ShardInfo?>>(LoadShardInfoIfNeeded);
+    }
+
+    private static bool IsAvatarUrlValid(string? url)
+    {
+        if (String.IsNullOrWhiteSpace(url))
+        {
+            return false;
+        }
+        
+        try
+        {
+            if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                return uri.Host == "cdn.robertsspaceindustries.com" || uri.Host == "robertsspaceindustries.com";
+            }
+            
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private Task<ShardInfo?> LoadShardInfoIfNeeded()
