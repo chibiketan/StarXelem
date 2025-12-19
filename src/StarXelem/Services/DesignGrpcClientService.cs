@@ -1,4 +1,5 @@
 ﻿using Sc.External.Common.Shard.V1;
+using Sc.External.Services.Contacts.V1;
 using Sc.External.Services.Entitlement.V1;
 using Sc.External.Services.Entitygraph.V1;
 using Sc.External.Services.Friends.V1;
@@ -79,9 +80,9 @@ public class DesignGrpcClientService : IGrpcClientService
     }
 
     public bool IsConnected => true;
-    public Task<IList<Friend>> GetFriendList()
+    public Task<IList<Contact>> GetFriendList()
     {
-        return Task.FromResult<IList<Friend>>(new List<Friend>
+        return Task.FromResult<IList<Contact>>(new List<Contact>
         {
             new()
             {
@@ -97,7 +98,7 @@ public class DesignGrpcClientService : IGrpcClientService
         });
     }
 
-    public Task<ShardInfo> GetShardInfo(uint accountId)
+    public Task<ShardInfo> GetShardInfo(int accountId)
     {
         return Task.FromResult(new ShardInfo());
     }

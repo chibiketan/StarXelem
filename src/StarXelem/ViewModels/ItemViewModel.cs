@@ -28,8 +28,8 @@ public partial class ItemViewModel : ViewModelBase
     public EItemType ItemType => (EItemType)_entityNodeProperties.EntityNodeProperties.ItemTypeEnum;
     public EItemSubType ItemSubType => (EItemSubType)_entityNodeProperties.EntityNodeProperties.ItemSubTypeEnum;
     public uint LocationId => _entityNodeProperties.EntityNodeProperties.LocationId;
-    public string? StowLocation => _entityNodeProperties.EntityNodeProperties.StowCtx?.Inv;
-    public string? StowShard => _entityNodeProperties.EntityNodeProperties.StowCtx?.Shd;
+    public string? StowLocation => null;
+    public string? StowShard => null;
     public string? LocalTypeName => _entityClassProperties?.RecordName;
     public Task<string?> Location => _location.Value;
     

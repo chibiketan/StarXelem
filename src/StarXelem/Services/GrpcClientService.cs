@@ -4,9 +4,9 @@ using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using Sc.External.Common.Api.V1;
 using Sc.External.Common.Shard.V1;
+using Sc.External.Services.Contacts.V1;
 using Sc.External.Services.Entitlement.V1;
 using Sc.External.Services.Entitygraph.V1;
-using Sc.External.Services.Friends.V1;
 using Sc.External.Services.Identity.V1;
 using Sc.Internal.Services.Entitlement.V1;
 using Sc.Internal.Services.MissionLocation.V1;
@@ -442,7 +442,8 @@ public class GrpcClientService : IGrpcClientService
                     request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
                 }
 
-                response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(60));
+                // response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(60));
+                response = await service.EntityQueryAsync(request, _authHeaders);
             
                 // foreach (var entityClass in response.Body.EntityClasses)
                 // {
@@ -474,6 +475,7 @@ public class GrpcClientService : IGrpcClientService
         {
             semaphoreSlim.Release();
         }
+        
 
         //return nodes.Select(n => new EntityItemQueryResult {EntityNodeProperties = n.Properties.EntityProperties, EntityClassProperties = GetFromDict(classDict, n.Properties.EntityProperties.ClassGuidCrc)}).ToList();
         return nodes.Select(n => new EntityItemQueryResult {EntityNodeProperties = n.Properties.EntityProperties, EntityEdge = GetFromDict(edgeDict, n.Properties.EntityProperties.Geid), EntityClassProperties = null}).ToList();
@@ -674,112 +676,112 @@ public class GrpcClientService : IGrpcClientService
         return response.Body.Results.Nodes.Select(n => n.Properties.EntityProperties).ToList();
     }
 
-    /**
-     * Récupère une liste de contexte de stockage pour une liste de geid (vaisseau, équipement, etc.)
-     */
-    public async Task<IList<EntityStowContext>> QueryStowContextByGeidList(IList<ulong> geidList)
-    {
-        var ownerFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-        {
-            Operator = ComparisonOperator.Equal,
-            Property = "ownerId",
-        };
-        ownerFilter.Values.Add(new ScalarValue {UnsignedBigintValue = _playerInfo.Player.Geid});
+    // /**
+    //  * Récupère une liste de contexte de stockage pour une liste de geid (vaisseau, équipement, etc.)
+    //  */
+    // public async Task<IList<EntityStowContext>> QueryStowContextByGeidList(IList<ulong> geidList)
+    // {
+    //     var ownerFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
+    //     {
+    //         Operator = ComparisonOperator.Equal,
+    //         Property = "ownerId",
+    //     };
+    //     ownerFilter.Values.Add(new ScalarValue {UnsignedBigintValue = _playerInfo.Player.Geid});
+    //
+    //     
+    //     var filter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
+    //     {
+    //         Operator = ComparisonOperator.In,
+    //         Property = "entityId",
+    //     };
+    //     filter.Values.AddRange(geidList.Select(x => new ScalarValue { UnsignedBigintValue = x }));
+    //     
+    //     var service = new EntityGraphService.EntityGraphServiceClient(_channel);
+    //
+    //     GetEntityStowContextsRequest request = new()
+    //     {
+    //         Body = new GetEntityStowContextsRequestBody
+    //         {
+    //             Query = new EntityStowContextQuery
+    //             {
+    //                 Filter = new EntityStowContextFilter
+    //                 {
+    //                     CompositeFilter = new EntityStowContextCompositeFilter
+    //                     {
+    //                         Operator = LogicalOperator.And,
+    //                         Filters =
+    //                         {
+    //                             new EntityStowContextFilter { PropertyFilter = ownerFilter },
+    //                             new EntityStowContextFilter { PropertyFilter = filter }
+    //                         }
+    //                     }
+    //                 },
+    //                 Pagination = new PaginationArguments
+    //                 {
+    //                     First = 0,
+    //                     After = ""
+    //                 }
+    //             }
+    //         }
+    //     };
+    //
+    //     await semaphoreSlim.WaitAsync();
+    //     GetEntityStowContextsResponse response;
+    //     try
+    //     {
+    //         response = await service.GetEntityStowContextsAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+    //     }
+    //     finally
+    //     {
+    //         semaphoreSlim.Release();
+    //     }
+    //
+    //     return response.Body.Results;
+    // }
 
-        
-        var filter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-        {
-            Operator = ComparisonOperator.In,
-            Property = "entityId",
-        };
-        filter.Values.AddRange(geidList.Select(x => new ScalarValue { UnsignedBigintValue = x }));
-        
-        var service = new EntityGraphService.EntityGraphServiceClient(_channel);
-
-        GetEntityStowContextsRequest request = new()
-        {
-            Body = new GetEntityStowContextsRequestBody
-            {
-                Query = new EntityStowContextQuery
-                {
-                    Filter = new EntityStowContextFilter
-                    {
-                        CompositeFilter = new EntityStowContextCompositeFilter
-                        {
-                            Operator = LogicalOperator.And,
-                            Filters =
-                            {
-                                new EntityStowContextFilter { PropertyFilter = ownerFilter },
-                                new EntityStowContextFilter { PropertyFilter = filter }
-                            }
-                        }
-                    },
-                    Pagination = new PaginationArguments
-                    {
-                        First = 0,
-                        After = ""
-                    }
-                }
-            }
-        };
-
-        await semaphoreSlim.WaitAsync();
-        GetEntityStowContextsResponse response;
-        try
-        {
-            response = await service.GetEntityStowContextsAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
-        }
-        finally
-        {
-            semaphoreSlim.Release();
-        }
-
-        return response.Body.Results;
-    }
-
-    public async Task<IList<EntityStowContext>> QueryStowContextByOwnerId(ulong ownerId)
-    {
-        var filter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-        {
-            Operator = ComparisonOperator.Equal,
-            Property = "ownerId",
-        };
-        filter.Values.Add(new ScalarValue {UnsignedBigintValue = ownerId});
-        
-        var service = new EntityGraphService.EntityGraphServiceClient(_channel);
-
-        GetEntityStowContextsRequest request = new()
-        {
-            Body = new GetEntityStowContextsRequestBody
-            {
-                Query = new EntityStowContextQuery
-                {
-                    Filter = new EntityStowContextFilter
-                    {
-                        PropertyFilter = filter
-                    },
-                    Pagination = new PaginationArguments
-                    {
-                        First = 0,
-                        After = ""
-                    }
-                }
-            }
-        };
-        
-        await semaphoreSlim.WaitAsync();
-        GetEntityStowContextsResponse response;
-        try
-        {
-            response = await service.GetEntityStowContextsAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
-        }
-        finally
-        {
-            semaphoreSlim.Release();
-        }
-
-        return response.Body.Results;
-    }
+    // public async Task<IList<EntityStowContext>> QueryStowContextByOwnerId(ulong ownerId)
+    // {
+    //     var filter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
+    //     {
+    //         Operator = ComparisonOperator.Equal,
+    //         Property = "ownerId",
+    //     };
+    //     filter.Values.Add(new ScalarValue {UnsignedBigintValue = ownerId});
+    //     
+    //     var service = new EntityGraphService.EntityGraphServiceClient(_channel);
+    //
+    //     GetEntityStowContextsRequest request = new()
+    //     {
+    //         Body = new GetEntityStowContextsRequestBody
+    //         {
+    //             Query = new EntityStowContextQuery
+    //             {
+    //                 Filter = new EntityStowContextFilter
+    //                 {
+    //                     PropertyFilter = filter
+    //                 },
+    //                 Pagination = new PaginationArguments
+    //                 {
+    //                     First = 0,
+    //                     After = ""
+    //                 }
+    //             }
+    //         }
+    //     };
+    //     
+    //     await semaphoreSlim.WaitAsync();
+    //     GetEntityStowContextsResponse response;
+    //     try
+    //     {
+    //         response = await service.GetEntityStowContextsAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+    //     }
+    //     finally
+    //     {
+    //         semaphoreSlim.Release();
+    //     }
+    //
+    //     return response.Body.Results;
+    // }
     
     public async Task<IList<Inventory>> QueryInventoryById(String id)
     {
@@ -1051,35 +1053,6 @@ public class GrpcClientService : IGrpcClientService
         };
         inventoryIdFilter.Values.Add(new ScalarValue {StringValue = ""});
 
-        var stowRequest = new GetEntityStowContextsRequest
-        {
-            Body = new GetEntityStowContextsRequestBody
-            {
-                Query = new EntityStowContextQuery
-                {
-                    Filter = new EntityStowContextFilter
-                    {
-                        CompositeFilter = new EntityStowContextCompositeFilter
-                        {
-                            Operator = LogicalOperator.And,
-                            Filters =
-                            {
-                                new EntityStowContextFilter { PropertyFilter = ownerIdFilter },
-                                new EntityStowContextFilter { PropertyFilter = inventoryIdFilter }
-                            }
-                        }
-                    },
-                    Pagination = new PaginationArguments
-                    {
-                        First = 20,
-                        After = ""
-                    }
-                }
-            } 
-        };
-        
-
-        var responseStow = await service.GetEntityStowContextsAsync(stowRequest, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
         
         Console.Write("hello");
     }
@@ -1160,15 +1133,15 @@ public class GrpcClientService : IGrpcClientService
     
     public bool IsConnected { get; private set; }
 
-    public async Task<IList<Friend>> GetFriendList()
+    public async Task<IList<Contact>> GetFriendList()
     {
-        var service = new FriendService.FriendServiceClient(_channel);
+        var service = new ContactsService.ContactsServiceClient(_channel);
         await semaphoreSlim.WaitAsync();
         try
         {
-            var response = await service.GetFriendListAsync(new GetFriendListRequest(), _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+            var response = await service.ListContactsAsync(new ListContactsRequest(), _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10)).ConfigureAwait(false);
 
-            return response.Friends;
+            return response.Contacts;
         }
         finally
         {
@@ -1176,13 +1149,13 @@ public class GrpcClientService : IGrpcClientService
         }
     }
 
-    public async Task<ShardInfo> GetShardInfo(uint accountId)
+    public async Task<ShardInfo> GetShardInfo(int accountId)
     {
         var request = new GetShardInfoRequest();
         
         request.AccountId = accountId;
         
-        var service = new FriendService.FriendServiceClient(_channel);
+        var service = new ContactsService.ContactsServiceClient(_channel);
         await semaphoreSlim.WaitAsync();
         try
         {

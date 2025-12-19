@@ -1,4 +1,5 @@
 ﻿using Sc.External.Common.Shard.V1;
+using Sc.External.Services.Contacts.V1;
 using Sc.External.Services.Entitygraph.V1;
 using Sc.External.Services.Friends.V1;
 using StarXelem.Models;
@@ -14,14 +15,14 @@ public interface IGrpcClientService
     Task<IList<EntityItemQueryResult>> QueryGraphBySearch(ItemQueryModel queryModel);
     Task<IList<EntityNodeProperties>> QueryGraphByParentUrnList(IList<string> parentUrnList);
     Task<IList<EntityNodeProperties>> QueryGraphByGeidListWithoutOwner(IList<ulong> geidList);
-    Task<IList<EntityStowContext>> QueryStowContextByGeidList(IList<ulong> geidList);
-    Task<IList<EntityStowContext>> QueryStowContextByOwnerId(ulong ownerId);
+    // Task<IList<EntityStowContext>> QueryStowContextByGeidList(IList<ulong> geidList);
+    // Task<IList<EntityStowContext>> QueryStowContextByOwnerId(ulong ownerId);
     Task<IList<Inventory>> QueryInventoryById(String id);
     Task<string?> GetPlayerName(ulong playerId);
     Task<IList<Node>> QueryInventoryBisById(String id);
     Task<IList<InventoryNodeProperties>> QueryInventories();
     Task TestRequest();
     bool IsConnected { get; }
-    Task<IList<Friend>> GetFriendList();
-    Task<ShardInfo> GetShardInfo(uint accountId);
+    Task<IList<Contact>> GetFriendList();
+    Task<ShardInfo> GetShardInfo(int accountId);
 }

@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using Sc.External.Common.Shard.V1;
+using Sc.External.Services.Contacts.V1;
 using Sc.External.Services.Entitygraph.V1;
 using Sc.External.Services.Friends.V1;
 using StarBreaker.Common;
@@ -13,7 +14,7 @@ namespace StarXelem.Models;
 
 public class FriendViewModel : ViewModelBase
 {
-    private readonly Friend _friend;
+    private readonly Contact _friend;
     private readonly IGrpcClientService _grpcClientService;
     private readonly System.Lazy<Task<ShardInfo?>> _shardInfo;
 
@@ -29,7 +30,7 @@ public class FriendViewModel : ViewModelBase
     public Task<int?> ShardPlayerCount => GetShardPlayerCountAsync();
     public Task<string?> ShardLocation => GetShardLocationAsync();
     
-    public FriendViewModel(Friend friend, IGrpcClientService grpcClientService)
+    public FriendViewModel(Contact friend, IGrpcClientService grpcClientService)
     {
         _friend = friend;
         _grpcClientService = grpcClientService;
@@ -44,7 +45,7 @@ public class FriendViewModel : ViewModelBase
             return Task.FromResult<ShardInfo?>(null);
         }
 
-        return _grpcClientService.GetShardInfo(_friend.Account.AccountId)!;
+        return _grpcClientService.GetShardInfo((int)_friend.Account.AccountId)!;
     }
     
     private async Task<String?> GetShardIdAsync()

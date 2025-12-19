@@ -122,10 +122,11 @@ public class LocationService : ILocationService
             }
         }
 
-        if (!String.IsNullOrEmpty(entity.EntityNodeProperties?.StowCtx?.Inv))
-        {
-            return ResolveEntityLocation(entity.EntityNodeProperties.StowCtx.Inv);
-        }
+        // TODO SC 4.5 : par quoi le remplacer ?
+        // if (!String.IsNullOrEmpty(entity.EntityNodeProperties?.StowCtx?.Inv))
+        // {
+        //     return ResolveEntityLocation(entity.EntityNodeProperties.StowCtx.Inv);
+        // }
         
         return Task.FromResult("pas de données")!;
     }
