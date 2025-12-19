@@ -3,16 +3,19 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:StarXelem.ViewModels.Popup"
+             xmlns:root="clr-namespace:StarXelem"
+             xmlns:custom="clr-namespace:StarXelem.Components"
              x:DataType="vm:PopupViewModel"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             d:DataContext="{x:Static root:DesignData.ComparisonPopupViewModel}"
              x:Class="StarXelem.Views.Popup.MainPopup"
              IsVisible="{Binding IsVisible}">
-    <Border Background="#50CCCCCC">
+    <Border Background="#50CCCCCC" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <Border Background="Gray" Margin="10" CornerRadius="15" Padding="5" HorizontalAlignment="Center" VerticalAlignment="Center" >
-            <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                <Button HorizontalAlignment="Right" CornerRadius="20" Command="{Binding CloseCommand}" IsVisible="{Binding IsCloseButtonVisible}" >X</Button>
-                <ContentControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Content="{Binding ContentViewModel}" />
-            </StackPanel>
+            <DockPanel HorizontalAlignment="Stretch" VerticalAlignment="Stretch"  >
+                <Button DockPanel.Dock="Top" HorizontalAlignment="Right" CornerRadius="20" Command="{Binding CloseCommand}" IsVisible="{Binding IsCloseButtonVisible}" >X</Button>
+                <ContentControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Content="{Binding ContentViewModel}"/>
+            </DockPanel>
         </Border>
     </Border>
 </UserControl>

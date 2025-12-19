@@ -7,4 +7,8 @@
       <ProjectReference Include="..\StarBreaker.DataCore\StarBreaker.DataCore.csproj" />
       <ProjectReference Include="..\StarBreaker.P4k\StarBreaker.P4k.csproj" />
     </ItemGroup>
+    
+    <ItemGroup>
+      <Folder Include="Generated\" />
+    </ItemGroup>
 </Project>

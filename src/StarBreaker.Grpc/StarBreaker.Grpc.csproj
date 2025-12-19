@@ -26,8 +26,4 @@
     <ItemGroup>
         <ProjectReference Include="..\StarBreaker.Common\StarBreaker.Common.csproj"/>
     </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Protos\" />
-    </ItemGroup>
 </Project>

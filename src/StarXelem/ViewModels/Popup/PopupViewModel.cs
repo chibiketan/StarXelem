@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -7,11 +8,11 @@ using CommunityToolkit.Mvvm.Messaging.Messages;
 namespace StarXelem.ViewModels.Popup;
 
 public class ShowPopupMessage {
-    public readonly ViewModelBase? ViewModel;
+    public readonly IPopupContentViewModel? ViewModel;
     public readonly bool ShowCloseButton;
     public readonly Action? OnClose;
     
-    public ShowPopupMessage(bool showCloseButton = true, Action? onClose = null, ViewModelBase? viewModel = null)
+    public ShowPopupMessage(bool showCloseButton = true, Action? onClose = null, IPopupContentViewModel? viewModel = null)
     {
         ViewModel = viewModel;
         ShowCloseButton = showCloseButton;
@@ -28,7 +29,7 @@ public partial class PopupViewModel : ViewModelBase, IRecipient<ShowPopupMessage
 {
     [ObservableProperty] private bool _isVisible = false;
     [ObservableProperty] private bool _isCloseButtonVisible = true;
-    [ObservableProperty] private ViewModelBase? _ContentViewModel;
+    [ObservableProperty] private IPopupContentViewModel? _ContentViewModel;
     
     private ShowPopupMessage? _message;
 
@@ -48,8 +49,26 @@ public partial class PopupViewModel : ViewModelBase, IRecipient<ShowPopupMessage
         Debug.Assert(_message == null); // The popup can only be shown if not already shown
         _message = message;
         IsCloseButtonVisible = _message.ShowCloseButton;
-        IsVisible = true;
+        // The popup visual expects a ViewModelBase; our popup content view models inherit from it
         ContentViewModel = _message.ViewModel;
+        IsVisible = true;
+
+        if (null != _message.ViewModel)
+        {
+            _ = TriggerOnShownAsync(_message.ViewModel);
+        }
+    }
+
+    private static async Task TriggerOnShownAsync(IPopupContentViewModel popupContent)
+    {
+        try
+        {
+            await popupContent.OnPopupShownAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            // swallowed on purpose: the popup should still be displayed even if the content fails its init
+        }
     }
 
     [RelayCommand]

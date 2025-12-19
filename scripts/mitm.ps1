@@ -6,3 +6,12 @@
 
 #mitmweb.exe --mode local:StarCitizen.exe  --allow-hosts 'cloudimperiumgames.com' -s stream-sc.py --set descriptor="D:\\repos\\starcitizen\\StarBreaker-master\\scripts\\set.bin"
 uvx --from mitmproxy --with protobuf mitmweb --mode local:StarCitizen.exe  --allow-hosts 'cloudimperiumgames.com' -s stream-sc.py --set descriptor="set.bin"
+
+
+
+# A exécuter à chaquye version de SC :
+# .\StarBreaker.Cli.exe proto-set-extract -i 'D:\Games\Roberts Space Industries\StarCitizen\LIVE\Bin64\StarCitizen.exe' -o ..\..\..\..\StarBreaker.Grpc\set.bin
+# .\StarBreaker.Cli.exe dcb-generate -o ..\..\..\..\StarBreaker.DataCore.Generated\Generated -p 'D:\Games\Roberts Space Industries\StarCitizen\LIVE\Data.p4k'
+# .\StarBreaker.Cli.exe proto-extract -i 'D:\Games\Roberts Space Industries\StarCitizen\LIVE\Bin64\StarCitizen.exe' -o ..\..\..\..\StarBreaker.Grpc\Protos
+# Mise à jour pour mitm
+# .\StarBreaker.Cli.exe proto-set-extract -i 'D:\Games\Roberts Space Industries\StarCitizen\LIVE\Bin64\StarCitizen.exe' -o ..\..\..\..\..\scripts\set.bin

@@ -333,7 +333,6 @@ public partial class ItemsTabViewModel : PageViewModelBase
         WeakReferenceMessenger.Default.Send(new ShowPopupMessage(showCloseButton:false, viewModel: vm));
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(10));
             var items = ItemList != null ? await ItemList : new List<ItemViewModel>();
 
             // En-têtes alignés avec les colonnes de la DataGrid
@@ -512,13 +511,13 @@ public partial class ItemsTabViewModel : PageViewModelBase
     }
 
     [RelayCommand(CanExecute = nameof(CanCompareDataFromImport))]
-    public Task CompareDataFromImportAsync()
+    public async Task CompareDataFromImportAsync()
     {
-        var vm = App.Current.Services.GetRequiredService<LoadingPopupContentViewModel>();
-        vm.ShowLoading = false;
-        vm.Message = "Ceci est un test";
+        var vm = App.Current.Services.GetRequiredService<ItemComparisonPopupContentViewModel>();
+        //vm.ShowLoading = false;
+        //vm.Message = "Ceci est un test";
+        vm.Target = new List<ItemViewModel>(await ItemList);
         WeakReferenceMessenger.Default.Send(new ShowPopupMessage(showCloseButton:true, viewModel: vm));
-        return Task.CompletedTask;
     }
 
     public bool CanCompareDataFromImport()

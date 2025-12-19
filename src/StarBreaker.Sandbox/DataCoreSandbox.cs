@@ -25,7 +25,7 @@ public static class DataCoreSandbox
 
         //const uint target = 1323318587;
         //const uint target = 411270983; // calva
-        const uint target = 4154328195; // ????
+        const uint target = 660982239; // ????
 
         var area18TagGuid = new CigGuid("71c8a4e7-776b-431a-8da2-4761d796af18");
         var area18Crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([area18TagGuid]));

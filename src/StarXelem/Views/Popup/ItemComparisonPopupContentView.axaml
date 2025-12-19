@@ -1,0 +1,119 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels.Popup"
+             xmlns:root="clr-namespace:StarXelem"
+             xmlns:conv="clr-namespace:StarXelem.Converters"
+             xmlns:system="clr-namespace:System;assembly=System.Runtime"
+             x:DataType="vm:ItemComparisonPopupContentViewModel"
+             d:DataContext="{x:Static root:DesignData.ItemComparisonPopupContentViewModel }"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="StarXelem.Views.Popup.ItemComparisonPopupContentView"
+             HorizontalAlignment="Stretch"
+             VerticalAlignment="Stretch">
+    <UserControl.Resources>
+        <conv:StatusToIconConverter x:Key="StatusToIconConverter"/>
+        <conv:StatusToVisibilityConverter x:Key="StatusToVisibilityConverter"/>
+        <StreamGeometry x:Key="arrow_up_right_regular">M12.748109,3.00129623 L20.3018618,3.00180934 L20.4020922,3.01572723 L20.4020922,3.01572723 L20.5009384,3.04332427 L20.5009384,3.04332427 L20.5612467,3.06889413 L20.5612467,3.06889413 C20.6404539,3.1037255 20.7146881,3.15440738 20.7799038,3.21960789 L20.8206178,3.2636488 L20.8206178,3.2636488 L20.8811543,3.34512786 L20.8811543,3.34512786 L20.9183431,3.41015101 L20.9183431,3.41015101 L20.9570257,3.50046614 L20.9570257,3.50046614 L20.9762122,3.56459327 L20.9762122,3.56459327 L20.9897917,3.6285349 L20.9897917,3.6285349 L20.9991061,3.72173042 L20.9991061,3.72173042 L20.9996358,11.2551867 C20.9996358,11.6694002 20.6638494,12.0051867 20.2496358,12.0051867 C19.86994,12.0051867 19.5561448,11.7230328 19.5064824,11.3569572 L19.4996358,11.2551867 L19.4991881,5.55929623 L4.27958018,20.7845763 C4.01334477,21.050874 3.59668392,21.0751288 3.30304694,20.8573087 L3.21892002,20.7847004 C2.95262231,20.518465 2.92836752,20.1018041 3.14618764,19.8081671 L3.21879595,19.7240402 L18.4381881,4.50029623 L12.748109,4.50129623 C12.3684132,4.50129623 12.054618,4.21914235 12.0049556,3.85306678 L11.998109,3.75129623 C11.998109,3.37160046 12.2802629,3.05780527 12.6463384,3.00814284 L12.748109,3.00129623 Z</StreamGeometry>
+        <StreamGeometry x:Key="arrow_down_left_regular">M3.3945553,20.9153925 C3.18663416,20.8037786 3.03904582,20.6001233 3.0053975,20.3601121 L2.998109,20.2551867 L2.998109,12.7512962 C2.998109,12.3370827 3.33389544,12.0012962 3.748109,12.0012962 C4.12780477,12.0012962 4.44159996,12.2834501 4.49126239,12.6495257 L4.498109,12.7512962 L4.497109,18.445 L19.7192437,3.21973195 C19.9854791,2.95343424 20.4021399,2.92917946 20.6957769,3.14699957 L20.7799038,3.21960789 C21.0462016,3.4858433 21.0704563,3.90250415 20.8526362,4.19614112 L20.7800279,4.28026805 L5.558109,19.505 L11.2496358,19.5051867 C11.6293316,19.5051867 11.9431268,19.7873406 11.9927892,20.1534161 L11.9996358,20.2551867 C11.9996358,20.6348824 11.7174819,20.9486776 11.3514064,20.9983401 L11.2496358,21.0051867 L3.68986264,21.0019727 L3.68986264,21.0019727 C3.60711491,20.9965305 3.52872811,20.9769353 3.45617515,20.946248 L3.3945553,20.9153925 Z</StreamGeometry>
+        <StreamGeometry x:Key="arrow_right_regular">M15.2685,4.20949 C14.97,3.92233 14.4952,3.93153 14.208,4.23005 C13.9209,4.52857 13.9301,5.00335 14.2286,5.29051 L22.5028,13.25 L3.75,13.25 C3.33579,13.25 3,13.5858 3,13.9999982 C3,14.4142 3.33579,14.75 3.75,14.75 L22.5018,14.75 L14.2286,22.7085 C13.9301,22.9957 13.9209,23.4705 14.208,23.769 C14.4952,24.0675 14.97,24.0767 15.2685,23.7896 L24.6965,14.7202 C25.1054,14.3268 25.1054,13.6723 24.6965,13.2788 L15.2685,4.20949 Z</StreamGeometry>
+        <StreamGeometry x:Key="new_regular">M13.25,17.5 C13.6642,17.5 14,17.8358 14,18.25 C14,18.6642 13.6642,19 13.25,19 L4.75,19 C4.33579,19 4,18.6642 4,18.25 C4,17.8358 4.33579,17.5 4.75,17.5 L13.25,17.5 Z M7.21967,7.21967 C7.48593364,6.95340636 7.90260223,6.92920058 8.19621222,7.14705264 L8.28033,7.21967 L14.7803,13.7197 C15.0732,14.0126 15.0732,14.4874 14.7803,14.7803 C14.5140273,15.0465727 14.097424,15.0707793 13.8038184,14.8529198 L13.7197,14.7803 L7.21967,8.28033 C6.92678,7.98744 6.92678,7.51256 7.21967,7.21967 Z M18.25,4 C18.6642,4 19,4.33579 19,4.75 L19,13.25 C19,13.6642 18.6642,14 18.25,14 C17.8358,14 17.5,13.6642 17.5,13.25 L17.5,4.75 C17.5,4.33579 17.8358,4 18.25,4 Z</StreamGeometry>
+        <StreamGeometry x:Key="delete_regular">M24,7.25 C27.1017853,7.25 29.629937,9.70601719 29.7458479,12.7794443 L29.75,13 L37,13 C37.6903559,13 38.25,13.5596441 38.25,14.25 C38.25,14.8972087 37.7581253,15.4295339 37.1278052,15.4935464 L37,15.5 L35.909,15.5 L34.2058308,38.0698451 C34.0385226,40.2866784 32.1910211,42 29.9678833,42 L18.0321167,42 C15.8089789,42 13.9614774,40.2866784 13.7941692,38.0698451 L12.09,15.5 L11,15.5 C10.3527913,15.5 9.8204661,15.0081253 9.75645361,14.3778052 L9.75,14.25 C9.75,13.6027913 10.2418747,13.0704661 10.8721948,13.0064536 L11,13 L18.25,13 C18.25,9.82436269 20.8243627,7.25 24,7.25 Z M33.4021054,15.5 L14.5978946,15.5 L16.2870795,37.8817009 C16.3559711,38.7945146 17.116707,39.5 18.0321167,39.5 L29.9678833,39.5 C30.883293,39.5 31.6440289,38.7945146 31.7129205,37.8817009 L33.4021054,15.5 Z M27.25,20.75 C27.8972087,20.75 28.4295339,21.2418747 28.4935464,21.8721948 L28.5,22 L28.5,33 C28.5,33.6903559 27.9403559,34.25 27.25,34.25 C26.6027913,34.25 26.0704661,33.7581253 26.0064536,33.1278052 L26,33 L26,22 C26,21.3096441 26.5596441,20.75 27.25,20.75 Z M20.75,20.75 C21.3972087,20.75 21.9295339,21.2418747 21.9935464,21.8721948 L22,22 L22,33 C22,33.6903559 21.4403559,34.25 20.75,34.25 C20.1027913,34.25 19.5704661,33.7581253 19.5064536,33.1278052 L19.5,33 L19.5,22 C19.5,21.3096441 20.0596441,20.75 20.75,20.75 Z M24,9.75 C22.2669685,9.75 20.8507541,11.1064548 20.7551448,12.8155761 L20.75,13 L27.25,13 C27.25,11.2050746 25.7949254,9.75 24,9.75 Z</StreamGeometry>
+        <DataTemplate x:Key="headerOverflow" x:DataType="system:String">
+            <Grid>
+                <TextBlock TextWrapping="WrapWithOverflow" TextAlignment="Center" Text="{Binding .}"></TextBlock>
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
+    <Grid Margin="10" RowDefinitions="Auto,*" RowSpacing="10">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10">
+            <TextBlock VerticalAlignment="Center">Nom :</TextBlock>
+            <TextBox Width="100" VerticalAlignment="Center" Text="{Binding SearchedName}" />
+            <TextBlock VerticalAlignment="Center">Status :</TextBlock>
+            <ScrollViewer MaxHeight="100">
+                <ItemsControl ItemsSource="{Binding ComparisonDiffTypeOptions}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Panel HorizontalAlignment="Stretch">
+                                <CheckBox HorizontalAlignment="Stretch" IsChecked="{Binding IsSelected}">
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </CheckBox>
+                            </Panel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </StackPanel>
+        <DataGrid Grid.Row="1" ItemsSource="{Binding FilteredResults}" IsReadOnly="True">
+            <DataGrid.Styles>
+                <Style x:DataType="DataGrid">
+                    <Setter Property="Background" Value="Black"/>
+                </Style>
+                <Style Selector="DataGridCell.centerCell" >
+                    <Setter Property="HorizontalContentAlignment" Value="Center" />
+                </Style>
+            </DataGrid.Styles>
+            <DataGrid.Columns>
+                <DataGridTextColumn Width="2*" Header="Type" Binding="{Binding TechnicalType}" />
+                <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding Name}" />
+                <DataGridTextColumn Width="95" Header="Quantité Excel" Binding="{Binding SourceCountSum}" CellStyleClasses="centerCell" HeaderTemplate="{StaticResource headerOverflow}" />
+                <DataGridTextColumn Width="95" Header="Quantité Live" Binding="{Binding TargetStackSum}" CellStyleClasses="centerCell" HeaderTemplate="{StaticResource headerOverflow}" />
+                <DataGridTemplateColumn Width="100" Header="Statut" SortMemberPath="Status" HeaderTemplate="{StaticResource headerOverflow}">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <!--
+                                We render distinct components and toggle their visibility
+                                based on the row Status. This gives full control over what
+                                is displayed for each value (layout, colors, icons, etc.).
+                            -->
+                            <Grid HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0 0 10 0">
+                                <!-- Equal -->
+                                <StackPanel HorizontalAlignment="Stretch" Orientation="Horizontal"
+                                            IsVisible="{Binding Status, Converter={StaticResource StatusToVisibilityConverter}, ConverterParameter=Equal}">
+                                    <!-- <TextBlock Text="✅" FontSize="16" Margin="0,0,4,0"/> -->
+                                    <PathIcon Data="{StaticResource arrow_right_regular}" Height="14" />
+                                    <TextBlock VerticalAlignment="Center" Text="Égal"/>
+                                </StackPanel>
+
+                                <!-- Gain -->
+                                <StackPanel HorizontalAlignment="Stretch" Orientation="Horizontal"
+                                            IsVisible="{Binding Status, Converter={StaticResource StatusToVisibilityConverter}, ConverterParameter=Gain}">
+                                    <!-- <TextBlock Text="⬆️" FontSize="16" Margin="0,0,4,0"/> -->
+                                    <PathIcon Data="{StaticResource arrow_up_right_regular}" Foreground="LightGreen" Height="14" />
+                                    <TextBlock Text="Gain"/>
+                                </StackPanel>
+
+                                <!-- Loss -->
+                                <StackPanel Orientation="Horizontal"
+                                            IsVisible="{Binding Status, Converter={StaticResource StatusToVisibilityConverter}, ConverterParameter=Loss}">
+                                    <!-- <TextBlock Text="⬇️" FontSize="16" Margin="0,0,4,0"/> -->
+                                    <PathIcon Data="{StaticResource arrow_down_left_regular}" Foreground="Orange" Height="14" >
+                                        <PathIcon.RenderTransform><RotateTransform Angle="-90" /></PathIcon.RenderTransform>
+                                    </PathIcon>
+                                    <TextBlock Text="Perte"/>
+                                </StackPanel>
+
+                                <!-- OnlySource -->
+                                <StackPanel Orientation="Horizontal"
+                                            IsVisible="{Binding Status, Converter={StaticResource StatusToVisibilityConverter}, ConverterParameter=OnlySource}">
+                                    <!-- <TextBlock Text="📥" FontSize="16" Margin="0,0,4,0"/> -->
+                                    <PathIcon Data="{StaticResource delete_regular}" Foreground="Red" Height="14" />
+                                    <TextBlock Text="Disparu"/>
+                                </StackPanel>
+
+                                <!-- OnlyTarget -->
+                                <StackPanel Orientation="Horizontal"
+                                            IsVisible="{Binding Status, Converter={StaticResource StatusToVisibilityConverter}, ConverterParameter=OnlyTarget}">
+                                    <!-- <TextBlock Text="📤" FontSize="16" Margin="0,0,4,0"/> -->
+                                    <PathIcon Data="{StaticResource new_regular}" Foreground="Yellow" Height="14" />
+                                    <TextBlock Text="Nouveau"/>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>

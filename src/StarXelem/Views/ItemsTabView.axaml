@@ -49,7 +49,7 @@
                 </ScrollViewer>
                 <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Command="{Binding ResetSelectedTypesCommand}" Height="20" Width="25">
-                        <PathIcon Data="{StaticResource arrow_rotate_clockwise_regular}" Height="14" />
+                         
                     </Button>
                 </StackPanel>
 

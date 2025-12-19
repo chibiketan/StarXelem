@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<FriendListTabViewModel>();
         services.AddTransient<PopupViewModel>();
         services.AddTransient<LoadingPopupContentViewModel>();
+        services.AddTransient<ItemComparisonPopupContentViewModel>();
 
         if (isDesignMode)
         {
