@@ -1,0 +1,28 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:StarXelem.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="StarXelem.Views.ExtractionTabView"
+             x:DataType="vm:ExtractionTabViewModel">
+    <Grid RowDefinitions="Auto, *">
+        <StackPanel Grid.Row="0" Margin="20" Spacing="20">
+            <TextBlock Text="Extractions" FontSize="24" FontWeight="Bold" />
+            <TextBlock Text="Générer un fichier CSV contenant l'ensemble des IDs CIG et leur valeur CRC32." TextWrapping="Wrap" />
+            
+            <Button Command="{Binding ExtractCigIdsCommand}" 
+                    Content="Générer le CSV des IDs CIG" 
+                    HorizontalAlignment="Left"
+                    Padding="10,5" />
+            
+            <StackPanel IsVisible="{Binding IsExtracting}" Spacing="10">
+                <ProgressBar IsIndeterminate="True" Height="4" />
+                <TextBlock Text="{Binding StatusMessage}" FontStyle="Italic" />
+            </StackPanel>
+            
+            <TextBlock IsVisible="{Binding !IsExtracting}" 
+                       Text="{Binding StatusMessage}" />
+        </StackPanel>
+    </Grid>
+</UserControl>
