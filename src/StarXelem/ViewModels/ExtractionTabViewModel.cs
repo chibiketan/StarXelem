@@ -60,21 +60,18 @@ public partial class ExtractionTabViewModel : PageViewModelBase
                 
                 using var entry = _p4kService.P4KFileSystem.OpenRead(DataCorePath);
                 var dcb = new DataCoreDatabase(entry);
-                
                 var records = dcb.MainRecords;
                 
-                var csvContent = new StringBuilder();
-                csvContent.AppendLine("CIG ID,CRC32");
+                await using var stream = await file.OpenWriteAsync();
+                await using var writer = new StreamWriter(stream, Encoding.UTF8);
+                await writer.WriteLineAsync("CIG ID,CRC32");
+                
 
                 foreach (var guid in records)
                 {
                     var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([guid]));
-                    csvContent.AppendLine($"{guid},{crc}");
+                    await writer.WriteLineAsync($"{guid},{crc}");
                 }
-
-                await using var stream = await file.OpenWriteAsync();
-                await using var writer = new StreamWriter(stream, Encoding.UTF8);
-                await writer.WriteAsync(csvContent.ToString());
             });
 
             StatusMessage = "Extraction terminée avec succès.";
