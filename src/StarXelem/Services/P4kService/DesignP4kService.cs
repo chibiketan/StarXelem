@@ -96,6 +96,11 @@ public class DesignP4kService : IP4kService
         return Task.FromResult<DataCoreTypedRecord?>(null);
     }
 
+    public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition()
+    {
+        yield break;
+    }
+
     private static P4kEntry[] GetFakeEntries() =>
     [
         new(@"Data\entry1", 69, 69, 0, false, 123, 0xffff, 0xdeadbeef),

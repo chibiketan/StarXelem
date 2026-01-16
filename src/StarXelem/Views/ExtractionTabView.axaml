@@ -16,6 +16,14 @@
                     HorizontalAlignment="Left"
                     Padding="10,5" />
             
+            <Separator></Separator>
+            
+            <TextBlock Text="Extrait le fichier des libellés des fichiers du jeu, identifie les composants et ajoute le type, la taille et le rang au début et dépose le fichier au bon endroit pour être utilisé par le jeu." TextWrapping="Wrap" />
+            <Button Command="{Binding UpdateLocalisationCommand}" 
+                    Content="Mettre à jour le fichier de langue pour les composants" 
+                    HorizontalAlignment="Left"
+                    Padding="10,5" />
+
             <StackPanel IsVisible="{Binding IsExtracting}" Spacing="10">
                 <ProgressBar IsIndeterminate="True" Height="4" />
                 <TextBlock Text="{Binding StatusMessage}" FontStyle="Italic" />

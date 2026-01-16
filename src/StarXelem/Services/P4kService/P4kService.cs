@@ -276,4 +276,15 @@ public class P4kService : IP4kService
         
         return _EntityClassDict.GetValueOrDefault(guidCrc);
     }
+
+    public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition()
+    {
+        await LoadDatabaseIfNeeded();
+
+        foreach (var record in _EntityClassDict.Values)
+        {
+            if (record.Data is EntityClassDefinition)
+                yield return record;
+        }
+    }
 }

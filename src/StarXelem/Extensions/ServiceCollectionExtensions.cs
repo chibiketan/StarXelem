@@ -23,6 +23,7 @@ public static class ServiceCollectionExtensions
         });
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<ShipTabViewModel>();
+        services.AddTransient<P4kShipTabViewModel>();
         services.AddTransient<ItemsTabViewModel>();
         services.AddTransient<ContainerTabViewModel>();
         services.AddTransient<FriendListTabViewModel>();

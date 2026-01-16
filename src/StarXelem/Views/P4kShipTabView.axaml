@@ -1,0 +1,54 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels"
+             xmlns:local="clr-namespace:StarXelem"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
+             x:DataType="vm:P4kShipTabViewModel"
+             d:DataContext="{x:Static local:DesignData.P4kShipTabViewModel}"
+             x:Class="StarXelem.Views.P4kShipTabView">
+    <Grid ColumnDefinitions="300,*" RowDefinitions="Auto,*" RowSpacing="8" ColumnSpacing="8">
+        <!-- Header / Progress -->
+        <StackPanel Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+            <TextBlock Text="Ships from P4K" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" Width="150" Height="6" VerticalAlignment="Center"/>
+            <CheckBox Content="Show only visible ships"
+                      IsChecked="{Binding ShowOnlyVisible, Mode=TwoWay}"
+                      VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Ship list -->
+        <ListBox Grid.Row="1" Grid.Column="0"
+                 ItemsSource="{Binding Ships}"
+                 SelectedItem="{Binding SelectedShip}"
+                 HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel>
+                        <TextBlock Text="{Binding Manufacturer}"/>
+                        <TextBlock Text="{Binding Name}"/>
+                        <TextBlock Text="{Binding TechnicalName, StringFormat=({0})}"/>
+                        <!-- <TextBlock Text="{Binding  Tags}" TextWrapping="Wrap" /> -->
+                        <!-- <TextBlock Text="{Binding IsVisible, StringFormat=(IsVisible : {0})}"/> -->
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Components grid -->
+        <DataGrid Grid.Row="1" Grid.Column="1"
+                  ItemsSource="{Binding Components}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  GridLinesVisibility="All">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Port" Binding="{Binding PortName}" />
+                <DataGridTextColumn Header="Display Name" Binding="{Binding DisplayName}" />
+                <DataGridTextColumn Header="Min Size" Binding="{Binding MinSize}" />
+                <DataGridTextColumn Header="Max Size" Binding="{Binding MaxSize}" />
+                <DataGridTextColumn Header="Flags" Binding="{Binding Flags}" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>

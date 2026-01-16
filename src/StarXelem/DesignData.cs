@@ -16,6 +16,7 @@ public static class DesignData
     public static PopupViewModel ComparisonPopupViewModel { get; } = App.Current.Services.GetRequiredService<PopupViewModel>();
     
     public static ItemComparisonPopupContentViewModel ItemComparisonPopupContentViewModel { get; } = App.Current.Services.GetRequiredService<ItemComparisonPopupContentViewModel>();
+    public static P4kShipTabViewModel P4kShipTabViewModel { get; } = App.Current.Services.GetRequiredService<P4kShipTabViewModel>();
 
 
     static DesignData()
@@ -54,6 +55,14 @@ public static class DesignData
         ComparisonPopupViewModel.ContentViewModel = ItemComparisonPopupContentViewModel;
         ComparisonPopupViewModel.IsVisible = true;
         ComparisonPopupViewModel.IsCloseButtonVisible = true;
+        
+        P4kShipTabViewModel.Ships.Add(new P4kShipModel
+        {
+            EntityClass = null,
+            Name = "Test ship",
+            TechnicalName = "test_ship",
+            Manufacturer = "Test Manufacturer"
+        });
 
     }
 }

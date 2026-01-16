@@ -59,6 +59,7 @@ public partial class MainWindowViewModel : ViewModelBase
         Pages =
         [
             App.Current.Services.GetRequiredService<ShipTabViewModel>(),
+            App.Current.Services.GetRequiredService<P4kShipTabViewModel>(),
             App.Current.Services.GetRequiredService<ItemsTabViewModel>(),
             App.Current.Services.GetRequiredService<ContainerTabViewModel>(),
             App.Current.Services.GetRequiredService<FriendListTabViewModel>(),
@@ -83,19 +84,15 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] 
     private ObservableCollection<PageViewModelBase> _pages;
 
+    partial void OnCurrentPageChanged(PageViewModelBase value)
+    {
+        _ = value.LoadAsync();
+    }
+
     partial void OnSelectedP4kFileChanged(P4kFileModel? value)
     {
         // On met à jour le fichier sélectionné dans le service
         _p4kService.SelectedP4KFile = value;
-
-        // On notifie les pages
-        foreach (var page in Pages)
-        {
-            if (page is ExtractionTabViewModel extractionPage)
-            {
-                extractionPage.OnSelectedP4KFileChanged();
-            }
-        }
     }
 
     private async Task OpenDataP4kAsync(object? parameter)

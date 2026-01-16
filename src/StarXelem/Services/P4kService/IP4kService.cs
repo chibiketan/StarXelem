@@ -30,4 +30,10 @@ public interface IP4kService
     /// <returns>La valeur trouvée qui correspond à la clé, sinon null</returns>
     Task<string?> GetLocaleValue(string? key);
     Task<DataCoreTypedRecord?> GetEntityType(uint guidCrc);
+
+    /// <summary>
+    /// Retourne l'ensemble des enregistrements de type EntityClassDefinition
+    /// </summary>
+    /// <returns>UUne énumération asynchronie des enregistrements</returns>
+    IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition();
 }
