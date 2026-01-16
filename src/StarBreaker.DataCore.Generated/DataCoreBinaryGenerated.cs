@@ -40,21 +40,53 @@ public sealed partial class DataCoreBinaryGenerated : IDataCoreBinary<DataCoreTy
         throw new NotImplementedException();
     }
 
+    [ThreadStatic] private static Stack<CigGuid> s_loadedRecords;
+    
     public T? ReadFromReference<T>(DataCoreReference reference) where T : class, IDataCoreReadable<T>
     {
+        s_loadedRecords = s_loadedRecords ?? new Stack<CigGuid>();
+        
         if (reference.RecordId == CigGuid.Empty || reference.InstanceIndex == -1)
             return null;
 
-        if (Database.MainRecords.TryGetValue(reference.RecordId, out var mr))
-            return null;
 
+        // Si le guid est déjà dans la liste, on retourne null, c'est une référence cyclique
+        if (s_loadedRecords.Contains(reference.RecordId))
+        {
+            return null;
+        }
+
+        if (s_loadedRecords.Count >= 1)
+        {
+            // On s'arrête à 1 inclusions 
+            return null;
+        } 
+
+        // ajouter dans une liste statthread le guid en cours de chargement
+        s_loadedRecords.Push(reference.RecordId);
+
+        // On récupère le record associé au GUID
         var record = Database.GetRecord(reference.RecordId);
-        return ReadFromInstance<T>(record.StructIndex, record.InstanceIndex);
+
+        // Au cas ou, un dernier check pour être sur
+        if (null == record)
+        {
+            // On pop la valeur
+            s_loadedRecords.Pop();
+            return null;
+        }
+        
+        var instance = ReadFromInstance<T>(record.StructIndex, record.InstanceIndex);
+        
+        // On pop la valeur
+        s_loadedRecords.Pop();
+        return instance;
     }
 
     public T? ReadFromPointer<T>(DataCorePointer pointer) where T : class, IDataCoreReadable<T>
     {
-        return ReadFromInstance<T>(pointer.StructIndex, pointer.InstanceIndex);
+        return (T?)ReadFromRecord(pointer.StructIndex, pointer.InstanceIndex);
+        //return ReadFromInstance<T>(pointer.StructIndex, pointer.InstanceIndex);
     }
 
     public T? ReadFromInstance<T>(int structIndex, int instanceIndex) where T : class, IDataCoreReadable<T>
