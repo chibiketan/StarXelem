@@ -16,7 +16,39 @@ public class P4kShipComponentModel
 {
     public required string PortName { get; set; }
     public required string DisplayName { get; set; }
-    public required string MinSize { get; set; }
-    public required string MaxSize { get; set; }
-    public required string Flags { get; set; }
+    public required ComponentClass Class { get; set; }
+    public required int Size { get; set; }
+    public required string Grade { get; set; }
+
+    public string? ClassIconPath
+    {
+        get
+        {
+            switch (Class)
+            {
+                case ComponentClass.Military: return "/Assets/Components/icone_militaire_50.png";
+                case ComponentClass.Civilian: return "/Assets/Components/icone_civile_50.png";
+                case ComponentClass.Competition: return "/Assets/Components/icone_competition_50.png";
+                case ComponentClass.Industrial: return "/Assets/Components/icone_industriel_50.png";
+                case ComponentClass.Stealth: return "/Assets/Components/icone_stealth_50.png";
+                default: return null;
+            }
+        }
+    }
+}
+
+public class P4kShipManufacturerModel
+{
+    public SCItemManufacturer? Manufacturer { get; set; }
+    public required string Name { get; set; }
+}
+
+public enum ComponentClass
+{
+    Unknown,
+    Military,
+    Industrial,
+    Civilian,
+    Competition,
+    Stealth,
 }

@@ -64,5 +64,74 @@ public static class DesignData
             Manufacturer = "Test Manufacturer"
         });
 
+        // Coolers
+        P4kShipTabViewModel.CoolerList.Add(new ()
+        {
+            Grade = "A",
+            Size = 1,
+            Class = ComponentClass.Military,
+            DisplayName = "Cooler A1",
+            PortName = "CoolerA1"
+        });
+        P4kShipTabViewModel.CoolerList.Add(new ()
+        {
+            Grade = "B",
+            Size = 1,
+            Class = ComponentClass.Military,
+            DisplayName = "Cooler B1",
+            PortName = "CoolerB1"
+        });
+        P4kShipTabViewModel.CoolerList.Add(new ()
+        {
+            Grade = "C",
+            Size = 1,
+            Class = ComponentClass.Military,
+            DisplayName = "Cooler C1",
+            PortName = "CoolerC1"
+        });
+        P4kShipTabViewModel.CoolerList.Add(new ()
+        {
+            Grade = "D",
+            Size = 1,
+            Class = ComponentClass.Military,
+            DisplayName = "Cooler D1",
+            PortName = "CoolerD1"
+        });
+        
+        // Powerplants
+        P4kShipTabViewModel.PowerplantList.AddRange([
+            new ()
+            {
+                Grade = "A",
+                Size = 0,
+                Class = ComponentClass.Industrial,
+                DisplayName = "Powerplant A0",
+                PortName = "PowerplantA0"
+            },
+            new ()
+            {
+                Grade = "B",
+                Size = 0,
+                Class = ComponentClass.Industrial,
+                DisplayName = "Powerplant B0",
+                PortName = "PowerplantB0"
+            },
+            new ()
+            {
+                Grade = "C",
+                Size = 0,
+                Class = ComponentClass.Industrial,
+                DisplayName = "Powerplant C0",
+                PortName = "PowerplantC0"
+            },
+            new ()
+            {
+                Grade = "D",
+                Size = 0,
+                Class = ComponentClass.Industrial,
+                DisplayName = "Powerplant D0",
+                PortName = "PowerplantD0"
+            }
+        ]);
     }
 }

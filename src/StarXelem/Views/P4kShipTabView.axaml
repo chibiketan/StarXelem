@@ -2,13 +2,23 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
              xmlns:vm="clr-namespace:StarXelem.ViewModels"
              xmlns:local="clr-namespace:StarXelem"
+             xmlns:conv="clr-namespace:StarXelem.Converters"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
              x:DataType="vm:P4kShipTabViewModel"
              d:DataContext="{x:Static local:DesignData.P4kShipTabViewModel}"
              x:Class="StarXelem.Views.P4kShipTabView">
-    <Grid ColumnDefinitions="300,*" RowDefinitions="Auto,*" RowSpacing="8" ColumnSpacing="8">
+    <UserControl.Resources>
+        <conv:ComponentGradeToBackgroundColorConverter x:Key="ComponentGradeToBackgroundColorConverter" />
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="DataGrid.component DataGridRow">
+            <Setter Property="Background" Value="{Binding Converter={StaticResource ComponentGradeToBackgroundColorConverter}}"></Setter>
+        </Style>
+    </UserControl.Styles>
+    <Grid ColumnDefinitions="300,*" RowDefinitions="Auto,200,*" RowSpacing="8" ColumnSpacing="8">
         <!-- Header / Progress -->
         <StackPanel Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
             <TextBlock Text="Ships from P4K" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -18,37 +28,187 @@
                       VerticalAlignment="Center"/>
         </StackPanel>
 
-        <!-- Ship list -->
-        <ListBox Grid.Row="1" Grid.Column="0"
-                 ItemsSource="{Binding Ships}"
-                 SelectedItem="{Binding SelectedShip}"
-                 HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <StackPanel>
-                        <TextBlock Text="{Binding Manufacturer}"/>
-                        <TextBlock Text="{Binding Name}"/>
-                        <TextBlock Text="{Binding TechnicalName, StringFormat=({0})}"/>
-                        <!-- <TextBlock Text="{Binding  Tags}" TextWrapping="Wrap" /> -->
-                        <!-- <TextBlock Text="{Binding IsVisible, StringFormat=(IsVisible : {0})}"/> -->
-                    </StackPanel>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+        <!-- Manufacturer list -->
+        <DockPanel Grid.Row="1" Grid.Column="0">
+            <TextBlock DockPanel.Dock="Top" FontWeight="Bold" Margin="10 0 0 0">Constructeurs :</TextBlock>
+            <ScrollViewer>
+                <ListBox
+                        ItemsSource="{Binding AllManufacturer}"
+                        SelectedItem="{Binding SelectedManufacturer}"
+                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <TextBlock Text="{Binding Name}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </ScrollViewer>
+        </DockPanel>
 
-        <!-- Components grid -->
-        <DataGrid Grid.Row="1" Grid.Column="1"
-                  ItemsSource="{Binding Components}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  GridLinesVisibility="All">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Port" Binding="{Binding PortName}" />
-                <DataGridTextColumn Header="Display Name" Binding="{Binding DisplayName}" />
-                <DataGridTextColumn Header="Min Size" Binding="{Binding MinSize}" />
-                <DataGridTextColumn Header="Max Size" Binding="{Binding MaxSize}" />
-                <DataGridTextColumn Header="Flags" Binding="{Binding Flags}" />
-            </DataGrid.Columns>
-        </DataGrid>
+        <!-- Ship list -->
+        <DockPanel Grid.Row="2" Grid.Column="0">
+            
+            <Separator DockPanel.Dock="Top" />
+            <TextBlock DockPanel.Dock="Top" FontWeight="Bold" Margin="10 0 0 0">Vaisseaux :</TextBlock>
+            <ListBox
+                     ItemsSource="{Binding Ships}"
+                     SelectedItem="{Binding SelectedShip}"
+                     HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Background="Transparent" ToolTip.Tip="{Binding TechnicalName, StringFormat='{}{{{0}}}'}" >
+                            <TextBlock Text="{Binding Name}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <Grid Grid.Row="1" Grid.Column="1" Grid.RowSpan="2" RowDefinitions="Auto,Auto,Auto,*" ColumnDefinitions="10,*,10,*" ColumnSpacing="0" RowSpacing="15">
+            <!-- Séparateur verical bloc gauche -->
+            <Separator Grid.Row="0" Grid.Column="0" Grid.RowSpan="4" Height="NaN" Width="1" />
+            <!-- Séparateur verical entre tableaux -->
+            <Separator Grid.Row="0" Grid.Column="2" Grid.RowSpan="3" Height="NaN" Width="1" />
+            
+
+            
+            <!-- Powerplant -->
+            <StackPanel Grid.Row="0" Grid.Column="1">
+                <Label FontWeight="Bold">Générateur(s) :</Label>
+                <DataGrid ItemsSource="{Binding PowerplantList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Width="50">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
+                        <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
+                        <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
+                        <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+            
+            <!-- Cooler -->
+            <StackPanel Grid.Row="0" Grid.Column="3">
+                <Label FontWeight="Bold">Refroisseur(s) :</Label>
+                <DataGrid ItemsSource="{Binding CoolerList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Width="50">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
+                        <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
+                        <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
+                        <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+            
+            <!-- Shield -->
+            <StackPanel Grid.Row="1" Grid.Column="1">
+                <Label FontWeight="Bold">Bouclier(s) :</Label>
+                <DataGrid ItemsSource="{Binding ShieldList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Width="50">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
+                        <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
+                        <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
+                        <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+            
+            <!-- Radar -->
+            <StackPanel Grid.Row="1" Grid.Column="3">
+                <Label FontWeight="Bold">Radar :</Label>
+                <DataGrid ItemsSource="{Binding RadarList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Width="50">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
+                        <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
+                        <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
+                        <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+
+            <!-- Quantum drive -->
+            <StackPanel Grid.Row="2" Grid.Column="1">
+                <Label FontWeight="Bold">Réacteur(s) quantum :</Label>
+                <DataGrid ItemsSource="{Binding QuantumdriveList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Width="50">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
+                        <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
+                        <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
+                        <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+            
+            <!-- Jump drive -->
+            <StackPanel Grid.Row="2" Grid.Column="3">
+                <Label FontWeight="Bold">Moteur de saut :</Label>
+                <DataGrid ItemsSource="{Binding QuantumjumpList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Width="50">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
+                        <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
+                        <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
+                        <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+            
+            <!-- Components grid (for debugging purpose) -->
+            <DockPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3">
+                <Separator DockPanel.Dock="Top" />
+                <Label DockPanel.Dock="Top" FontWeight="Bold">Liste des composants et points d'emport :</Label>
+                <DataGrid
+                              ItemsSource="{Binding Components}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              GridLinesVisibility="All">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Port" Binding="{Binding PortName}" />
+                        <DataGridTextColumn Header="Display Name" Binding="{Binding DisplayName}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Grid>
     </Grid>
 </UserControl>
