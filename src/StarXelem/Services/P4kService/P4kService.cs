@@ -26,6 +26,8 @@ public class P4kService : IP4kService
     public static readonly string DefaultStarCitizenFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Roberts Space Industries", "StarCitizen");
     private Task? _loadingLocalTask;
     private Task? _loadingDatabaseTask;
+    private CancellationTokenSource _cancellationTokenSource = new();
+    private Task _openP4kTask;
 
 
     public P4kDirectoryNode P4KFileSystem => _p4KFile ?? throw new InvalidOperationException("P4k file not open");
@@ -36,6 +38,7 @@ public class P4kService : IP4kService
         set
         {
             _selectedP4KFile = value;
+            ResetSelectedFile();
             SelectedP4KFileChanged?.Invoke(this, value);
         }
     }
@@ -55,10 +58,17 @@ public class P4kService : IP4kService
             return Task.FromResult(_p4KFile);
         }
 
-        return Task.Run(() =>
+        // On réinitialise la source de token vu que c'est un nouveau fichier
+        _cancellationTokenSource = new CancellationTokenSource();
+        _openP4kTask = Task.Run(() =>
         {
             _p4KFile = P4kDirectoryNode.FromP4k(P4kFile.FromFile(path, p4kProgress), fileSystemProgress);
-        });
+        }, _cancellationTokenSource.Token)
+            // Une fois ouvert on supprime la task
+            .ContinueWith(t => _openP4kTask = null);
+        
+        
+        return _openP4kTask;
     }
     
     public Task<IList<P4kFileModel>> LoadDefaultP4kLocations()
@@ -86,7 +96,7 @@ public class P4kService : IP4kService
 
         foreach (var p4k in p4ks)
         {
-            var install = await GetInstallationInfo(p4k);
+            var install = await GetInstallationInfo(p4k).ConfigureAwait(false);
             
             if (null != install)
             {
@@ -190,15 +200,20 @@ public class P4kService : IP4kService
             {
                 var sw = Stopwatch.StartNew();
                 // chargement du fichier p4k
-                await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>());
+                await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
                 //  chargement de la traduction
                 var globalEntry = P4KFileSystem.OpenRead(@"Data\Localization\english\global.ini");
                 _locale.Clear();
                 using (var sr = new StreamReader(globalEntry, Encoding.UTF8, true))
                 {
-                    while (await sr.ReadLineAsync() is { } line)
+                    while (await sr.ReadLineAsync().ConfigureAwait(false) is { } line)
                     {
-
+                        if (_cancellationTokenSource.IsCancellationRequested)
+                        {
+                            // on demande l'arrêt du traitement, on s'arrête la
+                            break;
+                        }
+                        
                         if (!String.IsNullOrEmpty(line))
                         {
                             var parts = line.Split('=', 2, StringSplitOptions.TrimEntries);
@@ -214,8 +229,8 @@ public class P4kService : IP4kService
                 sw.Stop();
                 _logger.LogTrace("Extracted all locale values in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
                 
-                await globalEntry.DisposeAsync();
-            });
+                await globalEntry.DisposeAsync().ConfigureAwait(false);
+            }, _cancellationTokenSource.Token);
         }
         
         return _loadingLocalTask;
@@ -228,7 +243,7 @@ public class P4kService : IP4kService
             return null;
         }
         
-        await LoadLangFileIfNeeded();
+        await LoadLangFileIfNeeded().ConfigureAwait(false);
 
         return _locale.GetValueOrDefault(key, key);
     }
@@ -240,31 +255,41 @@ public class P4kService : IP4kService
             _loadingDatabaseTask = Task.Run(async () =>
             {
                 // chargement du fichier p4k
-                await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>());
+                await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
                 // Chargement des données
                 var entry = P4KFileSystem.OpenRead(dataCorePath);
                 var dcb = new DataCoreDatabase(entry);
                 var df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
-                await entry.DisposeAsync();
+                await entry.DisposeAsync().ConfigureAwait(false);
 
                 var sw = Stopwatch.StartNew();
                 var allRecords = df.DataCore.Database.MainRecords
                     .AsParallel()
-                    .Select(x => df.GetFromRecord(x))
+                    .Select(x =>
+                    {
+                        if (_cancellationTokenSource.IsCancellationRequested) return null;
+                        return df.GetFromRecord(x);
+                    })
                     ;
                 sw.Stop();
                 _logger.LogTrace("Extracted all records in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
 
                 sw = Stopwatch.StartNew();
-                foreach (var record in allRecords.Where(r => r.Data is EntityClassDefinition or StarMapObject))
+                foreach (var record in allRecords.Where(r => r?.Data is EntityClassDefinition or StarMapObject))
                 {
+                    if (_cancellationTokenSource.IsCancellationRequested)
+                    {
+                        // une demande d'annulation est arrivée
+                        break;
+                    }
+                    
                     var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record.RecordId]));
 
                     _EntityClassDict.Add(crc, record);
                 }
                 sw.Stop();
                 _logger.LogTrace("Extracted all entity classes in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
-            });
+            }, _cancellationTokenSource.Token);
         }
         
         return _loadingDatabaseTask;        
@@ -272,19 +297,43 @@ public class P4kService : IP4kService
     
     public async Task<DataCoreTypedRecord?> GetEntityType(uint guidCrc)
     {
-        await LoadDatabaseIfNeeded();
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
         
         return _EntityClassDict.GetValueOrDefault(guidCrc);
     }
 
     public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition()
     {
-        await LoadDatabaseIfNeeded();
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
 
         foreach (var record in _EntityClassDict.Values)
         {
             if (record.Data is EntityClassDefinition)
                 yield return record;
         }
+    }
+
+    public Task FillDataCache()
+    {
+        var task1 = LoadDatabaseIfNeeded();
+        var task2 = LoadLangFileIfNeeded();
+        
+        return Task.WhenAll(task1, task2);
+    }
+
+    private void ResetSelectedFile()
+    {
+        // stop previous loading if any
+        _cancellationTokenSource.Cancel();
+        
+        // clear caches
+        _EntityClassDict.Clear();
+        _locale.Clear();
+        _loadingLocalTask = null;
+        _loadingDatabaseTask = null;
+        
+        
+        // reset file
+        _p4KFile = null;
     }
 }

@@ -20,6 +20,7 @@ public partial class FriendListTabViewModel : PageViewModelBase
     private readonly IGrpcClientService  _clientService;
     public override string Name => "Amis";
     public override string Icon => nameof(Symbol.People);
+    
     public Task<IList<FriendViewModel>>? _spaceships;
     [ObservableProperty] private bool _isLoading = false;
     [ObservableProperty] private string _treatmentStatus = "";
@@ -30,7 +31,7 @@ public partial class FriendListTabViewModel : PageViewModelBase
     {
         _clientService = clientService;
 
-        _clientService.OnConnectedChanged += (sender, b) => loadShipListCommand?.NotifyCanExecuteChanged();
+        _clientService.OnConnectedChanged += (sender, b) => LoadShipNotifyCanExecuteChanged();
     }
     
     [RelayCommand(CanExecute = nameof(CanLoadShipList))]
@@ -77,4 +78,17 @@ public partial class FriendListTabViewModel : PageViewModelBase
     {
         AppliFilterOnSearchresult();
     }
+    
+    private void LoadShipNotifyCanExecuteChanged()
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            loadShipListCommand?.NotifyCanExecuteChanged();
+        }
+        else
+        {
+            Dispatcher.UIThread.Post(LoadShipNotifyCanExecuteChanged);
+        }
+    }
+
 }

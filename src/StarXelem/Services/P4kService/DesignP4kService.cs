@@ -101,6 +101,11 @@ public class DesignP4kService : IP4kService
         yield break;
     }
 
+    public Task FillDataCache()
+    {
+        return Task.CompletedTask;
+    }
+
     private static P4kEntry[] GetFakeEntries() =>
     [
         new(@"Data\entry1", 69, 69, 0, false, 123, 0xffff, 0xdeadbeef),

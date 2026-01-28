@@ -93,21 +93,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         _p4KService = p4kService;
         _locationService = locationService;
 
-        _clientService.OnConnectedChanged += (sender, b) =>
-        {
-            ReloadLocationListCommand?.NotifyCanExecuteChanged();
-            loadItemListCommand?.NotifyCanExecuteChanged();
-            if (b)
-            {
-                ReloadLocationList();
-            }
-            else
-            {
-                // Perte de connexion, on efface la liste des conteneurs
-                LocationList = Task.FromResult<IList<FilterLocationOptionModel>?>(new List<FilterLocationOptionModel>());
-                refreshSelectAllLocation();
-            }
-        };
+        _clientService.OnConnectedChanged += (sender, b) => { OnConnectedStatusChanged(b); };
         // Initialize filter options for multi-select type filter
         _filterTypeList = new ObservableCollection<FilterTypeOption>(
             Enum.GetValues<EItemType>().Select(t =>
@@ -139,7 +125,28 @@ public partial class ItemsTabViewModel : PageViewModelBase
             ReloadLocationList();
         }
     }
-    
+
+    private void OnConnectedStatusChanged(bool b)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => OnConnectedStatusChanged(b));
+            return;
+        }
+        ReloadLocationListCommand?.NotifyCanExecuteChanged();
+        loadItemListCommand?.NotifyCanExecuteChanged();
+        if (b)
+        {
+            ReloadLocationList();
+        }
+        else
+        {
+            // Perte de connexion, on efface la liste des conteneurs
+            LocationList = Task.FromResult<IList<FilterLocationOptionModel>?>(new List<FilterLocationOptionModel>());
+            refreshSelectAllLocation();
+        }
+    }
+
     private void OnFilterTypeOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(FilterTypeOption.IsSelected) && sender is FilterTypeOption opt)

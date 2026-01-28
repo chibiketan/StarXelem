@@ -36,4 +36,10 @@ public interface IP4kService
     /// </summary>
     /// <returns>UUne énumération asynchronie des enregistrements</returns>
     IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition();
+
+    /// <summary>
+    /// Provoque le lancement de l'alimentation des différents cache ce qui permet d'avoir des données prêtes et une requête rapide
+    /// </summary>
+    /// <returns></returns>
+    Task FillDataCache();
 }

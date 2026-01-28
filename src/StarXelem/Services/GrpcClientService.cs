@@ -48,14 +48,14 @@ public class GrpcClientService : IGrpcClientService
         var dir = new FileInfo(p4kFile.Path).Directory?.FullName;
         _watcher = new StarCitizenClientWatcher(dir ?? "");
         _watcher.Start();
-        var loginData = await _watcher.WaitForLoginData();
+        var loginData = await _watcher.WaitForLoginData().ConfigureAwait(false);
         
         _logger.LogInformation("Got Login data for user: \"{Username}\" on server: \"{ServicesEndpoint}\"", loginData.Username, loginData.StarNetwork.ServicesEndpoint);
         
         _channel = GrpcChannel.ForAddress(new Uri(loginData.StarNetwork.ServicesEndpoint));
         var identityClient = new IdentityService.IdentityServiceClient(_channel);
         
-        var currentPlayer = await identityClient.GetCurrentPlayerAsync(new GetCurrentPlayerRequest(), new Metadata { { "Authorization", $"Bearer {loginData.AuthToken}" } });
+        var currentPlayer = await identityClient.GetCurrentPlayerAsync(new GetCurrentPlayerRequest(), new Metadata { { "Authorization", $"Bearer {loginData.AuthToken}" } }).ConfigureAwait(false);
         
         _playerInfo = currentPlayer;
         _authHeaders = new Metadata { 

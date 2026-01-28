@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:ui="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
+        xmlns:ic="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
         xmlns:popup="clr-namespace:StarXelem.Views.Popup"
         xmlns:local="clr-namespace:StarXelem"
         MinWidth="1024"
@@ -32,7 +33,8 @@
         <Button Name="openFolderButton" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center" Command="{Binding OpenDataP4kCommand}" CommandParameter="{Binding $parent[Window]}">
             <PathIcon Data="{StaticResource folder_open_regular}" />
         </Button>
-        
+        <Label Grid.Row="0" Grid.Column="2" Content="{Binding P4kStatus}" />
+        <ic:SymbolIcon Grid.Row="0" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Symbol="Server"  />
         <ui:NavigationView
             Grid.Row="1"
             Grid.ColumnSpan="3"

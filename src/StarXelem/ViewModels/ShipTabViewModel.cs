@@ -35,7 +35,7 @@ public partial class ShipTabViewModel : PageViewModelBase
         _locationService = locationService;
 
         _p4KService.SelectedP4KFileChanged += OnSelectedP4KFileChanged;
-        _clientService.OnConnectedChanged += (sender, b) => loadShipListCommand?.NotifyCanExecuteChanged();
+        _clientService.OnConnectedChanged += (sender, b) => LoadShipNotifyCanExecuteChanged();
     }
     
     [RelayCommand(CanExecute = nameof(CanLoadShipList))]
@@ -190,5 +190,17 @@ public partial class ShipTabViewModel : PageViewModelBase
     {
         // Le fichier a été modifié, on change tout, reconnexion en prime
         LoadShipListCommand.NotifyCanExecuteChanged();
+    }
+
+    private void LoadShipNotifyCanExecuteChanged()
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            loadShipListCommand?.NotifyCanExecuteChanged();
+        }
+        else
+        {
+            Dispatcher.UIThread.Post(LoadShipNotifyCanExecuteChanged);
+        }
     }
 }

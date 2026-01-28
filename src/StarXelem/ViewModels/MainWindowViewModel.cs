@@ -31,6 +31,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private Task<IList<P4kFileModel>> _installedEnvs;
     [ObservableProperty]
     private P4kFileModel? selectedP4kFile;
+    
+    [ObservableProperty]private string _p4kStatus = "";
 
     [ObservableProperty]
     private PopupViewModel _popupViewModel;
@@ -71,7 +73,7 @@ public partial class MainWindowViewModel : ViewModelBase
         OpenDataP4kCommand = new AsyncRelayCommand<object?>(OpenDataP4kAsync);
         if (null != _p4kService.SelectedP4KFile)
         {
-            _grpcClientService.InitClient(_p4kService.SelectedP4KFile);
+            OnSelectedP4KFileChanged(null, _p4kService.SelectedP4KFile);
         }
 
         _p4kService.SelectedP4KFileChanged += OnSelectedP4KFileChanged;
@@ -120,7 +122,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
             };
 
-            var files = await topLevel.StorageProvider.OpenFilePickerAsync(options);
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(options).ConfigureAwait(false);
             var file = files?.FirstOrDefault();
             if (file == null)
                 return;
@@ -132,14 +134,14 @@ public partial class MainWindowViewModel : ViewModelBase
             if (string.IsNullOrWhiteSpace(localPath))
                 return;
             
-            var infos = await _p4kService.GetInstallationInfo(localPath);
+            var infos = await _p4kService.GetInstallationInfo(localPath).ConfigureAwait(false);
 
             if (infos == null)
                 return;
 
             try
             {
-                var list = await InstalledEnvs;
+                var list = await InstalledEnvs.ConfigureAwait(false);
                 list ??= new List<P4kFileModel>();
 
                 var existing = list.FirstOrDefault(x => string.Equals(Path.GetFullPath(x.Path), Path.GetFullPath(infos.Path), StringComparison.OrdinalIgnoreCase));
@@ -160,7 +162,7 @@ public partial class MainWindowViewModel : ViewModelBase
             }
             catch
             {
-                var list = await InstalledEnvs;
+                var list = await InstalledEnvs.ConfigureAwait(false);
                 list ??= new List<P4kFileModel>();
 
                 var newList = list.ToList();
@@ -176,11 +178,75 @@ public partial class MainWindowViewModel : ViewModelBase
             _logger.LogError(ex, "Erreur lors de la sélection du fichier Data.p4k");
         }
     }
+
+    private CancellationTokenSource? _cts;
     
-    private void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)
+    private async void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)
+    {
+        if (null != _cts)
+        {
+            await _cts.CancelAsync();
+        }
+
+        _cts = new CancellationTokenSource();
+        var ct = _cts.Token;
+
+        if (e is null || string.IsNullOrWhiteSpace(e.Path))
+            return;
+
+        try
+        {
+            var initClientTask = _grpcClientService.InitClient(e).WaitAsync(ct);
+            UpdateP4kStatus("Chargement du fichier Data.p4k...");
+            await _p4kService.OpenP4k(e.Path, new Progress<double>(), new Progress<double>()).WaitAsync(ct).ConfigureAwait(false);
+            UpdateP4kStatus("Mise en cache des donnnées...");
+            await _p4kService.FillDataCache().WaitAsync(ct).ConfigureAwait(false);
+            UpdateP4kStatus("Chargement terminé");
+            // On termine par attendre l'initialisation du client gRPC
+            await initClientTask;
+        }
+        catch (OperationCanceledException)
+        {
+            UpdateP4kStatus("Chargement annulé");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erreur lors du chargement du P4K");
+            UpdateP4kStatus("Erreur lors du chargement");
+        }        
+    }
+    
+    private void OnSelectedP4KFileChangedDoNotUse(Object? sender, P4kFileModel? e)
     {
         // Le fichier a été modifié, reconnexion
-        _grpcClientService.InitClient(e);
+        _ = _grpcClientService.InitClient(e);
+        // Ensuite on relance le chargement du fichier au global
+        UpdateP4kStatus("Chargement du fichier Data.p4k...");
+        _p4kService.OpenP4k(e.Path, new Progress<double>(), new Progress<double>())
+            .ContinueWith((t) =>
+            {
+                if (!t.IsCompletedSuccessfully)
+                {
+                    return t;
+                }
+                
+                UpdateP4kStatus("Mise en cache des donnnées...");
+                // lancer le chargement des données de cache
+                return _p4kService.FillDataCache();
+            })
+            .Unwrap()
+            .ContinueWith((t) =>
+            {
+                if (!t.IsCompletedSuccessfully)
+                {
+                    _logger.LogError(t.Exception, "Erreur lors du chargement du fichier Data.p4k");
+                    UpdateP4kStatus("Chargement en erreur");
+                }
+                else
+                {
+                    UpdateP4kStatus("Chargement terminé");
+                }
+            });
     }
 
     private void SaveP4kFolderToRegistry(string folderPath)
@@ -207,13 +273,13 @@ public partial class MainWindowViewModel : ViewModelBase
             if (string.IsNullOrWhiteSpace(dataP4kPath))
                 return;
 
-            var infos = await _p4kService.GetInstallationInfo(dataP4kPath);
+            var infos = await _p4kService.GetInstallationInfo(dataP4kPath).ConfigureAwait(false);
             if (infos == null || infos.Manifest == null)
                 return;
 
             try
             {
-                var list = await InstalledEnvs;
+                var list = await InstalledEnvs.ConfigureAwait(false);
                 list ??= new List<P4kFileModel>();
 
                 var existing = list.FirstOrDefault(x => string.Equals(Path.GetFullPath(x.Path), Path.GetFullPath(infos.Path), StringComparison.OrdinalIgnoreCase));
@@ -237,6 +303,18 @@ public partial class MainWindowViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Impossible de charger le dossier P4K depuis le registre");
+        }
+    }
+    
+    private void UpdateP4kStatus(string status)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            P4kStatus = status;
+        }
+        else
+        {
+            Dispatcher.UIThread.Post(() => UpdateP4kStatus(status));
         }
     }
 }
