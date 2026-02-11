@@ -65,7 +65,8 @@ public partial class MainWindowViewModel : ViewModelBase
             App.Current.Services.GetRequiredService<ItemsTabViewModel>(),
             App.Current.Services.GetRequiredService<ContainerTabViewModel>(),
             App.Current.Services.GetRequiredService<FriendListTabViewModel>(),
-            App.Current.Services.GetRequiredService<ExtractionTabViewModel>()
+            App.Current.Services.GetRequiredService<ExtractionTabViewModel>(),
+            App.Current.Services.GetRequiredService<MissionsTabViewModel>()
         ];
         
         CurrentPage = _pages.First();

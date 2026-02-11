@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using DocumentFormat.OpenXml.InkML;
+using Microsoft.Extensions.DependencyInjection;
 using StarXelem.Models;
 using StarXelem.ViewModels;
 using StarXelem.ViewModels.Popup;
@@ -17,6 +18,7 @@ public static class DesignData
     
     public static ItemComparisonPopupContentViewModel ItemComparisonPopupContentViewModel { get; } = App.Current.Services.GetRequiredService<ItemComparisonPopupContentViewModel>();
     public static P4kShipTabViewModel P4kShipTabViewModel { get; } = App.Current.Services.GetRequiredService<P4kShipTabViewModel>();
+    public static MissionsTabViewModel MissionsTabViewModel { get; } = App.Current.Services.GetRequiredService<MissionsTabViewModel>();
 
 
     static DesignData()

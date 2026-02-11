@@ -1,3 +1,4 @@
+using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarBreaker.FileSystem;
 using StarBreaker.P4k;
@@ -42,4 +43,8 @@ public interface IP4kService
     /// </summary>
     /// <returns></returns>
     Task FillDataCache();
+
+    Task<List<DataCoreTypedRecord>> GetAllContractGenerator();
+    Task<string?> GetEntityClassName(EntityClassDefinition? entityClass);
+    Task<DataCoreTypedRecord> GetRecordWithFullHistory(CigGuid recordId);
 }

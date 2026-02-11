@@ -275,7 +275,7 @@ public class P4kService : IP4kService
                 _logger.LogTrace("Extracted all records in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
 
                 sw = Stopwatch.StartNew();
-                foreach (var record in allRecords.Where(r => r?.Data is EntityClassDefinition or StarMapObject))
+                foreach (var record in allRecords.Where(r => r?.Data is EntityClassDefinition or StarMapObject or ContractGenerator))
                 {
                     if (_cancellationTokenSource.IsCancellationRequested)
                     {
@@ -319,6 +319,64 @@ public class P4kService : IP4kService
         var task2 = LoadLangFileIfNeeded();
         
         return Task.WhenAll(task1, task2);
+    }
+
+    public async Task<List<DataCoreTypedRecord>> GetAllContractGenerator()
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+
+        var result = new List<DataCoreTypedRecord>(50);
+
+        foreach (var record in _EntityClassDict.Values)
+        {
+            if (record.Data is ContractGenerator)
+            {
+                result.Add(record);
+            }
+        }
+        
+        return result;
+    }
+
+    public async Task<string?> GetEntityClassName(EntityClassDefinition? entityClass)
+    {
+        var key = entityClass?.Components?.OfType<SAttachableComponentParams>().FirstOrDefault()?.AttachDef.Localization.Name;
+
+        if (null == key)
+        {
+            return null;
+        }
+        
+        await LoadLangFileIfNeeded().ConfigureAwait(false);
+        return _locale.GetValueOrDefault(key);
+    }
+
+    public async Task<DataCoreTypedRecord> GetRecordWithFullHistory(CigGuid recordId)
+    {
+        // chargement du fichier p4k
+        await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
+        // Chargement des données
+        var entry = P4KFileSystem.OpenRead(dataCorePath);
+        var dcb = new DataCoreDatabase(entry);
+        var df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
+        await entry.DisposeAsync().ConfigureAwait(false);
+
+        var sw = Stopwatch.StartNew();
+        var oldval = DataCoreBinaryGenerated.s_maxRecursiveLoad;
+        try
+        {
+            // On va se limiter à 3 déjà
+            DataCoreBinaryGenerated.s_maxRecursiveLoad = 2;
+            var record = df.GetFromRecord(recordId);
+            
+            sw.Stop();
+            //_logger.LogTrace("Extracted record {recordId} with full recursion in {ElapsedMilliseconds}ms", recordId, sw.ElapsedMilliseconds);
+            return record;
+        }
+        finally
+        {
+            DataCoreBinaryGenerated.s_maxRecursiveLoad = oldval;
+        }
     }
 
     private void ResetSelectedFile()

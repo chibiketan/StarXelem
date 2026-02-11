@@ -1,3 +1,4 @@
+using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarBreaker.FileSystem;
 using StarBreaker.P4k;
@@ -104,6 +105,182 @@ public class DesignP4kService : IP4kService
     public Task FillDataCache()
     {
         return Task.CompletedTask;
+    }
+
+    public Task<List<DataCoreTypedRecord>> GetAllContractGenerator()
+    {
+        return Task.FromResult(new List<DataCoreTypedRecord>
+        {
+            new DataCoreTypedRecord("TEST", "TEST", new CigGuid(), new ContractGenerator()
+            {
+                generators = [new ContractGeneratorHandler_List
+                    {
+                        debugName = "my_test",
+                        contractParams = new ContractParamOverrides
+                        {
+                            stringParamOverrides =
+                            [
+                                new ContractStringParam
+                                {
+                                    param = ContractStringParamType.Contractor,
+                                    value = "TestContractor"
+                                }
+                            ],
+                            boolParamOverrides =
+                            [
+                            ],
+                            intParamOverrides =
+                            [
+                            ],
+                            propertyTagReplacement =
+                            [
+                            ],
+                            propertyOverrides =
+                            [
+                            ],
+                            modifierOverrides =
+                            [
+                            ],
+                            missionTypeOverride = null
+                        },
+                        notForRelease = false,
+                        workInProgress = false,
+                        contracts =
+                        [
+                            new Contract
+                            {
+                                id = default,
+                                notForRelease = false,
+                                workInProgress = false,
+                                debugName = "debug_contract_name",
+                                template = null,
+                                paramOverrides = new ContractParamOverrides
+                                {
+                                    stringParamOverrides = [
+                                        new ContractStringParam
+                                        {
+                                            param = ContractStringParamType.Title,
+                                            value = "TestContractTitle"
+                                        },
+                                        new ContractStringParam
+                                        {
+                                            param = ContractStringParamType.Description,
+                                            value = "TestContractDescription"
+                                        }                                        
+                                    ],
+                                    boolParamOverrides = [],
+                                    intParamOverrides = [],
+                                    propertyTagReplacement = [],
+                                    propertyOverrides = [],
+                                    modifierOverrides = [],
+                                    missionTypeOverride = null
+                                },
+                                subContracts = [],
+                                additionalPrerequisites = [],
+                                generationParams = null,
+                                contractLifeTime = null,
+                                contractPlugins = [],
+                                contractResults = new ContractResults
+                                {
+                                    contractResults = [
+                                        new ContractResult_Item
+                                        {
+                                            entityClass = null,
+                                            amount = 2,
+                                            sendToPlayerHomeLocation = false,
+                                            awardOnlyToMissionOwner = false,
+                                            targetLocation = default,
+                                            notification = null,
+                                            missionResults = []
+                                        },
+                                        new ContractResult_Item
+                                        {
+                                            entityClass = null,
+                                            amount = 1,
+                                            sendToPlayerHomeLocation = false,
+                                            awardOnlyToMissionOwner = true,
+                                            targetLocation = default,
+                                            notification = null,
+                                            missionResults = []
+                                        },
+                                        new ContractResult_Item
+                                        {
+                                            entityClass = null,
+                                            amount = 9999,
+                                            sendToPlayerHomeLocation = true,
+                                            awardOnlyToMissionOwner = true,
+                                            targetLocation = default,
+                                            notification = null,
+                                            missionResults = []
+                                        },
+                                        new ContractResult_Item
+                                        {
+                                        entityClass = null,
+                                        amount = 42,
+                                        sendToPlayerHomeLocation = true,
+                                        awardOnlyToMissionOwner = false,
+                                        targetLocation = default,
+                                        notification = null,
+                                        missionResults = []
+                                        },
+                                        new ContractResult_ItemsWeighting
+                                        {
+                                            awardOnlyToMissionOwner = true,
+                                            targetLocation = default,
+                                            notification = null,
+                                            missionResults = [],
+                                            itemAwardStructure = [
+                                                new ItemAwardWeightings
+                                                {
+                                                    weighting = 0,
+                                                    awards = [
+                                                        new ItemAwardEntityClass
+                                                        {
+                                                            amountToAward = 33,
+                                                            entityClass = null
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ],
+                                    contractBuyInAmount = 0,
+                                    timeToComplete = 0,
+                                    difficulty = null
+                                }
+                            }
+                        ],
+                        defaultAvailability = new ContractAvailability
+                        {
+                            prerequisites = [],
+                            notifyOnAvailable = false,
+                            maxPlayersPerInstance = 0,
+                            onceOnly = false,
+                            availableInPrison = false,
+                            canReacceptAfterAbandoning = false,
+                            abandonedCooldownTime = 0,
+                            abandonedCooldownTimeVariation = 0,
+                            canReacceptAfterFailing = false,
+                            hasPersonalCooldown = false,
+                            personalCooldownTime = 0,
+                            personalCooldownTimeVariation = 0,
+                            hideInMobiGlas = false
+                        }
+                    }
+                ],
+                required_active_scenarios = []
+            })
+        });
+    }
+
+    public Task<string?> GetEntityClassName(EntityClassDefinition? entityClass)
+    {
+        return Task.FromResult("GetEntityClassName")!;
+    }
+
+    public Task<DataCoreTypedRecord> GetRecordWithFullHistory(CigGuid recordId)
+    {
+        return Task.FromResult(new DataCoreTypedRecord("toto", "toto", default, null));
     }
 
     private static P4kEntry[] GetFakeEntries() =>

@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ContainerTabViewModel>();
         services.AddTransient<FriendListTabViewModel>();
         services.AddTransient<ExtractionTabViewModel>();
+        services.AddTransient<MissionsTabViewModel>();
         services.AddTransient<PopupViewModel>();
         services.AddTransient<LoadingPopupContentViewModel>();
         services.AddTransient<ItemComparisonPopupContentViewModel>();

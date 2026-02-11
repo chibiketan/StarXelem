@@ -6,6 +6,10 @@ namespace StarBreaker.DataCoreGenerated;
 
 public sealed partial class DataCoreBinaryGenerated : IDataCoreBinary<DataCoreTypedRecord>
 {
+    [ThreadStatic] private static Stack<CigGuid> s_loadedRecords;
+    [ThreadStatic] public static int? s_maxRecursiveLoad;
+
+    
     public DataCoreDatabase Database { get; }
 
     public DataCoreBinaryGenerated(DataCoreDatabase database)
@@ -40,11 +44,11 @@ public sealed partial class DataCoreBinaryGenerated : IDataCoreBinary<DataCoreTy
         throw new NotImplementedException();
     }
 
-    [ThreadStatic] private static Stack<CigGuid> s_loadedRecords;
     
     public T? ReadFromReference<T>(DataCoreReference reference) where T : class, IDataCoreReadable<T>
     {
         s_loadedRecords = s_loadedRecords ?? new Stack<CigGuid>();
+        s_maxRecursiveLoad = s_maxRecursiveLoad ?? 1;
         
         if (reference.RecordId == CigGuid.Empty || reference.InstanceIndex == -1)
             return null;
@@ -56,9 +60,9 @@ public sealed partial class DataCoreBinaryGenerated : IDataCoreBinary<DataCoreTy
             return null;
         }
 
-        if (s_loadedRecords.Count >= 1)
+        if (s_loadedRecords.Count >= s_maxRecursiveLoad)
         {
-            // On s'arrête à 1 inclusions 
+            // On s'arrête à N inclusions, paramétrable au besoin 
             return null;
         } 
 
