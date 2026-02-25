@@ -11,12 +11,34 @@
              d:DesignHeight="600"
              d:DesignWidth="1424"
              d:DataContext="{x:Static local:DesignData.MissionsTabViewModel}">
-  <Grid RowDefinitions="Auto,*" ColumnDefinitions="200,200,*" Margin="8">
+    <UserControl.Resources>
+        <GridLength x:Key="DetailColumnWidth">700</GridLength>
+        <x:Double x:Key="TitleWidth">125</x:Double>
+    </UserControl.Resources>
+    <UserControl.DataTemplates>
+        <DataTemplate DataType="vm:MissionObjectiveViewModel">
+            <WrapPanel Margin="0, 0, 0, 5">
+                <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding ObjectiveList}" Margin="5, 0, 0, 0">
+                </ItemsControl>
+            </WrapPanel>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+    <Grid RowDefinitions="Auto,*" ColumnDefinitions="200,200,*" Margin="8">
     <StackPanel Orientation="Horizontal" Spacing="8">
       <Button Content="Rafraîchir" Command="{Binding RefreshCommand}"/>
       <TextBlock Text="Chargement..." IsVisible="{Binding IsLoading}" VerticalAlignment="Center"/>
     </StackPanel>
-      <ListBox Grid.Row="1" Grid.Column="0" ItemsSource="{Binding ContractorList}" SelectedItem="{Binding SelectedContractor}">
+      <ListBox Grid.Row="1" Grid.Column="0" ItemsSource="{Binding CategoryList}" SelectedItem="{Binding SelectedCategory}">
+          <ListBox.ItemTemplate>
+              <DataTemplate DataType="vm:MissionCategoryItemViewModel">
+                  <StackPanel>
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                  </StackPanel>
+              </DataTemplate>
+          </ListBox.ItemTemplate>
+      </ListBox>
+      <ListBox Grid.Row="1" Grid.Column="0" ItemsSource="{Binding ContractorList}" SelectedItem="{Binding SelectedContractor}" IsVisible="False">
           <ListBox.ItemTemplate>
               <DataTemplate DataType="vm:MissionContractorItemViewModel">
                   <StackPanel>
@@ -25,51 +47,98 @@
               </DataTemplate>
           </ListBox.ItemTemplate>
       </ListBox>
-      <ListBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding SelectedContractor.MissionList}" SelectedItem="{Binding SelectedMission}">
+      <ListBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding SelectedCategory.MissionList}" SelectedItem="{Binding SelectedMission}">
           <ListBox.ItemTemplate>
               <DataTemplate DataType="vm:MissionItemViewModel">
                   <StackPanel>
+                      <TextBlock Text="{Binding Contractor.Name}" FontWeight="Light" FontStyle="Italic" FontSize="9"/>
                       <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
                   </StackPanel>
               </DataTemplate>
           </ListBox.ItemTemplate>
       </ListBox>
-      <Grid Grid.Row="1" Grid.Column="2" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*" ColumnDefinitions="100,*,100,*" IsVisible="{Binding SelectedMission, 
-                            Converter={x:Static ObjectConverters.IsNotNull}}">
-          <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="Bold">Titre :</TextBlock>
-          <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedMission.Title}" TextWrapping="Wrap" />
-          <TextBlock Grid.Row="0" Grid.Column="2" FontWeight="Bold">Récompenses :</TextBlock>
-          <ItemsControl Grid.Row="0" Grid.Column="3" Grid.RowSpan="2" ItemsSource="{Binding SelectedMission.RewardList}">
-              <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="vm:MissionRewardItemViewModel">
-                      <WrapPanel Margin="0, 0, 0, 5">
-                          <TextBlock Text="{Binding Count}" Width="40" TextAlignment="Right" Margin="0,0,5,0" />
-                          <TextBlock Text="{Binding Name}" />
-                          <ic:SymbolIcon Symbol="Home" Margin="5, 0, 0,0" Foreground="Orange" >
-                              <ic:SymbolIcon.IsVisible>
-                                  <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                      <Binding Path="SendToHomeLocation" Converter="{x:Static ObjectConverters.IsNotNull}" />
-                                      <Binding Path="SendToHomeLocation" />
-                                  </MultiBinding>
-                              </ic:SymbolIcon.IsVisible>
-                          </ic:SymbolIcon>
-                          <ic:SymbolIcon Symbol="Backpack" Margin="5, 0, 0,0" Foreground="Green">
-                              <ic:SymbolIcon.IsVisible>
-                                  <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                      <Binding Path="SendToHomeLocation" Converter="{x:Static ObjectConverters.IsNotNull}" />
-                                      <Binding Path="!SendToHomeLocation" />
-                                  </MultiBinding>
-                              </ic:SymbolIcon.IsVisible>
-                              
-                          </ic:SymbolIcon>
-                          <ic:SymbolIcon Symbol="PeopleTeamDelete" IsVisible="{Binding OnlyToMissionOwner}" Margin="5, 0, 0,0" Foreground="Red"/>
-                          <ic:SymbolIcon Symbol="PeopleTeam" IsVisible="{Binding !OnlyToMissionOwner}" Margin="5, 0, 0,0" Foreground="Green" />
-                      </WrapPanel>
-                  </DataTemplate>
-              </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock Grid.Row="1" Grid.Column="0" FontWeight="Bold">Description :</TextBlock>
-          <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedMission.Description}"  VerticalAlignment="Top"  TextWrapping="Wrap" />
-      </Grid>
+      <ScrollViewer Grid.Row="1" Grid.Column="2" HorizontalScrollBarVisibility="Auto">
+          <Grid RowDefinitions="Auto" IsVisible="{Binding SelectedMission,
+                                Converter={x:Static ObjectConverters.IsNotNull}}">
+              <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="{StaticResource DetailColumnWidth}" />
+                  <ColumnDefinition Width="{StaticResource DetailColumnWidth}" />
+                  <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Grid.Row="0" Grid.Column="0">
+                  <!-- Première colonne -->
+                  <Grid ColumnDefinitions="Auto,*">
+                      <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="Bold" Width="{StaticResource TitleWidth}" TextAlignment="Right">nom debug :</TextBlock>
+                      <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedMission.DebugName}" TextWrapping="Wrap" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*">
+                      <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="Bold" Width="{StaticResource TitleWidth}" TextAlignment="Right">Titre :</TextBlock>
+                      <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedMission.Title}" TextWrapping="Wrap" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*">
+                      <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="Bold" Width="{StaticResource TitleWidth}" TextAlignment="Right">Description :</TextBlock>
+                      <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedMission.Description}"  VerticalAlignment="Top"  TextWrapping="Wrap" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding SelectedMission.MinStanding, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                      <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="Bold" Width="{StaticResource TitleWidth}" TextAlignment="Right">Min standing :</TextBlock>
+                      <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedMission.MinStanding}"  VerticalAlignment="Top"  TextWrapping="Wrap" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding SelectedMission.MaxStanding, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                      <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="Bold" Width="{StaticResource TitleWidth}" TextAlignment="Right">Max standing :</TextBlock>
+                      <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedMission.MaxStanding}"  VerticalAlignment="Top"  TextWrapping="Wrap" />
+                  </Grid>
+                  <!-- !Première colonne -->
+              </StackPanel>
+              <StackPanel Grid.Row="0" Grid.Column="1">
+                  <!-- Seconde colonne -->
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="Bold" Width="{StaticResource TitleWidth}" TextAlignment="Right">Récompenses :</TextBlock>
+                    <ItemsControl Grid.Row="0" Grid.Column="1" ItemsSource="{Binding SelectedMission.RewardList}">
+                      <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="vm:MissionRewardItemViewModel">
+                              <WrapPanel Margin="0, 0, 0, 5">
+                                  <TextBlock Text="{Binding Count}" Width="40" TextAlignment="Right" Margin="0,0,5,0" />
+                                  <TextBlock Text="{Binding Name}" />
+                                  <ic:SymbolIcon Symbol="Home" Margin="5, 0, 0,0" Foreground="Orange" >
+                                      <ic:SymbolIcon.IsVisible>
+                                          <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                              <Binding Path="SendToHomeLocation" Converter="{x:Static ObjectConverters.IsNotNull}" />
+                                              <Binding Path="SendToHomeLocation" />
+                                          </MultiBinding>
+                                      </ic:SymbolIcon.IsVisible>
+                                  </ic:SymbolIcon>
+                                  <ic:SymbolIcon Symbol="Backpack" Margin="5, 0, 0,0" Foreground="Green">
+                                      <ic:SymbolIcon.IsVisible>
+                                          <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                              <Binding Path="SendToHomeLocation" Converter="{x:Static ObjectConverters.IsNotNull}" />
+                                              <Binding Path="!SendToHomeLocation" />
+                                          </MultiBinding>
+                                      </ic:SymbolIcon.IsVisible>
+                                      
+                                  </ic:SymbolIcon>
+                                  <ic:SymbolIcon Symbol="PeopleTeamDelete" IsVisible="{Binding OnlyToMissionOwner}" Margin="5, 0, 0,0" Foreground="Red"/>
+                                  <ic:SymbolIcon Symbol="PeopleTeam" IsVisible="{Binding !OnlyToMissionOwner}" Margin="5, 0, 0,0" Foreground="Green" />
+                              </WrapPanel>
+                          </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Grid>
+                  <!-- Objectifs -->
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="Bold" Width="{StaticResource TitleWidth}" TextAlignment="Right">Objectifs :</TextBlock>
+                    <ItemsControl Grid.Row="0" Grid.Column="1" ItemsSource="{Binding SelectedMission.ObjectiveList}">
+                      <!-- <ItemsControl.ItemTemplate> -->
+                      <!--     <DataTemplate DataType="vm:MissionObjectiveViewModel"> -->
+                      <!--         <WrapPanel Margin="0, 0, 0, 5"> -->
+                      <!--             <TextBlock Text="{Binding Title}" TextWrapping="Wrap" /> -->
+                      <!--         </WrapPanel> -->
+                      <!--     </DataTemplate> -->
+                      <!-- </ItemsControl.ItemTemplate> -->
+                    </ItemsControl>
+                  </Grid>
+                  <!-- !Seconde colonne -->
+              </StackPanel>
+          </Grid>
+      </ScrollViewer>
   </Grid>
 </UserControl>

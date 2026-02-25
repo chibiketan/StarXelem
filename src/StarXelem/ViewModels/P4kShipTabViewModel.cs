@@ -38,6 +38,7 @@ public partial class P4kShipTabViewModel : PageViewModelBase
     [ObservableProperty] private List<P4kShipComponentModel> _quantumdriveList = new();
     [ObservableProperty] private List<P4kShipComponentModel> _radarList = new();
     [ObservableProperty] private List<P4kShipComponentModel> _quantumjumpList = new();
+    [ObservableProperty] private String _tagList = "";
     private Dictionary<String, CigGuid> _componentGuidMap = new(); 
 
     public P4kShipTabViewModel(IP4kService p4kService, ILogger<P4kShipTabViewModel> logger)
@@ -301,6 +302,7 @@ public partial class P4kShipTabViewModel : PageViewModelBase
         CoolerList = coolerList;
         PowerplantList = powerplantList;
         ShieldList = shieldList;
+        TagList = String.Join(", ", value.Tags.Split(", "));
     }
 
     async Task<ComponentClass> TranslateToComponentClass(string name)

@@ -66,16 +66,19 @@
             </ListBox>
         </DockPanel>
 
-        <Grid Grid.Row="1" Grid.Column="1" Grid.RowSpan="2" RowDefinitions="Auto,Auto,Auto,*" ColumnDefinitions="10,*,10,*" ColumnSpacing="0" RowSpacing="15">
+        <Grid Grid.Row="1" Grid.Column="1" Grid.RowSpan="2" RowDefinitions="Auto,Auto,Auto,Auto,*" ColumnDefinitions="10,*,10,*" ColumnSpacing="0" RowSpacing="15">
             <!-- Séparateur verical bloc gauche -->
-            <Separator Grid.Row="0" Grid.Column="0" Grid.RowSpan="4" Height="NaN" Width="1" />
+            <Separator Grid.Row="0" Grid.Column="0" Grid.RowSpan="5" Height="NaN" Width="1" />
             <!-- Séparateur verical entre tableaux -->
-            <Separator Grid.Row="0" Grid.Column="2" Grid.RowSpan="3" Height="NaN" Width="1" />
-            
+            <Separator Grid.Row="1" Grid.Column="2" Grid.RowSpan="3" Height="NaN" Width="1" />
+            <DockPanel Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3">
+                <Label DockPanel.Dock="Left">Tag : </Label>
+                <TextBlock Text="{Binding TagList}" TextWrapping="Wrap" />
+            </DockPanel>
 
             
             <!-- Powerplant -->
-            <StackPanel Grid.Row="0" Grid.Column="1">
+            <StackPanel Grid.Row="1" Grid.Column="1">
                 <Label FontWeight="Bold">Générateur(s) :</Label>
                 <DataGrid ItemsSource="{Binding PowerplantList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component">
                     <DataGrid.Columns>
@@ -95,7 +98,7 @@
             </StackPanel>
             
             <!-- Cooler -->
-            <StackPanel Grid.Row="0" Grid.Column="3">
+            <StackPanel Grid.Row="1" Grid.Column="3">
                 <Label FontWeight="Bold">Refroisseur(s) :</Label>
                 <DataGrid ItemsSource="{Binding CoolerList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component">
                     <DataGrid.Columns>
@@ -115,7 +118,7 @@
             </StackPanel>
             
             <!-- Shield -->
-            <StackPanel Grid.Row="1" Grid.Column="1">
+            <StackPanel Grid.Row="2" Grid.Column="1">
                 <Label FontWeight="Bold">Bouclier(s) :</Label>
                 <DataGrid ItemsSource="{Binding ShieldList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component">
                     <DataGrid.Columns>
@@ -135,7 +138,7 @@
             </StackPanel>
             
             <!-- Radar -->
-            <StackPanel Grid.Row="1" Grid.Column="3">
+            <StackPanel Grid.Row="2" Grid.Column="3">
                 <Label FontWeight="Bold">Radar :</Label>
                 <DataGrid ItemsSource="{Binding RadarList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component">
                     <DataGrid.Columns>
@@ -155,7 +158,7 @@
             </StackPanel>
 
             <!-- Quantum drive -->
-            <StackPanel Grid.Row="2" Grid.Column="1">
+            <StackPanel Grid.Row="3" Grid.Column="1">
                 <Label FontWeight="Bold">Réacteur(s) quantum :</Label>
                 <DataGrid ItemsSource="{Binding QuantumdriveList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component">
                     <DataGrid.Columns>
@@ -175,7 +178,7 @@
             </StackPanel>
             
             <!-- Jump drive -->
-            <StackPanel Grid.Row="2" Grid.Column="3">
+            <StackPanel Grid.Row="3" Grid.Column="3">
                 <Label FontWeight="Bold">Moteur de saut :</Label>
                 <DataGrid ItemsSource="{Binding QuantumjumpList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component">
                     <DataGrid.Columns>
@@ -195,7 +198,7 @@
             </StackPanel>
             
             <!-- Components grid (for debugging purpose) -->
-            <DockPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3">
+            <DockPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3">
                 <Separator DockPanel.Dock="Top" />
                 <Label DockPanel.Dock="Top" FontWeight="Bold">Liste des composants et points d'emport :</Label>
                 <DataGrid
