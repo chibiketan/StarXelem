@@ -314,10 +314,18 @@ public sealed partial class DataCoreBinaryGenerated : IDataCoreBinary<DataCoreTy
         return Database.SingleValues.AsSpan(firstIndex, count).ToArray();
     }
 
+    public CigGuid[] ReadGuidArray(ref SpanReader reader)
+    {
+        var count = reader.ReadInt32();
+        var firstIndex = reader.ReadInt32();
+        return Database.GuidValues.AsSpan(firstIndex, count).ToArray();
+    }
+
     public double[] ReadDoubleArray(ref SpanReader reader)
     {
         var count = reader.ReadInt32();
         var firstIndex = reader.ReadInt32();
         return Database.DoubleValues.AsSpan(firstIndex, count).ToArray();
     }
+
 }

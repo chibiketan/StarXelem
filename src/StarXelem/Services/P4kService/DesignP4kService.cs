@@ -143,6 +143,7 @@ public class DesignP4kService : IP4kService
                             ],
                             missionTypeOverride = null
                         },
+                        required_active_scenarios = [],
                         notForRelease = false,
                         workInProgress = false,
                         contracts =
@@ -247,7 +248,8 @@ public class DesignP4kService : IP4kService
                                     contractBuyInAmount = 0,
                                     timeToComplete = 0,
                                     difficulty = null
-                                }
+                                },
+                                required_active_scenarios = []
                             }
                         ],
                         defaultAvailability = new ContractAvailability
