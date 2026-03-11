@@ -23,6 +23,11 @@
                 </ItemsControl>
             </WrapPanel>
         </DataTemplate>
+        <DataTemplate DataType="vm:MissionPrerequisiteViewModel">
+            <WrapPanel Margin="0, 0, 0, 5">
+                <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+            </WrapPanel>
+        </DataTemplate>
     </UserControl.DataTemplates>
     <Grid RowDefinitions="Auto,*" ColumnDefinitions="200,200,*" Margin="8">
     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -127,14 +132,14 @@
                   <Grid ColumnDefinitions="Auto,*">
                     <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="Bold" Width="{StaticResource TitleWidth}" TextAlignment="Right">Objectifs :</TextBlock>
                     <ItemsControl Grid.Row="0" Grid.Column="1" ItemsSource="{Binding SelectedMission.ObjectiveList}">
-                      <!-- <ItemsControl.ItemTemplate> -->
-                      <!--     <DataTemplate DataType="vm:MissionObjectiveViewModel"> -->
-                      <!--         <WrapPanel Margin="0, 0, 0, 5"> -->
-                      <!--             <TextBlock Text="{Binding Title}" TextWrapping="Wrap" /> -->
-                      <!--         </WrapPanel> -->
-                      <!--     </DataTemplate> -->
-                      <!-- </ItemsControl.ItemTemplate> -->
                     </ItemsControl>
+                  </Grid>
+                  <Separator></Separator>
+                  <!-- Pré requis -->
+                  <Grid ColumnDefinitions="Auto,*">
+                      <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="Bold" Width="{StaticResource TitleWidth}" TextAlignment="Right">Pré-requis :</TextBlock>
+                      <ItemsControl Grid.Row="0" Grid.Column="1" ItemsSource="{Binding SelectedMission.PrerequisiteList}">
+                      </ItemsControl>
                   </Grid>
                   <!-- !Seconde colonne -->
               </StackPanel>

@@ -45,5 +45,8 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IGrpcClientService, GrpcClientService>();
             services.AddSingleton<ILocationService, LocationService>();
         }
+
+        // Les services indépendants du mode design
+        services.AddSingleton<IMissionMappingService, MissionMappingService>();
     }
 }
