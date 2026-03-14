@@ -58,7 +58,7 @@ public partial class P4kShipTabViewModel : PageViewModelBase
             var uniqueManufacturerSet = new HashSet<SCItemManufacturer>(20);
             var componentGuidMap = new Dictionary<string, CigGuid>(200);
 
-            var records = _p4kService.GetAllEntityClassDefinition();
+            var records = _p4kService.GetAllEntityClassDefinition(1);
 
             await foreach (var record in records.ConfigureAwait(false))
             {

@@ -123,7 +123,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
             // search for all components
             UpdateStatusMessage("Chargement du fichier p4k...");
             await _p4kService.OpenP4k(_p4kService.SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
-            var entityDefinitionList = _p4kService.GetAllEntityClassDefinition();
+            var entityDefinitionList = _p4kService.GetAllEntityClassDefinition(0);
 
             // Pour chaque définition d'entité existante
             await foreach (var entityDefinition in entityDefinitionList)

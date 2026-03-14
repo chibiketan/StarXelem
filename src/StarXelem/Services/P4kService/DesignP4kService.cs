@@ -97,7 +97,7 @@ public class DesignP4kService : IP4kService
         return Task.FromResult<DataCoreTypedRecord?>(null);
     }
 
-    public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition()
+    public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition(int depth)
     {
         yield break;
     }
@@ -283,6 +283,11 @@ public class DesignP4kService : IP4kService
     public Task<DataCoreTypedRecord> GetRecordWithFullHistory(CigGuid recordId)
     {
         return Task.FromResult(new DataCoreTypedRecord("toto", "toto", default, null));
+    }
+
+    public Task<DataCoreTypedRecord?> GetRecordWithSpecificDepth(CigGuid recordId, int depth)
+    {
+        return Task.FromResult<DataCoreTypedRecord?>(new DataCoreTypedRecord("toto", "toto", default, null));   
     }
 
     private static P4kEntry[] GetFakeEntries() =>

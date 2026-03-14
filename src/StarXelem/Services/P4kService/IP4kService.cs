@@ -36,7 +36,7 @@ public interface IP4kService
     /// Retourne l'ensemble des enregistrements de type EntityClassDefinition
     /// </summary>
     /// <returns>UUne énumération asynchronie des enregistrements</returns>
-    IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition();
+    IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition(int depth);
 
     /// <summary>
     /// Provoque le lancement de l'alimentation des différents cache ce qui permet d'avoir des données prêtes et une requête rapide
@@ -47,4 +47,13 @@ public interface IP4kService
     Task<List<DataCoreTypedRecord>> GetAllContractGenerator();
     Task<string?> GetEntityClassName(EntityClassDefinition? entityClass);
     Task<DataCoreTypedRecord> GetRecordWithFullHistory(CigGuid recordId);
+    
+    /// <summary>
+    /// Récupère un enregistrement avec un minimum une profondeur de données spécifique
+    /// </summary>
+    /// <param name="recordId">ID de l'enregistrement à récupérer</param>
+    /// <param name="depth">Profondeur d'historique de données minium</param>
+    /// <returns>L'enregistrement demandé</returns>
+    Task<DataCoreTypedRecord?> GetRecordWithSpecificDepth(CigGuid recordId, int depth);
+    
 }

@@ -21,13 +21,15 @@ public class P4kService : IP4kService
     public const string DataP4k = "Data.p4k";
     public const string BuildManifest = "build_manifest.id";
     private readonly Dictionary<string, string> _locale = new();
-    private readonly Dictionary<uint, DataCoreTypedRecord> _EntityClassDict = new();
+    private readonly Dictionary<uint, CacheEntry> _EntityClassDict = new();
+    private readonly Dictionary<CigGuid, CacheEntry> _entityClassGuidDict = new();
     public static readonly string DefaultRSILauncherFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "rsilauncher");
     public static readonly string DefaultStarCitizenFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Roberts Space Industries", "StarCitizen");
     private Task? _loadingLocalTask;
     private Task? _loadingDatabaseTask;
     private CancellationTokenSource _cancellationTokenSource = new();
     private Task _openP4kTask;
+    private DataForge<DataCoreTypedRecord> df;
 
 
     public P4kDirectoryNode P4KFileSystem => _p4KFile ?? throw new InvalidOperationException("P4k file not open");
@@ -54,7 +56,7 @@ public class P4kService : IP4kService
     {
         if (_p4KFile != null)
         {
-            _logger.LogWarning("P4k file already open");
+            // _logger.LogWarning("P4k file already open");
             return Task.FromResult(_p4KFile);
         }
 
@@ -63,6 +65,11 @@ public class P4kService : IP4kService
         _openP4kTask = Task.Run(() =>
         {
             _p4KFile = P4kDirectoryNode.FromP4k(P4kFile.FromFile(path, p4kProgress), fileSystemProgress);
+            // Chargement des données
+            var entry = P4KFileSystem.OpenRead(dataCorePath);
+            var dcb = new DataCoreDatabase(entry);
+            df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
+            entry.Dispose();
         }, _cancellationTokenSource.Token)
             // Une fois ouvert on supprime la task
             .ContinueWith(t => _openP4kTask = null);
@@ -257,10 +264,10 @@ public class P4kService : IP4kService
                 // chargement du fichier p4k
                 await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
                 // Chargement des données
-                var entry = P4KFileSystem.OpenRead(dataCorePath);
-                var dcb = new DataCoreDatabase(entry);
-                var df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
-                await entry.DisposeAsync().ConfigureAwait(false);
+                // var entry = P4KFileSystem.OpenRead(dataCorePath);
+                // var dcb = new DataCoreDatabase(entry);
+                // var df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
+                // await entry.DisposeAsync().ConfigureAwait(false);
 
                 var sw = Stopwatch.StartNew();
                 var allRecords = df.DataCore.Database.MainRecords
@@ -268,7 +275,19 @@ public class P4kService : IP4kService
                     .Select(x =>
                     {
                         if (_cancellationTokenSource.IsCancellationRequested) return null;
-                        return df.GetFromRecord(x);
+                        var savedDepth = DataCoreBinaryGenerated.s_maxRecursiveLoad;
+                        // Pas de chargement récursif pour le chargement initial
+                        DataCoreBinaryGenerated.s_maxRecursiveLoad = 0;
+                        try
+                        {
+                            var result = df.GetFromRecord(x);
+                            
+                            return result;
+                        }
+                        finally
+                        {
+                            DataCoreBinaryGenerated.s_maxRecursiveLoad = savedDepth;
+                        }
                     })
                     ;
                 sw.Stop();
@@ -283,9 +302,14 @@ public class P4kService : IP4kService
                         break;
                     }
                     
-                    var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record.RecordId]));
-
-                    _EntityClassDict.Add(crc, record);
+                    var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record!.RecordId]));
+                    var cacheEntry = new CacheEntry
+                    {
+                        depth = 0,
+                        Record = record
+                    };
+                    _EntityClassDict.Add(crc, cacheEntry);
+                    _entityClassGuidDict.Add(record.RecordId, cacheEntry);
                 }
                 sw.Stop();
                 _logger.LogTrace("Extracted all entity classes in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
@@ -294,23 +318,57 @@ public class P4kService : IP4kService
         
         return _loadingDatabaseTask;        
     }
-    
-    public async Task<DataCoreTypedRecord?> GetEntityType(uint guidCrc)
+
+    public Task<DataCoreTypedRecord?> GetEntityType(uint guidCrc)
+    {
+        return GetEntityType(guidCrc, 0);
+    }
+
+    public async Task<DataCoreTypedRecord?> GetEntityType(uint guidCrc, int depth)
     {
         await LoadDatabaseIfNeeded().ConfigureAwait(false);
         
-        return _EntityClassDict.GetValueOrDefault(guidCrc);
+        // TODO traiter correctement la notion de depth si <>
+        var cacheEntry = _EntityClassDict.GetValueOrDefault(guidCrc);
+
+        if (null != cacheEntry && cacheEntry.depth < depth)
+        {
+            await UpdateCacheRecordWithDepth(cacheEntry, depth).ConfigureAwait(false);
+        }
+        
+        return cacheEntry?.Record;
     }
 
-    public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition()
+    public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition(int depth)
     {
         await LoadDatabaseIfNeeded().ConfigureAwait(false);
 
-        foreach (var record in _EntityClassDict.Values)
+        var it = _EntityClassDict.Values
+            .Where(r => r.Record.Data is EntityClassDefinition)
+            .AsParallel()
+            .Select(r =>
+            {
+                UpdateCacheRecordWithDepth(r, depth).Wait();
+                return r.Record;
+            });
+
+        foreach (var record in it)
         {
-            if (record.Data is EntityClassDefinition)
-                yield return record;
+            yield return record;       
         }
+        
+        // foreach (var record in _EntityClassDict.Values)
+        // {
+        //     if (record.Record.Data is EntityClassDefinition)
+        //     {
+        //         if (record.depth < depth)
+        //         {
+        //             await UpdateCacheRecordWithDepth(record, depth).ConfigureAwait(false);
+        //         }
+        //         
+        //         yield return record.Record;
+        //     }
+        // }
     }
 
     public Task FillDataCache()
@@ -329,9 +387,9 @@ public class P4kService : IP4kService
 
         foreach (var record in _EntityClassDict.Values)
         {
-            if (record.Data is ContractGenerator)
+            if (record.Record.Data is ContractGenerator)
             {
-                result.Add(record);
+                result.Add(record.Record);
             }
         }
         
@@ -356,10 +414,10 @@ public class P4kService : IP4kService
         // chargement du fichier p4k
         await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
         // Chargement des données
-        var entry = P4KFileSystem.OpenRead(dataCorePath);
-        var dcb = new DataCoreDatabase(entry);
-        var df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
-        await entry.DisposeAsync().ConfigureAwait(false);
+        // var entry = P4KFileSystem.OpenRead(dataCorePath);
+        // var dcb = new DataCoreDatabase(entry);
+        // var df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
+        // await entry.DisposeAsync().ConfigureAwait(false);
 
         var sw = Stopwatch.StartNew();
         var oldval = DataCoreBinaryGenerated.s_maxRecursiveLoad;
@@ -379,6 +437,19 @@ public class P4kService : IP4kService
         }
     }
 
+    public async Task<DataCoreTypedRecord?> GetRecordWithSpecificDepth(CigGuid recordId, int depth)
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+        _entityClassGuidDict.TryGetValue(recordId, out var cacheEntry);
+
+        if (null != cacheEntry && cacheEntry.depth < depth)
+        {
+            await UpdateCacheRecordWithDepth(cacheEntry, depth).ConfigureAwait(false);
+        }
+
+        return cacheEntry?.Record;
+    }
+
     private void ResetSelectedFile()
     {
         // stop previous loading if any
@@ -386,6 +457,7 @@ public class P4kService : IP4kService
         
         // clear caches
         _EntityClassDict.Clear();
+        _entityClassGuidDict.Clear();
         _locale.Clear();
         _loadingLocalTask = null;
         _loadingDatabaseTask = null;
@@ -393,5 +465,42 @@ public class P4kService : IP4kService
         
         // reset file
         _p4KFile = null;
+    }
+
+    private async Task UpdateCacheRecordWithDepth(CacheEntry cacheEntry, int newDepth)
+    {
+        if (newDepth <= cacheEntry.depth)
+        {
+            // On est déjà avec plus d'infos, on ne fait rien
+            return;
+        }
+        
+        // chargement du fichier p4k
+        await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
+        // Chargement des données
+        // var entry = P4KFileSystem.OpenRead(dataCorePath);
+        // var dcb = new DataCoreDatabase(entry);
+        // df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
+        // await entry.DisposeAsync().ConfigureAwait(false);
+
+        var oldval = DataCoreBinaryGenerated.s_maxRecursiveLoad;
+        try
+        {
+            DataCoreBinaryGenerated.s_maxRecursiveLoad = newDepth;
+            var record = df.GetFromRecord(cacheEntry.Record.RecordId);
+            
+            cacheEntry.Record = record;
+            cacheEntry.depth = newDepth;
+        }
+        finally
+        {
+            DataCoreBinaryGenerated.s_maxRecursiveLoad = oldval;
+        }
+    }
+
+    private class CacheEntry
+    {
+        public required int depth { get; set; }
+        public required DataCoreTypedRecord Record { get; set; }
     }
 }
