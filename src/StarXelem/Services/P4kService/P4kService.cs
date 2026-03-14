@@ -366,7 +366,7 @@ public class P4kService : IP4kService
         try
         {
             // On va se limiter à 3 déjà
-            DataCoreBinaryGenerated.s_maxRecursiveLoad = 2;
+            DataCoreBinaryGenerated.s_maxRecursiveLoad = 3;
             var record = df.GetFromRecord(recordId);
             
             sw.Stop();

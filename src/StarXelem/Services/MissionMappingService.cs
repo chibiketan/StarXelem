@@ -694,6 +694,9 @@ internal sealed class MissionMappingService : IMissionMappingService
                 case null:
                     stepResult = [];
                     break;
+                case BlueprintRewards blueprintRewards:
+                    stepResult = await TransformContractResultToRewardVM(blueprintRewards).ConfigureAwait(false);
+                    break;
                 default:
                     stepResult = [];
                     _logger.LogDebug("Unknown contract result type : {type} for contract : {contract_name}", contractResult!.GetType().FullName, contract.debugName);
@@ -702,6 +705,51 @@ internal sealed class MissionMappingService : IMissionMappingService
 
             result.AddRange(stepResult);
         }
+
+        return result;
+    }
+
+    private async Task<List<MissionRewardItemViewModel>> TransformContractResultToRewardVM(BlueprintRewards contractResult)
+    {
+        var result = new List<MissionRewardItemViewModel>(1);
+        var content = "";
+
+        foreach (var blueprintPoolBlueprintReward in contractResult.blueprintPool.blueprintRewards)
+        {
+            switch (blueprintPoolBlueprintReward.blueprintRecord?.blueprint)
+            {
+                case null:
+                    break;
+                case CraftingBlueprint craftingBlueprint:
+                    // Le Name semble être @LOC_PLACEHOLDER à chaque fois...
+                    // craftingBlueprint.blueprintName
+                    switch (craftingBlueprint.processSpecificData)
+                    {
+                        case null:
+                            break;
+                        case CraftingProcess_Creation craftingProcessCreation:
+                            content = $"{content}    - {await _p4kService.GetEntityClassName(craftingProcessCreation.entityClass)}\n";
+                            break;
+                        default:
+                            // TODO break pour analyser plus tard
+                            Debugger.Break();
+                            break;
+                    }
+
+                    break;
+                default:
+                    // gérer quelque chose ici ?
+                    break;
+            }
+        }
+        
+        result.Add(new MissionRewardItemViewModel
+        {
+            Count = 1,
+            Name = $"{contractResult.chance*100}% de chance d'un blueprint\n{content}",
+            OnlyToMissionOwner = true,
+            SendToHomeLocation = true
+        });
 
         return result;
     }
