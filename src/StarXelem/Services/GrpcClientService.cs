@@ -69,9 +69,9 @@ public class GrpcClientService : IGrpcClientService
 
     public async Task<IList<SpaceshipModel>> GetSpaceships()
     {
-        var entitlementServiceClient = new EntitlementService.EntitlementServiceClient(_channel);
+        var entitlementServiceClient = new ExternalEntitlementService.ExternalEntitlementServiceClient(_channel);
 
-        var request = new QueryRequest();
+        var request = new Sc.External.Services.Entitlement.V1.QueryRequest();
         request.Query = new Query();
         request.Query.Filter = new Filter();
 
@@ -198,7 +198,7 @@ public class GrpcClientService : IGrpcClientService
         // Appel réel
         Console.WriteLine($"{DateTime.Now} avant la requête");
         await semaphoreSlim.WaitAsync();
-        QueryResponse response;
+        Sc.External.Services.Entitlement.V1.QueryResponse response;
         try
         {
             response = await entitlementServiceClient.QueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
