@@ -79,6 +79,7 @@
                 
                 <CheckBox Grid.Row="5" Grid.Column="4" Content="Debug mode" IsChecked="{Binding IsInDebugMode}" />
                 <CheckBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Content="Charger les objets liés (lent)" IsChecked="{Binding UseTreeProjection}" />
+                <CheckBox Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Content="Charger le contenu des objets" IsChecked="{Binding LoadInventoryContent}" />
                 <!-- <CheckBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Right" FlowDirection="RightToLeft" IsChecked="{Binding UseUserInventoryList}" >Utiliser les inventaires du compte</CheckBox> -->
             </Grid>
         </Expander>

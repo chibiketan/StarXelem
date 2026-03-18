@@ -31,15 +31,17 @@ public class GrpcClientService : IGrpcClientService
     private GetCurrentPlayerResponse? _playerInfo;
     private Metadata? _authHeaders;
     private GrpcChannel? _channel;
+    private readonly IP4kService _p4kService;
 
     public event EventHandler<bool>? OnConnectedChanged;
 
-    public GrpcClientService(ILogger<GrpcClientService> logger)
+    public GrpcClientService(ILogger<GrpcClientService> logger, IP4kService p4kService)
     {
         _watcher = null;
         _authHeaders = null;
         _logger = logger;
         IsConnected = false;
+        _p4kService = p4kService;
     }
 
     public async Task InitClient(P4kFileModel p4kFile)
@@ -432,7 +434,7 @@ public class GrpcClientService : IGrpcClientService
         var edgeDict = new Dictionary<ulong, EntityEdge>(500);
         var nodes = new List<Node>(800);
         EntityQueryResponse? response = null;
-        await semaphoreSlim.WaitAsync();
+        await semaphoreSlim.WaitAsync().ConfigureAwait(false);
         try
         {
             do
@@ -444,7 +446,7 @@ public class GrpcClientService : IGrpcClientService
                 }
 
                 // response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(60));
-                response = await service.EntityQueryAsync(request, _authHeaders);
+                response = await service.EntityQueryAsync(request, _authHeaders).ConfigureAwait(false);
             
                 // foreach (var entityClass in response.Body.EntityClasses)
                 // {
@@ -477,6 +479,123 @@ public class GrpcClientService : IGrpcClientService
             semaphoreSlim.Release();
         }
         
+        // --------------------------------------------------------------------------------------------------------------------------------------- AJOUT
+        if (itemQueryModel.LoadInventoryContent)
+        {
+            // A partir de la, comment on gère le chargement des éléments contenu dans ce que l'on a ?
+            // Et comment on sait ?
+            // TODO implemente ici
+            var containerList = new List<ulong>(500);
+
+
+            foreach (var node in nodes)
+            {
+                var type = await _p4kService.GetEntityType(node.Properties.EntityProperties.ClassGuidCrc).ConfigureAwait(false);
+                var container = ((EntityClassDefinition?)type?.Data)?.Components.OfType<SCItemInventoryContainerComponentParams>().FirstOrDefault();
+
+                if (null != container)
+                {
+                    // Le type est un contenant, on l'ajoute dans la liste à charger
+                    containerList.Add(node.Properties.EntityProperties.Geid);
+                }
+            }
+
+            while (containerList.Count > 0)
+            {
+                // Tant qu'on a des données à charger, charge les 50 premiers
+                var containerGeidList = containerList.Take(50).ToList();
+                containerList.RemoveRange(0, containerGeidList.Count);
+
+                // TODO on prépare le query
+                // TODO on execute la query
+                // TODO On ajoute aux résultats et on ajoute à la liste des conteneur si besoin 
+
+                // filtre par conteneur
+                var inventoryIdListFilter = new EdgeFilter
+                {
+                    EdgeType = "STOWED_IN",
+                };
+                inventoryIdListFilter.Values.AddRange(containerGeidList?.Select(t => new ScalarValue { StringValue = $"{t}:Container:0" }));
+
+
+                var orFilter = new EntityCompositeFilter
+                {
+                    Operator = LogicalOperator.Or
+                };
+                orFilter.Filters.Add(new EntityFilter { EdgeFilter = inventoryIdListFilter });
+
+                var existingFilter = filter.Filters.FirstOrDefault(c =>
+                    c.CompositeFilter != null && c.CompositeFilter.Operator == LogicalOperator.Or && c.CompositeFilter.Filters.Any(c1 => c1.EdgeFilter is { EdgeType: "STOWED_IN" }));
+
+                if (existingFilter != null)
+                {
+                    // On remplace le filtre excistant
+                    existingFilter.CompositeFilter = orFilter;
+                }
+                else
+                {
+                    // On ajoute un nouveau filtre
+                    filter.Filters.Add(new EntityFilter { CompositeFilter = orFilter });
+                }
+
+                // Petit reset pour être sûr de partir du début
+                request.Body.Query.Pagination.After = "";
+                response = null;
+
+                await semaphoreSlim.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    do
+                    {
+
+                        if (null != response)
+                        {
+                            request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
+                        }
+
+                        // response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(60));
+                        response = await service.EntityQueryAsync(request, _authHeaders).ConfigureAwait(false);
+
+                        foreach (var entityClass in response.Body.Results.Edges)
+                        {
+                            if (entityClass.Start.HasEntityId)
+                            {
+                                // TODO ça ce n'est pas terrible, voir si on a toujours la même quantité du coup y aller par index ?
+                                edgeDict.TryAdd(entityClass.Start.EntityId, entityClass);
+                            }
+                            else
+                            {
+                                _logger.LogInformation($"Edge start pas de type Entity : {entityClass.Start.Type}");
+                            }
+                        }
+
+                        nodes.AddRange(response.Body.Results.Nodes);
+                        foreach (var containerNode in response.Body.Results.Nodes)
+                        {
+                            var type = await _p4kService.GetEntityType(containerNode.Properties.EntityProperties.ClassGuidCrc).ConfigureAwait(false);
+                            var container = ((EntityClassDefinition?)type?.Data)?.Components.OfType<SCItemInventoryContainerComponentParams>().FirstOrDefault();
+
+                            if (null != container)
+                            {
+                                // Le type est un contenant, on l'ajoute dans la liste à charger
+                                containerList.Add(containerNode.Properties.EntityProperties.Geid);
+                            }
+                        }
+
+                        
+                        // Tant qu'il y a une nextPage, on continue;
+                    } while (response.Body.PageInfo.HasNextPage);
+
+                }
+                finally
+                {
+                    semaphoreSlim.Release();
+                }
+
+            }
+            // --------------------------------------------------------------------------------------------------------------------------------------- FIN AJOUT
+        }
+
 
         //return nodes.Select(n => new EntityItemQueryResult {EntityNodeProperties = n.Properties.EntityProperties, EntityClassProperties = GetFromDict(classDict, n.Properties.EntityProperties.ClassGuidCrc)}).ToList();
         return nodes.Select(n => new EntityItemQueryResult {EntityNodeProperties = n.Properties.EntityProperties, EntityEdge = GetFromDict(edgeDict, n.Properties.EntityProperties.Geid), EntityClassProperties = null}).ToList();

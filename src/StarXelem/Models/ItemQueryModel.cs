@@ -11,4 +11,5 @@ public class ItemQueryModel
     public List<String>? InventoryIdList { get; set; }
     public List<String>? ParentUrnList { get; set; }
     public bool UseProjection { get; set; } = false;
+    public bool LoadInventoryContent { get; set; } = false;
 }

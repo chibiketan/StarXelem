@@ -62,6 +62,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     [ObservableProperty] private bool _useConnectedProfilAsOwner = true;
     [ObservableProperty] private bool _useUserInventoryList = true;
     [ObservableProperty] private bool _useTreeProjection = false;
+    [ObservableProperty] private bool _loadInventoryContent = true;
     [ObservableProperty] private string _ownerId = "";
     [ObservableProperty] private string _id = "";
     [ObservableProperty] private bool _isInDebugMode = false;
@@ -198,6 +199,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         searchQuery.Id = _id;
         searchQuery.UseProjection = UseTreeProjection;
         searchQuery.TypeList = SearchTypeList.Where(i => i.IsSelected).Select(i => i.Type).ToList();
+        searchQuery.LoadInventoryContent = LoadInventoryContent;
 
         var inventoryList = (await LocationList ?? new List<FilterLocationOptionModel>())
             .Where(i => i.IsSelected)
