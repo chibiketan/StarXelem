@@ -45,16 +45,41 @@ public partial class MainWindowViewModel : ViewModelBase
         _p4kService = p4kService;
         _grpcClientService = grpcClientService;
         PopupViewModel = popupViewModel;
-        InstalledEnvs = p4kService.FindInstalledFiles();
+        _installedEnvs = p4kService.FindInstalledFiles();
         InstalledEnvs.ContinueWith(async x =>
         {
-            // Charge le chemin depuis le registre au démarrage
-            await LoadP4kFromRegistryAsync();
+            if (x.IsFaulted)
+            {
+                // On rethrow si le chargement a échoué
+                throw x.Exception;
+            }
 
+            // On récupère la liste initiale
             var list = await x;
 
+            // Charge le chemin depuis le registre au démarrage
+            // TODO Modifier la méthode pour retourner l'élément, comme ça on le retourne dans la liste
+            var localElement = await LoadP4kFromRegistryAsync();
+
+            if (localElement != null)
+            {
+                var existing = list.FirstOrDefault(x => string.Equals(Path.GetFullPath(x.Path), Path.GetFullPath(localElement.Path), StringComparison.OrdinalIgnoreCase));
+                if (existing == null)
+                {
+                    list.Insert(0, localElement);
+                }
+            }
+
+            return list;
+        })
+        .Unwrap()
+        .ContinueWith(async x =>
+        {
+            var list = await x;
+            
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                OnPropertyChanged(nameof(InstalledEnvs));
                 SelectedP4kFile = list?.FirstOrDefault();
             });
         });
@@ -264,46 +289,27 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private async Task LoadP4kFromRegistryAsync()
+    private async Task<P4kFileModel?> LoadP4kFromRegistryAsync()
     {
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(RegistryBasePath);
             var dataP4kPath = key?.GetValue(RegistryValueName) as string;
             if (string.IsNullOrWhiteSpace(dataP4kPath))
-                return;
+                return null;
 
             var infos = await _p4kService.GetInstallationInfo(dataP4kPath).ConfigureAwait(false);
-            if (infos == null || infos.Manifest == null)
-                return;
-
-            try
+            if (infos?.Manifest is not null)
             {
-                var list = await InstalledEnvs.ConfigureAwait(false);
-                list ??= new List<P4kFileModel>();
-
-                var existing = list.FirstOrDefault(x => string.Equals(Path.GetFullPath(x.Path), Path.GetFullPath(infos.Path), StringComparison.OrdinalIgnoreCase));
-                if (existing == null)
-                {
-                    var newList = list.ToList();
-                    newList.Add(infos);
-                    InstalledEnvs = Task.FromResult<IList<P4kFileModel>>(newList);
-                    SelectedP4kFile = infos;
-                }
-                else
-                {
-                    SelectedP4kFile = existing;
-                }
-            }
-            catch
-            {
-                SelectedP4kFile = infos;
+                return infos;
             }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Impossible de charger le dossier P4K depuis le registre");
         }
+            
+        return null;
     }
     
     private void UpdateP4kStatus(string status)
