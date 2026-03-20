@@ -208,6 +208,7 @@ public class LocationService : ILocationService
     public void ClearCache()
     {
         _entityCache.Clear();
+        _locationCache.Clear();
     }
     
     private readonly ConcurrentDictionary<ulong, Task<IList<EntityItemQueryResult>>> _entityCache = new();
