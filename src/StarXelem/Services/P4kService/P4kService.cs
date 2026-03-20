@@ -28,7 +28,7 @@ public class P4kService : IP4kService
     private Task? _loadingLocalTask;
     private Task? _loadingDatabaseTask;
     private CancellationTokenSource _cancellationTokenSource = new();
-    private Task _openP4kTask;
+    private Task? _openP4kTask;
     private DataForge<DataCoreTypedRecord> df;
 
 
@@ -59,7 +59,7 @@ public class P4kService : IP4kService
             // _logger.LogWarning("P4k file already open");
             return Task.FromResult(_p4KFile);
         }
-
+        
         // On réinitialise la source de token vu que c'est un nouveau fichier
         _cancellationTokenSource = new CancellationTokenSource();
         _openP4kTask = Task.Run(() =>
@@ -72,7 +72,14 @@ public class P4kService : IP4kService
             entry.Dispose();
         }, _cancellationTokenSource.Token)
             // Une fois ouvert on supprime la task
-            .ContinueWith(t => _openP4kTask = null);
+            .ContinueWith(t =>
+            {
+                _openP4kTask = null;
+                if (t.IsFaulted)
+                {
+                    throw t.Exception;
+                }
+            });
         
         
         return _openP4kTask;

@@ -16,6 +16,7 @@ using Microsoft.Win32;
 using StarXelem.Models;
 using StarXelem.Services;
 using StarXelem.ViewModels.Popup;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace StarXelem.ViewModels;
 
@@ -214,7 +215,43 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             _logger.LogError(ex, "Erreur lors du chargement du P4K");
             UpdateP4kStatus("Erreur lors du chargement");
+            // Affiche un message d'erreur à l'utilisateur avec le détail technique (sans stacktrace)
+            var fullMessage = BuildExceptionMessage(ex);
+            try
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    WeakReferenceMessenger.Default.Send(new ShowPopupMessage(
+                        showCloseButton: true,
+                        onClose: null,
+                        viewModel: new MessagePopupContentViewModel
+                        {
+                            Title = "Une erreur est survenue lors du chargement du fichier P4k",
+                            Message = fullMessage
+                        }
+                    ));
+                });
+            }
+            catch
+            {
+                // En dernier recours si l'UI thread n'est pas disponible, ne rien faire de plus
+            }
         }        
+    }
+
+    private static string BuildExceptionMessage(Exception ex)
+    {
+        // Concatène les messages de toutes les InnerException sans stacktrace
+        var parts = new List<string>();
+        for (var cur = ex; cur != null; cur = cur.InnerException)
+        {
+            if (!string.IsNullOrWhiteSpace(cur.Message))
+            {
+                parts.Add(cur.Message.Trim());
+            }
+        }
+
+        return string.Join("\n → ", parts.Distinct());
     }
     
     private void OnSelectedP4KFileChangedDoNotUse(Object? sender, P4kFileModel? e)

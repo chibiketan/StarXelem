@@ -1,0 +1,24 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels.Popup"
+             x:DataType="vm:MessagePopupContentViewModel"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="200"
+             x:Class="StarXelem.Views.Popup.MessagePopupContentView">
+    <UserControl.Styles>
+        <Style Selector="TextBlock">
+            <Style.Setters>
+                <Setter Property="Foreground" Value="Black" />
+            </Style.Setters>
+        </Style>
+    </UserControl.Styles>
+    <Border Padding="16" Background="White" CornerRadius="8">
+    <StackPanel Spacing="8">
+      <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="Bold" TextWrapping="Wrap"/>
+      <ScrollViewer MaxHeight="300">
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap"/>
+      </ScrollViewer>
+    </StackPanel>
+  </Border>
+</UserControl>
