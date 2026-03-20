@@ -220,387 +220,251 @@ public class GrpcClientService : IGrpcClientService
     
     public async Task<IList<EntityItemQueryResult>> QueryGraphBySearch(ItemQueryModel itemQueryModel)
     {
-        var filter = new EntityCompositeFilter
+        // Helpers pour simplifier la création des filtres
+        static ScalarValue ULong(ulong v) => new ScalarValue { UnsignedBigintValue = v };
+        static ScalarValue Int(int v) => new ScalarValue { IntegerValue = v };
+        static ScalarValue Str(string v) => new ScalarValue { StringValue = v };
+
+        EntityFilter PropEqULong(string property, ulong value) => new EntityFilter
         {
-            Operator = LogicalOperator.And,
-            Filters =
+            PropertyFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
             {
-                //new EntityFilter { PropertyFilter = ownerFilter },
-                // new EntityFilter { PropertyFilter = geidListFilter },
-                // new EntityFilter { PropertyFilter = itemTypeListFilter },
-                // new EntityFilter { PropertyFilter = itemSubTypeListFilter },
+                Operator = ComparisonOperator.Equal,
+                Property = property,
+                Values = { ULong(value) }
             }
         };
 
-        if ((itemQueryModel.useConnectedUserOwner && (itemQueryModel.InventoryIdList?.Count ?? 0) == 0)  || !String.IsNullOrEmpty(itemQueryModel.ownerId))
+        EntityFilter PropEqString(string property, string value) => new EntityFilter
+        {
+            PropertyFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
+            {
+                Operator = ComparisonOperator.Equal,
+                Property = property,
+                Values = { Str(value) }
+            }
+        };
+
+        EntityFilter PropIn(string property, IEnumerable<ScalarValue> values) => new EntityFilter
+        {
+            PropertyFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
+            {
+                Operator = ComparisonOperator.In,
+                Property = property,
+                Values = { values }
+            }
+        };
+
+        var andFilters = new List<EntityFilter>(8);
+
+        // Filtre owner
+        if ((itemQueryModel.useConnectedUserOwner && (itemQueryModel.InventoryIdList?.Count ?? 0) == 0) || !string.IsNullOrEmpty(itemQueryModel.ownerId))
         {
             ulong ownerId = itemQueryModel.useConnectedUserOwner ? _playerInfo.Player.Geid : ulong.Parse(itemQueryModel.ownerId);
-            // filtre par owner
-            var ownerFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-            {
-                Operator = ComparisonOperator.Equal,
-                Property = "ownerId"
-            };
-            
-            ownerFilter.Values.Add(new ScalarValue { UnsignedBigintValue = ownerId});
-            filter.Filters.Add(new EntityFilter { PropertyFilter = ownerFilter });
+            andFilters.Add(PropEqULong("ownerId", ownerId));
         }
 
-        if (!String.IsNullOrEmpty(itemQueryModel.Id))
+        // Filtre par id d'objet
+        if (!string.IsNullOrEmpty(itemQueryModel.Id))
         {
-            // filtre par id d'objet
-            var idFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-            {
-                Operator = ComparisonOperator.Equal,
-                Property = "geid"
-            };
-            
-            idFilter.Values.Add(new ScalarValue { UnsignedBigintValue = ulong.Parse(itemQueryModel.Id)});
-            filter.Filters.Add(new EntityFilter { PropertyFilter = idFilter });
+            andFilters.Add(PropEqULong("geid", ulong.Parse(itemQueryModel.Id)));
         }
 
+        // Filtre par type
         if ((itemQueryModel.TypeList?.Count ?? 0) > 0)
         {
-            // filtre par type
-            var typeListFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-            {
-                Operator = ComparisonOperator.In,
-                Property = "itemTypeEnum"
-            };
-            
-            typeListFilter.Values.AddRange(itemQueryModel.TypeList?.Select(t => new ScalarValue { IntegerValue = (int)t}));
-            filter.Filters.Add(new EntityFilter { PropertyFilter = typeListFilter });
+            andFilters.Add(PropIn("itemTypeEnum", itemQueryModel.TypeList!.Select(t => Int((int)t))));
         }
 
+        // Filtre par conteneur (STOWED_IN) avec option OR owner
         if ((itemQueryModel.InventoryIdList?.Count ?? 0) > 0)
         {
-            // filtre par conteneur
-            var inventoryIdListFilter = new EdgeFilter
-            {
-                EdgeType = "STOWED_IN",
-            };
-            inventoryIdListFilter.Values.AddRange(itemQueryModel.InventoryIdList?.Select(t => new ScalarValue { StringValue = t }));
+            var stowedIn = new EdgeFilter { EdgeType = "STOWED_IN" };
+            stowedIn.Values.AddRange(itemQueryModel.InventoryIdList!.Select(id => Str(id)));
 
+            var or = new EntityCompositeFilter { Operator = LogicalOperator.Or };
+            or.Filters.Add(new EntityFilter { EdgeFilter = stowedIn });
 
-            // // filtre par stowedContext pour faire un or
-            // var stowContextFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-            // {
-            //     Operator = ComparisonOperator.Match,
-            //     Property = "stowId"
-            // };
-            //
-            // stowContextFilter.Values.AddRange(itemQueryModel.InventoryIdList?.Select(t => new ScalarValue { StringValue = t }));
-            
-            // filtre par owner pour faire un or
-            ulong ownerId = _playerInfo.Player.Geid;
-            // filtre par owner
-            var ownerFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-            {
-                Operator = ComparisonOperator.Equal,
-                Property = "ownerId"
-            };
-            
-            ownerFilter.Values.Add(new ScalarValue { UnsignedBigintValue = ownerId});
-            var orFilter = new EntityCompositeFilter
-            {
-                Operator = LogicalOperator.Or
-            };
-            orFilter.Filters.Add(new EntityFilter { EdgeFilter = inventoryIdListFilter });
-            // orFilter.Filters.Add(new EntityFilter { PropertyFilter = stowContextFilter });
-            // Si on filtre par owner, on ajoute en OR l'id du owner pour avoir une vue d'ensemble
             if (itemQueryModel.useConnectedUserOwner)
             {
-                orFilter.Filters.Add(new EntityFilter { PropertyFilter = ownerFilter });
+                or.Filters.Add(PropEqULong("ownerId", _playerInfo.Player.Geid));
             }
 
-            filter.Filters.Add(new EntityFilter { CompositeFilter = orFilter });
+            andFilters.Add(new EntityFilter { CompositeFilter = or });
         }
 
+        // Filtre par parentUrn
         if ((itemQueryModel.ParentUrnList?.Count ?? 0) > 0)
         {
-            // Liste des parentUrn
-            var parentUrnListFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-            {
-                Operator = ComparisonOperator.In,
-                Property = "parentUrn"
-            };
-            parentUrnListFilter.Values.AddRange(itemQueryModel.ParentUrnList!.Select(x => new ScalarValue { StringValue = x }));
-            filter.Filters.Add(new EntityFilter { PropertyFilter = parentUrnListFilter });
+            andFilters.Add(PropIn("parentUrn", itemQueryModel.ParentUrnList!.Select(Str)));
         }
 
+        var compositeFilter = new EntityCompositeFilter { Operator = LogicalOperator.And };
+        compositeFilter.Filters.AddRange(andFilters);
 
-        // // Liste des parentUrn
-        // var geidListFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-        // {
-        //     Operator = ComparisonOperator.In,
-        //     Property = "parentUrn"
-        // };
-        // geidListFilter.Values.AddRange(parentUrnList.Select(x => new ScalarValue { StringValue = x }));
-        //
-        // // Liste des type d'entité
-        // var itemTypeListFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-        // {
-        //     Operator = ComparisonOperator.In,
-        //     Property = "itemTypeEnum"
-        // };
-        // itemTypeListFilter.Values.Add( new ScalarValue { IntegerValue = (int)EItemType.NOITEM_Vehicle });
-        //
-        // // Liste des sous type d'entité
-        // var itemSubTypeListFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-        // {
-        //     Operator = ComparisonOperator.In,
-        //     Property = "itemSubTypeEnum"
-        // };
-        // itemSubTypeListFilter.Values.Add( new ScalarValue { IntegerValue = (int)EItemSubType.Vehicle_Boat });
-        // itemSubTypeListFilter.Values.Add( new ScalarValue { IntegerValue = (int)EItemSubType.Vehicle_GroundVehicle });
-        // itemSubTypeListFilter.Values.Add( new ScalarValue { IntegerValue = (int)EItemSubType.Vehicle_PowerSuit });
-        // itemSubTypeListFilter.Values.Add( new ScalarValue { IntegerValue = (int)EItemSubType.Vehicle_Spaceship });
-
-
-
-
-        
-        
-        
         var service = new EntityGraphService.EntityGraphServiceClient(_channel);
 
-        EntityQueryRequest request = new()
+        var request = new EntityQueryRequest
         {
             Body = new EntityQueryRequestBody
             {
-                Scope = new Scope
-                {
-                    Type = ScopeType.Global,
-                    ShardId = ""
-                },
+                Scope = new Scope { Type = ScopeType.Global, ShardId = "" },
                 Query = new EntityGraphQuery
                 {
-                    Filter = new EntityFilter
-                    {
-                        CompositeFilter = filter
-                    },
+                    Filter = new EntityFilter { CompositeFilter = compositeFilter },
                     Projection = new EntityProjection
                     {
                         Tree = new EntityTreeProjection
                         {
                             Enabled = itemQueryModel.UseProjection,
                             IncludeInventoryNodes = false,
-                            PathMode = true,
-                            // Prune = new EntityPruneConstraint
-                            // {
-                            //     InventoryFilter = new InventoryFilter
-                            //     {
-                            //         PropertyFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-                            //         {
-                            //             Operator = ComparisonOperator.Equal,
-                            //             Property = "ownerId",
-                            //         
-                            //         }
-                            //     }
-                            // }
+                            PathMode = true
                         },
                         OutgoingEdges = true,
                         Snapshots = true,
                         EntityClasses = false
                     },
                     Language = "",
-                    Pagination = new PaginationArguments
-                    {
-                        First = 250,
-                        After = ""
-                    },
+                    Pagination = new PaginationArguments { First = 250, After = "" },
                     Sort = new EntitySortingArguments
                     {
-                        EntityProperty = new EntitySortingByProperty
-                        {
-                            Property = "geid",
-                            SortComparator = SortComparator.Numerical
-                        },
-                        // EdgeProperty = new EntitySortingByEdgeProperty
-                        // {
-                        //     Property = "rank",
-                        //     SortComparator = SortComparator.Lexicographic,
-                        //     EdgeType = "STOWED_IN"
-                        // },
+                        EntityProperty = new EntitySortingByProperty { Property = "geid", SortComparator = SortComparator.Numerical },
                         Order = PaginationOrder.Ascending
                     }
                 }
             }
         };
-        // TODO remove
-        // request.Body.Query.Projection.Tree.Prune.InventoryFilter.PropertyFilter.Values.Add(new ScalarValue { UnsignedBigintValue = _playerInfo.Player.Geid });
-        
-        var classDict = new Dictionary<uint, EntityClassProperties>(500);
+
         var edgeDict = new Dictionary<ulong, EntityEdge>(500);
         var nodes = new List<Node>(800);
-        EntityQueryResponse? response = null;
-        await semaphoreSlim.WaitAsync().ConfigureAwait(false);
-        try
+
+        // Exécution paginée générique
+        async Task RunPagedQueryAsync()
         {
-            do
+            EntityQueryResponse? response = null;
+            await semaphoreSlim.WaitAsync().ConfigureAwait(false);
+            try
             {
-
-                if (null != response)
+                do
                 {
-                    request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
-                }
+                    if (response != null)
+                        request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
 
-                // response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(60));
-                response = await service.EntityQueryAsync(request, _authHeaders).ConfigureAwait(false);
-            
-                // foreach (var entityClass in response.Body.EntityClasses)
-                // {
-                //     if (!classDict.ContainsKey(entityClass.Properties.GuidHashCrc))
-                //     {
-                //         classDict.Add(entityClass.Properties.GuidHashCrc, entityClass.Properties);
-                //     }
-                // }
+                    response = await service.EntityQueryAsync(request, _authHeaders).ConfigureAwait(false);
 
-                foreach (var entityClass in response.Body.Results.Edges)
-                {
-                    if (entityClass.Start.HasEntityId)
+                    foreach (var edge in response.Body.Results.Edges)
                     {
-                        // TODO ça ce n'est pas terrible, voir si on a toujours la même quantité du coup y aller par index ?
-                        edgeDict.TryAdd(entityClass.Start.EntityId, entityClass);
+                        if (edge.Start.HasEntityId)
+                            edgeDict.TryAdd(edge.Start.EntityId, edge);
+                        else
+                            _logger.LogInformation("Edge start pas de type Entity : {Type}", edge.Start.Type);
                     }
-                    else
-                    {
-                        _logger.LogInformation($"Edge start pas de type Entity : {entityClass.Start.Type}");
-                    }
-                }
 
-                nodes.AddRange(response.Body.Results.Nodes);
-                // Tant qu'il y a une nextPage, on continue;
-            } while (response.Body.PageInfo.HasNextPage);
+                    nodes.AddRange(response.Body.Results.Nodes);
+                } while (response.Body.PageInfo.HasNextPage);
+            }
+            finally
+            {
+                semaphoreSlim.Release();
+            }
+        }
 
-        }
-        finally
-        {
-            semaphoreSlim.Release();
-        }
-        
-        // --------------------------------------------------------------------------------------------------------------------------------------- AJOUT
+        // 1) Requête principale
+        await RunPagedQueryAsync().ConfigureAwait(false);
+
+        // 2) Chargement optionnel du contenu des inventaires trouvés
         if (itemQueryModel.LoadInventoryContent)
         {
-            // A partir de la, comment on gère le chargement des éléments contenu dans ce que l'on a ?
-            // Et comment on sait ?
-            // TODO implemente ici
             var containerList = new List<ulong>(500);
 
-
+            // Détection des conteneurs déjà trouvés
             foreach (var node in nodes)
             {
                 var type = await _p4kService.GetEntityType(node.Properties.EntityProperties.ClassGuidCrc).ConfigureAwait(false);
                 var container = ((EntityClassDefinition?)type?.Data)?.Components.OfType<SCItemInventoryContainerComponentParams>().FirstOrDefault();
-
-                if (null != container)
+                if (container != null)
                 {
-                    // Le type est un contenant, on l'ajoute dans la liste à charger
                     containerList.Add(node.Properties.EntityProperties.Geid);
                 }
             }
 
+            // Fonction locale pour mettre à jour/ajouter le filtre STOWED_IN (OR owner éventuellement)
+            void UpsertStowedInFilter(IEnumerable<ulong> geids)
+            {
+                var inventoryIdListFilter = new EdgeFilter { EdgeType = "STOWED_IN" };
+                inventoryIdListFilter.Values.AddRange(geids.Select(g => Str($"{g}:Container:0")));
+
+                var or = new EntityCompositeFilter { Operator = LogicalOperator.Or };
+                or.Filters.Add(new EntityFilter { EdgeFilter = inventoryIdListFilter });
+
+                if (itemQueryModel.useConnectedUserOwner)
+                    or.Filters.Add(PropEqULong("ownerId", _playerInfo.Player.Geid));
+
+                var existing = compositeFilter.Filters.FirstOrDefault(c =>
+                    c.CompositeFilter != null &&
+                    c.CompositeFilter.Operator == LogicalOperator.Or &&
+                    c.CompositeFilter.Filters.Any(f => f.EdgeFilter is { EdgeType: "STOWED_IN" }));
+
+                if (existing != null)
+                    existing.CompositeFilter = or;
+                else
+                    compositeFilter.Filters.Add(new EntityFilter { CompositeFilter = or });
+            }
+
             while (containerList.Count > 0)
             {
-                // Tant qu'on a des données à charger, charge les 50 premiers
-                var containerGeidList = containerList.Take(50).ToList();
-                containerList.RemoveRange(0, containerGeidList.Count);
+                var batch = containerList.Take(50).ToList();
+                containerList.RemoveRange(0, batch.Count);
 
-                // TODO on prépare le query
-                // TODO on execute la query
-                // TODO On ajoute aux résultats et on ajoute à la liste des conteneur si besoin 
+                UpsertStowedInFilter(batch);
 
-                // filtre par conteneur
-                var inventoryIdListFilter = new EdgeFilter
-                {
-                    EdgeType = "STOWED_IN",
-                };
-                inventoryIdListFilter.Values.AddRange(containerGeidList?.Select(t => new ScalarValue { StringValue = $"{t}:Container:0" }));
-
-
-                var orFilter = new EntityCompositeFilter
-                {
-                    Operator = LogicalOperator.Or
-                };
-                orFilter.Filters.Add(new EntityFilter { EdgeFilter = inventoryIdListFilter });
-
-                var existingFilter = filter.Filters.FirstOrDefault(c =>
-                    c.CompositeFilter != null && c.CompositeFilter.Operator == LogicalOperator.Or && c.CompositeFilter.Filters.Any(c1 => c1.EdgeFilter is { EdgeType: "STOWED_IN" }));
-
-                if (existingFilter != null)
-                {
-                    // On remplace le filtre excistant
-                    existingFilter.CompositeFilter = orFilter;
-                }
-                else
-                {
-                    // On ajoute un nouveau filtre
-                    filter.Filters.Add(new EntityFilter { CompositeFilter = orFilter });
-                }
-
-                // Petit reset pour être sûr de partir du début
+                // Reset pagination pour repartir du début
                 request.Body.Query.Pagination.After = "";
-                response = null;
 
+                // Requête paginée pour cette fournée + découverte de nouveaux conteneurs
+                EntityQueryResponse? response = null;
                 await semaphoreSlim.WaitAsync().ConfigureAwait(false);
                 try
                 {
                     do
                     {
-
-                        if (null != response)
-                        {
+                        if (response != null)
                             request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
-                        }
 
-                        // response = await service.EntityQueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(60));
                         response = await service.EntityQueryAsync(request, _authHeaders).ConfigureAwait(false);
 
-                        foreach (var entityClass in response.Body.Results.Edges)
+                        foreach (var edge in response.Body.Results.Edges)
                         {
-                            if (entityClass.Start.HasEntityId)
-                            {
-                                // TODO ça ce n'est pas terrible, voir si on a toujours la même quantité du coup y aller par index ?
-                                edgeDict.TryAdd(entityClass.Start.EntityId, entityClass);
-                            }
+                            if (edge.Start.HasEntityId)
+                                edgeDict.TryAdd(edge.Start.EntityId, edge);
                             else
-                            {
-                                _logger.LogInformation($"Edge start pas de type Entity : {entityClass.Start.Type}");
-                            }
+                                _logger.LogInformation("Edge start pas de type Entity : {Type}", edge.Start.Type);
                         }
 
                         nodes.AddRange(response.Body.Results.Nodes);
+
                         foreach (var containerNode in response.Body.Results.Nodes)
                         {
                             var type = await _p4kService.GetEntityType(containerNode.Properties.EntityProperties.ClassGuidCrc).ConfigureAwait(false);
                             var container = ((EntityClassDefinition?)type?.Data)?.Components.OfType<SCItemInventoryContainerComponentParams>().FirstOrDefault();
-
-                            if (null != container)
-                            {
-                                // Le type est un contenant, on l'ajoute dans la liste à charger
+                            if (container != null)
                                 containerList.Add(containerNode.Properties.EntityProperties.Geid);
-                            }
                         }
-
-                        
-                        // Tant qu'il y a une nextPage, on continue;
                     } while (response.Body.PageInfo.HasNextPage);
-
                 }
                 finally
                 {
                     semaphoreSlim.Release();
                 }
-
             }
-            // --------------------------------------------------------------------------------------------------------------------------------------- FIN AJOUT
         }
 
-
-        //return nodes.Select(n => new EntityItemQueryResult {EntityNodeProperties = n.Properties.EntityProperties, EntityClassProperties = GetFromDict(classDict, n.Properties.EntityProperties.ClassGuidCrc)}).ToList();
-        return nodes.Select(n => new EntityItemQueryResult {EntityNodeProperties = n.Properties.EntityProperties, EntityEdge = GetFromDict(edgeDict, n.Properties.EntityProperties.Geid), EntityClassProperties = null}).ToList();
-        
-        
+        return nodes.Select(n => new EntityItemQueryResult
+        {
+            EntityNodeProperties = n.Properties.EntityProperties,
+            EntityEdge = GetFromDict(edgeDict, n.Properties.EntityProperties.Geid),
+            EntityClassProperties = null
+        }).ToList();
     }
 
     public async Task<IList<EntityStowContext>> GetEntityStowContextByParentUrnList(IList<string> urnList, List<uint> crcTypeList)
