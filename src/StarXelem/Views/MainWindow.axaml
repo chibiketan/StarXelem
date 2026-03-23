@@ -35,9 +35,10 @@
         <Button Name="openFolderButton" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center" Command="{Binding OpenDataP4kCommand}" CommandParameter="{Binding $parent[Window]}">
             <PathIcon Data="{StaticResource folder_open_regular}" />
         </Button>
-        <Label Grid.Row="0" Grid.Column="2" Content="{Binding P4kStatus}" VerticalAlignment="Center" Margin="25 0 0 0" />
+        <!-- <Label Grid.Row="0" Grid.Column="2" Content="{Binding P4kStatus}" VerticalAlignment="Center" Margin="25 0 0 0" /> -->
         <ic:SymbolIcon Grid.Row="0" Grid.Column="2" Name="IconP4kStatus" HorizontalAlignment="Left" VerticalAlignment="Center" Symbol="Server"
-                       Foreground="{Binding FileLoadState, Converter={StaticResource P4kStateToBrushConverter}}" />
+                       Foreground="{Binding FileLoadState, Converter={StaticResource P4kStateToBrushConverter}}"
+                       ToolTip.Tip="{Binding P4kStatusTooltip}" />
         <ui:NavigationView
             Grid.Row="1"
             Grid.ColumnSpan="3"

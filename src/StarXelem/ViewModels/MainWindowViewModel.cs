@@ -111,6 +111,7 @@ public partial class MainWindowViewModel : ViewModelBase
             if (e.PropertyName == nameof(IP4kService.FileLoadState))
             {
                 OnPropertyChanged(nameof(FileLoadState));
+                OnPropertyChanged(nameof(P4kStatusTooltip));
             }
         };
 
@@ -368,6 +369,29 @@ public partial class MainWindowViewModel : ViewModelBase
         else
         {
             Dispatcher.UIThread.Post(() => UpdateP4kStatus(status));
+        }
+    }
+
+    // Texte affiché dans l'infobulle au survol de l'icône d'état
+    public string P4kStatusTooltip
+    {
+        get
+        {
+            var state = _p4kService.FileLoadState;
+            return state switch
+            {
+                P4kService.P4kFileLoadState.NotLoaded => "P4K: Non chargé",
+                P4kService.P4kFileLoadState.Loading => "P4K: En cours de chargement...",
+                P4kService.P4kFileLoadState.Loaded => "P4K: Chargé",
+                P4kService.P4kFileLoadState.CacheLoading => "P4K: Cache en cours de chargement...",
+                P4kService.P4kFileLoadState.CacheLoaded => "P4K: Cache chargé",
+                P4kService.P4kFileLoadState.Cancelled => "P4K: Chargement annulé",
+                P4kService.P4kFileLoadState.Error =>
+                    string.IsNullOrWhiteSpace(_p4kService.GetLastErrorMessage())
+                        ? "P4K: En erreur"
+                        : $"P4K: En erreur\n{_p4kService.GetLastErrorMessage()}",
+                _ => "P4K: Inconnu"
+            };
         }
     }
 
