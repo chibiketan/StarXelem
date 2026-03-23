@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarBreaker.FileSystem;
@@ -6,13 +7,17 @@ using StarXelem.Models;
 
 namespace StarXelem.Services;
 
-public interface IP4kService
+public interface IP4kService : INotifyPropertyChanged
 {
     P4kDirectoryNode P4KFileSystem { get; }
     
     P4kFileModel? SelectedP4KFile { get; set; }
     
     event EventHandler<P4kFileModel?>? SelectedP4KFileChanged;
+
+    // Nouveaux champs exposés
+    P4kService.P4kFileLoadState FileLoadState { get; }
+    string? GetLastErrorMessage();
     
     Task OpenP4k(string path, IProgress<double> p4kProgress, IProgress<double> fileSystemProgress);
     Task<IList<P4kFileModel>> FindInstalledFiles();

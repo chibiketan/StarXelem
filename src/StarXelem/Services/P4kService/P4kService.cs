@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -12,7 +14,7 @@ using StarXelem.Models;
 
 namespace StarXelem.Services;
 
-public class P4kService : IP4kService
+public class P4kService : IP4kService, INotifyPropertyChanged
 {
     private const string dataCorePath = "Data\\Game2.dcb";
     private readonly ILogger<P4kService> _logger;
@@ -30,6 +32,45 @@ public class P4kService : IP4kService
     private CancellationTokenSource _cancellationTokenSource = new();
     private Task? _openP4kTask;
     private DataForge<DataCoreTypedRecord> df;
+    private string? _lastErrorMessage;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public enum P4kFileLoadState
+    {
+        NotLoaded,
+        Loading,
+        Loaded,
+        Cancelled,
+        CacheLoading,
+        CacheLoaded,
+        Error
+    }
+
+    private P4kFileLoadState _fileLoadState = P4kFileLoadState.NotLoaded;
+
+    public P4kFileLoadState FileLoadState
+    {
+        get => _fileLoadState;
+        private set => SetFileLoadState(value);
+    }
+
+    public string? GetLastErrorMessage()
+    {
+        return _fileLoadState == P4kFileLoadState.Error ? _lastErrorMessage : null;
+    }
+
+    private void SetFileLoadState(P4kFileLoadState newState)
+    {
+        if (_fileLoadState == newState) return;
+        _fileLoadState = newState;
+        OnPropertyChanged(nameof(FileLoadState));
+    }
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
 
     public P4kDirectoryNode P4KFileSystem => _p4KFile ?? throw new InvalidOperationException("P4k file not open");
@@ -57,11 +98,17 @@ public class P4kService : IP4kService
         if (_p4KFile != null)
         {
             // _logger.LogWarning("P4k file already open");
+            if (FileLoadState != P4kFileLoadState.Loaded)
+            {
+                FileLoadState = P4kFileLoadState.Loaded;
+            }
             return Task.FromResult(_p4KFile);
         }
         
         // On réinitialise la source de token vu que c'est un nouveau fichier
         _cancellationTokenSource = new CancellationTokenSource();
+        _lastErrorMessage = null;
+        FileLoadState = P4kFileLoadState.Loading;
         _openP4kTask = Task.Run(() =>
         {
             _p4KFile = P4kDirectoryNode.FromP4k(P4kFile.FromFile(path, p4kProgress), fileSystemProgress);
@@ -77,7 +124,18 @@ public class P4kService : IP4kService
                 _openP4kTask = null;
                 if (t.IsFaulted)
                 {
-                    throw t.Exception;
+                    var ex = t.Exception?.GetBaseException() ?? t.Exception!;
+                    _lastErrorMessage = ex.Message;
+                    FileLoadState = P4kFileLoadState.Error;
+                    throw ex;
+                }
+                else if (t.IsCanceled)
+                {
+                    FileLoadState = P4kFileLoadState.Cancelled;
+                }
+                else
+                {
+                    FileLoadState = P4kFileLoadState.Loaded;
                 }
             });
         
@@ -223,6 +281,8 @@ public class P4kService : IP4kService
     {
         if (null == _loadingLocalTask)
         {
+            // Démarrage du chargement de cache (locale)
+            FileLoadState = P4kFileLoadState.CacheLoading;
             _loadingLocalTask = Task.Run(async () =>
             {
                 var sw = Stopwatch.StartNew();
@@ -258,6 +318,18 @@ public class P4kService : IP4kService
                 
                 await globalEntry.DisposeAsync().ConfigureAwait(false);
             }, _cancellationTokenSource.Token);
+
+            // Mise à jour de l'état de cache à la fin
+            _loadingLocalTask.ContinueWith(t =>
+            {
+                UpdateCacheStateFromTasks();
+                if (t.IsFaulted)
+                {
+                    var ex = t.Exception?.GetBaseException() ?? t.Exception!;
+                    _lastErrorMessage = ex.Message;
+                    FileLoadState = P4kFileLoadState.Error;
+                }
+            });
         }
         
         return _loadingLocalTask;
@@ -279,6 +351,8 @@ public class P4kService : IP4kService
     {
         if (null == _loadingDatabaseTask)
         {
+            // Démarrage du chargement de cache (database)
+            FileLoadState = P4kFileLoadState.CacheLoading;
             _loadingDatabaseTask = Task.Run(async () =>
             {
                 // chargement du fichier p4k
@@ -334,6 +408,18 @@ public class P4kService : IP4kService
                 sw.Stop();
                 _logger.LogTrace("Extracted all entity classes in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
             }, _cancellationTokenSource.Token);
+
+            // Mise à jour de l'état de cache à la fin
+            _loadingDatabaseTask.ContinueWith(t =>
+            {
+                UpdateCacheStateFromTasks();
+                if (t.IsFaulted)
+                {
+                    var ex = t.Exception?.GetBaseException() ?? t.Exception!;
+                    _lastErrorMessage = ex.Message;
+                    FileLoadState = P4kFileLoadState.Error;
+                }
+            });
         }
         
         return _loadingDatabaseTask;        
@@ -393,10 +479,30 @@ public class P4kService : IP4kService
 
     public Task FillDataCache()
     {
+        FileLoadState = P4kFileLoadState.CacheLoading;
         var task1 = LoadDatabaseIfNeeded();
         var task2 = LoadLangFileIfNeeded();
+        var all = Task.WhenAll(task1, task2);
+
+        all.ContinueWith(t =>
+        {
+            if (t.IsFaulted)
+            {
+                var ex = t.Exception?.GetBaseException() ?? t.Exception!;
+                _lastErrorMessage = ex.Message;
+                FileLoadState = P4kFileLoadState.Error;
+            }
+            else if (t.IsCanceled)
+            {
+                FileLoadState = P4kFileLoadState.Cancelled;
+            }
+            else
+            {
+                FileLoadState = P4kFileLoadState.CacheLoaded;
+            }
+        });
         
-        return Task.WhenAll(task1, task2);
+        return all;
     }
 
     public async Task<List<DataCoreTypedRecord>> GetAllContractGenerator()
@@ -485,6 +591,35 @@ public class P4kService : IP4kService
         
         // reset file
         _p4KFile = null;
+        _lastErrorMessage = null;
+        FileLoadState = P4kFileLoadState.NotLoaded;
+    }
+
+    private void UpdateCacheStateFromTasks()
+    {
+        // Si déjà en erreur, ne pas surcharger l'état
+        if (FileLoadState == P4kFileLoadState.Error) return;
+
+        bool anyStarted = _loadingLocalTask != null || _loadingDatabaseTask != null;
+        bool anyFaulted = (_loadingLocalTask?.IsFaulted ?? false) || (_loadingDatabaseTask?.IsFaulted ?? false);
+        bool anyRunning = (_loadingLocalTask != null && !_loadingLocalTask.IsCompleted) || (_loadingDatabaseTask != null && !_loadingDatabaseTask.IsCompleted);
+        bool allCompletedForStarted = (_loadingLocalTask == null || _loadingLocalTask.IsCompletedSuccessfully)
+                                      && (_loadingDatabaseTask == null || _loadingDatabaseTask.IsCompletedSuccessfully);
+
+        if (anyFaulted)
+        {
+            var ex = _loadingLocalTask?.Exception?.GetBaseException() ?? _loadingDatabaseTask?.Exception?.GetBaseException();
+            _lastErrorMessage = ex?.Message;
+            FileLoadState = P4kFileLoadState.Error;
+        }
+        else if (anyRunning)
+        {
+            FileLoadState = P4kFileLoadState.CacheLoading;
+        }
+        else if (anyStarted && allCompletedForStarted)
+        {
+            FileLoadState = P4kFileLoadState.CacheLoaded;
+        }
     }
 
     private async Task UpdateCacheRecordWithDepth(CacheEntry cacheEntry, int newDepth)

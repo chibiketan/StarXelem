@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarBreaker.FileSystem;
@@ -10,6 +11,11 @@ public class DesignP4kService : IP4kService
 {
     private P4kFileModel? _selectedP4KFile;
     public P4kDirectoryNode P4KFileSystem { get; }
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    // Valeurs design-time pour l'aperçu
+    public P4kService.P4kFileLoadState FileLoadState { get; private set; } = P4kService.P4kFileLoadState.CacheLoaded;
+    public string? GetLastErrorMessage() => null;
 
     public P4kFileModel? SelectedP4KFile
     {
@@ -17,6 +23,7 @@ public class DesignP4kService : IP4kService
         set
         {
             _selectedP4KFile = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedP4KFile)));
             SelectedP4KFileChanged?.Invoke(this, value);
         }
     }
