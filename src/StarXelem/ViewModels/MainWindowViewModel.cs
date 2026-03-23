@@ -105,6 +105,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
         _p4kService.SelectedP4KFileChanged += OnSelectedP4KFileChanged;
 
+        // Propage les changements d'état de chargement vers la VM pour les bindings (ex: couleur d'icône)
+        _p4kService.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IP4kService.FileLoadState))
+            {
+                OnPropertyChanged(nameof(FileLoadState));
+            }
+        };
+
     }
     
     [ObservableProperty]
@@ -361,4 +370,7 @@ public partial class MainWindowViewModel : ViewModelBase
             Dispatcher.UIThread.Post(() => UpdateP4kStatus(status));
         }
     }
+
+    // Expose l'état du service pour les bindings UI (ex: couleur de l'icône dans MainWindow)
+    public P4kService.P4kFileLoadState FileLoadState => _p4kService.FileLoadState;
 }
