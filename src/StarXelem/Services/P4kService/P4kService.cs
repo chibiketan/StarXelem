@@ -85,12 +85,23 @@ public class P4kService : IP4kService
         return _openP4kTask;
     }
     
-    public Task<IList<P4kFileModel>> LoadDefaultP4kLocations()
+    public async Task<IList<P4kFileModel>> LoadDefaultP4kLocations()
     {
-        if (!TryGetInstallDirectory(out var currentInstallDirectory))
-            currentInstallDirectory = DefaultStarCitizenFolder;
+        var result = new List<P4kFileModel>(5);
+        var pathList = TryGetListOfInstallDirectory();
 
-        return GetP4ksFromDirectoryAsync(currentInstallDirectory);
+        if (pathList.Count == 0)
+        {
+            pathList.Add(DefaultStarCitizenFolder);
+        }
+
+        foreach (var path in pathList)
+        {
+            var installations = await GetP4ksFromDirectoryAsync(path).ConfigureAwait(false);
+            result.AddRange(installations);
+        }
+        
+        return result;
     }
 
     private async Task<IList<P4kFileModel>> GetP4ksFromDirectoryAsync(string installationPath)
@@ -125,15 +136,15 @@ public class P4kService : IP4kService
     /// Checks the RSI Launcher logs for a Star Citizen Install Directory
     /// </summary>
     /// <returns>The current Star Citizen install directory</returns>
-    private bool TryGetInstallDirectory(out string dir)
+    private List<string> TryGetListOfInstallDirectory()
     {
-        dir = "";
+        var result = new List<string>(50);
 
         var launcherPath = DefaultRSILauncherFolder;
         if (!Directory.Exists(launcherPath))
         {
             _logger.LogError("Failed to find RSI Launcher directory");
-            return false;
+            return result;
         }
 
         var logPath = Path.Combine(launcherPath, "logs", "log.log");
@@ -141,7 +152,7 @@ public class P4kService : IP4kService
         if (!File.Exists(logPath))
         {
             _logger.LogError("Failed to find RSI Launcher log");
-            return false;
+            return result;
         }
 
         foreach (var line in File.ReadLines(logPath))
@@ -154,18 +165,20 @@ public class P4kService : IP4kService
                 var strstart = line.IndexOf(" at ", StringComparison.InvariantCultureIgnoreCase) + " at ".Length;
                 var strend = line.LastIndexOf("StarCitizen", StringComparison.InvariantCultureIgnoreCase) + "StarCitizen".Length;
                 var installDirectory = line.Substring(strstart, strend - strstart);
-                dir = installDirectory;
-                return true;
+                var dir = installDirectory;
+                
+                result.Add(dir);
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "Failed to parse SC install directory from launcher log");
-                return false;
             }
         }
 
-        _logger.LogError("Failed to find SC install directory from launcher log");
-        return false;
+        // On prend uniquement les chemins distincts
+        result = result.Distinct().ToList();
+        _logger.LogInformation($"{result.Count} chemins trouvés");
+        return result;
     }
 
 
