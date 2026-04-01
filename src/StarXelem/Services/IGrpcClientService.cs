@@ -1,4 +1,5 @@
 ﻿using Sc.External.Common.Shard.V1;
+using Sc.External.Services.BlueprintLibrary.V1;
 using Sc.External.Services.Contacts.V1;
 using Sc.External.Services.Entitygraph.V1;
 using Sc.External.Services.Friends.V1;
@@ -26,4 +27,5 @@ public interface IGrpcClientService
     Task<IList<Contact>> GetFriendList();
     Task<ShardInfo> GetShardInfo(int accountId);
     Task<IList<EntityStowContext>> GetEntityStowContextByParentUrnList(IList<string> urnList, List<uint> crcTypeList);
+    Task<List<BlueprintEntry>> GetBlueprintList();
 }

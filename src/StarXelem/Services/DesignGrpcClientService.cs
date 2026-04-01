@@ -1,4 +1,5 @@
 ﻿using Sc.External.Common.Shard.V1;
+using Sc.External.Services.BlueprintLibrary.V1;
 using Sc.External.Services.Contacts.V1;
 using Sc.External.Services.Entitlement.V1;
 using Sc.External.Services.Entitygraph.V1;
@@ -106,5 +107,10 @@ public class DesignGrpcClientService : IGrpcClientService
     public Task<IList<EntityStowContext>> GetEntityStowContextByParentUrnList(IList<string> urnList, List<uint> list)
     {
         return Task.FromResult<IList<EntityStowContext>>(new List<EntityStowContext>());
+    }
+
+    public Task<List<BlueprintEntry>> GetBlueprintList()
+    {
+        return Task.FromResult(new List<BlueprintEntry>());
     }
 }

@@ -53,5 +53,9 @@
         <DependentUpon>FriendListTabView.axaml</DependentUpon>
         <SubType>Code</SubType>
       </Compile>
+      <Compile Update="Views\BlueprintListTabView.axaml.cs">
+        <DependentUpon>BlueprintTabView.axaml</DependentUpon>
+        <SubType>Code</SubType>
+      </Compile>
     </ItemGroup>
 </Project>

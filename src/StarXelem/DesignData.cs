@@ -11,6 +11,7 @@ public static class DesignData
     public static MainWindowViewModel MainWindowViewModel { get; } = App.Current.Services.GetRequiredService<MainWindowViewModel>();
     public static ShipTabViewModel ShipTabViewModel { get; } = App.Current.Services.GetRequiredService<ShipTabViewModel>();
     public static ItemsTabViewModel ItemsTabViewModel { get; } = App.Current.Services.GetRequiredService<ItemsTabViewModel>();
+    public static BlueprintListTabViewModel BlueprintListTabViewModel { get; } = App.Current.Services.GetRequiredService<BlueprintListTabViewModel>();
     public static ContainerTabViewModel ContainerTabViewModel { get; } = App.Current.Services.GetRequiredService<ContainerTabViewModel>();
     public static FriendListTabViewModel FriendListTabViewModel { get; } = App.Current.Services.GetRequiredService<FriendListTabViewModel>();
 
@@ -135,5 +136,80 @@ public static class DesignData
                 PortName = "PowerplantD0"
             }
         ]);
+
+        BlueprintListTabViewModel.IsLoading = true;
+        BlueprintListTabViewModel.TreatmentStatus = "En cours de chargement...";
+        BlueprintListTabViewModel.BlueprintList = new List<BlueprintViewModel>
+        {
+            new BlueprintViewModel
+            {
+                Name = "BluePrint 1",
+                TierLevel = 1,
+                RemainingUse = -1,
+                CraftDuration = TimeSpan.FromMinutes(10),
+                CategoryList = [
+                    new BlueprintCategoryModel
+                    {
+                        Name = "Categorie 1",
+                        MaterialList = [
+                            new BlueprintMaterialModel
+                            {
+                                Name = "Aslarite",
+                                QuantityInScu = 0.015f
+                            }
+                        ],
+                        StatModifierList = [
+                            new BlueprintStatModel
+                            {
+                                Name = "Vitesse",
+                                Min = 0.97f,
+                                Max = 1.10f
+                            }
+                        ]
+                    },
+                    new BlueprintCategoryModel
+                    {
+                        Name = "Categorie 2",
+                        MaterialList = [
+                            new BlueprintMaterialModel
+                            {
+                                Name = "Hadanite",
+                                QuantityInScu = 0.01f
+                            },
+                            new BlueprintMaterialModel
+                            {
+                                Name = "Titanium",
+                                QuantityInScu = 0.06f
+                            }
+
+                        ],
+                        StatModifierList = [
+                            new BlueprintStatModel
+                            {
+                                Name = "température Min.",
+                                Min = 0.8f,
+                                Max = 1.2f
+                            },
+                            new BlueprintStatModel
+                            {
+                                Name = "température Max.",
+                                Min = 0.8f,
+                                Max = 1.2f
+                            }
+
+                        ]
+                    }
+                ]
+            },
+            new BlueprintViewModel
+            {
+                Name = "BluePrint 2",
+                TierLevel = 1,
+                RemainingUse = 2,
+                CraftDuration = new TimeSpan(0, 0, 4, 30),
+                CategoryList = []
+            }
+        };
     }
+    
 }

@@ -1,10 +1,12 @@
-﻿using System.Text;
+﻿using System.Runtime.InteropServices;
+using System.Text;
 using Google.Protobuf.Collections;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using Sc.External.Common.Api.V1;
 using Sc.External.Common.Shard.V1;
+using Sc.External.Services.BlueprintLibrary.V1;
 using Sc.External.Services.Contacts.V1;
 using Sc.External.Services.Entitlement.V1;
 using Sc.External.Services.Entitygraph.V1;
@@ -888,177 +890,68 @@ public class GrpcClientService : IGrpcClientService
     
     public async Task TestRequest()
     {
-        var filterContainerGeid = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-        {
-            Operator = ComparisonOperator.NotEqual,
-            Property = "geid",
-        };
-        filterContainerGeid.Values.Add(new ScalarValue {UnsignedBigintValue = 3490636373});
 
-        var labelFilter = new ContainerLabelFilter
+        var service = new Sc.External.Services.BlueprintLibrary.V1.BlueprintLibraryService.BlueprintLibraryServiceClient(_channel);
+        var request = new QueryBlueprintEntriesRequest
         {
-            Operator = LabelOperator.HasAny
-        };
-        labelFilter.Labels.Add(ContainerNodeLabel.Location);
-        labelFilter.Labels.Add(ContainerNodeLabel.HasPhysicsGrid);
-        labelFilter.Labels.Add(ContainerNodeLabel.Container);
-        labelFilter.Labels.Add(ContainerNodeLabel.StarSystem);
-        labelFilter.Labels.Add(ContainerNodeLabel.UniverseRoot);
-        
-        ContainerQueryRequest requestContainer = new()
-        {
-            Body = new ContainerQueryRequestBody
+            Query = new Query
             {
-                Scope = new Scope
+                Pagination = new PaginationArguments
                 {
-                    Type = ScopeType.Global,
-                    ShardId = ""
-                },
-                Query = new ContainerGraphQuery
-                {
-                    Filter = new ContainerFilter
-                    {
-                        // LabelFilter = labelFilter
-                        PropertyFilter = filterContainerGeid
-                    },
-                    Pagination = new PaginationArguments
-                    {
-                        First = 20,
-                        After = ""
-                    },
-                    Projection = new ContainerProjection
-                    {
-                        Tree = new ContainerTreeProjection
-                        {
-                            Enabled = false
-                        },
-                        EntityClasses = false,
-                        Snapshots = false
-                    }
+                    First = 250,
+                    After = ""
                 }
             }
         };
         
-      
-        var service = new EntityGraphService.EntityGraphServiceClient(_channel);
-        var responseContainer = await service.ContainerQueryAsync(requestContainer, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
-        return;
-        //responseContainer.Body.Results.Nodes.First().Properties.
-        
+        var response = await service.QueryBlueprintEntriesAsync(request, _authHeaders).ConfigureAwait(false);
+        // Guid de  l'objet DB des types
+        var typeDb = await _p4kService.GetRecordWithSpecificDepth(new CigGuid("2f8b8c66-af27-4e6a-ba30-e95efd593dd4"), 0);
 
-        // var request = new GetInventoriesRequest
-        // {
-        //     Body = new GetInventoriesRequestBody
-        //     {
-        //          OwnerId = _playerInfo.Player.Geid.ToString()
-        //     }
-        // };
-        // var response = await service.GetInventoriesAsync(request, _authHeaders);
+        foreach (var responseResult in response.Results)
+        {
+            //var guidCrc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([new CigGuid(responseResult.BlueprintId)]));
+            var blueprint = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(responseResult.BlueprintId), 2);
+            var category = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(responseResult.CategoryId), 1);
+            //var categoryBis = ((BlueprintCategoryDatabaseRecord)typeDb.Data).categories.FirstOrDefault(c => c)
+            var itemClass = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(responseResult.ItemClassId), 1);
+            Console.WriteLine("Coucou");
+        }
         
+        Console.WriteLine("Coucou");
+
+    }
+
+    public async Task<List<BlueprintEntry>> GetBlueprintList()
+    {
+        var service = new BlueprintLibraryService.BlueprintLibraryServiceClient(_channel);
+        var request = new QueryBlueprintEntriesRequest
+        {
+            Query = new Query
+            {
+                Pagination = new PaginationArguments
+                {
+                    First = 250,
+                    After = ""
+                }
+            }
+        };
+        var result = new List<BlueprintEntry>();
+        QueryBlueprintEntriesResponse? response = null;
+
+        do
+        {
+            if (null != response)
+            {
+                request.Query.Pagination.After = response.PageInfo.EndCursor;
+            }
             
-            
-        var geidListFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-        {
-            Operator = ComparisonOperator.In,
-            Property = "geid"
-        };
-        geidListFilter.Values.Add(new ScalarValue { UnsignedBigintValue = 6209912647207 });
-        
-        var inventoryidListFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-        {
-            Operator = ComparisonOperator.NotIn,
-            //Property = "subjectId"
-            Property = "id"
-        };
-        //inventoryidListFilter.Values.Add(new ScalarValue { UnsignedBigintValue = 3490636373 });
-        inventoryidListFilter.Values.Add(new ScalarValue { StringValue = "" });
-        
-        
-        var filterQuery = new EntityCompositeFilter
-        {
-            Operator = LogicalOperator.And,
-            Filters =
-            {
-                // new EntityFilter { PropertyFilter = ownerFilter },
-                new EntityFilter {
-                    PropertyFilter = geidListFilter
-                }
-            }
-        };
-        
-        //201962463294:Hangar:3490636373
-        EntityQueryRequest requestQuery = new()
-        {
-            Body = new EntityQueryRequestBody
-            {
-                Scope = new Scope
-                {
-                    Type = ScopeType.Global,
-                    ShardId = ""
-                },
-                Query = new EntityGraphQuery
-                {
-                    Filter = new EntityFilter
-                    {
-                        PropertyFilter = geidListFilter,
-                        //CompositeFilter = filterQuery
-                    },
-                    Projection = new EntityProjection
-                    {
-                        Tree = new EntityTreeProjection
-                        {
-                            Enabled = true,
-                            IncludeInventoryNodes = false,
-                            PathMode = false,
-                            // Prune = new EntityPruneConstraint
-                            // {
-                            //     InventoryFilter = new InventoryFilter
-                            //     {
-                            //         PropertyFilter = inventoryidListFilter,
-                            //     }
-                            // }
-                        },
-                        OutgoingEdges = false,
-                        Snapshots = false,
-                        EntityClasses = true
-                    },
-                    Language = "",
-                    Pagination = new PaginationArguments
-                    {
-                        First = 0,
-                        After = ""
-                    }
-                }
-            }
-        };
-        // var responseQuery = await service.EntityQueryAsync(requestQuery, _authHeaders);
-        //
-        // // TODO fetch using EItemType ? 
-        //
-        //
-        // while (responseQuery.Body.PageInfo.HasNextPage)
-        // {
-        //     requestQuery.Body.Query.Pagination.After = responseQuery.Body.PageInfo.EndCursor;
-        //     responseQuery = await service.EntityQueryAsync(requestQuery, _authHeaders);            
-        // }
+            response = await service.QueryBlueprintEntriesAsync(request, _authHeaders).ConfigureAwait(false);
+        } while (response.PageInfo.HasNextPage);
 
-        var ownerIdFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-        {
-            Operator = ComparisonOperator.Equal,
-            Property = "ownerId"
-        };
-        ownerIdFilter.Values.Add(new ScalarValue {UnsignedBigintValue = 0});
 
-        
-        var inventoryIdFilter = new Sc.External.Services.Entitygraph.V1.PropertyFilter
-        {
-            Operator = ComparisonOperator.In,
-            Property = "inventoryId"
-        };
-        inventoryIdFilter.Values.Add(new ScalarValue {StringValue = ""});
-
-        
-        Console.Write("hello");
+        result.AddRange(response.Results);
+        return result;
     }
 
 
