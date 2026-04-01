@@ -16,6 +16,7 @@
             <conv:MicroScuConverter x:Key="MicroScuConverter" />
             <conv:TaskIsFinishedConverter x:Key="TaskIsFinishedConverter" />
             <conv:TaskIsNotFinishedConverter x:Key="TaskIsNotFinishedConverter" />
+            <conv:MinusOneToInfinityConverter x:Key="MinusOneToInfinityConverter" />
             <comp:TaskStringComparer x:Key="TaskStringComparer" />
             <comp:ItemViewModelName x:Key="ItemViewModelName" />
             <comp:ItemViewModelOwnerComparer x:Key="ItemViewModelOwnerComparer" />
@@ -60,7 +61,7 @@
                     <Grid RowDefinitions="*" ColumnDefinitions="25,*,30">
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding TierLevel, StringFormat=T{0}}" VerticalAlignment="Top" HorizontalAlignment="Center" />
                         <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}"  VerticalAlignment="Top" HorizontalAlignment="Left" />
-                        <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding RemainingUse, StringFormat=[{0:00}]}"  VerticalAlignment="Top" HorizontalAlignment="Center" />
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding RemainingUse, Converter={StaticResource MinusOneToInfinityConverter}, StringFormat='[{0}]'}"  VerticalAlignment="Top" HorizontalAlignment="Center" />
                     </Grid>
                 </DataTemplate>
             </ListBox.ItemTemplate>
@@ -74,7 +75,7 @@
                             <TextBlock Classes="title" Text="{Binding SelectedBluePrint.Name}"/>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Classes="subtitle" Text="{Binding SelectedBluePrint.TierLevel, StringFormat='Tiers {0} | '}" />
-                                <TextBlock Classes="subtitle" Text="{Binding SelectedBluePrint.RemainingUse, StringFormat=Usage restant : {0}}" />
+                                <TextBlock Classes="subtitle" Text="{Binding SelectedBluePrint.RemainingUse, Converter={StaticResource MinusOneToInfinityConverter}, StringFormat='Usage restant : {0}'}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" >
                                 <ic:SymbolIcon Classes="subtitle" Symbol="Timer" Margin="0 0 5 0" />

@@ -172,3 +172,55 @@ public sealed class TaskIsNotFinishedConverter : IValueConverter
     }
 
 }
+
+public sealed class MinusOneToInfinityConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is null)
+            return null;
+
+        try
+        {
+            switch (value)
+            {
+                case sbyte sb when sb == -1:
+                case short s when s == -1:
+                case int i when i == -1:
+                case long l when l == -1L:
+                    return "∞";
+                case string str:
+                    if (long.TryParse(str, NumberStyles.Integer, culture, out var li))
+                        return li == -1 ? "∞" : (object)str;
+                    return str;
+                default:
+                    if (value is IConvertible)
+                    {
+                        var asLong = System.Convert.ToInt64(value, culture);
+                        if (asLong == -1L)
+                            return "∞";
+                    }
+                    break;
+            }
+
+            // Return original value (keeps numeric type so external StringFormat can still apply)
+            return value;
+        }
+        catch
+        {
+            return value;
+        }
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is string s && s.Trim() == "∞")
+        {
+            if (targetType == typeof(int) || targetType == typeof(int?))
+                return -1;
+            if (targetType == typeof(long) || targetType == typeof(long?))
+                return -1L;
+        }
+        return value;
+    }
+}
