@@ -58,22 +58,42 @@
             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
             <Setter Property="Padding" Value="5" />
         </Style>
+        <Style Selector="Button.icon">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="Button.icon:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
     </UserControl.Styles>
     <Grid RowDefinitions="50,*" ColumnDefinitions="300,*" ColumnSpacing="10">
         <Button Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Classes="accent" HorizontalAlignment="Left" VerticalAlignment="Center" Command="{Binding LoadItemListCommand}">Charger</Button>
         <Label Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" Content="{Binding TreatmentStatus}" Margin="80,0,0,0" />
-        
-        <ListBox Grid.Row="1" Grid.Column="0" ItemsSource="{Binding BlueprintList}" SelectedItem="{Binding SelectedBluePrint}">
-            <ListBox.ItemTemplate>
-                <DataTemplate DataType="{x:Type vm:BlueprintViewModel}">
-                    <Grid RowDefinitions="*" ColumnDefinitions="25,*,30">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding TierLevel, StringFormat=T{0}}" VerticalAlignment="Top" HorizontalAlignment="Center" />
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}"  VerticalAlignment="Top" HorizontalAlignment="Left" />
-                        <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding RemainingUse, Converter={StaticResource MinusOneToInfinityConverter}, StringFormat='[{0}]'}"  VerticalAlignment="Top" HorizontalAlignment="Center" />
-                    </Grid>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+        <DockPanel  Grid.Row="1" Grid.Column="0">
+            <RelativePanel DockPanel.Dock="Top" VerticalAlignment="Top" HorizontalAlignment="Stretch" Margin="0 0 0 5" >
+                <TextBox Width="200" Name="Search" RelativePanel.AlignHorizontalCenterWithPanel="True" Padding="28 0 28 0" VerticalContentAlignment="Center" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" />
+                <Label Target="Search" RelativePanel.AlignLeftWith="Search" RelativePanel.AlignVerticalCenterWith="Search">
+                    <ic:SymbolIcon  Margin="2 0 0 0" Symbol="Search" />
+                </Label>
+                <Button Classes="icon" RelativePanel.AlignVerticalCenterWith="Search" RelativePanel.AlignRightWith="Search" Margin="0 0 4 0" Command="{Binding ClearSearchCommand}" IsVisible="{Binding Search, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <ic:SymbolIcon Symbol="DismissCircle" />
+                </Button>
+            </RelativePanel>
+            <ListBox ItemsSource="{Binding BlueprintList}" SelectedItem="{Binding SelectedBluePrint}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:BlueprintViewModel}">
+                        <Grid RowDefinitions="*" ColumnDefinitions="25,*,30">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding TierLevel, StringFormat=T{0}}" VerticalAlignment="Top" HorizontalAlignment="Center" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}"  VerticalAlignment="Top" HorizontalAlignment="Left" />
+                            <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding RemainingUse, Converter={StaticResource MinusOneToInfinityConverter}, StringFormat='[{0}]'}"  VerticalAlignment="Top" HorizontalAlignment="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
         <StackPanel Grid.Row="1" Grid.Column="1" Width="400" HorizontalAlignment="Left" Spacing="10" Classes="card" IsVisible="{Binding SelectedBluePrint, Converter={x:Static ObjectConverters.IsNotNull}}">
             <Border Classes="card-body">
                 <StackPanel>

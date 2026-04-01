@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Services;
 using StarBreaker.Common;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace StarXelem.ViewModels;
 
@@ -21,6 +23,10 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     [ObservableProperty] public BlueprintViewModel? _selectedBluePrint;
     [ObservableProperty] private bool _isLoading = false;
     [ObservableProperty] private string _treatmentStatus = "";
+    [ObservableProperty] private string _search = "";
+
+    // Stocke la liste complète pour le filtrage
+    private List<BlueprintViewModel>? _allBlueprints;
 
     public BlueprintListTabViewModel(ILogger<BlueprintListTabViewModel> logger, IGrpcClientService clientService, IP4kService p4kService)
     {
@@ -182,10 +188,50 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         {
             TreatmentStatus = "Terminé";
             IsLoading = false;
-            BlueprintList = result;
+            _allBlueprints = result;
+            ApplyFilter();
         });
     }
+
+    [RelayCommand(CanExecute = nameof(CanClearSearch))]
+    public void ClearSearch()
+    {
+        Search = "";
+        ApplyFilter();
+    }
+
+    public bool CanClearSearch()
+    {
+        return !string.IsNullOrEmpty(Search);
+    }
     
+    partial void OnSearchChanged(string value)
+    {
+        ClearSearchCommand.NotifyCanExecuteChanged();
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        var source = _allBlueprints ?? new List<BlueprintViewModel>();
+
+        if (string.IsNullOrWhiteSpace(Search))
+        {
+            BlueprintList = source.ToList();
+        }
+        else
+        {
+            var term = Search.Trim();
+            BlueprintList = source
+                .Where(b => b.Name?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                .ToList();
+        }
+
+        if (SelectedBluePrint is not null && (BlueprintList is null || !BlueprintList.Contains(SelectedBluePrint)))
+        {
+            SelectedBluePrint = null;
+        }
+    }
 }
 
 public class BlueprintCategoryModel
