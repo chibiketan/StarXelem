@@ -25,10 +25,12 @@
             <StreamGeometry x:Key="remove_regular">M3.7547787,12.4995322 L20.2466903,12.4995322 C20.6609039,12.4995322 20.9966903,12.1637458 20.9966903,11.7495322 C20.9966903,11.3353187 20.6609039,10.9995322 20.2466903,10.9995322 L3.7547787,10.9995322 C3.34056514,10.9995322 3.0047787,11.3353187 3.0047787,11.7495322 C3.0047787,12.1637458 3.34056514,12.4995322 3.7547787,12.4995322 Z</StreamGeometry>
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="ForegroundBrush" Color="LightGray" />
+                    <SolidColorBrush x:Key="ForegroundBrush" Color="Black" />
+                    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#CCC" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="ForegroundBrush" Color="LightGray" />
+                    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#333" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
@@ -38,17 +40,23 @@
             <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
+        <Style Selector=".card ic|SymbolIcon">
+            <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}" />
+        </Style>
         <Style Selector=".card TextBlock.title">
             <Setter Property="FontSize" Value="24" />
             <Setter Property="FontWeight" Value="Bold" />
         </Style>
         <Style Selector=".card TextBlock.subtitle">
             <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="DemiBold" />
         </Style>
         <Style Selector=".card ic|SymbolIcon.subtitle">
             <Setter Property="FontSize" Value="12" />
         </Style>
-        <Style Selector="Button.main">
+        <Style Selector="Border.card-body">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+            <Setter Property="Padding" Value="5" />
         </Style>
     </UserControl.Styles>
     <Grid RowDefinitions="50,*" ColumnDefinitions="300,*" ColumnSpacing="10">
@@ -67,10 +75,10 @@
             </ListBox.ItemTemplate>
         </ListBox>
         <StackPanel Grid.Row="1" Grid.Column="1" Width="400" HorizontalAlignment="Left" Spacing="10" Classes="card" IsVisible="{Binding SelectedBluePrint, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <Border Background="#333">
+            <Border Classes="card-body">
                 <StackPanel>
                     <Grid ColumnDefinitions="Auto,*">
-                        <Image Grid.Row="0" Grid.Column="0" Width="100" Height="100" VerticalAlignment="Top" Margin="10" Source="avares://StarXelem/Assets/equipement_introuvable.png" />
+                        <Image Grid.Row="0" Grid.Column="0" Width="100" Height="100" VerticalAlignment="Top" Margin="0 5 10 5" Source="avares://StarXelem/Assets/equipement_introuvable.png" />
                         <StackPanel Grid.Row="0" Grid.Column="1" Spacing="3">
                             <TextBlock Classes="title" Text="{Binding SelectedBluePrint.Name}"/>
                             <StackPanel Orientation="Horizontal">
@@ -89,7 +97,7 @@
             <ItemsControl ItemsSource="{Binding SelectedBluePrint.CategoryList}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:BlueprintCategoryModel}">
-                        <Border Background="#333" Margin="0 0 0 10">
+                        <Border Margin="0 0 0 10" Classes="card-body">
                             <StackPanel>
                                 <TextBlock Text="{Binding Name}" FontSize="14" />
                                 <TextBlock>Ressources :</TextBlock>
