@@ -29,8 +29,6 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         _p4KService = p4kService;
 
         _clientService.OnConnectedChanged += (sender, b) => { OnConnectedStatusChanged(b); };
-
-        
     }
 
     private void OnConnectedStatusChanged(bool b)

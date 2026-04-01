@@ -143,7 +143,7 @@ public static class DesignData
         {
             new BlueprintViewModel
             {
-                Name = "BluePrint 1",
+                Name = "Antium helmet moss camo",
                 TierLevel = 1,
                 RemainingUse = -1,
                 CraftDuration = TimeSpan.FromMinutes(10),
@@ -210,6 +210,7 @@ public static class DesignData
                 CategoryList = []
             }
         };
+        BlueprintListTabViewModel.SelectedBluePrint = BlueprintListTabViewModel.BlueprintList[0];
     }
     
 }

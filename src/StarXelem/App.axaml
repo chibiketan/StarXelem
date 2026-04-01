@@ -17,5 +17,8 @@
         <!-- <StyleInclude Source="avares://Avalonia.Controls.TreeDataGrid/Themes/Fluent.axaml"/> -->
         <!-- <StyleInclude Source="avares://AvaloniaHex/Themes/Simple/AvaloniaHex.axaml"/> -->
         <!-- <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" /> -->
+        <Style Selector="TextBlock">
+            <Setter Property="FontFamily" Value="Roboto" />
+        </Style>
     </Application.Styles>
 </Application>

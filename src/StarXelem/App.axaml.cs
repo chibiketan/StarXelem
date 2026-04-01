@@ -46,6 +46,12 @@ public partial class App : Application
             };
         }
 
+        if (Design.IsDesignMode)
+        {
+            // On trigger les données de design
+            Console.WriteLine("NB blueprint au lancement {0}", DesignData.BlueprintListTabViewModel.BlueprintList?.Count);
+        }
+
         base.OnFrameworkInitializationCompleted();
     }
 

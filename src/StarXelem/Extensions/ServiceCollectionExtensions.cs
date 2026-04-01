@@ -25,7 +25,6 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ShipTabViewModel>();
         services.AddTransient<P4kShipTabViewModel>();
         services.AddTransient<ItemsTabViewModel>();
-        services.AddTransient<BlueprintListTabViewModel>();
         services.AddTransient<ContainerTabViewModel>();
         services.AddTransient<FriendListTabViewModel>();
         services.AddTransient<ExtractionTabViewModel>();
@@ -39,12 +38,14 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IP4kService, DesignP4kService>();
             services.AddSingleton<IGrpcClientService, DesignGrpcClientService>();
             services.AddSingleton<ILocationService, DesignLocationService>();
+            services.AddSingleton<BlueprintListTabViewModel>();
         }
         else
         {
             services.AddSingleton<IP4kService, P4kService>();
             services.AddSingleton<IGrpcClientService, GrpcClientService>();
             services.AddSingleton<ILocationService, LocationService>();
+            services.AddTransient<BlueprintListTabViewModel>();
         }
 
         // Les services indépendants du mode design
