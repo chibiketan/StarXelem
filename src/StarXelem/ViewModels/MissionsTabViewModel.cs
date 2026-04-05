@@ -70,7 +70,7 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
                 var sw = Stopwatch.StartNew();
                 
                 
-                var contractGeneratorList = contractGeneratorListTmp.AsParallel().Select(s => _p4kService.GetRecordWithFullHistory(s.RecordId).Result).ToList();
+                var contractGeneratorList = contractGeneratorListTmp.AsParallel().Select(s => _p4kService.GetRecordWithSpecificDepth(s.RecordId, 3).Result);
                 
                 
                 sw.Stop();

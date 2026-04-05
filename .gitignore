@@ -197,16 +197,6 @@ src/.idea/
 
 .idea/
 
-
+src/StarXelem/datafiles
 research/*
-src/StarBreaker.Sandbox/strings.txt
-src/StarBreaker.Sandbox/working.txt
-src/StarBreaker.Sandbox/mats.txt
-src/StarBreaker.Sandbox/keys.txt
 scripts/dump
-src/StarBreaker.Grpc/protos
-scripts/__pycache__
-crack
-src/StarBreaker.DataCore.Generated/Generated
-src/StarBreaker.DataCore.Generated/datafiles
-src/StarBreaker.GrpcClient/Actions/*.json
