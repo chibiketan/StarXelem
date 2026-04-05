@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using Humanizer;
+using StarBreaker.Extraction;
 using StarBreaker.P4k;
 
 namespace StarXelem.Extensions;

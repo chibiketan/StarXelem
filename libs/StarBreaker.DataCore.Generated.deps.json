@@ -1,0 +1,88 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "StarBreaker.DataCore.Generated/1.0.0": {
+        "dependencies": {
+          "StarBreaker.DataCore": "1.0.0",
+          "StarBreaker.P4k": "1.0.0"
+        },
+        "runtime": {
+          "StarBreaker.DataCore.Generated.dll": {}
+        }
+      },
+      "ZstdSharp.Port/0.8.5": {
+        "runtime": {
+          "lib/net9.0/ZstdSharp.dll": {
+            "assemblyVersion": "0.8.5.0",
+            "fileVersion": "0.8.5.0"
+          }
+        }
+      },
+      "StarBreaker.Common/1.0.0": {
+        "runtime": {
+          "StarBreaker.Common.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "StarBreaker.DataCore/1.0.0": {
+        "dependencies": {
+          "StarBreaker.Common": "1.0.0"
+        },
+        "runtime": {
+          "StarBreaker.DataCore.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "StarBreaker.P4k/1.0.0": {
+        "dependencies": {
+          "StarBreaker.Common": "1.0.0",
+          "ZstdSharp.Port": "0.8.5"
+        },
+        "runtime": {
+          "StarBreaker.P4k.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "StarBreaker.DataCore.Generated/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "ZstdSharp.Port/0.8.5": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-TR4j17WeVSEb3ncgL2NqlXEqcy04I+Kk9CaebNDplUeL8XOgjkZ7fP4Wg4grBdPLIqsV86p2QaXTkZoRMVOsew==",
+      "path": "zstdsharp.port/0.8.5",
+      "hashPath": "zstdsharp.port.0.8.5.nupkg.sha512"
+    },
+    "StarBreaker.Common/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "StarBreaker.DataCore/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "StarBreaker.P4k/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using StarBreaker.Common;
 using StarBreaker.DataCore;
 using StarBreaker.DataCoreGenerated;
+using StarBreaker.Extraction;
 using StarBreaker.FileSystem;
 using StarBreaker.P4k;
 using StarXelem.Models;
@@ -111,7 +112,7 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         FileLoadState = P4kFileLoadState.Loading;
         _openP4kTask = Task.Run(() =>
         {
-            _p4KFile = P4kDirectoryNode.FromP4k(P4kFile.FromFile(path, p4kProgress), fileSystemProgress);
+            _p4KFile = P4kDirectoryNode.FromP4k(P4kFile.FromFile(path, p4kProgress), null, fileSystemProgress);
             // Chargement des données
             var entry = P4KFileSystem.OpenRead(dataCorePath);
             var dcb = new DataCoreDatabase(entry);

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
-        <TargetFramework>net9.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
         <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -38,13 +38,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\StarBreaker.DataCore.Generated\StarBreaker.DataCore.Generated.csproj" />
-      <ProjectReference Include="..\StarBreaker.DataCore\StarBreaker.DataCore.csproj" />
-      <ProjectReference Include="..\StarBreaker.Grpc\StarBreaker.Grpc.csproj" />
-      <ProjectReference Include="..\StarBreaker.P4k\StarBreaker.P4k.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
       <Compile Update="Views\ContainerTabView.axaml.cs">
         <DependentUpon>ContainerTabView.axaml</DependentUpon>
         <SubType>Code</SubType>
@@ -57,5 +50,35 @@
         <DependentUpon>BlueprintTabView.axaml</DependentUpon>
         <SubType>Code</SubType>
       </Compile>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="Google.Protobuf">
+        <HintPath>..\..\libs\Google.Protobuf.dll</HintPath>
+      </Reference>
+      <Reference Include="Grpc.Core.Api">
+        <HintPath>..\..\libs\Grpc.Core.Api.dll</HintPath>
+      </Reference>
+      <Reference Include="Grpc.Net.Client">
+        <HintPath>..\..\libs\Grpc.Net.Client.dll</HintPath>
+      </Reference>
+      <Reference Include="StarBreaker.Common">
+        <HintPath>..\..\libs\StarBreaker.Common.dll</HintPath>
+      </Reference>
+      <Reference Include="StarBreaker.DataCore">
+        <HintPath>..\..\libs\StarBreaker.DataCore.dll</HintPath>
+      </Reference>
+      <Reference Include="StarBreaker.DataCore.Generated">
+        <HintPath>..\..\libs\StarBreaker.DataCore.Generated.dll</HintPath>
+      </Reference>
+      <Reference Include="StarBreaker.Extraction">
+        <HintPath>..\..\libs\StarBreaker.Extraction.dll</HintPath>
+      </Reference>
+      <Reference Include="StarBreaker.Grpc">
+        <HintPath>..\..\libs\StarBreaker.Grpc.dll</HintPath>
+      </Reference>
+      <Reference Include="StarBreaker.P4k">
+        <HintPath>..\..\libs\StarBreaker.P4k.dll</HintPath>
+      </Reference>
     </ItemGroup>
 </Project>

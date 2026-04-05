@@ -1,0 +1,250 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "StarBreaker.Extraction/1.0.0": {
+        "dependencies": {
+          "StarBreaker.Chf": "1.0.0",
+          "StarBreaker.CryChunkFile": "1.0.0",
+          "StarBreaker.CryXmlB": "1.0.0",
+          "StarBreaker.Dds": "1.0.0",
+          "StarBreaker.P4k": "1.0.0",
+          "StarBreaker.Wwise": "1.0.0"
+        },
+        "runtime": {
+          "StarBreaker.Extraction.dll": {}
+        }
+      },
+      "DirectXTexNet/1.0.7": {
+        "runtime": {
+          "lib/net6.0/DirectXTexNet.dll": {
+            "assemblyVersion": "1.0.7.0",
+            "fileVersion": "1.0.7.0"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/win-x64/native/DirectXTexNetImpl.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "assemblyVersion": "1.0.7.0",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x64/native/Ijwhost.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "6.0.2924.17105"
+          },
+          "runtimes/win-x86/native/DirectXTexNetImpl.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "assemblyVersion": "1.0.7.0",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x86/native/Ijwhost.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "6.0.2924.17105"
+          }
+        }
+      },
+      "SharpGLTF.Core/1.0.3": {
+        "runtime": {
+          "lib/net8.0/SharpGLTF.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "SharpGLTF.Runtime/1.0.3": {
+        "dependencies": {
+          "SharpGLTF.Core": "1.0.3"
+        },
+        "runtime": {
+          "lib/net8.0/SharpGLTF.Runtime.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "SharpGLTF.Toolkit/1.0.3": {
+        "dependencies": {
+          "SharpGLTF.Runtime": "1.0.3"
+        },
+        "runtime": {
+          "lib/net8.0/SharpGLTF.Toolkit.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "ZstdSharp.Port/0.8.5": {
+        "runtime": {
+          "lib/net9.0/ZstdSharp.dll": {
+            "assemblyVersion": "0.8.5.0",
+            "fileVersion": "0.8.5.0"
+          }
+        }
+      },
+      "StarBreaker.Chf/1.0.0": {
+        "dependencies": {
+          "StarBreaker.Common": "1.0.0",
+          "ZstdSharp.Port": "0.8.5"
+        },
+        "runtime": {
+          "StarBreaker.Chf.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "StarBreaker.Common/1.0.0": {
+        "runtime": {
+          "StarBreaker.Common.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "StarBreaker.CryChunkFile/1.0.0": {
+        "dependencies": {
+          "SharpGLTF.Core": "1.0.3",
+          "SharpGLTF.Toolkit": "1.0.3",
+          "StarBreaker.Common": "1.0.0"
+        },
+        "runtime": {
+          "StarBreaker.CryChunkFile.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "StarBreaker.CryXmlB/1.0.0": {
+        "dependencies": {
+          "StarBreaker.Common": "1.0.0"
+        },
+        "runtime": {
+          "StarBreaker.CryXmlB.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "StarBreaker.Dds/1.0.0": {
+        "dependencies": {
+          "DirectXTexNet": "1.0.7",
+          "StarBreaker.Common": "1.0.0"
+        },
+        "runtime": {
+          "StarBreaker.Dds.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "StarBreaker.P4k/1.0.0": {
+        "dependencies": {
+          "StarBreaker.Common": "1.0.0",
+          "ZstdSharp.Port": "0.8.5"
+        },
+        "runtime": {
+          "StarBreaker.P4k.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "StarBreaker.Wwise/1.0.0": {
+        "dependencies": {
+          "StarBreaker.Common": "1.0.0"
+        },
+        "runtime": {
+          "StarBreaker.Wwise.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "StarBreaker.Extraction/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "DirectXTexNet/1.0.7": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-N6jYdAgCIccIu5vImPwDwmk8dpIyeHK0tW4iqy7bQOAWimPJIBgUtIVU12SCyr7vVTxiM4xZ14NnzKGihh8CLA==",
+      "path": "directxtexnet/1.0.7",
+      "hashPath": "directxtexnet.1.0.7.nupkg.sha512"
+    },
+    "SharpGLTF.Core/1.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-su+Flcg2g6GgOIgulRGBDMHA6zY5NBx6NYH1Ayd6iBbSbwspHsN2VQgZfANgJy92cBf7qtpjC0uMiShbO+TEEg==",
+      "path": "sharpgltf.core/1.0.3",
+      "hashPath": "sharpgltf.core.1.0.3.nupkg.sha512"
+    },
+    "SharpGLTF.Runtime/1.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-W0bg2WyXlcSAJVu153hNUNm+BU4RP46yLwGD4099hSm8dsXG/H+J95PBoLJbIq8KGVkUWvfM0+XWHoEkCyd50A==",
+      "path": "sharpgltf.runtime/1.0.3",
+      "hashPath": "sharpgltf.runtime.1.0.3.nupkg.sha512"
+    },
+    "SharpGLTF.Toolkit/1.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-vkEuf8ch76NNgZXU/3zoXTIXRO0o14H3aRoSFzcuUQb0PTxvV6jEfmWkUVO6JtLDuFCIimqZaf3hdxr32ltpfQ==",
+      "path": "sharpgltf.toolkit/1.0.3",
+      "hashPath": "sharpgltf.toolkit.1.0.3.nupkg.sha512"
+    },
+    "ZstdSharp.Port/0.8.5": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-TR4j17WeVSEb3ncgL2NqlXEqcy04I+Kk9CaebNDplUeL8XOgjkZ7fP4Wg4grBdPLIqsV86p2QaXTkZoRMVOsew==",
+      "path": "zstdsharp.port/0.8.5",
+      "hashPath": "zstdsharp.port.0.8.5.nupkg.sha512"
+    },
+    "StarBreaker.Chf/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "StarBreaker.Common/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "StarBreaker.CryChunkFile/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "StarBreaker.CryXmlB/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "StarBreaker.Dds/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "StarBreaker.P4k/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "StarBreaker.Wwise/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
