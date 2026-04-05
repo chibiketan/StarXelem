@@ -304,7 +304,6 @@ public class DesignP4kService : IP4kService
         new(@"Data\entry2", 69, 69, 0, false, 123, 0xffff, 0xdeadbeef),
         new(@"Data\ObjectContainers\entry2", 69, 69, 0, false, 123, 0xffff, 0xdeadbeef),
         new(@"Data\Textures\entry2", 69, 69, 0, false, 123, 0xffff, 0xdeadbeef),
-        new(@"Engine\entry3", 69, 69, 0, false, 123, 0xffff, 0xdeadbeef),
         new(@"Engine\entry3", 69, 69, 0, false, 123, 0xffff, 0xdeadbeef)
     ];
 }

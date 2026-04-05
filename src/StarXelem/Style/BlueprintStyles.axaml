@@ -13,7 +13,7 @@
                     <Grid Grid.Row="0" Grid.Column="1" Classes="master" RowDefinitions="Auto,Auto,Auto,*" ColumnDefinitions="*">
                         <Grid Grid.Row="0" RowDefinitions="*,*,*" ColumnDefinitions="*,Auto">
                             <TextBlock Grid.Column="0" Classes="title">BLUEPRINT</TextBlock>
-                            <Button Grid.Row="0" Grid.Column="1" Classes="btn principal">
+                            <Button Grid.Row="0" Grid.Column="1" Classes="btn principal" IsEnabled="False">
                                 <Grid ColumnDefinitions="Auto,*,Auto">
                                     <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync">
                                         <ic:SymbolIcon.RenderTransform>
@@ -93,81 +93,90 @@
                         <Separator Classes="horizontal" />
                         <ItemsControl Classes="content">
                             <ItemsControl.Items>
-                                <Border Classes="card">
-                                    <Grid RowDefinitions="Auto,Auto,*">
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 demi-bold" >Un test de catégorie</TextBlock>
-                                        <Separator Grid.Row="1" Grid.Column="0" Classes="horizontal" />
-                                        <Grid Grid.Row="2" Grid.Column="0" RowDefinitions="Auto,*" ColumnDefinitions="*,Auto,*">
-                                            <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 dimming bold">Ressources</TextBlock>
-                                            <ItemsControl Grid.Row="1" Grid.Column="0">
-                                                <ItemsControl.Items>
-                                                    <Grid ColumnDefinitions="Auto,*,Auto">
-                                                        <Border Grid.Column="0" Classes="bulletpoint" />
-                                                        <TextBlock Grid.Column="1" Classes="demi-dimming">Un métal rare</TextBlock>
-                                                        <TextBlock Grid.Column="2" Classes="demi-bold">0.02 SCU</TextBlock>
-                                                    </Grid>
-                                                </ItemsControl.Items>
-                                            </ItemsControl>
-                                            <Separator Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Classes="vertical spacer" />
-                                            <TextBlock Grid.Row="0" Grid.Column="2" Classes="h1 dimming bold">Propriétés :</TextBlock>
-                                            <ItemsControl Grid.Row="1" Grid.Column="2">
-                                                <ItemsControl.Items>
-                                                    <Grid ColumnDefinitions="*,Auto">
-                                                        <TextBlock Grid.Column="0" Classes="demi-dimming" >Modifcateurs de dégats</TextBlock>
-                                                        <Grid Grid.Column="1" ColumnDefinitions="Auto,25,Auto">
-                                                            <TextBlock Grid.Column="0" Classes="demi-bold">0.8</TextBlock>
-                                                            <Separator Grid.Column="1" Classes="horizontal" Margin="5 0" />
-                                                            <TextBlock Grid.Column="2" Classes="demi-bold">1.2</TextBlock>
-                                                        </Grid>
-                                                    </Grid>
-                                                    
-                                                </ItemsControl.Items>
-                                            </ItemsControl>
-                                        </Grid>
-                                    </Grid>
-                                </Border>
-                                <Border Classes="card">
-                                    <Grid RowDefinitions="Auto,Auto,*">
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 demi-bold" >Insulative Liner</TextBlock>
-                                        <Separator Grid.Row="1" Grid.Column="0" Classes="horizontal" />
-                                        <Grid Grid.Row="2" Grid.Column="0" RowDefinitions="Auto,*" ColumnDefinitions="*,Auto,*">
-                                            <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 dimming bold">Ressources</TextBlock>
-                                            <ItemsControl Grid.Row="1" Grid.Column="0">
-                                                <ItemsControl.Items>
-                                                    <Grid ColumnDefinitions="Auto,*,Auto">
-                                                        <Border Grid.Column="0" Classes="bulletpoint" />
-                                                        <TextBlock Grid.Column="1" Classes="demi-dimming">Aslarite</TextBlock>
-                                                        <TextBlock Grid.Column="2" Classes="demi-bold">0,01 SCU</TextBlock>
-                                                    </Grid>
-                                                </ItemsControl.Items>
-                                            </ItemsControl>
-                                            <Separator Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Classes="vertical spacer" />
-                                            <TextBlock Grid.Row="0" Grid.Column="2" Classes="h1 dimming bold">Propriétés :</TextBlock>
-                                            <ItemsControl Grid.Row="1" Grid.Column="2">
-                                                <ItemsControl.Items>
-                                                    <Grid ColumnDefinitions="*,Auto">
-                                                        <TextBlock Grid.Column="0" Classes="demi-dimming" >Max Temp</TextBlock>
-                                                        <Grid Grid.Column="1" ColumnDefinitions="Auto,25,Auto">
-                                                            <TextBlock Grid.Column="0" Classes="demi-bold">0.8</TextBlock>
-                                                            <Separator Grid.Column="1" Classes="horizontal" Margin="5 0" />
-                                                            <TextBlock Grid.Column="2" Classes="demi-bold">1.2</TextBlock>
-                                                        </Grid>
-                                                    </Grid>
-                                                    <Grid ColumnDefinitions="*,Auto">
-                                                        <TextBlock Grid.Column="0" Classes="demi-dimming" >Min Temp</TextBlock>
-                                                        <Grid Grid.Column="1" ColumnDefinitions="Auto,25,Auto">
-                                                            <TextBlock Grid.Column="0" Classes="demi-bold">0.8</TextBlock>
-                                                            <Separator Grid.Column="1" Classes="horizontal" Margin="5 0" />
-                                                            <TextBlock Grid.Column="2" Classes="demi-bold">1.2</TextBlock>
-                                                        </Grid>
-                                                    </Grid>
-                                                    
-                                                </ItemsControl.Items>
-                                            </ItemsControl>
-                                        </Grid>
-                                    </Grid>
-                                </Border>
-                                
+                                <ContentPresenter>
+                                    <ContentPresenter.Content>
+                                        
+                                        <Border Classes="card">
+                                            <Grid RowDefinitions="Auto,Auto,*">
+                                                <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 demi-bold" >Un test de catégorie</TextBlock>
+                                                <Separator Grid.Row="1" Grid.Column="0" Classes="horizontal" />
+                                                <Grid Grid.Row="2" Grid.Column="0" RowDefinitions="Auto,*" ColumnDefinitions="*,Auto,*">
+                                                    <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 dimming bold">Ressources</TextBlock>
+                                                    <ItemsControl Grid.Row="1" Grid.Column="0">
+                                                        <ItemsControl.Items>
+                                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                                <Border Grid.Column="0" Classes="bulletpoint" />
+                                                                <TextBlock Grid.Column="1" Classes="demi-dimming">Un métal rare</TextBlock>
+                                                                <TextBlock Grid.Column="2" Classes="demi-bold">0.02 SCU</TextBlock>
+                                                            </Grid>
+                                                        </ItemsControl.Items>
+                                                    </ItemsControl>
+                                                    <Separator Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Classes="vertical spacer" />
+                                                    <TextBlock Grid.Row="0" Grid.Column="2" Classes="h1 dimming bold">Propriétés :</TextBlock>
+                                                    <ItemsControl Grid.Row="1" Grid.Column="2">
+                                                        <ItemsControl.Items>
+                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                <TextBlock Grid.Column="0" Classes="demi-dimming" >Modifcateurs de dégats</TextBlock>
+                                                                <Grid Grid.Column="1" ColumnDefinitions="Auto,25,Auto">
+                                                                    <TextBlock Grid.Column="0" Classes="demi-bold">0.8</TextBlock>
+                                                                    <Separator Grid.Column="1" Classes="horizontal" Margin="5 0" />
+                                                                    <TextBlock Grid.Column="2" Classes="demi-bold">1.2</TextBlock>
+                                                                </Grid>
+                                                            </Grid>
+                                                            
+                                                        </ItemsControl.Items>
+                                                    </ItemsControl>
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+                                    </ContentPresenter.Content>
+                                </ContentPresenter>
+                                <ContentPresenter>
+                                    <ContentPresenter.Content>
+                                        
+                                        <Border Classes="card">
+                                            <Grid RowDefinitions="Auto,Auto,*">
+                                                <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 demi-bold" >Insulative Liner</TextBlock>
+                                                <Separator Grid.Row="1" Grid.Column="0" Classes="horizontal" />
+                                                <Grid Grid.Row="2" Grid.Column="0" RowDefinitions="Auto,*" ColumnDefinitions="*,Auto,*">
+                                                    <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 dimming bold">Ressources</TextBlock>
+                                                    <ItemsControl Grid.Row="1" Grid.Column="0">
+                                                        <ItemsControl.Items>
+                                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                                <Border Grid.Column="0" Classes="bulletpoint" />
+                                                                <TextBlock Grid.Column="1" Classes="demi-dimming">Aslarite</TextBlock>
+                                                                <TextBlock Grid.Column="2" Classes="demi-bold">0,01 SCU</TextBlock>
+                                                            </Grid>
+                                                        </ItemsControl.Items>
+                                                    </ItemsControl>
+                                                    <Separator Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Classes="vertical spacer" />
+                                                    <TextBlock Grid.Row="0" Grid.Column="2" Classes="h1 dimming bold">Propriétés :</TextBlock>
+                                                    <ItemsControl Grid.Row="1" Grid.Column="2">
+                                                        <ItemsControl.Items>
+                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                <TextBlock Grid.Column="0" Classes="demi-dimming" >Max Temp</TextBlock>
+                                                                <Grid Grid.Column="1" ColumnDefinitions="Auto,25,Auto">
+                                                                    <TextBlock Grid.Column="0" Classes="demi-bold">0.8</TextBlock>
+                                                                    <Separator Grid.Column="1" Classes="horizontal" Margin="5 0" />
+                                                                    <TextBlock Grid.Column="2" Classes="demi-bold">1.2</TextBlock>
+                                                                </Grid>
+                                                            </Grid>
+                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                <TextBlock Grid.Column="0" Classes="demi-dimming" >Min Temp</TextBlock>
+                                                                <Grid Grid.Column="1" ColumnDefinitions="Auto,25,Auto">
+                                                                    <TextBlock Grid.Column="0" Classes="demi-bold">0.8</TextBlock>
+                                                                    <Separator Grid.Column="1" Classes="horizontal" Margin="5 0" />
+                                                                    <TextBlock Grid.Column="2" Classes="demi-bold">1.2</TextBlock>
+                                                                </Grid>
+                                                            </Grid>
+                                                            
+                                                        </ItemsControl.Items>
+                                                    </ItemsControl>
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+                                    </ContentPresenter.Content>
+                                </ContentPresenter>
                             </ItemsControl.Items>
                         </ItemsControl>
                     </StackPanel>
@@ -311,7 +320,8 @@
         
         <Style Selector="^ ItemsControl.content">
             <Setter Property="Margin" Value="20" />
-            <Style Selector="^ > Border.card">
+            
+            <Style Selector="^ > ContentPresenter > Border.card">
                 <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
@@ -325,12 +335,12 @@
                 <Style Selector="^ > Grid > TextBlock.title">
                     <Setter Property="Margin" Value="10 10 10 0" />
                 </Style>
-                
-                <Style Selector="^:nth-last-child(n+2)">
-                    <Setter Property="Margin" Value="0 0 0 20" />
-                </Style>
+            </Style>
+            <Style Selector="^ > ContentPresenter:nth-last-child(n+2)">
+                <Setter Property="Margin" Value="0 0 0 20" />
             </Style>
         </Style>
+
     </Style>
     
     <!-- Boutons -->

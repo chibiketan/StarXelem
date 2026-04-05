@@ -3,15 +3,8 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{089100B1-113F-4E66-888A-E83F3999EAFD}"
 	ProjectSection(SolutionItems) = preProject
 		Directory.Build.props = Directory.Build.props
-		..\README.md = ..\README.md
 		..\.gitignore = ..\.gitignore
-		..\crc32c.html = ..\crc32c.html
-		..\scripts\mitm.ps1 = ..\scripts\mitm.ps1
-		..\scripts\stream-sc.py = ..\scripts\stream-sc.py
-		..\.github\workflows\build.yml = ..\.github\workflows\build.yml
 		.editorconfig = .editorconfig
-		..\scripts\diff.ps1 = ..\scripts\diff.ps1
-		..\FORMATS.md = ..\FORMATS.md
 		..\scripts\update_ptu.ps1 = ..\scripts\update_ptu.ps1
 		..\scripts\update_live.ps1 = ..\scripts\update_live.ps1
 	EndProjectSection

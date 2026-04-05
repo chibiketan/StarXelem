@@ -121,6 +121,7 @@ public sealed class MicroScuConverter : IValueConverter
     }
 }
 
+
 public sealed class TaskIsFinishedConverter : IValueConverter
 {
     // Converts a Task to a boolean indicating whether it has completed successfully.
