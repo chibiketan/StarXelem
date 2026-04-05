@@ -15,6 +15,7 @@
         <ResourceDictionary>
             <conv:HumanScuConverter x:Key="ScuConverter" />
             <conv:MinusOneToInfinityConverter x:Key="MinusOneToInfinityConverter" />
+            <conv:PercentageConverter x:Key="PercentageConverter" />
         </ResourceDictionary>
     </UserControl.Resources>
     <Grid RowDefinitions="*" ColumnDefinitions="Auto,300,Auto,*" Classes="master-detail">
@@ -58,7 +59,7 @@
         </ListBox>
     </Grid>
     <Separator Grid.Row="0" Grid.Column="2" Classes="vertical" />
-    <StackPanel Grid.Row="0" Grid.Column="3" Classes="detail" Margin="0" >
+    <StackPanel Grid.Row="0" Grid.Column="3" Classes="detail" Margin="0" IsVisible="{Binding SelectedBluePrint, Converter={x:Static ObjectConverters.IsNotNull}}" >
         <Border Classes="header">
             <Grid ColumnDefinitions="Auto,*" RowDefinitions="20,Auto,*" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" >
                 <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Classes="equipment-icon">
@@ -111,9 +112,9 @@
                                             <Grid ColumnDefinitions="*,Auto">
                                                 <TextBlock Grid.Column="0" Classes="demi-dimming" Text="{Binding Name}" />
                                                 <Grid Grid.Column="1" ColumnDefinitions="Auto,25,Auto">
-                                                    <TextBlock Grid.Column="0" Classes="demi-bold" Text="{Binding Min}" />
+                                                    <TextBlock Grid.Column="0" Classes="demi-bold" Text="{Binding Min, Converter={StaticResource PercentageConverter}, ConverterParameter=4}" />
                                                     <Separator Grid.Column="1" Classes="horizontal" Margin="5 0" />
-                                                    <TextBlock Grid.Column="2" Classes="demi-bold" Text="{Binding Max}" />
+                                                    <TextBlock Grid.Column="2" Classes="demi-bold" Text="{Binding Max, Converter={StaticResource PercentageConverter}, ConverterParameter=4}" />
                                                 </Grid>
                                             </Grid>
                                         </DataTemplate>
