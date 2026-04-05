@@ -1,0 +1,95 @@
+﻿<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=System.Runtime">
+    <!-- Add Resources Here -->
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <!-- Pour le thème lumineux -->
+            <SolidColorBrush x:Key="ForegroundBrush" Color="Black" />
+            <SolidColorBrush x:Key="DimmingBrush" Color="#bbb" />
+            <SolidColorBrush x:Key="DemiDimmingBrush" Color="#999" />
+            <!-- fond menu gauche -->
+            <SolidColorBrush x:Key="BackgroundGrade1Brush" Color="#FFEBEBEB" />
+            <!-- fond partie maître -->
+            <SolidColorBrush x:Key="BackgroundGrade2Brush" Color="#FFF8F8F8" />
+            <!-- fond partie Détail -->
+            <SolidColorBrush x:Key="BackgroundGrade3Brush" Color="#FFFFFFFF" />
+            <!-- fond partie carte dans le détail -->
+            <SolidColorBrush x:Key="BackgroundGrade4Brush" Color="#FFFAFAFA" />
+            
+            <!-- Icon -->
+            <SolidColorBrush x:Key="IconBackgroundBrush" Color="#1f8b5cf6" />
+            <SolidColorBrush x:Key="IconStrokeBrush" Color="#a78bfa" />
+            <SolidColorBrush x:Key="IconBorderBrush" Color="#4d8b5cf6" />
+
+            <!-- card -->
+            <SolidColorBrush x:Key="CardBackgroundBrush" Color="#fafafa" />
+            <SolidColorBrush x:Key="CardBorderBrush" Color="#e4e4e4" />
+
+            <!-- boutons -->
+            <SolidColorBrush x:Key="ButtonPrimaryHoverBackgroundBrush" Color="#CECBF6" />
+            <SolidColorBrush x:Key="ButtonPrimaryBackgroundBrush" Color="#EEEDFE" />
+            <SolidColorBrush x:Key="ButtonPrimaryForegroundBrush" Color="#534AB7" />
+            <SolidColorBrush x:Key="ButtonPrimaryBorderBrush" Color="#AFA9EC" />
+
+            <!-- badges -->
+            <SolidColorBrush x:Key="BadgeTiers1ForegroundColor" Color="#FFA78BFA" />
+            <SolidColorBrush x:Key="BadgeTiers1BackgroundColor" Color="#338B5CF6" />
+            <SolidColorBrush x:Key="BadgeTiers1BorderColor" Color="#AFA9EC" />
+            <SolidColorBrush x:Key="BadgeUsageForegroundColor" Color="#FF5DCAA5" />
+            <SolidColorBrush x:Key="BadgeUsageBackgroundColor" Color="#261D9E75" />
+            <SolidColorBrush x:Key="BadgeUsageBorderColor" Color="#5DCAA5" />
+            <SolidColorBrush x:Key="BadgeTimerForegroundColor" Color="#777" />
+            <SolidColorBrush x:Key="BadgeTimerBackgroundColor" Color="#0FFFFFFF" />
+            <SolidColorBrush x:Key="BadgeTimerBorderColor" Color="#ddd" />
+
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+            <!-- Pour le thème sombre -->
+            <SolidColorBrush x:Key="ForegroundBrush" Color="LightGray" />
+            <SolidColorBrush x:Key="DimmingBrush" Color="#B3ffffff" />
+            <SolidColorBrush x:Key="DemiDimmingBrush" Color="#D3ffffff" />
+            <!-- fond menu gauche -->
+            <SolidColorBrush x:Key="BackgroundGrade1Brush" Color="#ff0b0d13" />
+            <!-- fond partie maître -->
+            <SolidColorBrush x:Key="BackgroundGrade2Brush" Color="#FF111318" />
+            <!-- fond partie Détail -->
+            <SolidColorBrush x:Key="BackgroundGrade3Brush" Color="#FF0F1117" />
+            <!-- fond partie carte dans le détail -->
+            <SolidColorBrush x:Key="BackgroundGrade4Brush" Color="#08ffffff" />
+            
+            <!-- Icon -->
+            <SolidColorBrush x:Key="IconBackgroundBrush" Color="#1f8b5cf6" />
+            <SolidColorBrush x:Key="IconStrokeBrush" Color="#a78bfa" />
+            <SolidColorBrush x:Key="IconBorderBrush" Color="#4d8b5cf6" />
+            
+            <!-- card -->
+            <SolidColorBrush x:Key="CardBackgroundBrush" Color="#08ffffff" />
+            <SolidColorBrush x:Key="CardBorderBrush" Color="#14ffffff" />
+            
+            <!-- boutons -->
+            <SolidColorBrush x:Key="ButtonPrimaryHoverBackgroundBrush" Color="#408b5cf6" />
+            <SolidColorBrush x:Key="ButtonPrimaryBackgroundBrush" Color="#268b5cf6" />
+            <SolidColorBrush x:Key="ButtonPrimaryForegroundBrush" Color="#a78bfa" />
+            <SolidColorBrush x:Key="ButtonPrimaryBorderBrush" Color="#598b5cf6" />
+            
+            <!-- badges -->
+            <SolidColorBrush x:Key="BadgeTiers1ForegroundColor" Color="#a78bfa" />
+            <SolidColorBrush x:Key="BadgeTiers1BackgroundColor" Color="#338b5cf6" />
+            <SolidColorBrush x:Key="BadgeTiers1BorderColor" Color="#4d8b5cf6" />
+            <SolidColorBrush x:Key="BadgeUsageForegroundColor" Color="#FF5DCAA5" />
+            <SolidColorBrush x:Key="BadgeUsageBackgroundColor" Color="#261D9E75" />
+            <SolidColorBrush x:Key="BadgeUsageBorderColor" Color="#4d1d9e75" />
+            <SolidColorBrush x:Key="BadgeTimerForegroundColor" Color="#73FFFFFF" />
+            <SolidColorBrush x:Key="BadgeTimerBackgroundColor" Color="#0FFFFFFF" />
+            <SolidColorBrush x:Key="BadgeTimerBorderColor" Color="#1affffff" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+    <!-- Pour les règles générales -->
+    <system:Double x:Key="H1FontSize" >16</system:Double>
+    <system:Double x:Key="H2FontSize" >13</system:Double>
+    <system:Double x:Key="DefaultFontSize" >11</system:Double>
+    <ResourceDictionary.MergedDictionaries>
+        <MergeResourceInclude Source="equipment_icons.axaml" />
+    </ResourceDictionary.MergedDictionaries>
+</ResourceDictionary>

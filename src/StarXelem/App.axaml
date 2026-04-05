@@ -9,7 +9,14 @@
     <Application.DataTemplates>
         <local:ViewLocator/>
     </Application.DataTemplates>
-  
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="Style/DefaultResources.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+ 
     <Application.Styles>
         <FluentTheme />
         <sty:FluentAvaloniaTheme />
@@ -17,8 +24,6 @@
         <!-- <StyleInclude Source="avares://Avalonia.Controls.TreeDataGrid/Themes/Fluent.axaml"/> -->
         <!-- <StyleInclude Source="avares://AvaloniaHex/Themes/Simple/AvaloniaHex.axaml"/> -->
         <!-- <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" /> -->
-        <Style Selector="TextBlock">
-            <Setter Property="FontFamily" Value="Roboto" />
-        </Style>
+        <StyleInclude Source="Style/BlueprintStyles.axaml" />
     </Application.Styles>
 </Application>

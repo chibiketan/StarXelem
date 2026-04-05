@@ -87,13 +87,12 @@ public partial class MainWindowViewModel : ViewModelBase
         Pages =
         [
             App.Current.Services.GetRequiredService<ShipTabViewModel>(),
-            App.Current.Services.GetRequiredService<P4kShipTabViewModel>(),
             App.Current.Services.GetRequiredService<ItemsTabViewModel>(),
             App.Current.Services.GetRequiredService<BlueprintListTabViewModel>(),
-            App.Current.Services.GetRequiredService<ContainerTabViewModel>(),
             App.Current.Services.GetRequiredService<FriendListTabViewModel>(),
-            App.Current.Services.GetRequiredService<ExtractionTabViewModel>(),
-            App.Current.Services.GetRequiredService<MissionsTabViewModel>()
+            App.Current.Services.GetRequiredService<P4kShipTabViewModel>(),
+            App.Current.Services.GetRequiredService<MissionsTabViewModel>(),
+            App.Current.Services.GetRequiredService<ExtractionTabViewModel>()
         ];
         
         CurrentPage = _pages.First();
