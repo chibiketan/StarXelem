@@ -38,6 +38,7 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IP4kService, DesignP4kService>();
             services.AddSingleton<IGrpcClientService, DesignGrpcClientService>();
             services.AddSingleton<ILocationService, DesignLocationService>();
+            services.AddSingleton<IEntityClassDefinitionService, EntityClassDefinitionService>();
             services.AddSingleton<BlueprintListTabViewModel>();
         }
         else
@@ -45,6 +46,7 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IP4kService, P4kService>();
             services.AddSingleton<IGrpcClientService, GrpcClientService>();
             services.AddSingleton<ILocationService, LocationService>();
+            services.AddSingleton<IEntityClassDefinitionService, EntityClassDefinitionService>();
             services.AddTransient<BlueprintListTabViewModel>();
         }
 

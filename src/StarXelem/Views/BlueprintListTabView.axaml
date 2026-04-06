@@ -16,6 +16,7 @@
             <conv:HumanScuConverter x:Key="ScuConverter" />
             <conv:MinusOneToInfinityConverter x:Key="MinusOneToInfinityConverter" />
             <conv:PercentageConverter x:Key="PercentageConverter" />
+            <conv:ResourceKeyToGeometryConverter x:Key="ResourceKeyToGeometryConverter" />
         </ResourceDictionary>
     </UserControl.Resources>
     <Grid RowDefinitions="*" ColumnDefinitions="Auto,300,Auto,*" Classes="master-detail">
@@ -64,7 +65,7 @@
             <Grid ColumnDefinitions="Auto,*" RowDefinitions="20,Auto,*" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" >
                 <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Classes="equipment-icon">
                     <!-- TODO comment choisir le bon item ? Binding ? -->
-                    <Path Data="{DynamicResource Icon.Ammunition}" />
+                    <Path Name="ItemType" Data="{Binding SelectedBluePrint.ItemIconKey, Converter={StaticResource ResourceKeyToGeometryConverter}}" />
                 </Border>
                 <TextBlock Grid.Row="1" Grid.Column="1" Classes="title" Text="{Binding SelectedBluePrint.Name}" />
                 <WrapPanel Grid.Row="2" Grid.Column="1">

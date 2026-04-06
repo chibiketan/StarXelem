@@ -17,6 +17,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     
     private readonly IGrpcClientService  _clientService;
     private readonly IP4kService _p4KService;
+    private readonly IEntityClassDefinitionService _entityClassDefinitionService;
     public override string Name => "Blueprints";
     public override string Icon => nameof(Symbol.Copy);
     [ObservableProperty] public IList<BlueprintViewModel>? _blueprintList;
@@ -28,11 +29,12 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     // Stocke la liste complète pour le filtrage
     private List<BlueprintViewModel>? _allBlueprints;
 
-    public BlueprintListTabViewModel(ILogger<BlueprintListTabViewModel> logger, IGrpcClientService clientService, IP4kService p4kService)
+    public BlueprintListTabViewModel(ILogger<BlueprintListTabViewModel> logger, IGrpcClientService clientService, IP4kService p4kService, IEntityClassDefinitionService entityClassDefinitionService)
     {
         _logger = logger;
         _clientService = clientService;
         _p4KService = p4kService;
+        _entityClassDefinitionService = entityClassDefinitionService;
 
         _clientService.OnConnectedChanged += (sender, b) => { OnConnectedStatusChanged(b); };
     }
@@ -170,6 +172,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             // TODO fill Category list
 
             var name = await _p4KService.GetEntityClassName(craftedItem) ?? "Inconnu";
+            var types = _entityClassDefinitionService.GetType(craftedItem);
             
             //
             result.Add(new BlueprintViewModel
@@ -178,7 +181,9 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                 TierLevel = 1,
                 CraftDuration = duration,
                 RemainingUse = bp.RemainingUses,
-                CategoryList = categoryList
+                CategoryList = categoryList,
+                Type = types.type,
+                Subtype = types.subtype
             });
         }
         // TODO filter ?
@@ -261,5 +266,18 @@ public class BlueprintViewModel : ViewModelBase
     public required int RemainingUse { get; set; }
     public required TimeSpan CraftDuration { get; set; }
     public required List<BlueprintCategoryModel> CategoryList { get; set; }
+    public EItemType Type { get; set; }
+    public EItemSubType Subtype { get; set; }
 
+    public string ItemIconKey => (Type, Subtype) switch
+    {
+        (EItemType.WeaponPersonal, EItemSubType.Small) => "Icon.Pistol",
+        (EItemType.WeaponPersonal, EItemSubType.Medium) => "Icon.LightWeapon",
+        (EItemType.WeaponAttachment, EItemSubType.Magazine) => "Icon.Ammunition",
+        (EItemType.Char_Armor_Arms, _) => "Icon.Arms",
+        (EItemType.Char_Armor_Legs, _) => "Icon.Legs",
+        (EItemType.Char_Armor_Torso, _) => "Icon.Body",
+        (EItemType.Char_Armor_Helmet, _) => "Icon.Helmet",
+        _ => "Icon.Ammunition"
+    };
 }
