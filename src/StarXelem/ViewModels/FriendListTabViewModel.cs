@@ -21,7 +21,7 @@ public partial class FriendListTabViewModel : PageViewModelBase
     public override string Name => "Amis";
     public override string Icon => nameof(Symbol.People);
     
-    public Task<IList<FriendViewModel>>? _spaceships;
+    [ObservableProperty] private Task<List<FriendViewModel>?>? _friendList;
     [ObservableProperty] private bool _isLoading = false;
     [ObservableProperty] private string _treatmentStatus = "";
     [ObservableProperty] private bool _onlyConnected = true;
@@ -31,34 +31,42 @@ public partial class FriendListTabViewModel : PageViewModelBase
     {
         _clientService = clientService;
 
-        _clientService.OnConnectedChanged += (sender, b) => LoadShipNotifyCanExecuteChanged();
+        _clientService.OnConnectedChanged += (sender, b) => LoadFriendNotifyCanExecuteChanged();
     }
     
-    [RelayCommand(CanExecute = nameof(CanLoadShipList))]
-    public async Task LoadShipList()
+    [RelayCommand(CanExecute = nameof(CanLoadFriendList))]
+    public async Task LoadFriendList()
     {
         IsLoading = true;
         TreatmentStatus = "Appel RSI";
-        var spaceships = await _clientService.GetFriendList();
+        var friendList = await _clientService.GetFriendList();
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Terminé");
-        _spaceships = Task.FromResult<IList<FriendViewModel>>(spaceships.Select(f => new FriendViewModel(f, _clientService)).ToList());
+        FriendList = Task.FromResult(friendList.Select(f => new FriendViewModel(
+            displayName: f.Account?.DisplayName ?? "Unknown",
+            tokenName: f.Account?.Nickname ?? "Unknown",
+            avatarUrl: f.Account?.AvatarUrl,
+            isConnected: f.Presence != null,
+            isInGame: f.Presence?.Activity?.PlayerId != null,
+            activity: f.Presence?.Activity?.State ?? "Hors ligne",
+            shardInfoLoader: f.Account?.AccountId != null && f.Presence?.Status != null ? () => _clientService.GetShardInfo((int)f.Account.AccountId)! : null
+        )).ToList())!;
         IsLoading = false;
         AppliFilterOnSearchresult();
     }
 
-    public bool CanLoadShipList()
+    public bool CanLoadFriendList()
     {
         return _clientService.IsConnected && !IsLoading;
     }
 
-    private async Task<IList<FriendViewModel>> GetFriendListSafe()
+    private async Task<List<FriendViewModel>> GetFriendListSafe()
     {
-        if (null == _spaceships)
+        if (null == FriendList)
         {
             return new List<FriendViewModel>();
         }
         
-        var list = await _spaceships;
+        var list = await FriendList;
         return list ?? new List<FriendViewModel>();
     }
 
@@ -79,15 +87,15 @@ public partial class FriendListTabViewModel : PageViewModelBase
         AppliFilterOnSearchresult();
     }
     
-    private void LoadShipNotifyCanExecuteChanged()
+    private void LoadFriendNotifyCanExecuteChanged()
     {
         if (Dispatcher.UIThread.CheckAccess())
         {
-            loadShipListCommand?.NotifyCanExecuteChanged();
+            LoadFriendListCommand?.NotifyCanExecuteChanged();
         }
         else
         {
-            Dispatcher.UIThread.Post(LoadShipNotifyCanExecuteChanged);
+            Dispatcher.UIThread.Post(LoadFriendNotifyCanExecuteChanged);
         }
     }
 

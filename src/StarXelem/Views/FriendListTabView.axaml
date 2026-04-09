@@ -2,43 +2,162 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:ic="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
              xmlns:vm="clr-namespace:StarXelem.ViewModels"
              xmlns:local="clr-namespace:StarXelem"
              xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             xmlns:models="clr-namespace:StarXelem.Models"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="450"
              x:DataType="vm:FriendListTabViewModel"
              d:DataContext="{x:Static local:DesignData.FriendListTabViewModel}"
              x:Class="StarXelem.Views.FriendListTabView">
-    <Grid RowDefinitions="50,*">
-        <Grid Grid.Row="0" ColumnSpacing="15">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Button Command="{Binding LoadShipListCommand}">Récupérer la liste des amis</Button>
-            <CheckBox Grid.Column="1" IsChecked="{Binding OnlyConnected}" >Afficher uniquement les amis connectés</CheckBox>
-            <Label Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" IsVisible="{Binding IsLoading}" Content="{Binding TreatmentStatus}" />
+    <UserControl.Styles>
+        <Style Selector=".main > Grid.header">
+            <Setter Property="Margin" Value="15" />
+        </Style>
+        <Style Selector="DataGrid">
+            <Style Selector="^ DataGridColumnHeader">
+                <Setter Property="Padding" Value="15" />
+                <Setter Property="FontSize" Value="{DynamicResource H2FontSize}" />
+                <Setter Property="FontWeight" Value="DemiBold" />
+                <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}" />
+                <Setter Property="AreSeparatorsVisible" Value="False" />
+            </Style>
+
+        </Style>
+        <Style Selector="Ellipse.status-indicator">
+            <Setter Property="Fill" Value="Gray" />
+        </Style>
+        <Style Selector="Ellipse.status-indicator.connected">
+            <Setter Property="Fill" Value="#4CAF50" />
+        </Style>    
+        <Style Selector="DataGridCell.dimming TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}" />
+        </Style>
+
+        <!-- Activity badges -->
+        <Style Selector="Border.badge.offline">
+            <Setter Property="Background" Value="{DynamicResource BadgeTimerBackgroundColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeTimerBorderColor}" />
+        </Style>
+        <Style Selector="Border.badge.offline Ellipse">
+            <Setter Property="Fill" Value="{DynamicResource BadgeTimerForegroundColor}" />
+        </Style>
+        <Style Selector="Border.badge.offline TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource BadgeTimerForegroundColor}" />
+        </Style>
+
+        <Style Selector="Border.badge.persistentUniverse">
+            <Setter Property="Background" Value="{DynamicResource BadgeTiers1BackgroundColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeTiers1BorderColor}" />
+        </Style>
+        <Style Selector="Border.badge.persistentUniverse Ellipse">
+            <Setter Property="Fill" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
+        </Style>
+        <Style Selector="Border.badge.persistentUniverse TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
+        </Style>
+
+        <Style Selector="Border.badge.menu">
+            <Setter Property="Background" Value="{DynamicResource BadgeUsageBackgroundColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeUsageBorderColor}" />
+        </Style>
+        <Style Selector="Border.badge.menu Ellipse">
+            <Setter Property="Fill" Value="{DynamicResource BadgeUsageForegroundColor}" />
+        </Style>
+        <Style Selector="Border.badge.menu TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource BadgeUsageForegroundColor}" />
+        </Style>
+
+        <Style Selector="Border.badge.arenaCommander">
+            <Setter Property="Background" Value="{DynamicResource BadgeArenaCommanderBackgroundColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeArenaCommanderBorderColor}" />
+        </Style>
+        <Style Selector="Border.badge.arenaCommander Ellipse">
+            <Setter Property="Fill" Value="{DynamicResource BadgeArenaCommanderForegroundColor}" />
+        </Style>
+        <Style Selector="Border.badge.arenaCommander TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource BadgeArenaCommanderForegroundColor}" />
+        </Style>
+    </UserControl.Styles>
+    <Grid RowDefinitions="Auto,*" Classes="main">
+        <Grid Grid.Row="0" ColumnSpacing="15" Classes="header" ColumnDefinitions="Auto, Auto, *,Auto" Height="45">
+            <Button Classes="btn principal" Command="{Binding LoadFriendListCommand}">
+                <Grid ColumnDefinitions="Auto,*">
+                    <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync">
+                        <ic:SymbolIcon.RenderTransform>
+                            <RotateTransform Angle="90"/>
+                        </ic:SymbolIcon.RenderTransform>
+                    </ic:SymbolIcon>
+                    <Label Grid.Column="1">Actualiser</Label>
+                </Grid>
+            </Button>
+            <Separator Grid.Column="1" Classes="vertical" />
+            <ToggleSwitch Grid.Column="2" OffContent="Tous les amis" OnContent="Uniquement les amis connectés" IsChecked="{Binding OnlyConnected}" VerticalAlignment="Center"  VerticalContentAlignment="Center" />
+            <Grid Grid.Column="3" ColumnDefinitions="Auto,Auto" VerticalAlignment="Center" Margin="0 0 15 0">
+                <TextBlock Grid.Column="0" Text="{Binding FilteredFriendList.Count, FallbackValue=''}" />
+                <TextBlock Grid.Column="1" Classes="dimming" Text="{Binding FriendList^.Count, StringFormat=' / {0} amis', FallbackValue=0 amis}" />
+            </Grid>
         </Grid>
         <Grid Grid.Row="1">
-            <DataGrid RowHeight="150" ItemsSource="{Binding FilteredFriendList}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="All" >
+            <DataGrid Classes="custom" RowHeight="150" ItemsSource="{Binding FilteredFriendList}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal" >
+                <DataGrid.Resources>
+                    <!-- Permet de ne plus réserver d'espace à droite pour l'icone de tri -->
+                    <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>
+                </DataGrid.Resources>
+                <DataGrid.Styles>
+                    <Style Selector="DataGridColumnHeader:nth-last-child(1)">
+                        <Setter Property="HorizontalContentAlignment" Value="Right"></Setter>
+                    </Style>
+                </DataGrid.Styles>
                 <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="Avatar">
+                    <DataGridTemplateColumn Header="">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Image asyncImageLoader:ImageLoader.Source="{Binding AvatarUrl}" MaxWidth="150" MaxHeight="150"></Image>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Pseudo" Binding="{Binding DisplayName}" />
-                    <DataGridTextColumn Header="Nom du compte" Binding="{Binding TokenName}" />
-                    <DataGridCheckBoxColumn Header="Est connecté" Binding="{Binding IsConnected}"  />
-                    <!-- <DataGridCheckBoxColumn Header="Est en jeu" Binding="{Binding IsInGame}" /> -->
-                    <DataGridTextColumn Header="Status" Binding="{Binding  Activity}" />
-                    <DataGridTextColumn Header="Shard" Binding="{Binding ShardId^, FallbackValue=Chargement}" />
-                    <DataGridTextColumn Header="Nb joueur" Binding="{Binding ShardPlayerCount^}" />
-                    <DataGridTextColumn Header="Nb joueur Total" Binding="{Binding ShardTotalPlayers^}" />
-                    <!-- <DataGridTextColumn Header="Shard lieu" Binding="{Binding ShardLocation^}" /> -->
+                    <DataGridTemplateColumn Header="PSEUDO">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate DataType="{x:Type models:FriendViewModel}">
+                                <Grid ColumnDefinitions="Auto,*" Margin="15,0">
+                                    <Ellipse Grid.Column="0" Classes="status-indicator" Classes.connected="{Binding IsConnected}" Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Classes.dimming="{Binding IsConnected, Converter={x:Static BoolConverters.Not}}" />
+                                </Grid>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="NOM DU COMPTE" Binding="{Binding TokenName}" CellStyleClasses="dimming" />
+                    <DataGridTemplateColumn Header="STATUT">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate DataType="{x:Type models:FriendViewModel}">
+                                <Border Classes="badge"
+                                        Classes.offline="{Binding IsOffline}"
+                                        Classes.persistentUniverse="{Binding IsInPersistentUniverse}"
+                                        Classes.menu="{Binding IsInMenu}"
+                                        Classes.arenaCommander="{Binding IsInArenaCommander}"
+                                        HorizontalAlignment="Left" Margin="15,0">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Ellipse Width="7" Height="7" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding ActivityLabel}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="SHARD" Binding="{Binding ShardId^, FallbackValue=Chargement}" CellStyleClasses="dimming" />
+                    <DataGridTemplateColumn Header="JOUEUR" >
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate DataType="{x:Type models:FriendViewModel}">
+                                <Grid ColumnDefinitions="30,10,30" IsVisible="{Binding ShardTotalPlayers^, Converter={x:Static ObjectConverters.IsNotNull}}" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                    <TextBlock Grid.Column="0" Text="{Binding ShardPlayerCount^}" HorizontalAlignment="Right" />
+                                    <TextBlock Grid.Column="1" Classes="dimming" HorizontalAlignment="Center">/</TextBlock>
+                                    <TextBlock Grid.Column="2" Classes="dimming" Text="{Binding ShardTotalPlayers^}" />
+                                </Grid>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     
                 </DataGrid.Columns>
             </DataGrid>

@@ -42,6 +42,9 @@
             <SolidColorBrush x:Key="BadgeTimerForegroundColor" Color="#777" />
             <SolidColorBrush x:Key="BadgeTimerBackgroundColor" Color="#0FFFFFFF" />
             <SolidColorBrush x:Key="BadgeTimerBorderColor" Color="#ddd" />
+            <SolidColorBrush x:Key="BadgeArenaCommanderForegroundColor" Color="#FFEF9F27" />
+            <SolidColorBrush x:Key="BadgeArenaCommanderBackgroundColor" Color="#1EEF9F27" />
+            <SolidColorBrush x:Key="BadgeArenaCommanderBorderColor" Color="#4CEF9F27" />
 
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
@@ -83,6 +86,9 @@
             <SolidColorBrush x:Key="BadgeTimerForegroundColor" Color="#73FFFFFF" />
             <SolidColorBrush x:Key="BadgeTimerBackgroundColor" Color="#0FFFFFFF" />
             <SolidColorBrush x:Key="BadgeTimerBorderColor" Color="#1affffff" />
+            <SolidColorBrush x:Key="BadgeArenaCommanderForegroundColor" Color="#FFEF9F27" />
+            <SolidColorBrush x:Key="BadgeArenaCommanderBackgroundColor" Color="#1EEF9F27" />
+            <SolidColorBrush x:Key="BadgeArenaCommanderBorderColor" Color="#4CEF9F27" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
     <!-- Pour les règles générales -->

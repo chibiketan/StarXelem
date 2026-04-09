@@ -271,6 +271,10 @@
             <Setter Property="Margin" Value="5" />
         </Style>
     </Style>
+    
+    <Style Selector=":is(Panel).main">
+        <Setter Property="Background" Value="{DynamicResource BackgroundGrade3Brush}" />
+    </Style>
 
     <!-- Master -->
     <Style Selector=":is(Panel).master">
@@ -440,7 +444,5 @@
         </Style>
     </Style>
 
-
-    
 
 </Styles>

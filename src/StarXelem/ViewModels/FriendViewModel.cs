@@ -1,57 +1,67 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
 using Sc.External.Common.Shard.V1;
-using Sc.External.Services.Contacts.V1;
-using Sc.External.Services.Entitygraph.V1;
-using Sc.External.Services.Friends.V1;
-using StarBreaker.Common;
-using StarBreaker.DataCoreGenerated;
-using StarBreaker.P4k;
-using StarXelem.Services;
-using StarXelem.Services.LocationService;
 using StarXelem.ViewModels;
 
 namespace StarXelem.Models;
 
 public class FriendViewModel : ViewModelBase
 {
-    private readonly Contact _friend;
-    private readonly IGrpcClientService _grpcClientService;
-    private readonly System.Lazy<Task<ShardInfo?>> _shardInfo;
+    private readonly Lazy<Task<ShardInfo?>> _shardInfo;
 
-    public string? AvatarUrl => IsAvatarUrlValid(_friend.Account?.AvatarUrl) ? _friend.Account.AvatarUrl : "https://cdn.robertsspaceindustries.com/static/images/account/avatar_default_big.jpg";
-    public string DisplayName => _friend.Account?.DisplayName ?? "Unknown";
-    public string TokenName => _friend.Account?.Nickname ?? "Unknown";
-    public bool IsConnected => null != _friend.Presence;
-    public bool IsInGame => _friend.Presence?.Activity?.PlayerId != null;
-    
-    public string Activity => _friend.Presence?.Activity?.State ?? "Hors ligne";
+    private const string DefaultAvatarUrl = "https://cdn.robertsspaceindustries.com/static/images/account/avatar_default_big.jpg";
+
+    public string? AvatarUrl { get; }
+    public string DisplayName { get; }
+    public string TokenName { get; }
+    public bool IsConnected { get; }
+    public bool IsInGame { get; }
+    public string Activity { get; }
+
+    public string ActivityLabel => Activity switch
+    {
+        "persistent_universe" => "Univers Persistant",
+        "menu" => "Menu",
+        "arena_commander" => "Arena Commander",
+        _ => Activity
+    };
+
+    public bool IsOffline => !IsConnected;
+    public bool IsInPersistentUniverse => Activity == "persistent_universe";
+    public bool IsInMenu => Activity == "menu";
+    public bool IsInArenaCommander => Activity == "arena_commander";
+
     public Task<string?> ShardId => GetShardIdAsync();
     public Task<int?> ShardTotalPlayers => GetShardTotalPlayersAsync();
     public Task<int?> ShardPlayerCount => GetShardPlayerCountAsync();
     public Task<string?> ShardLocation => GetShardLocationAsync();
-    
-    public FriendViewModel(Contact friend, IGrpcClientService grpcClientService)
-    {
-        _friend = friend;
-        _grpcClientService = grpcClientService;
 
-        _shardInfo = new Lazy<Task<ShardInfo?>>(LoadShardInfoIfNeeded);
+    public FriendViewModel(
+        string displayName,
+        string tokenName,
+        string? avatarUrl,
+        bool isConnected,
+        bool isInGame,
+        string activity,
+        Func<Task<ShardInfo?>>? shardInfoLoader = null)
+    {
+        DisplayName = displayName;
+        TokenName = tokenName;
+        AvatarUrl = IsAvatarUrlValid(avatarUrl) ? avatarUrl : DefaultAvatarUrl;
+        IsConnected = isConnected;
+        IsInGame = isInGame;
+        Activity = activity;
+        _shardInfo = new Lazy<Task<ShardInfo?>>(() => shardInfoLoader?.Invoke() ?? Task.FromResult<ShardInfo?>(null));
     }
 
     private static bool IsAvatarUrlValid(string? url)
     {
-        if (String.IsNullOrWhiteSpace(url))
-        {
+        if (string.IsNullOrWhiteSpace(url))
             return false;
-        }
-        
+
         try
         {
             if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
-            {
                 return uri.Host == "cdn.robertsspaceindustries.com" || uri.Host == "robertsspaceindustries.com";
-            }
-            
+
             return false;
         }
         catch
@@ -60,61 +70,31 @@ public class FriendViewModel : ViewModelBase
         }
     }
 
-    private Task<ShardInfo?> LoadShardInfoIfNeeded()
-    {
-        if (null == _friend.Account || null == _friend.Presence)
-        {
-            return Task.FromResult<ShardInfo?>(null);
-        }
-
-        return _grpcClientService.GetShardInfo((int)_friend.Account.AccountId)!;
-    }
-    
-    private async Task<String?> GetShardIdAsync()
+    private async Task<string?> GetShardIdAsync()
     {
         var shardInfo = await _shardInfo.Value;
-
-        if (null == shardInfo)
-        {
-            return null;
-        }
-
-        return shardInfo.Id;
+        return shardInfo?.Id;
     }
-    
+
     private async Task<int?> GetShardTotalPlayersAsync()
     {
         var shardInfo = await _shardInfo.Value;
-
         if (null == shardInfo || 0 == shardInfo.TotalPlayers)
-        {
             return null;
-        }
-
         return shardInfo.TotalPlayers;
     }
-    
+
     private async Task<int?> GetShardPlayerCountAsync()
     {
         var shardInfo = await _shardInfo.Value;
-
         if (null == shardInfo || 0 == shardInfo.PlayerCount)
-        {
             return null;
-        }
-
         return shardInfo.PlayerCount;
     }
 
     private async Task<string?> GetShardLocationAsync()
     {
         var shardInfo = await _shardInfo.Value;
-
-        if (null == shardInfo)
-        {
-            return null;
-        }
-
-        return shardInfo.Location;
+        return shardInfo?.Location;
     }
 }

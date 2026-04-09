@@ -1,5 +1,6 @@
 ﻿using DocumentFormat.OpenXml.InkML;
 using Microsoft.Extensions.DependencyInjection;
+using Sc.External.Common.Shard.V1;
 using StarXelem.Models;
 using StarXelem.ViewModels;
 using StarXelem.ViewModels.Popup;
@@ -211,6 +212,15 @@ public static class DesignData
             }
         };
         BlueprintListTabViewModel.SelectedBluePrint = BlueprintListTabViewModel.BlueprintList[0];
+
+        FriendListTabViewModel.FriendList = Task.FromResult(new List<FriendViewModel>
+        {
+            new FriendViewModel("DesignPilot", "design_pilot", null, isConnected: true,  isInGame: true,  activity: "persistent_universe", () => Task.FromResult(new ShardInfo{Id = "un DGS de shard", PlayerCount = 500, TotalPlayers = 700})!),
+            new FriendViewModel("ArenaMaster", "arena_master", null, isConnected: true,  isInGame: true,  activity: "arena_commander", () => Task.FromResult(new ShardInfo{Id = "une autre shard", PlayerCount = 54, TotalPlayers = 605})!),
+            new FriendViewModel("MenuUser",    "menu_user",    null, isConnected: true,  isInGame: false, activity: "menu"),
+            new FriendViewModel("OfflineUser", "offline_user", null, isConnected: false, isInGame: false, activity: "Hors ligne"),
+        });
+        FriendListTabViewModel.OnlyConnected = false;
     }
     
 }
