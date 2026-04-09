@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -39,6 +40,15 @@ public partial class MainWindowViewModel : ViewModelBase
     private PopupViewModel _popupViewModel;
 
     public IAsyncRelayCommand OpenDataP4kCommand { get; }
+
+    [RelayCommand]
+    private void SwitchTheme()
+    {
+        var app = Application.Current!;
+        app.RequestedThemeVariant = app.RequestedThemeVariant == ThemeVariant.Light
+            ? ThemeVariant.Dark
+            : ThemeVariant.Light;
+    }
     
     public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IP4kService p4kService, IGrpcClientService grpcClientService, PopupViewModel popupViewModel)
     {

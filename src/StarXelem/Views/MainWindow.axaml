@@ -39,6 +39,10 @@
         <ic:SymbolIcon Grid.Row="0" Grid.Column="2" Name="IconP4kStatus" HorizontalAlignment="Left" VerticalAlignment="Center" Symbol="Server"
                        Foreground="{Binding FileLoadState, Converter={StaticResource P4kStateToBrushConverter}}"
                        ToolTip.Tip="{Binding P4kStatusTooltip}" />
+        <Button Classes="btn principal" Name="SwitchTheme" Grid.Row="0" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Command="{Binding SwitchThemeCommand}" Margin="10 0">
+            <ic:SymbolIcon Symbol="DarkTheme" />
+        </Button>
+
         <ui:NavigationView
             Grid.Row="1"
             Grid.ColumnSpan="3"
