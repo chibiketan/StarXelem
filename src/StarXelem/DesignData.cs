@@ -215,10 +215,21 @@ public static class DesignData
 
         FriendListTabViewModel.FriendList = Task.FromResult(new List<FriendViewModel>
         {
-            new FriendViewModel("DesignPilot", "design_pilot", null, isConnected: true,  isInGame: true,  activity: "persistent_universe", () => Task.FromResult(new ShardInfo{Id = "un DGS de shard", PlayerCount = 500, TotalPlayers = 700})!),
-            new FriendViewModel("ArenaMaster", "arena_master", null, isConnected: true,  isInGame: true,  activity: "arena_commander", () => Task.FromResult(new ShardInfo{Id = "une autre shard", PlayerCount = 54, TotalPlayers = 605})!),
-            new FriendViewModel("MenuUser",    "menu_user",    null, isConnected: true,  isInGame: false, activity: "menu"),
-            new FriendViewModel("OfflineUser", "offline_user", null, isConnected: false, isInGame: false, activity: "Hors ligne"),
+            // Avatar réel → image affichée (tokenName avec '_' → "OU")
+            new FriendViewModel("OnlineUser", "online_user",
+                "https://cdn.robertsspaceindustries.com/static/images/account/avatar_default_big.jpg",
+                isConnected: true, isInGame: true, activity: "persistent_universe",
+                () => Task.FromResult(new ShardInfo { Id = "shard-001", PlayerCount = 500, TotalPlayers = 700 })!),
+            // Pas d'avatar, tokenName avec espace → "DP"
+            new FriendViewModel("DesignPilot", "design pilot", null,
+                isConnected: true, isInGame: true, activity: "arena_commander",
+                () => Task.FromResult(new ShardInfo { Id = "shard-002", PlayerCount = 54, TotalPlayers = 605 })!),
+            // Pas d'avatar, tokenName avec '_' → "AW"
+            new FriendViewModel("AliceWonder", "alice_wonder", null,
+                isConnected: true, isInGame: false, activity: "menu"),
+            // Pas d'avatar, tokenName simple → "NO"
+            new FriendViewModel("Nova", "nova", null,
+                isConnected: false, isInGame: false, activity: "Hors ligne"),
         });
         FriendListTabViewModel.OnlyConnected = false;
     }

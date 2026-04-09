@@ -79,6 +79,26 @@
         <Style Selector="Border.badge.arenaCommander TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource BadgeArenaCommanderForegroundColor}" />
         </Style>
+
+        <!-- Avatar -->
+        <Style Selector="Image.avatar">
+            <Setter Property="MaxWidth" Value="50" />
+            <Setter Property="MaxHeight" Value="50" />
+            <Setter Property="Margin" Value="10" />
+        </Style>
+        <Style Selector="Border.avatar-placeholder">
+            <Setter Property="Width" Value="50" />
+            <Setter Property="Height" Value="50" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Margin" Value="10" />
+        </Style>
+        <Style Selector="Border.avatar-placeholder TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="16" />
+        </Style>
     </UserControl.Styles>
     <Grid RowDefinitions="Auto,*" Classes="main">
         <Grid Grid.Row="0" ColumnSpacing="15" Classes="header" ColumnDefinitions="Auto, Auto, *,Auto" Height="45">
@@ -100,7 +120,7 @@
             </Grid>
         </Grid>
         <Grid Grid.Row="1">
-            <DataGrid Classes="custom" RowHeight="150" ItemsSource="{Binding FilteredFriendList}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal" >
+            <DataGrid ItemsSource="{Binding FilteredFriendList}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal" >
                 <DataGrid.Resources>
                     <!-- Permet de ne plus réserver d'espace à droite pour l'icone de tri -->
                     <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>
@@ -113,8 +133,16 @@
                 <DataGrid.Columns>
                     <DataGridTemplateColumn Header="">
                         <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Image asyncImageLoader:ImageLoader.Source="{Binding AvatarUrl}" MaxWidth="150" MaxHeight="150"></Image>
+                            <DataTemplate DataType="{x:Type models:FriendViewModel}">
+                                <Panel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Image Classes="avatar"
+                                           asyncImageLoader:ImageLoader.Source="{Binding AvatarUrl}"
+                                           IsVisible="{Binding AvatarUrl, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                    <Border Classes="badge persistentUniverse avatar-placeholder"
+                                            IsVisible="{Binding AvatarUrl, Converter={x:Static ObjectConverters.IsNull}}">
+                                        <TextBlock Text="{Binding Initials}" />
+                                    </Border>
+                                </Panel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>

@@ -1,3 +1,4 @@
+using System.Linq;
 using Sc.External.Common.Shard.V1;
 using StarXelem.ViewModels;
 
@@ -10,6 +11,7 @@ public class FriendViewModel : ViewModelBase
     private const string DefaultAvatarUrl = "https://cdn.robertsspaceindustries.com/static/images/account/avatar_default_big.jpg";
 
     public string? AvatarUrl { get; }
+    public string Initials => GetInitials(TokenName);
     public string DisplayName { get; }
     public string TokenName { get; }
     public bool IsConnected { get; }
@@ -45,11 +47,36 @@ public class FriendViewModel : ViewModelBase
     {
         DisplayName = displayName;
         TokenName = tokenName;
-        AvatarUrl = IsAvatarUrlValid(avatarUrl) ? avatarUrl : DefaultAvatarUrl;
+        AvatarUrl = IsAvatarUrlValid(avatarUrl) ? avatarUrl : null;
         IsConnected = isConnected;
         IsInGame = isInGame;
         Activity = activity;
         _shardInfo = new Lazy<Task<ShardInfo?>>(() => shardInfoLoader?.Invoke() ?? Task.FromResult<ShardInfo?>(null));
+    }
+
+    private static string GetInitials(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return "?";
+
+        int spaceIndex = name.IndexOf(' ');
+        if (spaceIndex >= 0)
+            return $"{GetFirstAlphanumericUpper(name, 0)}{GetFirstAlphanumericUpper(name, spaceIndex + 1)}";
+
+        int underscoreIndex = name.IndexOf('_');
+        if (underscoreIndex >= 0)
+            return $"{GetFirstAlphanumericUpper(name, 0)}{GetFirstAlphanumericUpper(name, underscoreIndex + 1)}";
+
+        var chars = name.Where(char.IsLetterOrDigit).Take(2).ToArray();
+        return new string(chars).ToUpper();
+    }
+
+    private static char GetFirstAlphanumericUpper(string name, int startIndex)
+    {
+        for (int i = startIndex; i < name.Length; i++)
+            if (char.IsLetterOrDigit(name[i]))
+                return char.ToUpper(name[i]);
+        return '?';
     }
 
     private static bool IsAvatarUrlValid(string? url)
