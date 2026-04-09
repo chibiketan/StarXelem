@@ -80,6 +80,36 @@
             <Setter Property="Foreground" Value="{DynamicResource BadgeArenaCommanderForegroundColor}" />
         </Style>
 
+        <!-- Badges région -->
+        <Style Selector="Border.badge.regionEurope">
+            <Setter Property="Background" Value="{DynamicResource BadgeRegionEuropeBackgroundColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionEuropeBorderColor}" />
+            <Style Selector="^ TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionEuropeForegroundColor}" />
+            </Style>
+        </Style>
+        <Style Selector="Border.badge.regionUsa">
+            <Setter Property="Background" Value="{DynamicResource BadgeRegionUsaBackgroundColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionUsaBorderColor}" />
+            <Style Selector="^ TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionUsaForegroundColor}" />
+            </Style>
+        </Style>
+        <Style Selector="Border.badge.regionAsie">
+            <Setter Property="Background" Value="{DynamicResource BadgeRegionAsieBackgroundColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionAsieBorderColor}" />
+            <Style Selector="^ TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionAsieForegroundColor}" />
+            </Style>
+        </Style>
+        <Style Selector="Border.badge.regionAustralie">
+            <Setter Property="Background" Value="{DynamicResource BadgeRegionAustralieBackgroundColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionAustralieBorderColor}" />
+            <Style Selector="^ TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionAustralieForegroundColor}" />
+            </Style>
+        </Style>
+
         <!-- Avatar -->
         <Style Selector="Image.avatar">
             <Setter Property="MaxWidth" Value="50" />
@@ -175,6 +205,21 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
                     <DataGridTextColumn Header="SHARD" Binding="{Binding ShardId^, FallbackValue=Chargement}" CellStyleClasses="dimming" />
+                    <DataGridTemplateColumn Header="REGION">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate DataType="{x:Type models:FriendViewModel}">
+                                <Border Classes="badge"
+                                        Classes.regionEurope="{Binding IsEuropeRegion^}"
+                                        Classes.regionUsa="{Binding IsUsaRegion^}"
+                                        Classes.regionAsie="{Binding IsAsieRegion^}"
+                                        Classes.regionAustralie="{Binding IsAustralieRegion^}"
+                                        IsVisible="{Binding ShardRegion^, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                        HorizontalAlignment="Left" Margin="15,0">
+                                    <TextBlock Text="{Binding ShardRegion^}" VerticalAlignment="Center" />
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTemplateColumn Header="JOUEUR" >
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate DataType="{x:Type models:FriendViewModel}">

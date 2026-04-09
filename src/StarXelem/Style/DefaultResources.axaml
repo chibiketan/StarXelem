@@ -45,6 +45,19 @@
             <SolidColorBrush x:Key="BadgeArenaCommanderForegroundColor" Color="#FFEF9F27" />
             <SolidColorBrush x:Key="BadgeArenaCommanderBackgroundColor" Color="#1EEF9F27" />
             <SolidColorBrush x:Key="BadgeArenaCommanderBorderColor" Color="#4CEF9F27" />
+            <!-- badges région -->
+            <SolidColorBrush x:Key="BadgeRegionEuropeForegroundColor" Color="#FF0C447C" />
+            <SolidColorBrush x:Key="BadgeRegionEuropeBackgroundColor" Color="#FFE6F1FB" />
+            <SolidColorBrush x:Key="BadgeRegionEuropeBorderColor" Color="#FF85B7EB" />
+            <SolidColorBrush x:Key="BadgeRegionUsaForegroundColor" Color="#FF085041" />
+            <SolidColorBrush x:Key="BadgeRegionUsaBackgroundColor" Color="#FFE1F5EE" />
+            <SolidColorBrush x:Key="BadgeRegionUsaBorderColor" Color="#FF5DCAA5" />
+            <SolidColorBrush x:Key="BadgeRegionAsieForegroundColor" Color="#FF633806" />
+            <SolidColorBrush x:Key="BadgeRegionAsieBackgroundColor" Color="#FFFAEEDA" />
+            <SolidColorBrush x:Key="BadgeRegionAsieBorderColor" Color="#FFEF9F27" />
+            <SolidColorBrush x:Key="BadgeRegionAustralieForegroundColor" Color="#FF712B13" />
+            <SolidColorBrush x:Key="BadgeRegionAustralieBackgroundColor" Color="#FFFAECE7" />
+            <SolidColorBrush x:Key="BadgeRegionAustralieBorderColor" Color="#FFF0997B" />
 
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
@@ -89,6 +102,19 @@
             <SolidColorBrush x:Key="BadgeArenaCommanderForegroundColor" Color="#FFEF9F27" />
             <SolidColorBrush x:Key="BadgeArenaCommanderBackgroundColor" Color="#1EEF9F27" />
             <SolidColorBrush x:Key="BadgeArenaCommanderBorderColor" Color="#4CEF9F27" />
+            <!-- badges région -->
+            <SolidColorBrush x:Key="BadgeRegionEuropeForegroundColor" Color="#FF85B7EB" />
+            <SolidColorBrush x:Key="BadgeRegionEuropeBackgroundColor" Color="#1E378ADD" />
+            <SolidColorBrush x:Key="BadgeRegionEuropeBorderColor" Color="#4D378ADD" />
+            <SolidColorBrush x:Key="BadgeRegionUsaForegroundColor" Color="#FF5DCAA5" />
+            <SolidColorBrush x:Key="BadgeRegionUsaBackgroundColor" Color="#1E1D9E75" />
+            <SolidColorBrush x:Key="BadgeRegionUsaBorderColor" Color="#4D1D9E75" />
+            <SolidColorBrush x:Key="BadgeRegionAsieForegroundColor" Color="#FFEF9F27" />
+            <SolidColorBrush x:Key="BadgeRegionAsieBackgroundColor" Color="#1EEF9F27" />
+            <SolidColorBrush x:Key="BadgeRegionAsieBorderColor" Color="#4CEF9F27" />
+            <SolidColorBrush x:Key="BadgeRegionAustralieForegroundColor" Color="#FFF0997B" />
+            <SolidColorBrush x:Key="BadgeRegionAustralieBackgroundColor" Color="#1ED85A30" />
+            <SolidColorBrush x:Key="BadgeRegionAustralieBorderColor" Color="#4DD85A30" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
     <!-- Pour les règles générales -->

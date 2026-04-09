@@ -35,6 +35,11 @@ public class FriendViewModel : ViewModelBase
     public Task<int?> ShardTotalPlayers => GetShardTotalPlayersAsync();
     public Task<int?> ShardPlayerCount => GetShardPlayerCountAsync();
     public Task<string?> ShardLocation => GetShardLocationAsync();
+    public Task<string?> ShardRegion => GetShardRegionAsync();
+    public Task<bool> IsEuropeRegion => CheckRegionAsync("euw1b");
+    public Task<bool> IsUsaRegion => CheckRegionAsync("use1b");
+    public Task<bool> IsAsieRegion => CheckRegionAsync("ape1a");
+    public Task<bool> IsAustralieRegion => CheckRegionAsync("apse2a");
 
     public FriendViewModel(
         string displayName,
@@ -123,5 +128,34 @@ public class FriendViewModel : ViewModelBase
     {
         var shardInfo = await _shardInfo.Value;
         return shardInfo?.Location;
+    }
+
+    private async Task<string?> GetShardRegionAsync()
+    {
+        var shardInfo = await _shardInfo.Value;
+        if (shardInfo?.Id is not { } id)
+            return null;
+
+        var parts = id.Split('_');
+        if (parts.Length < 2)
+            return null;
+
+        return parts[1] switch
+        {
+            "euw1b"  => "Europe",
+            "use1b"  => "USA",
+            "apse2a" => "Australie",
+            "ape1a"  => "Asie",
+            _        => null
+        };
+    }
+
+    private async Task<bool> CheckRegionAsync(string regionCode)
+    {
+        var shardInfo = await _shardInfo.Value;
+        if (shardInfo?.Id is not { } id)
+            return false;
+        var parts = id.Split('_');
+        return parts.Length >= 2 && parts[1] == regionCode;
     }
 }

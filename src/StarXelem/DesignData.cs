@@ -219,11 +219,11 @@ public static class DesignData
             new FriendViewModel("OnlineUser", "online_user",
                 "https://cdn.robertsspaceindustries.com/static/images/account/avatar_default_big.jpg",
                 isConnected: true, isInGame: true, activity: "persistent_universe",
-                () => Task.FromResult(new ShardInfo { Id = "shard-001", PlayerCount = 500, TotalPlayers = 700 })!),
+                () => Task.FromResult(new ShardInfo { Id = "pub_euw1b_3.24_12345", PlayerCount = 500, TotalPlayers = 700 })!),
             // Pas d'avatar, tokenName avec espace → "DP"
             new FriendViewModel("DesignPilot", "design pilot", null,
                 isConnected: true, isInGame: true, activity: "arena_commander",
-                () => Task.FromResult(new ShardInfo { Id = "shard-002", PlayerCount = 54, TotalPlayers = 605 })!),
+                () => Task.FromResult(new ShardInfo { Id = "pub_use1b_3.24_67890", PlayerCount = 54, TotalPlayers = 605 })!),
             // Pas d'avatar, tokenName avec '_' → "AW"
             new FriendViewModel("AliceWonder", "alice_wonder", null,
                 isConnected: true, isInGame: false, activity: "menu"),
