@@ -1,6 +1,8 @@
 ﻿using DocumentFormat.OpenXml.InkML;
 using Microsoft.Extensions.DependencyInjection;
 using Sc.External.Common.Shard.V1;
+using Sc.External.Services.Entitlement.V1;
+using Sc.External.Services.Entitygraph.V1;
 using StarXelem.Models;
 using StarXelem.ViewModels;
 using StarXelem.ViewModels.Popup;
@@ -232,6 +234,43 @@ public static class DesignData
                 isConnected: false, isInGame: false, activity: "Hors ligne"),
         });
         FriendListTabViewModel.OnlyConnected = false;
+
+        ShipTabViewModel.IsLoading = true;
+        ShipTabViewModel.TreatmentStatus = "Appel RSI";
+        ShipTabViewModel.Spaceships = Task.FromResult<IList<SpaceshipModel>>(new List<SpaceshipModel>
+        {
+            // STOWED — achat réel, dans un hangar
+            new(new Entitlement { Name = "Idris-P", SourceSku = "PackageName", EntityClassGuid = "GUID1", RealMoney = true, Status = EntitlementStatus.Fulfilled })
+            {
+                Shipname = "AEGS_Idris_P",
+                ReadableLocation = "[(LOCATION|obj_a18_landing_01)] Area 18 - ArcCorp",
+                StowContext = new EntityStowContext { IsStowed = true, ShardId = "pub_use1b_3.24_12345" }
+            },
+            // UNSTOWED — porté sur le joueur
+            new(new Entitlement { Name = "", SourceSku = "Aurora MR Starter Pack", EntityClassGuid = "GUID2", RealMoney = true, Status = EntitlementStatus.Fulfilled })
+            {
+                Shipname = "RSIN_AuroraMR",
+                ReadableLocation = "Porté",
+                StowContext = new EntityStowContext { IsStowed = false, ShardId = "pub_euw1b_3.24_67890" }
+            },
+            // DESTROYED — StowContext null
+            new(new Entitlement { Name = "Cutlass Black", SourceSku = "PackageName", EntityClassGuid = "GUID3", RealMoney = false, Status = EntitlementStatus.Fulfilled })
+            {
+                Shipname = "DRAK_Cutlass_Black"
+            },
+            // UNCLAIMED — jamais réclamé
+            new(new Entitlement { Name = "Avenger Titan", SourceSku = "PackageName", EntityClassGuid = "GUID4", RealMoney = true, Status = EntitlementStatus.Unclaimed })
+            {
+                Shipname = "AEGS_Avenger_Titan"
+            },
+            // STOWED — achat CCU (pas d'argent réel)
+            new(new Entitlement { Name = "Carrack", SourceSku = "PackageName", EntityClassGuid = "GUID5", RealMoney = false, Status = EntitlementStatus.Fulfilled })
+            {
+                Shipname = "MISC_Carrack",
+                ReadableLocation = "[(LOCATION|obj_lorville_01)] Lorville - Hurston",
+                StowContext = new EntityStowContext { IsStowed = true, ShardId = "pub_use1b_3.24_99999" }
+            },
+        });
     }
     
 }

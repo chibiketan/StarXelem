@@ -11,125 +11,6 @@
              x:DataType="vm:FriendListTabViewModel"
              d:DataContext="{x:Static local:DesignData.FriendListTabViewModel}"
              x:Class="StarXelem.Views.FriendListTabView">
-    <UserControl.Styles>
-        <Style Selector=".main > Grid.header">
-            <Setter Property="Margin" Value="15" />
-        </Style>
-        <Style Selector="DataGrid">
-            <Style Selector="^ DataGridColumnHeader">
-                <Setter Property="Padding" Value="15" />
-                <Setter Property="FontSize" Value="{DynamicResource H2FontSize}" />
-                <Setter Property="FontWeight" Value="DemiBold" />
-                <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}" />
-                <Setter Property="AreSeparatorsVisible" Value="False" />
-            </Style>
-
-        </Style>
-        <Style Selector="Ellipse.status-indicator">
-            <Setter Property="Fill" Value="Gray" />
-        </Style>
-        <Style Selector="Ellipse.status-indicator.connected">
-            <Setter Property="Fill" Value="#4CAF50" />
-        </Style>    
-        <Style Selector="DataGridCell.dimming TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}" />
-        </Style>
-
-        <!-- Activity badges -->
-        <Style Selector="Border.badge.offline">
-            <Setter Property="Background" Value="{DynamicResource BadgeTimerBackgroundColor}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BadgeTimerBorderColor}" />
-        </Style>
-        <Style Selector="Border.badge.offline Ellipse">
-            <Setter Property="Fill" Value="{DynamicResource BadgeTimerForegroundColor}" />
-        </Style>
-        <Style Selector="Border.badge.offline TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource BadgeTimerForegroundColor}" />
-        </Style>
-
-        <Style Selector="Border.badge.persistentUniverse">
-            <Setter Property="Background" Value="{DynamicResource BadgeTiers1BackgroundColor}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BadgeTiers1BorderColor}" />
-        </Style>
-        <Style Selector="Border.badge.persistentUniverse Ellipse">
-            <Setter Property="Fill" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
-        </Style>
-        <Style Selector="Border.badge.persistentUniverse TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
-        </Style>
-
-        <Style Selector="Border.badge.menu">
-            <Setter Property="Background" Value="{DynamicResource BadgeUsageBackgroundColor}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BadgeUsageBorderColor}" />
-        </Style>
-        <Style Selector="Border.badge.menu Ellipse">
-            <Setter Property="Fill" Value="{DynamicResource BadgeUsageForegroundColor}" />
-        </Style>
-        <Style Selector="Border.badge.menu TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource BadgeUsageForegroundColor}" />
-        </Style>
-
-        <Style Selector="Border.badge.arenaCommander">
-            <Setter Property="Background" Value="{DynamicResource BadgeArenaCommanderBackgroundColor}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BadgeArenaCommanderBorderColor}" />
-        </Style>
-        <Style Selector="Border.badge.arenaCommander Ellipse">
-            <Setter Property="Fill" Value="{DynamicResource BadgeArenaCommanderForegroundColor}" />
-        </Style>
-        <Style Selector="Border.badge.arenaCommander TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource BadgeArenaCommanderForegroundColor}" />
-        </Style>
-
-        <!-- Badges région -->
-        <Style Selector="Border.badge.regionEurope">
-            <Setter Property="Background" Value="{DynamicResource BadgeRegionEuropeBackgroundColor}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionEuropeBorderColor}" />
-            <Style Selector="^ TextBlock">
-                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionEuropeForegroundColor}" />
-            </Style>
-        </Style>
-        <Style Selector="Border.badge.regionUsa">
-            <Setter Property="Background" Value="{DynamicResource BadgeRegionUsaBackgroundColor}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionUsaBorderColor}" />
-            <Style Selector="^ TextBlock">
-                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionUsaForegroundColor}" />
-            </Style>
-        </Style>
-        <Style Selector="Border.badge.regionAsie">
-            <Setter Property="Background" Value="{DynamicResource BadgeRegionAsieBackgroundColor}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionAsieBorderColor}" />
-            <Style Selector="^ TextBlock">
-                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionAsieForegroundColor}" />
-            </Style>
-        </Style>
-        <Style Selector="Border.badge.regionAustralie">
-            <Setter Property="Background" Value="{DynamicResource BadgeRegionAustralieBackgroundColor}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionAustralieBorderColor}" />
-            <Style Selector="^ TextBlock">
-                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionAustralieForegroundColor}" />
-            </Style>
-        </Style>
-
-        <!-- Avatar -->
-        <Style Selector="Image.avatar">
-            <Setter Property="MaxWidth" Value="50" />
-            <Setter Property="MaxHeight" Value="50" />
-            <Setter Property="Margin" Value="10" />
-        </Style>
-        <Style Selector="Border.avatar-placeholder">
-            <Setter Property="Width" Value="50" />
-            <Setter Property="Height" Value="50" />
-            <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Margin" Value="10" />
-        </Style>
-        <Style Selector="Border.avatar-placeholder TextBlock">
-            <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="FontSize" Value="16" />
-        </Style>
-    </UserControl.Styles>
     <Grid RowDefinitions="Auto,*" Classes="main">
         <Grid Grid.Row="0" ColumnSpacing="15" Classes="header" ColumnDefinitions="Auto, Auto, *,Auto" Height="45">
             <Button Classes="btn principal" Command="{Binding LoadFriendListCommand}">
@@ -139,7 +20,7 @@
                             <RotateTransform Angle="90"/>
                         </ic:SymbolIcon.RenderTransform>
                     </ic:SymbolIcon>
-                    <Label Grid.Column="1">Actualiser</Label>
+                    <TextBlock Grid.Column="1">Actualiser</TextBlock>
                 </Grid>
             </Button>
             <Separator Grid.Column="1" Classes="vertical" />

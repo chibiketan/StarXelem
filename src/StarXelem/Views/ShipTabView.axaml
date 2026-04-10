@@ -1,35 +1,65 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:ic="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
              xmlns:vm="clr-namespace:StarXelem.ViewModels"
              xmlns:local="clr-namespace:StarXelem"
+             xmlns:models="clr-namespace:StarXelem.Models"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:DataType="vm:ShipTabViewModel"
              d:DataContext="{x:Static local:DesignData.ShipTabViewModel}"
              x:Class="StarXelem.Views.ShipTabView">
-    <Grid RowDefinitions="50,*">
-        <Grid Grid.Row="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Button Command="{Binding LoadShipListCommand}">Récupérer liste vaisseau</Button>
-            <Label Grid.Column="1" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" Content="{Binding TreatmentStatus}" />
+    <Grid RowDefinitions="Auto,*" Classes="main">
+        <Grid Grid.Row="0" Classes="header" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
+            <Button Grid.Column="0" Classes="btn principal" Command="{Binding LoadShipListCommand}">
+                <Grid ColumnDefinitions="Auto,*">
+                    <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync">
+                        <ic:SymbolIcon.RenderTransform>
+                            <RotateTransform Angle="90"/>
+                        </ic:SymbolIcon.RenderTransform>
+                    </ic:SymbolIcon>
+                    <TextBlock Grid.Column="1">Actualiser</TextBlock>
+                </Grid>
+            </Button>
+            <TextBlock Grid.Column="1" Classes="dimming" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" Text="{Binding TreatmentStatus}" />
         </Grid>
         <Grid Grid.Row="1">
             <DataGrid  ItemsSource="{Binding Spaceships^}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="All">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Nom" Binding="{Binding Name}" />
-                    <DataGridTextColumn Header="Modèle" Binding="{Binding Shipname}" />
-                    <DataGridTextColumn Header="Package source" Binding="{Binding PackageSource}" />
-                    <DataGridCheckBoxColumn Header="Achat Réel" Binding="{Binding IsRealPurchase}" />
-                    <DataGridTextColumn Header="Statut" Binding="{Binding DisplayState}" />
-                    <DataGridTextColumn Header="Emplacement" Binding="{Binding ReadableLocation}" />
-                    <DataGridTextColumn Header="Shard" Binding="{Binding Shard}" />
-                    <DataGridTextColumn Header="Entity Type" Binding="{Binding ItemType}" IsVisible="False" />
-                    <DataGridTextColumn Header="Entity sous type" Binding="{Binding ItemSubType}" IsVisible="False" />
+                    <DataGridTextColumn Header="NOM" Binding="{Binding Name}" />
+                    <DataGridTextColumn Header="MODÈLE" Binding="{Binding Shipname}" CellStyleClasses="demi-dimming" />
+                    <DataGridTemplateColumn Header="STORE">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate DataType="{x:Type models:SpaceshipModel}">
+                                <Ellipse Classes="status-indicator" Classes.connected="{Binding IsRealPurchase}"
+                                         Width="8" Height="8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="STATUT" Binding="{Binding DisplayState}" />
+                    <DataGridTemplateColumn Header="EMPLACEMENT">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate DataType="{x:Type models:SpaceshipModel}">
+                                <Panel VerticalAlignment="Center" Margin="15,0">
+                                    <TextBlock IsVisible="{Binding IsEmptyLocation}" Classes="dimming" Text="—" />
+                                    <Border Classes="badge porte" IsVisible="{Binding IsPorte}" HorizontalAlignment="Left">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Ellipse Width="7" Height="7" VerticalAlignment="Center" />
+                                            <TextBlock Text="Porté" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+                                    <StackPanel Orientation="Horizontal" IsVisible="{Binding IsStandardLocation}" Spacing="4">
+                                        <TextBlock Classes="dimming" Text="{Binding LocationPrefix}" />
+                                        <TextBlock Classes="demi-dimming" Text="{Binding LocationName}" />
+                                    </StackPanel>
+                                </Panel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="SHARD" Binding="{Binding Shard}" />
+                    <DataGridTextColumn Header="ENTITY TYPE" Binding="{Binding ItemType}" IsVisible="False" />
+                    <DataGridTextColumn Header="ENTITY SOUS TYPE" Binding="{Binding ItemSubType}" IsVisible="False" />
                 </DataGrid.Columns>
             </DataGrid>
         </Grid>

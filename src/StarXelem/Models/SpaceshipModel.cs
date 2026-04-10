@@ -17,6 +17,11 @@ public class SpaceshipModel
     public string? DisplayState => GetState().GetDisplayName();
     public string? Location => EntityProperties?.EntityEdge?.End?.InventoryId;
     public string? ReadableLocation { get; set; }
+    public bool IsPorte => ReadableLocation == "Porté";
+    public bool IsEmptyLocation => string.IsNullOrEmpty(ReadableLocation);
+    public bool IsStandardLocation => !IsPorte && !IsEmptyLocation;
+    public string? LocationPrefix => IsStandardLocation ? ExtractLocationPrefix(ReadableLocation!) : null;
+    public string? LocationName  => IsStandardLocation ? ExtractLocationName(ReadableLocation!)  : null;
     public string? Shard => StowContext?.ShardId;
     public EItemType ItemType => (EItemType)(EntityProperties?.EntityNodeProperties?.ItemTypeEnum ?? -1);
     public EItemSubType ItemSubType => (EItemSubType)(EntityProperties?.EntityNodeProperties?.ItemSubTypeEnum ?? -1);
@@ -30,6 +35,20 @@ public class SpaceshipModel
     {
         Entitlement = entitlement;
         Shipname = "";
+    }
+
+    private static string ExtractLocationPrefix(string location)
+    {
+        if (!location.StartsWith('[')) return string.Empty;
+        var end = location.IndexOf(']');
+        return end < 0 ? string.Empty : location[..(end + 1)];
+    }
+
+    private static string ExtractLocationName(string location)
+    {
+        if (!location.StartsWith('[')) return location;
+        var end = location.IndexOf(']');
+        return end < 0 ? location : location[(end + 1)..].TrimStart();
     }
 
     private SpaceshipState GetState()
