@@ -1,11 +1,11 @@
-﻿<Styles xmlns="https://github.com/avaloniaui"
+<Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:uc="clr-namespace:StarXelem.Views"
         xmlns:ic="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
         >
     <Design.PreviewWith>
         <ThemeVariantScope RequestedThemeVariant="Dark">
-            
+
             <Border Width="900" Height="600" Padding="0" Margin="0">
                 <!-- Add Controls for Previewer Here -->
                 <Grid RowDefinitions="*" ColumnDefinitions="Auto,300,Auto,*" Classes="master-detail">
@@ -95,7 +95,7 @@
                             <ItemsControl.Items>
                                 <ContentPresenter>
                                     <ContentPresenter.Content>
-                                        
+
                                         <Border Classes="card">
                                             <Grid RowDefinitions="Auto,Auto,*">
                                                 <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 demi-bold" >Un test de catégorie</TextBlock>
@@ -123,7 +123,7 @@
                                                                     <TextBlock Grid.Column="2" Classes="demi-bold">1.2</TextBlock>
                                                                 </Grid>
                                                             </Grid>
-                                                            
+
                                                         </ItemsControl.Items>
                                                     </ItemsControl>
                                                 </Grid>
@@ -133,7 +133,7 @@
                                 </ContentPresenter>
                                 <ContentPresenter>
                                     <ContentPresenter.Content>
-                                        
+
                                         <Border Classes="card">
                                             <Grid RowDefinitions="Auto,Auto,*">
                                                 <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 demi-bold" >Insulative Liner</TextBlock>
@@ -169,7 +169,7 @@
                                                                     <TextBlock Grid.Column="2" Classes="demi-bold">1.2</TextBlock>
                                                                 </Grid>
                                                             </Grid>
-                                                            
+
                                                         </ItemsControl.Items>
                                                     </ItemsControl>
                                                 </Grid>
@@ -181,16 +181,18 @@
                         </ItemsControl>
                     </StackPanel>
                 </Grid>
-                
+
             </Border>
         </ThemeVariantScope>
     </Design.PreviewWith>
 
     <!-- Add Styles Here -->
+
+    <!-- Typographie -->
     <Style Selector="TextBlock">
         <Setter Property="FontFamily" Value="Roboto" />
     </Style>
-    
+
     <Style Selector="TextBlock.title">
         <!-- <Setter Property="FontSize" Value="16" /> -->
     </Style>
@@ -210,24 +212,23 @@
     <Style Selector="TextBlock.demi-dimming">
         <Setter Property="Foreground" Value="{DynamicResource DemiDimmingBrush}" />
     </Style>
-    
-    <!-- Headers -->
+
     <Style Selector="TextBlock.h1, :is(Panel) TextBlock.h1">
-        <Setter Property="FontSize" Value="{DynamicResource H1FontSize}"></Setter>
-    </Style>
-    
-    <Style Selector="TextBlock.h2, :is(Panel) TextBlock.h2">
-        <Setter Property="FontSize" Value="{DynamicResource H2FontSize}"></Setter>
+        <Setter Property="FontSize" Value="{DynamicResource H1FontSize}" />
     </Style>
 
-    <!-- Separators -->
+    <Style Selector="TextBlock.h2, :is(Panel) TextBlock.h2">
+        <Setter Property="FontSize" Value="{DynamicResource H2FontSize}" />
+    </Style>
+
+    <!-- Séparateurs -->
     <Style Selector="Separator.vertical">
         <Setter Property="Width" Value="1" />
         <Setter Property="Height" Value="NaN" />
         <Setter Property="Margin" Value="0" />
-        
+
         <Style Selector="^.spacer">
-            <Setter Property="Margin" Value="15 0"></Setter>
+            <Setter Property="Margin" Value="15 0" />
         </Style>
     </Style>
 
@@ -237,10 +238,10 @@
         <Setter Property="Margin" Value="0" />
 
         <Style Selector="^.spacer">
-            <Setter Property="Margin" Value="0 15"></Setter>
+            <Setter Property="Margin" Value="0 15" />
         </Style>
     </Style>
-    
+
     <!-- Bulletpoint -->
     <Style Selector="Border.bulletpoint">
         <Setter Property="Margin" Value="2 0 10 0" />
@@ -249,8 +250,8 @@
         <Setter Property="CornerRadius" Value="5" />
         <Setter Property="Background" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
     </Style>
-    
-    <!-- Icon -->
+
+    <!-- Icon d'équipement -->
     <Style Selector="Border.equipment-icon">
         <Setter Property="Background" Value="{DynamicResource IconBackgroundBrush}" />
         <Setter Property="Width" Value="60" />
@@ -261,7 +262,7 @@
         <Setter Property="Margin" Value="0 0 10 0" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="BorderBrush" Value="{DynamicResource IconBorderBrush}" />
-        
+
         <Style Selector="^ > Path">
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -271,16 +272,65 @@
             <Setter Property="Margin" Value="5" />
         </Style>
     </Style>
-    
+
+    <!-- Boutons -->
+    <Style Selector="Button.btn">
+        <Style Selector="^ > :is(Panel) > ic|SymbolIcon:nth-child(1)">
+            <Setter Property="Margin" Value="0 0 5 0" />
+        </Style>
+        <Style Selector="^ > :is(Panel) > ic|SymbolIcon:nth-last-child(1)">
+            <Setter Property="Margin" Value="5 0 0 0" />
+        </Style>
+
+        <Style Selector="^.principal">
+            <Setter Property="BorderBrush" Value="{DynamicResource ButtonPrimaryBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ButtonPrimaryBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ButtonPrimaryForegroundBrush}" />
+
+            <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="BorderBrush" Value="{DynamicResource ButtonPrimaryBorderBrush}" />
+                <Setter Property="Background" Value="{DynamicResource ButtonPrimaryHoverBackgroundBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource ButtonPrimaryForegroundBrush}" />
+            </Style>
+        </Style>
+
+        <Style Selector="^.icon">
+            <Setter Property="Padding" Value="0" />
+        </Style>
+    </Style>
+
+    <!-- DataGrid -->
     <Style Selector=":is(Panel).main">
         <Setter Property="Background" Value="{DynamicResource BackgroundGrade3Brush}" />
     </Style>
 
+    <Style Selector=".main > Grid.header">
+        <Setter Property="Margin" Value="15" />
+        <Setter Property="Height" Value="45" />
+    </Style>
+
+    <Style Selector=".main DataGrid">
+        <Setter Property="GridLinesVisibility" Value="Horizontal" />
+
+        <Style Selector="^ DataGridColumnHeader">
+            <Setter Property="Padding" Value="15" />
+            <Setter Property="FontSize" Value="{DynamicResource H2FontSize}" />
+            <Setter Property="FontWeight" Value="DemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}" />
+            <Setter Property="AreSeparatorsVisible" Value="False" />
+        </Style>
+    </Style>
+
+    <Style Selector="DataGridCell.dimming TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}" />
+    </Style>
+
     <!-- Master -->
     <Style Selector=":is(Panel).master">
-        <Setter Property="Background" Value="{DynamicResource BackgroundGrade2Brush}"></Setter>
+        <Setter Property="Background" Value="{DynamicResource BackgroundGrade2Brush}" />
+
         <Style Selector="^ > :is(Control):not(Separator)">
-            <Setter Property="Margin" Value="5 0"></Setter>
+            <Setter Property="Margin" Value="5 0" />
         </Style>
         <Style Selector="^ > :is(Control):nth-child(1)">
             <Setter Property="Margin" Value="5 5 5 0" />
@@ -288,7 +338,6 @@
         <Style Selector="^ > :is(Control):nth-last-child(1)">
             <Setter Property="Margin" Value="5 0 5 5" />
         </Style>
-        
         <Style Selector="^ TextBlock.title">
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Margin" Value="20 25 0 25" />
@@ -303,28 +352,29 @@
             <Setter Property="Margin" Value="20 5 15 5" />
         </Style>
     </Style>
-        
+
     <!-- Detail -->
     <Style Selector=":is(Panel).detail">
-        <Setter Property="Background" Value="{DynamicResource BackgroundGrade3Brush}"></Setter>
+        <Setter Property="Background" Value="{DynamicResource BackgroundGrade3Brush}" />
+
         <Style Selector="^ > Border.header">
-            <Setter Property="Background" Value="{DynamicResource BackgroundGrade4Brush}"></Setter>
+            <Setter Property="Background" Value="{DynamicResource BackgroundGrade4Brush}" />
             <Setter Property="Padding" Value="25 5 5 5" />
             <Setter Property="Height" Value="110" />
+
             <Style Selector="^ TextBlock.title">
                 <Setter Property="FontSize" Value="{DynamicResource H1FontSize}" />
                 <Setter Property="FontWeight" Value="Bold" />
-                <Setter Property="Margin" Value="0 0 0 10"></Setter>
+                <Setter Property="Margin" Value="0 0 0 10" />
             </Style>
             <Style Selector="^ > :is(Panel) > :is(Panel) > Border.badge:not(:nth-last-child(1))">
                 <Setter Property="Margin" Value="0 0 5 0" />
             </Style>
-
         </Style>
-        
+
         <Style Selector="^ ItemsControl.content">
             <Setter Property="Margin" Value="20" />
-            
+
             <Style Selector="^ > ContentPresenter > Border.card">
                 <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
@@ -335,7 +385,6 @@
                 <Style Selector="^ > Grid > Separator.horizontal">
                     <Setter Property="Margin" Value="-15 10 -15 10" />
                 </Style>
-
                 <Style Selector="^ > Grid > TextBlock.title">
                     <Setter Property="Margin" Value="10 10 10 0" />
                 </Style>
@@ -344,261 +393,274 @@
                 <Setter Property="Margin" Value="0 0 0 20" />
             </Style>
         </Style>
+    </Style>
 
-    </Style>
-    
-    <!-- Boutons -->
-    <Style Selector="Button.btn">
-        <Style Selector="^ > :is(Panel) > ic|SymbolIcon:nth-child(1)">
-            <!-- bouton avec une icone en premier -->
-            <Setter Property="Margin" Value="0 0 5 0" />
-        </Style>
-        <Style Selector="^ > :is(Panel) > ic|SymbolIcon:nth-last-child(1)">
-            <!-- bouton avec une icone en premier -->
-            <Setter Property="Margin" Value="5 0 0 0" />
-        </Style>
-        <Style Selector="^.principal">
-            <Setter Property="BorderBrush" Value="{DynamicResource ButtonPrimaryBorderBrush}" />
-            <Setter Property="Background" Value="{DynamicResource ButtonPrimaryBackgroundBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource ButtonPrimaryForegroundBrush}" />
-            <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-                <Setter Property="BorderBrush" Value="{DynamicResource ButtonPrimaryBorderBrush}" />
-                <Setter Property="Background" Value="{DynamicResource ButtonPrimaryHoverBackgroundBrush}" />
-                <Setter Property="Foreground" Value="{DynamicResource ButtonPrimaryForegroundBrush}" />
-            </Style>
-        </Style>
-        <Style Selector="^.icon">
-            <Setter Property="Padding" Value="0" />
-        </Style>
-    </Style>
-    
-    <!-- DataGrid -->
-    <Style Selector=".main > Grid.header">
-        <Setter Property="Margin" Value="15" />
-        <Setter Property="Height" Value="45" />
-    </Style>
-    <Style Selector=".main DataGrid">
-        <Setter Property="GridLinesVisibility" Value="Horizontal" />
-        <Style Selector="^ DataGridColumnHeader">
-            <Setter Property="Padding" Value="15" />
-            <Setter Property="FontSize" Value="{DynamicResource H2FontSize}" />
-            <Setter Property="FontWeight" Value="DemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}" />
-            <Setter Property="AreSeparatorsVisible" Value="False" />
-        </Style>
+    <!-- Status indicator -->
+    <Style Selector="Ellipse.status-indicator">
+        <Setter Property="Fill" Value="Gray" />
 
+        <Style Selector="^.connected">
+            <Setter Property="Fill" Value="#4CAF50" />
+        </Style>
     </Style>
-    <Style Selector="DataGridCell.dimming TextBlock">
-        <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}" />
+
+    <!-- Couleurs de base des borders colorées (utilisées hors badge) -->
+    <Style Selector="Border.tiers-1">
+        <Setter Property="Background" Value="{DynamicResource BadgeTiers1BackgroundColor}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BadgeTiers1BorderColor}" />
+
+        <Style Selector="^ TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
+        </Style>
+        <Style Selector="^ ic|SymbolIcon">
+            <Setter Property="Foreground" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
+        </Style>
     </Style>
-    
-    <!-- badge -->
+
+    <Style Selector="Border.usage">
+        <Setter Property="Background" Value="{DynamicResource BadgeUsageBackgroundColor}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BadgeUsageBorderColor}" />
+
+        <Style Selector="^ TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource BadgeUsageForegroundColor}" />
+        </Style>
+        <Style Selector="^ ic|SymbolIcon">
+            <Setter Property="Foreground" Value="{DynamicResource BadgeUsageForegroundColor}" />
+        </Style>
+    </Style>
+
+    <Style Selector="Border.temps">
+        <Setter Property="Background" Value="{DynamicResource BadgeTimerBackgroundColor}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BadgeTimerBorderColor}" />
+
+        <Style Selector="^ TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource BadgeTimerForegroundColor}" />
+        </Style>
+        <Style Selector="^ ic|SymbolIcon">
+            <Setter Property="Foreground" Value="{DynamicResource BadgeTimerForegroundColor}" />
+        </Style>
+    </Style>
+
+    <!-- Badges -->
     <Style Selector="Border.badge">
-        <Setter Property="BorderThickness" Value="1"></Setter>
-        <Setter Property="CornerRadius" Value="4"></Setter>
-        <Setter Property="Padding" Value="5 2 5 2"></Setter>
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="5 2 5 2" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="HorizontalAlignment" Value="Center" />
+
         <Style Selector="^ > :is(Panel) > :is(Control):not(:nth-last-child(1))">
             <Setter Property="Margin" Value="0 0 5 0" />
         </Style>
         <Style Selector="^ ic|SymbolIcon">
             <Setter Property="FontSize" Value="12" />
         </Style>
-    </Style>
-    
-    <Style Selector="Border.tiers-1">
-        <Setter Property="Background" Value="{DynamicResource BadgeTiers1BackgroundColor}"></Setter>
-        <Setter Property="BorderBrush" Value="{DynamicResource BadgeTiers1BorderColor}"></Setter>
-        <Style Selector="^ TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource BadgeTiers1ForegroundColor}"></Setter>
-        </Style>
-    </Style>
 
-    <Style Selector="Border.usage">
-        <Setter Property="Background" Value="{DynamicResource BadgeUsageBackgroundColor}"></Setter>
-        <Setter Property="BorderBrush" Value="{DynamicResource BadgeUsageBorderColor}"></Setter>
-        <Style Selector="^ TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource BadgeUsageForegroundColor}"></Setter>
-        </Style>
-    </Style>
-
-    <Style Selector="Border.temps">
-        <Setter Property="Background" Value="{DynamicResource BadgeTimerBackgroundColor}"></Setter>
-        <Setter Property="BorderBrush" Value="{DynamicResource BadgeTimerBorderColor}"></Setter>
-        <Style Selector="^ TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource BadgeTimerForegroundColor}"></Setter>
-        </Style>
-    </Style>
-
-
-
-    <!-- ListBox.bp-list -->
-    <Style Selector="ListBox.bp-list > ListBoxItem:selected ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource BadgeTiers1BackgroundColor}" />
-    </Style>
-
-    <Style Selector="ListBox.bp-list > ListBoxItem:selected /template/ Rectangle#SelectionIndicator">
-        <Setter Property="IsVisible" Value="False" />
-    </Style>
-
-    <!-- ListBoxItem -->
-    <Style Selector="ListBox.bp-list > ListBoxItem">
-        <Style Selector="^ > Grid.bp-list-row">
-            <Setter Property="ColumnSpacing" Value="10" />
-            <Style Selector="^ > TextBlock">
-                <Setter Property="VerticalAlignment" Value="Center"></Setter>
-            </Style>
-        </Style>
-
-        <Style Selector="^:selected > Grid.bp-list-row > TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}"/>
-            
-            <Style Selector="^:nth-last-child()">
-                <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}"/>
-            </Style>
-        </Style>
-        
-        <Style Selector="^:not(:selected)  > Grid.bp-list-row > TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}"/>
-        </Style>
-    </Style>
-
-    <!-- status indicator -->
-    <Style Selector="Ellipse.status-indicator">
-        <Setter Property="Fill" Value="Gray" />
-    </Style>
-    <Style Selector="Ellipse.status-indicator.connected">
-        <Setter Property="Fill" Value="#4CAF50" />
-    </Style>    
-
-            <!-- Activity badges -->
-        <Style Selector="Border.badge.offline">
+        <!-- Activité -->
+        <Style Selector="^.offline">
             <Setter Property="Background" Value="{DynamicResource BadgeTimerBackgroundColor}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BadgeTimerBorderColor}" />
-        </Style>
-        <Style Selector="Border.badge.offline Ellipse">
-            <Setter Property="Fill" Value="{DynamicResource BadgeTimerForegroundColor}" />
-        </Style>
-        <Style Selector="Border.badge.offline TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource BadgeTimerForegroundColor}" />
+
+            <Style Selector="^ Ellipse">
+                <Setter Property="Fill" Value="{DynamicResource BadgeTimerForegroundColor}" />
+            </Style>
+            <Style Selector="^ TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeTimerForegroundColor}" />
+            </Style>
+            <Style Selector="^ ic|SymbolIcon">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeTimerForegroundColor}" />
+            </Style>
         </Style>
 
-        <Style Selector="Border.badge.persistentUniverse">
+        <Style Selector="^.persistentUniverse">
             <Setter Property="Background" Value="{DynamicResource BadgeTiers1BackgroundColor}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BadgeTiers1BorderColor}" />
-        </Style>
-        <Style Selector="Border.badge.persistentUniverse Ellipse">
-            <Setter Property="Fill" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
-        </Style>
-        <Style Selector="Border.badge.persistentUniverse TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
+
+            <Style Selector="^ Ellipse">
+                <Setter Property="Fill" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
+            </Style>
+            <Style Selector="^ TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
+            </Style>
+            <Style Selector="^ ic|SymbolIcon">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
+            </Style>
         </Style>
 
-        <Style Selector="Border.badge.menu">
+        <Style Selector="^.menu">
             <Setter Property="Background" Value="{DynamicResource BadgeUsageBackgroundColor}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BadgeUsageBorderColor}" />
-        </Style>
-        <Style Selector="Border.badge.menu Ellipse">
-            <Setter Property="Fill" Value="{DynamicResource BadgeUsageForegroundColor}" />
-        </Style>
-        <Style Selector="Border.badge.menu TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource BadgeUsageForegroundColor}" />
+
+            <Style Selector="^ Ellipse">
+                <Setter Property="Fill" Value="{DynamicResource BadgeUsageForegroundColor}" />
+            </Style>
+            <Style Selector="^ TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeUsageForegroundColor}" />
+            </Style>
+            <Style Selector="^ ic|SymbolIcon">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeUsageForegroundColor}" />
+            </Style>
         </Style>
 
-        <Style Selector="Border.badge.arenaCommander">
+        <Style Selector="^.arenaCommander">
             <Setter Property="Background" Value="{DynamicResource BadgeArenaCommanderBackgroundColor}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BadgeArenaCommanderBorderColor}" />
-        </Style>
-        <Style Selector="Border.badge.arenaCommander Ellipse">
-            <Setter Property="Fill" Value="{DynamicResource BadgeArenaCommanderForegroundColor}" />
-        </Style>
-        <Style Selector="Border.badge.arenaCommander TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource BadgeArenaCommanderForegroundColor}" />
+
+            <Style Selector="^ Ellipse">
+                <Setter Property="Fill" Value="{DynamicResource BadgeArenaCommanderForegroundColor}" />
+            </Style>
+            <Style Selector="^ TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeArenaCommanderForegroundColor}" />
+            </Style>
+            <Style Selector="^ ic|SymbolIcon">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeArenaCommanderForegroundColor}" />
+            </Style>
         </Style>
 
-        <Style Selector="Border.badge.porte">
+        <Style Selector="^.porte">
             <Setter Property="Background" Value="{DynamicResource BadgePorteBackgroundColor}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BadgePorteBorderColor}" />
+
             <Style Selector="^ Ellipse">
                 <Setter Property="Fill" Value="{DynamicResource BadgePorteForegroundColor}" />
             </Style>
             <Style Selector="^ TextBlock">
                 <Setter Property="Foreground" Value="{DynamicResource BadgePorteForegroundColor}" />
             </Style>
+            <Style Selector="^ ic|SymbolIcon">
+                <Setter Property="Foreground" Value="{DynamicResource BadgePorteForegroundColor}" />
+            </Style>
         </Style>
 
-        <!-- Ship state badges -->
-        <Style Selector="Border.badge.tiers-1">
+        <!-- État du vaisseau -->
+        <Style Selector="^.tiers-1">
             <Style Selector="^ Ellipse">
                 <Setter Property="Fill" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
             </Style>
         </Style>
 
-        <Style Selector="Border.badge.usage">
+        <Style Selector="^.usage">
             <Style Selector="^ Ellipse">
                 <Setter Property="Fill" Value="{DynamicResource BadgeUsageForegroundColor}" />
             </Style>
         </Style>
 
-        <Style Selector="Border.badge.destroyed">
-            <Setter Property="Background"  Value="{DynamicResource BadgeDestroyedBackgroundColor}" />
+        <Style Selector="^.destroyed">
+            <Setter Property="Background" Value="{DynamicResource BadgeDestroyedBackgroundColor}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BadgeDestroyedBorderColor}" />
+
             <Style Selector="^ Ellipse">
                 <Setter Property="Fill" Value="{DynamicResource BadgeDestroyedForegroundColor}" />
             </Style>
             <Style Selector="^ TextBlock">
                 <Setter Property="Foreground" Value="{DynamicResource BadgeDestroyedForegroundColor}" />
             </Style>
+            <Style Selector="^ ic|SymbolIcon">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeDestroyedForegroundColor}" />
+            </Style>
         </Style>
 
-        <!-- Badges région -->
-        <Style Selector="Border.badge.regionEurope">
+        <!-- Région -->
+        <Style Selector="^.regionEurope">
             <Setter Property="Background" Value="{DynamicResource BadgeRegionEuropeBackgroundColor}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionEuropeBorderColor}" />
+
             <Style Selector="^ TextBlock">
                 <Setter Property="Foreground" Value="{DynamicResource BadgeRegionEuropeForegroundColor}" />
             </Style>
-        </Style>
-        <Style Selector="Border.badge.regionUsa">
-            <Setter Property="Background" Value="{DynamicResource BadgeRegionUsaBackgroundColor}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionUsaBorderColor}" />
-            <Style Selector="^ TextBlock">
-                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionUsaForegroundColor}" />
-            </Style>
-        </Style>
-        <Style Selector="Border.badge.regionAsie">
-            <Setter Property="Background" Value="{DynamicResource BadgeRegionAsieBackgroundColor}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionAsieBorderColor}" />
-            <Style Selector="^ TextBlock">
-                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionAsieForegroundColor}" />
-            </Style>
-        </Style>
-        <Style Selector="Border.badge.regionAustralie">
-            <Setter Property="Background" Value="{DynamicResource BadgeRegionAustralieBackgroundColor}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionAustralieBorderColor}" />
-            <Style Selector="^ TextBlock">
-                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionAustralieForegroundColor}" />
+            <Style Selector="^ ic|SymbolIcon">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionEuropeForegroundColor}" />
             </Style>
         </Style>
 
-        <!-- Avatar -->
-        <Style Selector="Image.avatar">
-            <Setter Property="MaxWidth" Value="50" />
-            <Setter Property="MaxHeight" Value="50" />
-            <Setter Property="Margin" Value="10" />
+        <Style Selector="^.regionUsa">
+            <Setter Property="Background" Value="{DynamicResource BadgeRegionUsaBackgroundColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionUsaBorderColor}" />
+
+            <Style Selector="^ TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionUsaForegroundColor}" />
+            </Style>
+            <Style Selector="^ ic|SymbolIcon">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionUsaForegroundColor}" />
+            </Style>
         </Style>
-        <Style Selector="Border.avatar-placeholder">
-            <Setter Property="Width" Value="50" />
-            <Setter Property="Height" Value="50" />
-            <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Margin" Value="10" />
+
+        <Style Selector="^.regionAsie">
+            <Setter Property="Background" Value="{DynamicResource BadgeRegionAsieBackgroundColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionAsieBorderColor}" />
+
+            <Style Selector="^ TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionAsieForegroundColor}" />
+            </Style>
+            <Style Selector="^ ic|SymbolIcon">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionAsieForegroundColor}" />
+            </Style>
         </Style>
-        <Style Selector="Border.avatar-placeholder TextBlock">
+
+        <Style Selector="^.regionAustralie">
+            <Setter Property="Background" Value="{DynamicResource BadgeRegionAustralieBackgroundColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionAustralieBorderColor}" />
+
+            <Style Selector="^ TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionAustralieForegroundColor}" />
+            </Style>
+            <Style Selector="^ ic|SymbolIcon">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionAustralieForegroundColor}" />
+            </Style>
+        </Style>
+    </Style>
+
+    <!-- ListBox.bp-list -->
+    <Style Selector="ListBox.bp-list">
+        <Style Selector="^ > ListBoxItem:selected ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource BadgeTiers1BackgroundColor}" />
+        </Style>
+        <Style Selector="^ > ListBoxItem:selected /template/ Rectangle#SelectionIndicator">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+
+        <Style Selector="^ > ListBoxItem">
+            <Style Selector="^ > Grid.bp-list-row">
+                <Setter Property="ColumnSpacing" Value="10" />
+
+                <Style Selector="^ > TextBlock">
+                    <Setter Property="VerticalAlignment" Value="Center" />
+                </Style>
+            </Style>
+
+            <Style Selector="^:selected > Grid.bp-list-row > TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}"/>
+
+                <Style Selector="^:nth-last-child()">
+                    <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}"/>
+                </Style>
+            </Style>
+
+            <Style Selector="^:not(:selected) > Grid.bp-list-row > TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}"/>
+            </Style>
+        </Style>
+    </Style>
+
+    <!-- Avatar -->
+    <Style Selector="Image.avatar">
+        <Setter Property="MaxWidth" Value="50" />
+        <Setter Property="MaxHeight" Value="50" />
+        <Setter Property="Margin" Value="10" />
+    </Style>
+
+    <Style Selector="Border.avatar-placeholder">
+        <Setter Property="Width" Value="50" />
+        <Setter Property="Height" Value="50" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Margin" Value="10" />
+
+        <Style Selector="^ TextBlock">
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="FontSize" Value="16" />
         </Style>
+    </Style>
 </Styles>

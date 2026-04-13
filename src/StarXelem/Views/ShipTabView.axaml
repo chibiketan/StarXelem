@@ -61,25 +61,34 @@
                     <DataGridTemplateColumn Header="EMPLACEMENT">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate DataType="{x:Type models:SpaceshipModel}">
-                                <Panel VerticalAlignment="Center" Margin="15,10">
-                                    <TextBlock IsVisible="{Binding IsEmptyLocation}" Classes="dimming" Text="—" />
-                                    <Border Classes="badge arenaCommander" IsVisible="{Binding IsPorte}" HorizontalAlignment="Left">
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <Ellipse Width="7" Height="7" VerticalAlignment="Center" />
-                                            <TextBlock Text="Logout dedans" VerticalAlignment="Center" />
-                                        </StackPanel>
+                                <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center" Margin="15,10" ColumnSpacing="6">
+                                    <TextBlock Grid.Column="0" Grid.ColumnSpan="2" IsVisible="{Binding IsEmptyLocation}" Classes="dimming" Text="—" VerticalAlignment="Center" />
+                                    <Border Grid.Column="0" Classes="badge arenaCommander" IsVisible="{Binding IsPorte}" VerticalAlignment="Center" Padding="4.5">
+                                        <ic:SymbolIcon Symbol="Person" FontSize="14" VerticalAlignment="Center" />
                                     </Border>
-                                    <StackPanel Orientation="Horizontal" IsVisible="{Binding IsStandardLocation}" Spacing="4">
-                                        <TextBlock Classes="dimming" Text="{Binding LocationPrefix}" />
-                                        <TextBlock Classes="demi-dimming" Text="{Binding LocationName}" />
-                                    </StackPanel>
-                                </Panel>
+                                    <Border Grid.Column="0" Classes="badge regionEurope" IsVisible="{Binding IsLocationTypeLocation}" Padding="4.5">
+                                        <ic:SymbolIcon Symbol="Home" FontSize="14" VerticalAlignment="Center" />
+                                    </Border>
+                                    <Border Grid.Column="0" Classes="badge tiers-1" IsVisible="{Binding IsLocationTypeHangar}" Padding="4.5">
+                                        <ic:SymbolIcon Symbol="Location" FontSize="14" VerticalAlignment="Center" />
+                                    </Border>
+                                    <Border Grid.Column="0" Classes="badge arenaCommander" IsVisible="{Binding IsLocationTypeId}" Padding="4.5">
+                                        <ic:SymbolIcon Symbol="VehicleShip" FontSize="14" VerticalAlignment="Center" />
+                                    </Border>
+                                    <Border Grid.Column="0" Classes="badge offline" IsVisible="{Binding IsLocationTypeOther}" HorizontalAlignment="Left" Padding="4.5">
+                                        <ic:SymbolIcon Symbol="Question" FontSize="14" VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Grid.Column="1" Text="Logout dedans" VerticalAlignment="Center" IsVisible="{Binding IsPorte}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding LocationName}" VerticalAlignment="Center" IsVisible="{Binding IsLocationTypeLocation}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding LocationName}" VerticalAlignment="Center" IsVisible="{Binding IsLocationTypeHangar}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding LocationName}" VerticalAlignment="Center" IsVisible="{Binding IsLocationTypeId}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding ReadableLocation}" VerticalAlignment="Center" IsVisible="{Binding IsLocationTypeOther}" />
+
+                                </Grid>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
                     <DataGridTextColumn Header="SHARD" Binding="{Binding Shard}" />
-                    <DataGridTextColumn Header="ENTITY TYPE" Binding="{Binding ItemType}" IsVisible="False" />
-                    <DataGridTextColumn Header="ENTITY SOUS TYPE" Binding="{Binding ItemSubType}" IsVisible="False" />
                 </DataGrid.Columns>
             </DataGrid>
         </Grid>

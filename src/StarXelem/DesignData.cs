@@ -243,7 +243,7 @@ public static class DesignData
             new(new Entitlement { Name = "Idris-P", SourceSku = "PackageName", EntityClassGuid = "GUID1", RealMoney = true, Status = EntitlementStatus.Fulfilled })
             {
                 Shipname = "AEGS_Idris_P",
-                ReadableLocation = "[(LOCATION|obj_a18_landing_01)] Area 18 - ArcCorp",
+                ReadableLocation = "[HANGAR] Area 18 - ArcCorp",
                 StowContext = new EntityStowContext { IsStowed = true, ShardId = "pub_use1b_3.24_12345" }
             },
             // UNSTOWED — porté sur le joueur
@@ -261,13 +261,14 @@ public static class DesignData
             // UNCLAIMED — jamais réclamé
             new(new Entitlement { Name = "Avenger Titan", SourceSku = "PackageName", EntityClassGuid = "GUID4", RealMoney = true, Status = EntitlementStatus.Unclaimed })
             {
-                Shipname = "AEGS_Avenger_Titan"
+                Shipname = "AEGS_Avenger_Titan",
+                ReadableLocation = "[123456] Idris-P",
             },
             // STOWED — achat CCU (pas d'argent réel)
             new(new Entitlement { Name = "Carrack", SourceSku = "PackageName", EntityClassGuid = "GUID5", RealMoney = false, Status = EntitlementStatus.Fulfilled })
             {
                 Shipname = "MISC_Carrack",
-                ReadableLocation = "[(LOCATION|obj_lorville_01)] Lorville - Hurston",
+                ReadableLocation = "[LOCATION] Lorville - Hurston",
                 StowContext = new EntityStowContext { IsStowed = true, ShardId = "pub_use1b_3.24_99999" }
             },
         });

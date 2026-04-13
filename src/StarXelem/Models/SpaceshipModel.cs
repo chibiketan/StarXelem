@@ -8,7 +8,7 @@ namespace StarXelem.Models;
 
 public class SpaceshipModel
 {
-    public string Name => (Entitlement.Name == Entitlement.SourceSku ? "" : Entitlement.Name);
+    public string Name => !IsNameValid(Entitlement.Name) ? "" : Entitlement.Name;
     public string Ship => (EntityClassDefinition?.Components.FirstOrDefault(c => c is VehicleComponentParams) as VehicleComponentParams)?.vehicleName ?? Entitlement.EntityClassGuid;
     public string? PackageSource => Entitlement.SourceSku;
     public string Shipname { get; set; }
@@ -26,9 +26,12 @@ public class SpaceshipModel
     public bool IsStandardLocation => !IsPorte && !IsEmptyLocation;
     public string? LocationPrefix => IsStandardLocation ? ExtractLocationPrefix(ReadableLocation!) : null;
     public string? LocationName  => IsStandardLocation ? ExtractLocationName(ReadableLocation!)  : null;
+    private string? LocationPrefixInner => IsStandardLocation ? ExtractLocationPrefixInner(ReadableLocation!) : null;
+    public bool IsLocationTypeLocation => LocationPrefixInner == "LOCATION";
+    public bool IsLocationTypeHangar   => LocationPrefixInner == "HANGAR";
+    public bool IsLocationTypeId       => LocationPrefixInner != null && System.Text.RegularExpressions.Regex.IsMatch(LocationPrefixInner, @"^\d+$");
+    public bool IsLocationTypeOther    => IsStandardLocation && !IsLocationTypeLocation && !IsLocationTypeHangar && !IsLocationTypeId;
     public string? Shard => StowContext?.ShardId;
-    public EItemType ItemType => (EItemType)(EntityProperties?.EntityNodeProperties?.ItemTypeEnum ?? -1);
-    public EItemSubType ItemSubType => (EItemSubType)(EntityProperties?.EntityNodeProperties?.ItemSubTypeEnum ?? -1);
 
     public Entitlement Entitlement { get; }
     public EntityClassDefinition? EntityClassDefinition { get; set; }
@@ -55,6 +58,13 @@ public class SpaceshipModel
         return end < 0 ? location : location[(end + 1)..].TrimStart();
     }
 
+    private static string? ExtractLocationPrefixInner(string location)
+    {
+        if (!location.StartsWith('[')) return null;
+        var end = location.IndexOf(']');
+        return end < 0 ? null : location[1..end];
+    }
+
     private SpaceshipState GetState()
     {
         if (Entitlement.Status == EntitlementStatus.Unclaimed)
@@ -76,6 +86,26 @@ public class SpaceshipModel
         }
         
         return SpaceshipState.UNKNOWN;
+    }
+
+    private bool IsNameValid(string entitlementName)
+    {
+        if (String.IsNullOrWhiteSpace(entitlementName))
+        {
+            return false;
+        }
+
+        if (entitlementName.Equals("Insurance grant", StringComparison.CurrentCultureIgnoreCase))
+        {
+            return false;
+        }
+
+        if (entitlementName.Equals(Entitlement.SourceSku, StringComparison.CurrentCultureIgnoreCase))
+        {
+            return false;
+        }
+        
+        return true;
     }
 }
 

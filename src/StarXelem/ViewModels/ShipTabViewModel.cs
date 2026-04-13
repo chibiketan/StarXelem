@@ -22,8 +22,8 @@ public partial class ShipTabViewModel : PageViewModelBase
     private readonly IGrpcClientService  _clientService;
     private readonly IP4kService _p4KService;
     private readonly ILocationService _locationService;
-    public override string Name => "Starships";
-    public override string Icon => nameof(Symbol.Star);
+    public override string Name => "Mon hangar";
+    public override string Icon => nameof(Symbol.Home);
     [ObservableProperty] public Task<IList<SpaceshipModel>>? _spaceships;
     [ObservableProperty] private bool _isLoading = false;
     [ObservableProperty] private string _treatmentStatus = "";
