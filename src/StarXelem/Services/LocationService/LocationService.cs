@@ -16,7 +16,7 @@ public class LocationService : ILocationService
         _p4KService = p4KService;
     }
     
-    public async Task<string?> ResolveEntityLocation(string? entityLocation)
+    public async Task<string?> ResolveEntityLocation(string? entityLocation, IList<EItemType>? allowedTypes = null)
     {
         if (string.IsNullOrWhiteSpace(entityLocation))
         {
@@ -61,6 +61,15 @@ public class LocationService : ILocationService
                 return $"Entité non trouvée ({split[0]})";
             }
 
+            if (allowedTypes is { Count: > 0 })
+            {
+                var itemType = (EItemType)results[0].EntityNodeProperties!.ItemTypeEnum;
+                if (!allowedTypes.Contains(itemType))
+                {
+                    return await ResolveLocation(results[0], allowedTypes);
+                }
+            }
+
             var entityType = await _p4KService.GetEntityType(results[0].EntityNodeProperties.ClassGuidCrc);
             var typeName = entityType.RecordName;
             var c = (entityType?.Data as EntityClassDefinition)?.Components
@@ -71,7 +80,7 @@ public class LocationService : ILocationService
                 if (c.AttachDef.Localization.Name == "@LOC_PLACEHOLDER")
                 {
                     // C'est un placeholder, on va chercher son possesseur
-                    return await ResolveLocation(results[0]);
+                    return await ResolveLocation(results[0], allowedTypes);
                 }
                 
                 var tmpeName = await _p4KService.GetLocaleValue(c.AttachDef.Localization.Name);
@@ -88,7 +97,7 @@ public class LocationService : ILocationService
         return entityLocation;
     }
     
-    public Task<string?> ResolveLocation(EntityItemQueryResult entity)
+    public Task<string?> ResolveLocation(EntityItemQueryResult entity, IList<EItemType>? allowedTypes = null)
     {
         if (entity.EntityEdge != null)
         {
@@ -100,7 +109,7 @@ public class LocationService : ILocationService
                     //return Task.FromResult("[EDGE] attached to traiter")!;
                     if (entity.EntityEdge.End.HasEntityId)
                     {
-                        return ResolveEntityLocation(entity.EntityEdge.End.EntityId);
+                        return ResolveEntityLocation(entity.EntityEdge.End.EntityId, allowedTypes);
                     }
 
                     if (entity.EntityEdge.End.HasInventoryId)
@@ -115,7 +124,7 @@ public class LocationService : ILocationService
                     break;
                 case EntityEdgeType.StowedIn:
                     // Rangé dans un conteneur
-                    return this.ResolveEntityLocation(entity.EntityEdge.End.InventoryId);
+                    return this.ResolveEntityLocation(entity.EntityEdge.End.InventoryId, allowedTypes);
                 case EntityEdgeType.References:
                     // Lié à une référence ?
                     return Task.FromResult("[EDGE] Référence à traiter")!;
@@ -131,7 +140,7 @@ public class LocationService : ILocationService
         return Task.FromResult("pas de données")!;
     }
 
-    public async Task<String?> ResolveEntityLocation(ulong guid)
+    public async Task<String?> ResolveEntityLocation(ulong guid, IList<EItemType>? allowedTypes = null)
     {
         // TODO remove
         var results = await _entityCache.GetOrAdd(guid, entityId =>
@@ -153,6 +162,15 @@ public class LocationService : ILocationService
             return $"Entité non trouvée ({guid})";
         }
 
+        if (allowedTypes is { Count: > 0 })
+        {
+            var itemType = (EItemType)results[0].EntityNodeProperties!.ItemTypeEnum;
+            if (!allowedTypes.Contains(itemType))
+            {
+                return await ResolveLocation(results[0], allowedTypes);
+            }
+        }
+
         var entityType = await _p4KService.GetEntityType(results[0].EntityNodeProperties!.ClassGuidCrc);
         var typeName = entityType!.RecordName;
         var c = (entityType?.Data as EntityClassDefinition)?.Components
@@ -163,9 +181,9 @@ public class LocationService : ILocationService
             if (c.AttachDef.Localization.Name == "@LOC_PLACEHOLDER")
             {
                 // C'est un placeholder, on va chercher son possesseur
-                return await ResolveLocation(results[0]);
+                return await ResolveLocation(results[0], allowedTypes);
             }
-                
+
             var tmpeName = await _p4KService.GetLocaleValue(c.AttachDef.Localization.Name);
 
             if (!string.IsNullOrEmpty(tmpeName))
@@ -173,7 +191,7 @@ public class LocationService : ILocationService
                 typeName = tmpeName;
             }
         }
-            
+
         return $"[{guid}] {typeName}";
     }
 
