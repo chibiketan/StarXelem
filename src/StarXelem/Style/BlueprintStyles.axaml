@@ -378,6 +378,7 @@
         <Setter Property="Height" Value="45" />
     </Style>
     <Style Selector=".main DataGrid">
+        <Setter Property="GridLinesVisibility" Value="Horizontal" />
         <Style Selector="^ DataGridColumnHeader">
             <Setter Property="Padding" Value="15" />
             <Setter Property="FontSize" Value="{DynamicResource H2FontSize}" />
@@ -524,6 +525,30 @@
             </Style>
             <Style Selector="^ TextBlock">
                 <Setter Property="Foreground" Value="{DynamicResource BadgePorteForegroundColor}" />
+            </Style>
+        </Style>
+
+        <!-- Ship state badges -->
+        <Style Selector="Border.badge.tiers-1">
+            <Style Selector="^ Ellipse">
+                <Setter Property="Fill" Value="{DynamicResource BadgeTiers1ForegroundColor}" />
+            </Style>
+        </Style>
+
+        <Style Selector="Border.badge.usage">
+            <Style Selector="^ Ellipse">
+                <Setter Property="Fill" Value="{DynamicResource BadgeUsageForegroundColor}" />
+            </Style>
+        </Style>
+
+        <Style Selector="Border.badge.destroyed">
+            <Setter Property="Background"  Value="{DynamicResource BadgeDestroyedBackgroundColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeDestroyedBorderColor}" />
+            <Style Selector="^ Ellipse">
+                <Setter Property="Fill" Value="{DynamicResource BadgeDestroyedForegroundColor}" />
+            </Style>
+            <Style Selector="^ TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource BadgeDestroyedForegroundColor}" />
             </Style>
         </Style>
 

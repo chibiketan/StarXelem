@@ -17,7 +17,11 @@ public class SpaceshipModel
     public string? DisplayState => GetState().GetDisplayName();
     public string? Location => EntityProperties?.EntityEdge?.End?.InventoryId;
     public string? ReadableLocation { get; set; }
-    public bool IsPorte => ReadableLocation == "Porté";
+    public bool IsPorte     => ReadableLocation == "Porté";
+    public bool IsStowed    => State == SpaceshipState.STOWED;
+    public bool IsUnstowed  => State == SpaceshipState.UNSTOWED;
+    public bool IsUnclaimed => State == SpaceshipState.UNCLAIMED;
+    public bool IsDestroyed => State == SpaceshipState.DESTROYED;
     public bool IsEmptyLocation => string.IsNullOrEmpty(ReadableLocation);
     public bool IsStandardLocation => !IsPorte && !IsEmptyLocation;
     public string? LocationPrefix => IsStandardLocation ? ExtractLocationPrefix(ReadableLocation!) : null;

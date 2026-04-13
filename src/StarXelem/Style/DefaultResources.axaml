@@ -48,6 +48,9 @@
             <SolidColorBrush x:Key="BadgePorteForegroundColor" Color="#FF854F0B" />
             <SolidColorBrush x:Key="BadgePorteBackgroundColor" Color="#FFFAEEDA" />
             <SolidColorBrush x:Key="BadgePorteBorderColor" Color="#FFEF9F27" />
+            <SolidColorBrush x:Key="BadgeDestroyedForegroundColor" Color="#FFA32D2D" />
+            <SolidColorBrush x:Key="BadgeDestroyedBackgroundColor" Color="#FFF7C1C1" />
+            <SolidColorBrush x:Key="BadgeDestroyedBorderColor"     Color="#FFF09595" />
             <!-- badges région -->
             <SolidColorBrush x:Key="BadgeRegionEuropeForegroundColor" Color="#FF0C447C" />
             <SolidColorBrush x:Key="BadgeRegionEuropeBackgroundColor" Color="#FFE6F1FB" />
@@ -108,6 +111,9 @@
             <SolidColorBrush x:Key="BadgePorteForegroundColor" Color="#FFEF9F27" />
             <SolidColorBrush x:Key="BadgePorteBackgroundColor" Color="#1EEF9F27" />
             <SolidColorBrush x:Key="BadgePorteBorderColor" Color="#4CEF9F27" />
+            <SolidColorBrush x:Key="BadgeDestroyedForegroundColor" Color="#FFF09595" />
+            <SolidColorBrush x:Key="BadgeDestroyedBackgroundColor" Color="#1DE24B4A" />
+            <SolidColorBrush x:Key="BadgeDestroyedBorderColor"     Color="#4DE24B4A" />
             <!-- badges région -->
             <SolidColorBrush x:Key="BadgeRegionEuropeForegroundColor" Color="#FF85B7EB" />
             <SolidColorBrush x:Key="BadgeRegionEuropeBackgroundColor" Color="#1E378ADD" />

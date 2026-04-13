@@ -23,13 +23,17 @@
                 </Grid>
             </Button>
             <TextBlock Grid.Column="1" Classes="dimming" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" Text="{Binding TreatmentStatus}" />
+            <Grid Grid.Column="2" HorizontalAlignment="Right" ColumnDefinitions="Auto,Auto" VerticalAlignment="Center">
+                <TextBlock Grid.Column="0" Classes="demi-dimming" Text="{Binding Spaceships^.Count, FallbackValue=-}" Margin="0 0 7 0" />
+                <TextBlock Grid.Column="1" Classes="dimming" >Vaisseaux</TextBlock>
+            </Grid>
         </Grid>
         <Grid Grid.Row="1">
-            <DataGrid  ItemsSource="{Binding Spaceships^}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="All">
+            <DataGrid  ItemsSource="{Binding Spaceships^}" AutoGenerateColumns="False" IsReadOnly="True" >
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="NOM" Binding="{Binding Name}" />
                     <DataGridTextColumn Header="MODÈLE" Binding="{Binding Shipname}" CellStyleClasses="demi-dimming" />
-                    <DataGridTemplateColumn Header="STORE">
+                    <DataGridTemplateColumn Header="STORE" MinWidth="0" SortMemberPath="IsRealPurchase">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate DataType="{x:Type models:SpaceshipModel}">
                                 <Ellipse Classes="status-indicator" Classes.connected="{Binding IsRealPurchase}"
@@ -37,16 +41,32 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="STATUT" Binding="{Binding DisplayState}" />
+                    <DataGridTemplateColumn Header="STATUT" SortMemberPath="DisplayState">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate DataType="{x:Type models:SpaceshipModel}">
+                                <Border Classes="badge"
+                                        Classes.tiers-1="{Binding IsStowed}"
+                                        Classes.arenaCommander="{Binding IsUnstowed}"
+                                        Classes.usage="{Binding IsUnclaimed}"
+                                        Classes.destroyed="{Binding IsDestroyed}"
+                                        HorizontalAlignment="Left" Margin="15,0">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Ellipse Width="7" Height="7" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding DisplayState}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTemplateColumn Header="EMPLACEMENT">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate DataType="{x:Type models:SpaceshipModel}">
-                                <Panel VerticalAlignment="Center" Margin="15,0">
+                                <Panel VerticalAlignment="Center" Margin="15,10">
                                     <TextBlock IsVisible="{Binding IsEmptyLocation}" Classes="dimming" Text="—" />
-                                    <Border Classes="badge porte" IsVisible="{Binding IsPorte}" HorizontalAlignment="Left">
+                                    <Border Classes="badge arenaCommander" IsVisible="{Binding IsPorte}" HorizontalAlignment="Left">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
                                             <Ellipse Width="7" Height="7" VerticalAlignment="Center" />
-                                            <TextBlock Text="Porté" VerticalAlignment="Center" />
+                                            <TextBlock Text="Logout dedans" VerticalAlignment="Center" />
                                         </StackPanel>
                                     </Border>
                                     <StackPanel Orientation="Horizontal" IsVisible="{Binding IsStandardLocation}" Spacing="4">

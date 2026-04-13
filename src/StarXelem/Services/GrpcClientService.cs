@@ -890,7 +890,6 @@ public class GrpcClientService : IGrpcClientService
     
     public async Task TestRequest()
     {
-
         var service = new Sc.External.Services.BlueprintLibrary.V1.BlueprintLibraryService.BlueprintLibraryServiceClient(_channel);
         var request = new QueryBlueprintEntriesRequest
         {
@@ -928,7 +927,7 @@ public class GrpcClientService : IGrpcClientService
         var request = new QueryBlueprintEntriesRequest
         {
             Query = new Query
-            {
+            { 
                 Pagination = new PaginationArguments
                 {
                     First = 250,
