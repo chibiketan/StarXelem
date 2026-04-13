@@ -5,17 +5,40 @@ using StarXelem.Models;
 
 namespace StarXelem.Services.LocationService;
 
+/// <summary>
+/// Implémentation de production de <see cref="ILocationService"/>.
+/// Interroge le graphe d'entités via gRPC et les données P4K pour résoudre
+/// les identifiants bruts en noms d'emplacements localisés.
+/// Les résultats sont mis en cache pour éviter les requêtes redondantes au sein d'une session.
+/// </summary>
 public class LocationService : ILocationService
 {
     private readonly IGrpcClientService _grpcClientService;
     private readonly IP4kService _p4KService;
 
+    /// <summary>
+    /// Initialise une nouvelle instance de <see cref="LocationService"/>.
+    /// </summary>
+    /// <param name="grpcClientService">Service de communication gRPC avec le backend Star Citizen.</param>
+    /// <param name="p4KService">Service d'accès aux données P4K (types d'entités et chaînes localisées).</param>
     public LocationService(IGrpcClientService grpcClientService, IP4kService p4KService)
     {
         _grpcClientService = grpcClientService;
         _p4KService = p4KService;
     }
     
+    /// <inheritdoc/>
+    /// <remarks>
+    /// La chaîne brute est découpée en trois parties (<c>entityId:type:id</c>).
+    /// Le segment <c>type</c> détermine la stratégie de résolution :
+    /// <list type="bullet">
+    ///   <item><term>UNKNOWN</term><description>Retourne la chaîne brute telle quelle.</description></item>
+    ///   <item><term>PlayerInventory</term><description>Retourne <c>"Porté"</c> directement.</description></item>
+    ///   <item><term>Location / Hangar</term><description>Résout via CRC hash → <c>StarMapObject.name</c> → locale P4K.</description></item>
+    ///   <item><term>Container</term><description>Interroge le graphe gRPC, récupère le type via P4K, puis localise
+    ///   ou remonte l'arbre de possession si l'entité est un placeholder ou d'un type non autorisé.</description></item>
+    /// </list>
+    /// </remarks>
     public async Task<string?> ResolveEntityLocation(string? entityLocation, IList<EItemType>? allowedTypes = null)
     {
         if (string.IsNullOrWhiteSpace(entityLocation))
@@ -97,6 +120,15 @@ public class LocationService : ILocationService
         return entityLocation;
     }
     
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Suit les arêtes du graphe d'entités :
+    /// <list type="bullet">
+    ///   <item><term>AttachedTo</term><description>Résout récursivement l'entité parente via son <c>EntityId</c>.</description></item>
+    ///   <item><term>StowedIn</term><description>Résout récursivement le conteneur via son <c>InventoryId</c>.</description></item>
+    ///   <item><term>References</term><description>Non implémenté, retourne un message indicatif.</description></item>
+    /// </list>
+    /// </remarks>
     public Task<string?> ResolveLocation(EntityItemQueryResult entity, IList<EItemType>? allowedTypes = null)
     {
         if (entity.EntityEdge != null)
@@ -140,6 +172,16 @@ public class LocationService : ILocationService
         return Task.FromResult("pas de données")!;
     }
 
+    /// <summary>
+    /// Résout la localisation d'une entité à partir de son identifiant numérique (GUID).
+    /// Le résultat est mis en cache dans <see cref="_entityCache"/> pour éviter les requêtes répétées.
+    /// </summary>
+    /// <param name="guid">Identifiant unique de l'entité (GUID numérique).</param>
+    /// <param name="allowedTypes">
+    /// Liste optionnelle des types d'items acceptés comme emplacement final.
+    /// Si le type de l'entité ne figure pas dans cette liste, la résolution remonte la chaîne de possession.
+    /// </param>
+    /// <returns>Le nom localisé de l'emplacement, ou un message d'erreur si l'entité est introuvable.</returns>
     public async Task<String?> ResolveEntityLocation(ulong guid, IList<EItemType>? allowedTypes = null)
     {
         // TODO remove
@@ -195,6 +237,14 @@ public class LocationService : ILocationService
         return $"[{guid}] {typeName}";
     }
 
+    /// <summary>
+    /// Résout un emplacement de type <c>Location</c> ou <c>Hangar</c> à partir de son identifiant CRC.
+    /// Le CRC correspond au hash du type d'entité dans les données P4K.
+    /// Le résultat est mis en cache dans <see cref="_locationCache"/>.
+    /// </summary>
+    /// <param name="id">Hash CRC de l'emplacement.</param>
+    /// <param name="type">Type de localisation (<c>Location</c> ou <c>Hangar</c>), utilisé comme préfixe dans le nom retourné.</param>
+    /// <returns>Le nom localisé préfixé du type, ou un libellé de fallback si la résolution échoue.</returns>
     private async Task<string> ResolveLocationId(uint id, ELocationType type)
     {
         // l'id correspond au hash CRC du type
@@ -205,9 +255,7 @@ public class LocationService : ILocationService
 
             if (null == tmp)
             {
-                var loc = (ELocation)guid;
-                
-                return $"[{type.ToString().ToUpperInvariant()}] {loc}";
+                return null;
             }
             var localKey = ((StarMapObject)tmp.Data).name;
             var locationName = await _p4KService.GetLocaleValue(localKey);
@@ -223,6 +271,7 @@ public class LocationService : ILocationService
         return $"[{type.ToString().ToUpperInvariant()}] {locationName}";        
     }
 
+    /// <inheritdoc/>
     public void ClearCache()
     {
         _entityCache.Clear();
@@ -232,35 +281,6 @@ public class LocationService : ILocationService
     private readonly ConcurrentDictionary<ulong, Task<IList<EntityItemQueryResult>>> _entityCache = new();
 
     private readonly ConcurrentDictionary<uint, Task<string?>> _locationCache = new();
-    
-    enum ELocation:ulong
-    {
-        UNKNOWN = 0,
-        AREA_18 = 2273540638,
-        BAIJINI = 3490636373,
-        EVERUS_HARBOR = 308639451,
-        LORVILLE = 4005457614,
-        NEW_BABBAGE = 3170699229,
-        ARC_L2 = 4129327548,
-        STARLIGHT = 844538234,
-        PORT_TRESLER = 2147648880,
-        PYRO_GATEWAY = 1547955914,
-        SERAPHIM = 1752411604,
-        ONYX_S3B1 = 2302725662,
-        ORBITUARY = 848868938,
-        CHECKMATE = 810966700,
-        STANTON_GATEWAY = 639835600,
-        ROD_S_FUEL_N_SUPPLIES = 2421159735,
-        ENDGAME = 4067808819,
-        GASLIGHT = 3531251586,
-        DUDLEY_AND_DAUGHTERS = 1309454298,
-        RAT_S_NEST = 660982239,
-        RUIN_STATION = 2026442305,
-        CRU_L1 = 1510935576,
-        WICKELO_MICROTECH = 48776985,
-        MIC_L1 = 3513657059,
-        ORISON = 1105811199
-    }
     
     enum ELocationType
     {
