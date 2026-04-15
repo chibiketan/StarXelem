@@ -24,7 +24,20 @@ public partial class ExtractionTabViewModel : PageViewModelBase
     public override string Name => "Extractions";
     public override string Icon => nameof(Symbol.Download);
 
-    [ObservableProperty] private bool _isExtracting = false;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsExtracting))]
+    [NotifyCanExecuteChangedFor(nameof(ExtractCigIdsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(UpdateLocalisationCommand))]
+    private bool _isExtractingCsv = false;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsExtracting))]
+    [NotifyCanExecuteChangedFor(nameof(ExtractCigIdsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(UpdateLocalisationCommand))]
+    private bool _isExtractingLang = false;
+
+    public bool IsExtracting => IsExtractingCsv || IsExtractingLang;
+
     [ObservableProperty] private string _statusMessage = "";
 
     public ExtractionTabViewModel(IP4kService p4kService, ILogger<ExtractionTabViewModel> logger)
@@ -50,45 +63,40 @@ public partial class ExtractionTabViewModel : PageViewModelBase
                 new FilePickerFileType("Fichiers CSV") { Patterns = new[] { "*.csv" } }
             },
             SuggestedFileName = "cig_ids_crc32.csv"
-        });
+        }).ConfigureAwait(false);
 
         if (file == null) return;
 
-        IsExtracting = true;
-        StatusMessage = "Extraction en cours...";
+        await Dispatcher.UIThread.InvokeAsync(() => IsExtractingCsv = true);
 
         try
         {
             await Task.Run(async () =>
             {
-                await _p4kService.OpenP4k(_p4kService.SelectedP4KFile.Path, new Progress<double>(), new Progress<double>());
-                
+                await _p4kService.OpenP4k(_p4kService.SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
+
                 using var entry = _p4kService.P4KFileSystem.OpenRead(DataCorePath);
                 var dcb = new DataCoreDatabase(entry);
                 var records = dcb.MainRecords;
-                
-                await using var stream = await file.OpenWriteAsync();
+
+                await using var stream = await file.OpenWriteAsync().ConfigureAwait(false);
                 await using var writer = new StreamWriter(stream, Encoding.UTF8);
-                await writer.WriteLineAsync("CIG ID,CRC32");
-                
+                await writer.WriteLineAsync("CIG ID,CRC32").ConfigureAwait(false);
 
                 foreach (var guid in records)
                 {
                     var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([guid]));
-                    await writer.WriteLineAsync($"{guid},{crc}");
+                    await writer.WriteLineAsync($"{guid},{crc}").ConfigureAwait(false);
                 }
-            });
-
-            StatusMessage = "Extraction terminée avec succès.";
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erreur lors de l'extraction des IDs CIG");
-            StatusMessage = $"Erreur : {ex.Message}";
         }
         finally
         {
-            IsExtracting = false;
+            await Dispatcher.UIThread.InvokeAsync(() => IsExtractingCsv = false);
         }
     }
 
@@ -117,7 +125,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
         
         var replacementMap = new Dictionary<string, string>(100);
         
-        IsExtracting = true;
+        IsExtractingLang = true;
         try
         {
             // search for all components
@@ -126,7 +134,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
             var entityDefinitionList = _p4kService.GetAllEntityClassDefinition(0);
 
             // Pour chaque définition d'entité existante
-            await foreach (var entityDefinition in entityDefinitionList)
+            await foreach (var entityDefinition in entityDefinitionList.ConfigureAwait(false))
             {
                 // Normalement ce ne sont que des EntityClassDefinition
                 var entityType = entityDefinition.Data as EntityClassDefinition;
@@ -157,7 +165,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
                 var size = attachableParams.AttachDef.Size;
                 var className = "?";
                 // récupérer la classe (faut regarder dans la description...)
-                var description = await _p4kService.GetLocaleValue(attachableParams.AttachDef.Localization.Description);
+                var description = await _p4kService.GetLocaleValue(attachableParams.AttachDef.Localization.Description).ConfigureAwait(false);
                 var searchRegex = new Regex(@"Class:\s*(\w+)");
                 // On retire le '@' devant la description
                 var searchResult = searchRegex.Match(description.Substring(1));
@@ -206,6 +214,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
             }
 
             UpdateStatusMessage("Ecriture du fichier de localisation terminée !");
+            await Task.Delay(4000).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -214,7 +223,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
         }
         finally
         {
-            IsExtracting = false;
+            await Dispatcher.UIThread.InvokeAsync(() => IsExtractingLang = false);
         }
     }
     
@@ -228,9 +237,10 @@ public partial class ExtractionTabViewModel : PageViewModelBase
         });
     }
     
-    // Mise à jour de l'état du bouton quand le fichier p4k change
+    // Mise à jour de l'état des boutons quand le fichier p4k change
     public void OnSelectedP4KFileChanged()
     {
         ExtractCigIdsCommand.NotifyCanExecuteChanged();
+        UpdateLocalisationCommand.NotifyCanExecuteChanged();
     }
 }

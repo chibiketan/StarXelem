@@ -81,4 +81,8 @@
         <HintPath>..\..\libs\StarBreaker.P4k.dll</HintPath>
       </Reference>
     </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="maquettes\" />
+    </ItemGroup>
 </Project>

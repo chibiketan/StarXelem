@@ -1,0 +1,145 @@
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .app { display: flex; height: 580px; background: #0f1117; border-radius: 12px; overflow: hidden; border: 0.5px solid rgba(255,255,255,0.08); font-family: var(--font-sans); }
+
+  .sidebar { width: 52px; background: #0b0d13; display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 4px; border-right: 0.5px solid rgba(255,255,255,0.07); flex-shrink: 0; }
+  .nav-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .nav-icon svg { width: 15px; height: 15px; stroke: rgba(255,255,255,0.3); fill: none; stroke-width: 1.5; }
+  .nav-icon.active { background: rgba(139,92,246,0.2); }
+  .nav-icon.active svg { stroke: #a78bfa; }
+  .nav-sep { width: 24px; height: 0.5px; background: rgba(255,255,255,0.08); margin: 4px 0; }
+
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 24px 28px; gap: 14px; }
+
+  .page-title { font-size: 15px; font-weight: 500; color: rgba(255,255,255,0.85); margin-bottom: 2px; }
+  .page-subtitle { font-size: 11px; color: rgba(255,255,255,0.3); }
+
+  .section-label { font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.25); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 8px; }
+
+  .action-card { background: rgba(255,255,255,0.03); border: 0.5px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px 18px; display: flex; align-items: center; gap: 16px; }
+  .action-card:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.12); }
+
+  .action-icon { width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .action-icon svg { width: 17px; height: 17px; fill: none; stroke-width: 1.5; stroke: currentColor; }
+  .ai-csv    { background: rgba(139,92,246,0.15); border: 0.5px solid rgba(139,92,246,0.3); color: #a78bfa; }
+  .ai-lang   { background: rgba(29,158,117,0.12); border: 0.5px solid rgba(29,158,117,0.3); color: #5dcaa5; }
+
+  .action-text { flex: 1; min-width: 0; }
+  .action-title { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); margin-bottom: 4px; }
+  .action-desc { font-size: 11px; color: rgba(255,255,255,0.4); line-height: 1.5; white-space: normal; }
+
+  .action-btn { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 7px; font-size: 11px; font-weight: 500; cursor: pointer; flex-shrink: 0; border: 0.5px solid transparent; transition: opacity 0.15s; white-space: nowrap; }
+  .action-btn:active { opacity: 0.7; }
+  .btn-csv  { background: rgba(139,92,246,0.15); border-color: rgba(139,92,246,0.35); color: #a78bfa; }
+  .btn-csv:hover  { background: rgba(139,92,246,0.25); }
+  .btn-lang { background: rgba(29,158,117,0.12); border-color: rgba(29,158,117,0.3); color: #5dcaa5; }
+  .btn-lang:hover { background: rgba(29,158,117,0.2); }
+  .action-btn svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .status-bar { display: none; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 7px; background: rgba(255,255,255,0.04); border: 0.5px solid rgba(255,255,255,0.08); margin-top: 2px; }
+  .status-bar.visible { display: flex; }
+  .spin { width: 11px; height: 11px; border: 1.5px solid rgba(139,92,246,0.3); border-top-color: #a78bfa; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+  .spin.teal { border-color: rgba(29,158,117,0.3); border-top-color: #5dcaa5; }
+  .status-text { font-size: 11px; color: rgba(255,255,255,0.4); }
+  .status-text strong { color: rgba(255,255,255,0.65); font-weight: 500; }
+  @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+  .divider { height: 0.5px; background: rgba(255,255,255,0.06); }
+</style>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+    <div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg></div>
+    <div class="nav-sep"></div>
+    <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+    <div class="nav-icon"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
+    <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+    <div class="nav-sep"></div>
+    <div class="nav-icon"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+    <div class="nav-icon active"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+  </div>
+
+  <div class="main">
+    <div>
+      <div class="page-title">Extractions</div>
+      <div class="page-subtitle">Outils de génération et d'export de données du jeu</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-label">Données brutes</div>
+
+    <div class="action-card">
+      <div class="action-icon ai-csv">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      </div>
+      <div class="action-text">
+        <div class="action-title">Export CSV des IDs CIG</div>
+        <div class="action-desc">Génère un fichier CSV contenant l'ensemble des IDs CIG et leur valeur CRC32.</div>
+      </div>
+      <div class="action-btn btn-csv" onclick="runAction('csv')">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Générer
+      </div>
+    </div>
+    <div class="status-bar" id="status-csv">
+      <div class="spin"></div>
+      <span class="status-text">Génération du fichier <strong>CSV</strong>…</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-label">Fichiers du jeu</div>
+
+    <div class="action-card">
+      <div class="action-icon ai-lang">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      </div>
+      <div class="action-text">
+        <div class="action-title">Mise à jour du fichier de langue</div>
+        <div class="action-desc">Extrait les libellés des fichiers du jeu, identifie les composants, ajoute le type, la taille et le rang, puis dépose le fichier au bon endroit pour être utilisé par le jeu.</div>
+      </div>
+      <div class="action-btn btn-lang" onclick="runAction('lang')">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" fill="none"/></svg>
+        Mettre à jour
+      </div>
+    </div>
+    <div class="status-bar" id="status-lang">
+      <div class="spin teal"></div>
+      <span class="status-text" id="status-lang-text">Lecture des <strong>fichiers du jeu</strong>…</span>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const steps = {
+  csv:  ['Génération du fichier CSV…'],
+  lang: [
+    'Lecture des <strong>fichiers du jeu</strong>…',
+    'Identification des <strong>composants</strong>…',
+    'Ajout du type, taille et rang…',
+    'Dépôt du fichier au <strong>bon endroit</strong>…',
+  ]
+};
+
+function runAction(id) {
+  const bar = document.getElementById('status-' + id);
+  const textEl = id === 'lang' ? document.getElementById('status-lang-text') : null;
+  bar.classList.add('visible');
+
+  if (id === 'lang' && textEl) {
+    let i = 0;
+    textEl.innerHTML = steps.lang[0];
+    const iv = setInterval(() => {
+      i++;
+      if (i < steps.lang.length) { textEl.innerHTML = steps.lang[i]; }
+      else { clearInterval(iv); setTimeout(() => bar.classList.remove('visible'), 600); }
+    }, 900);
+  } else {
+    setTimeout(() => bar.classList.remove('visible'), 1800);
+  }
+}
+</script>
