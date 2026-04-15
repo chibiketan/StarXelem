@@ -60,7 +60,7 @@
             <Setter Property="FontWeight" Value="Medium"/>
 
             <Style Selector="^:pointerover /template/ ContentPresenter">
-                <Setter Property="Background" Value="#331D9E75"/>
+                <Setter Property="Background" Value="{DynamicResource ButtonLangHoverBackgroundBrush}"/>
             </Style>
         </Style>
     </UserControl.Styles>
@@ -92,12 +92,12 @@
                         <Border Grid.Column="0"
                                 Width="38" Height="38"
                                 CornerRadius="9"
-                                Background="{DynamicResource IconBackgroundBrush}"
-                                BorderBrush="{DynamicResource IconBorderBrush}"
+                                Background="{DynamicResource ButtonPrimaryBackgroundBrush}"
+                                BorderBrush="{DynamicResource ButtonPrimaryBorderBrush}"
                                 BorderThickness="1"
                                 VerticalAlignment="Center">
                             <ic:SymbolIcon Symbol="Document"
-                                           Foreground="{DynamicResource IconStrokeBrush}"
+                                           Foreground="{DynamicResource ButtonPrimaryForegroundBrush}"
                                            FontSize="17"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center" />
@@ -129,7 +129,9 @@
                         CornerRadius="7"
                         Padding="12,8">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ProgressBar IsIndeterminate="True" Width="80" Height="3" VerticalAlignment="Center" />
+                        <ProgressBar IsIndeterminate="False" Minimum="0" Maximum="100"
+                                     Value="{Binding CsvProgress}"
+                                     Height="3" HorizontalAlignment="Stretch" VerticalAlignment="Center" />
                         <TextBlock FontSize="11" Foreground="{DynamicResource DimmingBrush}" VerticalAlignment="Center">
                             <Run Text="Génération du fichier " />
                             <Run Text="CSV" Foreground="{DynamicResource ForegroundBrush}" FontWeight="Medium" />
@@ -190,8 +192,9 @@
                         CornerRadius="7"
                         Padding="12,8">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ProgressBar IsIndeterminate="True" Width="80" Height="3"
-                                     VerticalAlignment="Center"
+                        <ProgressBar IsIndeterminate="False" Minimum="0" Maximum="100"
+                                     Value="{Binding LangProgress}"
+                                     Height="3" HorizontalAlignment="Stretch" VerticalAlignment="Center"
                                      Foreground="{DynamicResource BadgeUsageForegroundColor}" />
                         <TextBlock Text="{Binding StatusMessage}"
                                    FontSize="11"

@@ -31,13 +31,14 @@
             <SolidColorBrush x:Key="ButtonPrimaryBackgroundBrush" Color="#EEEDFE" />
             <SolidColorBrush x:Key="ButtonPrimaryForegroundBrush" Color="#534AB7" />
             <SolidColorBrush x:Key="ButtonPrimaryBorderBrush" Color="#AFA9EC" />
+            <SolidColorBrush x:Key="ButtonLangHoverBackgroundBrush" Color="#9FE1CB" />
 
             <!-- badges -->
             <SolidColorBrush x:Key="BadgeTiers1ForegroundColor" Color="#FFA78BFA" />
             <SolidColorBrush x:Key="BadgeTiers1BackgroundColor" Color="#338B5CF6" />
             <SolidColorBrush x:Key="BadgeTiers1BorderColor" Color="#AFA9EC" />
-            <SolidColorBrush x:Key="BadgeUsageForegroundColor" Color="#FF5DCAA5" />
-            <SolidColorBrush x:Key="BadgeUsageBackgroundColor" Color="#261D9E75" />
+            <SolidColorBrush x:Key="BadgeUsageForegroundColor" Color="#FF0F6E56" />
+            <SolidColorBrush x:Key="BadgeUsageBackgroundColor" Color="#FFE1F5EE" />
             <SolidColorBrush x:Key="BadgeUsageBorderColor" Color="#5DCAA5" />
             <SolidColorBrush x:Key="BadgeTimerForegroundColor" Color="#777" />
             <SolidColorBrush x:Key="BadgeTimerBackgroundColor" Color="#0FFFFFFF" />
@@ -94,6 +95,7 @@
             <SolidColorBrush x:Key="ButtonPrimaryBackgroundBrush" Color="#268b5cf6" />
             <SolidColorBrush x:Key="ButtonPrimaryForegroundBrush" Color="#a78bfa" />
             <SolidColorBrush x:Key="ButtonPrimaryBorderBrush" Color="#598b5cf6" />
+            <SolidColorBrush x:Key="ButtonLangHoverBackgroundBrush" Color="#331D9E75" />
             
             <!-- badges -->
             <SolidColorBrush x:Key="BadgeTiers1ForegroundColor" Color="#a78bfa" />

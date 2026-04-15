@@ -39,6 +39,8 @@ public partial class ExtractionTabViewModel : PageViewModelBase
     public bool IsExtracting => IsExtractingCsv || IsExtractingLang;
 
     [ObservableProperty] private string _statusMessage = "";
+    [ObservableProperty] private double _csvProgress = 0;
+    [ObservableProperty] private double _langProgress = 0;
 
     public ExtractionTabViewModel(IP4kService p4kService, ILogger<ExtractionTabViewModel> logger)
     {
@@ -83,8 +85,16 @@ public partial class ExtractionTabViewModel : PageViewModelBase
                 await using var writer = new StreamWriter(stream, Encoding.UTF8);
                 await writer.WriteLineAsync("CIG ID,CRC32").ConfigureAwait(false);
 
+                var total = records.Count;
+                var i = 0;
                 foreach (var guid in records)
                 {
+                    i++;
+                    if (i % 50 == 0)
+                    {
+                        var pct = (double)i / total * 100;
+                        await Dispatcher.UIThread.InvokeAsync(() => CsvProgress = pct);
+                    }
                     var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([guid]));
                     await writer.WriteLineAsync($"{guid},{crc}").ConfigureAwait(false);
                 }
@@ -96,7 +106,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
         }
         finally
         {
-            await Dispatcher.UIThread.InvokeAsync(() => IsExtractingCsv = false);
+            await Dispatcher.UIThread.InvokeAsync(() => { IsExtractingCsv = false; CsvProgress = 0; });
         }
     }
 
@@ -131,6 +141,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
             // search for all components
             UpdateStatusMessage("Chargement du fichier p4k...");
             await _p4kService.OpenP4k(_p4kService.SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() => LangProgress = 25);
             var entityDefinitionList = _p4kService.GetAllEntityClassDefinition(0);
 
             // Pour chaque définition d'entité existante
@@ -181,6 +192,8 @@ public partial class ExtractionTabViewModel : PageViewModelBase
                 }
             }
             
+            await Dispatcher.UIThread.InvokeAsync(() => LangProgress = 60);
+
             // extract localisation file, check each line then write the final file
             UpdateStatusMessage("Ecriture du fichier de localisation en cours...");
             await using var rawStream = _p4kService.P4KFileSystem.OpenRead(@"Data\Localization\english\global.ini");
@@ -213,7 +226,9 @@ public partial class ExtractionTabViewModel : PageViewModelBase
                 fileWriter.WriteLine(string.Join('=', split));
             }
 
+            await Dispatcher.UIThread.InvokeAsync(() => LangProgress = 90);
             UpdateStatusMessage("Ecriture du fichier de localisation terminée !");
+            await Dispatcher.UIThread.InvokeAsync(() => LangProgress = 100);
             await Task.Delay(4000).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -223,7 +238,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
         }
         finally
         {
-            await Dispatcher.UIThread.InvokeAsync(() => IsExtractingLang = false);
+            await Dispatcher.UIThread.InvokeAsync(() => { IsExtractingLang = false; LangProgress = 0; });
         }
     }
     
