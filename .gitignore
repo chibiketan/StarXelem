@@ -200,3 +200,4 @@ src/.idea/
 src/StarXelem/datafiles
 research/*
 scripts/dump
+/src/.claude/settings.local.json
