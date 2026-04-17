@@ -680,7 +680,7 @@ internal sealed class MissionMappingService : IMissionMappingService
                     stepResult = await TransformContractResultToRewardVM(contractResultCompletionBounty).ConfigureAwait(false);
                     break;
                 case ContractResult_CalculatedReward contractResultCalculatedReward:
-                    stepResult = await TransformContractResultToRewardVM(contractResultCalculatedReward).ConfigureAwait(false);
+                    stepResult = await TransformContractResultToRewardVM(contract, contractResultCalculatedReward).ConfigureAwait(false);
                     break;
                 case ContractResult_CalculatedReputation contractResultCalculatedReputation:
                     stepResult = await TransformContractResultToRewardVM(contractResultCalculatedReputation).ConfigureAwait(false);
@@ -838,14 +838,36 @@ internal sealed class MissionMappingService : IMissionMappingService
         return result;
     }
 
-    private Task<List<MissionRewardItemViewModel>> TransformContractResultToRewardVM(ContractResult_CalculatedReward contractResult)
+    private Task<List<MissionRewardItemViewModel>> TransformContractResultToRewardVM(ContractBase contract, ContractResult_CalculatedReward contractResult)
     {
+        // Le calcul approché qui semble fonctionner :
+        // difficultyScore = (mechanicalSkill + 1) × 0.34
+        //                 + (mentalLoad      + 1) × 0.33
+        //                 + (riskOfLoss      + 1) × 0.22
+        //                 + (gameKnowledge   + 1) × 0.11
+        // reward_raw = roundf( exp(difficultyScore × 0.3036) × 316.51 × timeToComplete ) 320.41
+        // int aUEC = (int)((reward_raw + 125f) / 100f) * 250;
+        // Après raffinage
+        // raw   = roundf( exp(score × 0.2990) × 328.14 × timeToComplete )
+        // Toujours pas totalement convaincu...
+        if (contract.contractResults.difficulty is null)
+        {
+            return Task.FromResult(new List<MissionRewardItemViewModel>(0));
+        }
+        
+        var difficultyScore = ((double)contract.contractResults.difficulty.mechanicalSkill + 2) * (contract.contractResults.difficulty.difficultyProfile?.mechanicalSkillWeight ?? 1.0)
+            + ((double)contract.contractResults.difficulty.mentalLoad + 2) * (contract.contractResults.difficulty.difficultyProfile?.mentalLoadWeight ?? 1.0)
+            + ((double)contract.contractResults.difficulty.riskOfLoss + 2) * (contract.contractResults.difficulty.difficultyProfile?.riskOfLossWeight ?? 1.0)
+            + ((double)contract.contractResults.difficulty.gameKnowledge + 2) * (contract.contractResults.difficulty.difficultyProfile?.gameKnowledgeWeight ?? 1.0);;
+        var reward_raw = Math.Round(Math.Exp(difficultyScore * 0.2990) * 328.14 * contract.contractResults.timeToComplete, 2);
+        var aUEC = (int)((reward_raw + 125f) / 100f) * 250;
+        
         var result = new List<MissionRewardItemViewModel>(5)
         {
             new MissionRewardItemViewModel
             {
-                Count = 1,
-                Name = "Récompense calculée",
+                Count = aUEC,
+                Name = $"aUEC",
                 OnlyToMissionOwner = false,
                 SendToHomeLocation = false
             }
@@ -1055,7 +1077,7 @@ internal sealed class MissionMappingService : IMissionMappingService
         }
         
         // Petit break, à supprimer mais utile pour savoir pour investiguer
-        Debugger.Break();
+        // Debugger.Break();
         
         return
         [
