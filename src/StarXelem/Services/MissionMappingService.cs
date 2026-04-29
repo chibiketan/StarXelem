@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using OneOf;
+using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.ViewModels;
 
@@ -838,7 +839,7 @@ internal sealed class MissionMappingService : IMissionMappingService
         return result;
     }
 
-    private Task<List<MissionRewardItemViewModel>> TransformContractResultToRewardVM(ContractBase contract, ContractResult_CalculatedReward contractResult)
+    private async Task<List<MissionRewardItemViewModel>> TransformContractResultToRewardVM(ContractBase contract, ContractResult_CalculatedReward contractResult)
     {
         // Le calcul approché qui semble fonctionner :
         // difficultyScore = (mechanicalSkill + 1) × 0.34
@@ -852,28 +853,40 @@ internal sealed class MissionMappingService : IMissionMappingService
         // Toujours pas totalement convaincu...
         if (contract.contractResults.difficulty is null)
         {
-            return Task.FromResult(new List<MissionRewardItemViewModel>(0));
+            return new List<MissionRewardItemViewModel>(0);
         }
+
+        // On récupère le DefaultRecord par son Guid
+        var scDefaultRecord = await _p4kService.GetRecordWithSpecificDepth(new CigGuid("330ce5d3-fb01-4f82-8708-3154a3a4b78a"), 1);
+        var uecCurve = ((scDefaultRecord?.Data as GameMode)?.subsumptionMissionModule as SSubsumptionMission)?.uecCurve;
+        // Depuis sc_default.xml > uecCurve
+        double i         = uecCurve!.i;    // 1.0
+        double steepness = uecCurve!.k;    // 0.3
+        double midpoint  = uecCurve!.m;    // -37.0
+        const double BASE_SCALE = 20.0 / 27.0; // ≈ 0.7407, constante interne
         
         var difficultyScore = ((double)contract.contractResults.difficulty.mechanicalSkill + 2) * (contract.contractResults.difficulty.difficultyProfile?.mechanicalSkillWeight ?? 1.0)
             + ((double)contract.contractResults.difficulty.mentalLoad + 2) * (contract.contractResults.difficulty.difficultyProfile?.mentalLoadWeight ?? 1.0)
             + ((double)contract.contractResults.difficulty.riskOfLoss + 2) * (contract.contractResults.difficulty.difficultyProfile?.riskOfLossWeight ?? 1.0)
             + ((double)contract.contractResults.difficulty.gameKnowledge + 2) * (contract.contractResults.difficulty.difficultyProfile?.gameKnowledgeWeight ?? 1.0);;
-        var reward_raw = Math.Round(Math.Exp(difficultyScore * 0.2990) * 328.14 * contract.contractResults.timeToComplete, 2);
-        var aUEC = (int)((reward_raw + 125f) / 100f) * 250;
-        
+        var reward_raw = Math.Round(
+            Math.Exp((difficultyScore - midpoint) * steepness)
+            * i * BASE_SCALE
+            * (contract.contractResults.timeToComplete / 60.0)
+        );
+        var aUEC = Math.Round((reward_raw + 125.0) / 250.0) * 250;
         var result = new List<MissionRewardItemViewModel>(5)
         {
             new MissionRewardItemViewModel
             {
-                Count = aUEC,
-                Name = $"aUEC",
+                Count = (int)aUEC,
+                Name = "aUEC",
                 OnlyToMissionOwner = false,
                 SendToHomeLocation = false
             }
         };
 
-        return Task.FromResult(result);
+        return result;
     }
 
     private async Task<List<MissionRewardItemViewModel>> TransformContractResultToRewardVM(ContractResult_ItemsWeighting contractResult)

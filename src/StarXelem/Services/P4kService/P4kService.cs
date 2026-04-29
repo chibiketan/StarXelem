@@ -389,7 +389,7 @@ public class P4kService : IP4kService, INotifyPropertyChanged
                 _logger.LogTrace("Extracted all records in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
 
                 sw = Stopwatch.StartNew();
-                foreach (var record in allRecords.Where(r => r?.Data is EntityClassDefinition or StarMapObject or ContractGenerator or CraftingBlueprintRecord or BlueprintCategoryDatabaseRecord))
+                foreach (var record in allRecords.Where(r => r?.Data is EntityClassDefinition or StarMapObject or ContractGenerator or CraftingBlueprintRecord or BlueprintCategoryDatabaseRecord or GameMode))
                 {
                     if (_cancellationTokenSource.IsCancellationRequested)
                     {
