@@ -21,7 +21,7 @@
     </UserControl.Resources>
     <Grid RowDefinitions="*" ColumnDefinitions="Auto,300,Auto,*" Classes="master-detail">
     <Separator Grid.Row="0" Grid.Column="0" Classes="vertical" />
-    <Grid Grid.Row="0" Grid.Column="1" Classes="master" RowDefinitions="Auto,Auto,Auto,*" ColumnDefinitions="*">
+    <Grid Grid.Row="0" Grid.Column="1" Classes="master" RowDefinitions="Auto,Auto,Auto,*,Auto" ColumnDefinitions="*">
         <Grid Grid.Row="0" RowDefinitions="*,*,*" ColumnDefinitions="*,Auto">
             <TextBlock Grid.Column="0" Classes="title">BLUEPRINT</TextBlock>
             <Button Grid.Row="0" Grid.Column="1" Classes="btn principal" Command="{Binding LoadItemListCommand}">
@@ -58,6 +58,17 @@
                 </DataTemplate>
             </ListBox.DataTemplates>
         </ListBox>
+        <Button Grid.Row="4" Command="{Binding SendToOrbitalAllianceCommand}" Margin="5 15" HorizontalAlignment="Center" >
+            <Grid ColumnDefinitions="Auto,*">
+                <ic:SymbolIcon Grid.Column="0" Symbol="ArrowUpload" Margin=" 0 0 10 0">
+                    <ic:SymbolIcon.RenderTransform>
+                        <RotateTransform Angle="45"/>
+                    </ic:SymbolIcon.RenderTransform>
+                </ic:SymbolIcon>
+                <TextBlock Grid.Column="1">Envoi Orbital Alliance</TextBlock>
+            </Grid>
+        </Button>
+
     </Grid>
     <Separator Grid.Row="0" Grid.Column="2" Classes="vertical" />
     <StackPanel Grid.Row="0" Grid.Column="3" Classes="detail" Margin="0" IsVisible="{Binding SelectedBluePrint, Converter={x:Static ObjectConverters.IsNotNull}}" >

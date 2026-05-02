@@ -1,7 +1,9 @@
-﻿using Avalonia.Threading;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using FluentAvalonia.UI.Controls;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Services;
@@ -14,7 +16,7 @@ namespace StarXelem.ViewModels;
 public partial class BlueprintListTabViewModel : PageViewModelBase
 {
     private readonly ILogger<BlueprintListTabViewModel> _logger;
-    
+
     private readonly IGrpcClientService  _clientService;
     private readonly IP4kService _p4KService;
     private readonly IEntityClassDefinitionService _entityClassDefinitionService;
@@ -53,12 +55,11 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     public async Task LoadItemList()
     {
         IsLoading = true;
-        
+
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Appel RSI");
-     
 
 
-        
+
         // TODO call blueprint load/search
         var bpDbList = await _clientService.GetBlueprintList().ConfigureAwait(false);
         var result = new List<BlueprintViewModel>();
@@ -68,7 +69,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         {
             var bpRecord = await _p4KService.GetRecordWithSpecificDepth(new CigGuid(bp.BlueprintId), 1);
             var b = bpRecord?.Data as CraftingBlueprintRecord;
-            
+
             // On fait quoi si pas de blueprint trouvé ?
             if (b is null ||b.blueprint is not CraftingBlueprint craftingBlueprint)
             {
@@ -98,7 +99,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                     _logger.LogWarning("Unknown cost type : {type}", costs.craftTime.GetType().FullName);
                     break;
             }
-            
+
             var categoryList = new List<BlueprintCategoryModel>();
             var craftingCost = costs.mandatoryCost as CraftingCost_Select;
             foreach (var craftingCostOption in craftingCost.options)
@@ -118,7 +119,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                         var materialList = new List<BlueprintMaterialModel>();
 
                         var ressources = craftingCostSelect.options.OfType<CraftingCost_Resource>().ToList();
-                        
+
                         foreach (var craftingCostResource in ressources)
                         {
                             materialList.Add(new BlueprintMaterialModel
@@ -127,7 +128,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                                 QuantityInScu = (craftingCostResource.quantity as SStandardCargoUnit)?.standardCargoUnits ?? -1.0f
                             });
                         }
-                        
+
                         var statModifierList = new List<BlueprintStatModel>();
                         var dssfsd = craftingCostSelect.context.OfType<CraftingCostContext_ResultGameplayPropertyModifiers>();
 
@@ -146,17 +147,17 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                                 });
                             }
 
-                            
+
                         }
-                        
-                        
+
+
                         categoryList.Add(new BlueprintCategoryModel
                         {
                             Name = categoryName,
                             MaterialList = materialList,
                             StatModifierList = statModifierList
                         });
-                        
+
                         break;
                     // case CraftingCost_Base_NonRef craftingCostBaseNonRef:
                     //     break;
@@ -173,7 +174,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
 
             var name = await _p4KService.GetEntityClassName(craftedItem) ?? "Inconnu";
             var types = _entityClassDefinitionService.GetType(craftedItem);
-            
+
             //
             result.Add(new BlueprintViewModel
             {
@@ -209,7 +210,18 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     {
         return !string.IsNullOrEmpty(Search);
     }
-    
+
+    [RelayCommand(CanExecute = nameof(CanSendToOrbitalAlliance))]
+    public void SendToOrbitalAlliance()
+    {
+        OpenSendPopup();
+    }
+
+    private bool CanSendToOrbitalAlliance()
+    {
+        return _allBlueprints is { Count: > 0 };
+    }
+
     partial void OnSearchChanged(string value)
     {
         ClearSearchCommand.NotifyCanExecuteChanged();
@@ -236,6 +248,20 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         {
             SelectedBluePrint = null;
         }
+
+        SendToOrbitalAllianceCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OpenSendPopup()
+    {
+        var vm = App.Current.Services.GetRequiredService<Popup.SendToOrbitalAlliancePopupContentViewModel>();
+
+        vm.BlueprintsToSend = _allBlueprints;
+        WeakReferenceMessenger.Default.Send(new Popup.ShowPopupMessage(
+            showCloseButton: true,
+            onClose: null,
+            viewModel: vm
+        ));
     }
 }
 

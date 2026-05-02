@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:ic="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels.Popup"
+             xmlns:vmb="clr-namespace:StarXelem.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="400"
+             x:DataType="vm:SendToOrbitalAlliancePopupContentViewModel"
+             x:Class="StarXelem.Views.Popup.SendToOrbitalAlliancePopupContentView">
+    <Grid RowDefinitions="Auto,Auto,Auto,*" ColumnDefinitions="Auto,*" Margin="10" Background="Black">
+        <!-- Header avec icône -->
+        <StackPanel Grid.Row="0" Grid.Column="0" Grid.RowSpan="4" Margin="0 0 10 0">
+            <Border Classes="equipment-icon" Width="56" Height="56" CornerRadius="10">
+                <ic:SymbolIcon Symbol="ArrowUpload" FontSize="30">
+                    <ic:SymbolIcon.RenderTransform>
+                        <RotateTransform Angle="45"/>
+                    </ic:SymbolIcon.RenderTransform>
+                </ic:SymbolIcon>
+            </Border>
+        </StackPanel>
+
+        <!-- Titre -->
+        <TextBlock Grid.Row="0" Grid.Column="1" Classes="h2 bold" Text="{Binding Title}" Margin="0 0 0 5"/>
+
+        <!-- Message principal -->
+        <TextBlock Grid.Row="1" Grid.Column="1" Classes="body dimming" Text="{Binding Message}"
+                   MaxHeight="60" HorizontalAlignment="Left"/>
+
+        <!-- Statut/infos supplémentaires -->
+        <TextBlock Grid.Row="2" Grid.Column="1" Margin="0 5 0 0" Classes="caption dimming" Text="{Binding StatusMessage}"
+                   MaxHeight="40" HorizontalAlignment="Left" IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+        <!-- Boutons de confirmation -->
+        <WrapPanel Grid.Row="3" Grid.Column="1" Margin="0 15 0 0">
+            <Button Classes="btn secondaire" Command="{Binding CancelCommand}">Annuler</Button>
+            <Button Classes="btn principal" Content="Confirmer l'envoi" Command="{Binding ConfirmCommand}" Margin="8 0 0 0"/>
+        </WrapPanel>
+    </Grid>
+</UserControl>
