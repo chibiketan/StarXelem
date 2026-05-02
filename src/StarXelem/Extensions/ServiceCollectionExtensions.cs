@@ -29,6 +29,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<FriendListTabViewModel>();
         services.AddTransient<ExtractionTabViewModel>();
         services.AddTransient<MissionsTabViewModel>();
+        services.AddTransient<SettingsTabViewModel>();
         services.AddTransient<PopupViewModel>();
         services.AddTransient<LoadingPopupContentViewModel>();
         services.AddTransient<ItemComparisonPopupContentViewModel>();
@@ -52,5 +53,6 @@ public static class ServiceCollectionExtensions
 
         // Les services indépendants du mode design
         services.AddSingleton<IMissionMappingService, MissionMappingService>();
+        services.AddSingleton<ISettingsService, RegistrySettingsService>();
     }
 }

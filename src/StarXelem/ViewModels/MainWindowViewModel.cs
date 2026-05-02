@@ -13,7 +13,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Win32;
 using StarXelem.Models;
 using StarXelem.Services;
 using StarXelem.ViewModels.Popup;
@@ -26,8 +25,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IP4kService _p4kService;
     private readonly IGrpcClientService _grpcClientService;
-    private const string RegistryBasePath = "Software\\StarXelem";
-    private const string RegistryValueName = "P4KFolder";
+    private readonly ISettingsService _settingsService;
+    private const string P4kFolderSettingName = "P4KFolder";
 
     [ObservableProperty]
     private Task<IList<P4kFileModel>> _installedEnvs;
@@ -50,11 +49,12 @@ public partial class MainWindowViewModel : ViewModelBase
             : ThemeVariant.Light;
     }
     
-    public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IP4kService p4kService, IGrpcClientService grpcClientService, PopupViewModel popupViewModel)
+    public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IP4kService p4kService, IGrpcClientService grpcClientService, ISettingsService settingsService, PopupViewModel popupViewModel)
     {
         _logger = logger;
         _p4kService = p4kService;
         _grpcClientService = grpcClientService;
+        _settingsService = settingsService;
         PopupViewModel = popupViewModel;
         _installedEnvs = p4kService.FindInstalledFiles();
         InstalledEnvs.ContinueWith(async x =>
@@ -102,7 +102,8 @@ public partial class MainWindowViewModel : ViewModelBase
             App.Current.Services.GetRequiredService<FriendListTabViewModel>(),
             App.Current.Services.GetRequiredService<P4kShipTabViewModel>(),
             App.Current.Services.GetRequiredService<MissionsTabViewModel>(),
-            App.Current.Services.GetRequiredService<ExtractionTabViewModel>()
+            App.Current.Services.GetRequiredService<ExtractionTabViewModel>(),
+            App.Current.Services.GetRequiredService<SettingsTabViewModel>()
         ];
         
         CurrentPage = _pages.First();
@@ -336,14 +337,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         try
         {
-            using var key = Registry.CurrentUser.CreateSubKey(RegistryBasePath);
-            key?.SetValue(RegistryValueName, folderPath, RegistryValueKind.String);
+            _ = _settingsService.SetAsync(P4kFolderSettingName, folderPath);
         }
         catch (Exception ex)
         {
             // Ignorer les erreurs d'accès au registre pour ne pas bloquer l'utilisateur
-            _logger.LogWarning(ex, "Impossible de charger le dossier P4K depuis le registre");
-
+            _logger.LogWarning(ex, "Impossible de sauvegarder le dossier P4K dans les paramètres");
         }
     }
 
@@ -351,8 +350,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(RegistryBasePath);
-            var dataP4kPath = key?.GetValue(RegistryValueName) as string;
+            var dataP4kPath = await _settingsService.GetAsync(P4kFolderSettingName).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(dataP4kPath))
                 return null;
 
@@ -366,7 +364,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             _logger.LogWarning(ex, "Impossible de charger le dossier P4K depuis le registre");
         }
-            
+
         return null;
     }
     
