@@ -11,7 +11,7 @@
              x:Class="StarXelem.Views.Popup.MainPopup"
              IsVisible="{Binding IsVisible}">
     <Border Background="#50CCCCCC" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-        <Border Background="Gray" Margin="10" CornerRadius="15" Padding="5" HorizontalAlignment="Center" VerticalAlignment="Center" >
+        <Border Background="{DynamicResource BackgroundGrade2Brush}" Margin="10" CornerRadius="15" Padding="5" HorizontalAlignment="Center" VerticalAlignment="Center" >
             <DockPanel HorizontalAlignment="Stretch" VerticalAlignment="Stretch"  >
                 <Button DockPanel.Dock="Top" HorizontalAlignment="Right" CornerRadius="20" Command="{Binding CloseCommand}" IsVisible="{Binding IsCloseButtonVisible}" >X</Button>
                 <ContentControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Content="{Binding ContentViewModel}"/>

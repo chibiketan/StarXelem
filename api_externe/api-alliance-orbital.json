@@ -1,0 +1,296 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Alliance — API Externe",
+    "description": "API destinée aux applications tierces (ex : application Windows RCP).\n\n## Authentification\n\nToutes les routes nécessitent une clé API dans le header `Authorization`.\n\n```\nAuthorization: Bearer alc_<votre_clé>\n```\n\nLes clés API se génèrent depuis la page **Configuration → Clés API** du site Alliance.\n\n## Limites\n\n- **60 requêtes / minute** par clé\n- Maximum **2 000 blueprints** par synchronisation",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Alliance",
+      "url": "https://alliance-orbital.eu"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://alliance-orbital.eu",
+      "description": "Serveur courant"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyBearer": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Profil",
+      "description": "Informations sur le profil RSI lié à la clé API"
+    },
+    {
+      "name": "Blueprints",
+      "description": "Synchronisation des blueprints possédés"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Clé API générée depuis **Configuration → Clés API**. Format : `alc_` suivi de 64 caractères hexadécimaux."
+      }
+    },
+    "schemas": {
+      "ProfilItem": {
+        "type": "object",
+        "required": [
+          "guid",
+          "handle"
+        ],
+        "properties": {
+          "guid": {
+            "type": "string",
+            "description": "Identifiant unique interne du profil RSI (CUID). À conserver pour les appels `POST /api/external/blueprints`.",
+            "example": "cm9abc123def456ghi"
+          },
+          "handle": {
+            "type": "string",
+            "description": "Handle RSI (pseudo Star Citizen)",
+            "example": "StarPilot42"
+          },
+          "avatar": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "URL complète de l'avatar RSI",
+            "example": "https://robertsspaceindustries.com/media/abc123/avatar/avatar.jpg"
+          }
+        }
+      },
+      "ProfilResponse": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ProfilItem"
+        },
+        "description": "Liste de tous les profils RSI liés au compte"
+      },
+      "BlueprintSyncRequest": {
+        "type": "object",
+        "required": [
+          "rsiProfilGuid",
+          "blueprintGuids"
+        ],
+        "properties": {
+          "rsiProfilGuid": {
+            "type": "string",
+            "description": "GUID du profil RSI obtenu via `GET /api/external/profil`. Doit appartenir au compte associé à la clé API.",
+            "example": "cm9abc123def456ghi"
+          },
+          "blueprintGuids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 2000,
+            "description": "Liste des **slugs** ou **IDs** de blueprints possédés. Maximum 2 000 entrées. Les doublons sont ignorés. Les blueprints absents de cette liste seront marqués comme non possédés (synchronisation complète).",
+            "example": [
+              "aurora-mr",
+              "cutlass-black",
+              "constellation-andromeda"
+            ]
+          }
+        }
+      },
+      "BlueprintSyncResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "received",
+          "matched",
+          "updated"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "received": {
+            "type": "integer",
+            "description": "Nombre de GUIDs reçus après déduplication",
+            "example": 3
+          },
+          "matched": {
+            "type": "integer",
+            "description": "Nombre de blueprints reconnus en base de données",
+            "example": 3
+          },
+          "updated": {
+            "type": "integer",
+            "description": "Nombre de tiers de blueprint effectivement mis à jour",
+            "example": 3
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "example": 401
+          },
+          "statusMessage": {
+            "type": "string",
+            "example": "Clé API invalide ou révoquée"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/external/profil": {
+      "get": {
+        "summary": "Liste des profils RSI",
+        "description": "Retourne **tous les profils RSI** liés au compte associé à la clé API.\n\n> Utilisez le `guid` du profil souhaité pour appeler `POST /api/external/blueprints`.\n\n> Le champ `main: true` identifie le profil principal du compte.",
+        "operationId": "getExternalProfil",
+        "tags": [
+          "Profil"
+        ],
+        "security": [
+          {
+            "ApiKeyBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profil RSI principal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfilResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Clé API manquante, invalide ou révoquée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "statusCode": 401,
+                  "statusMessage": "Clé API invalide ou révoquée"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Aucun profil RSI associé au compte",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "statusCode": 404,
+                  "statusMessage": "Aucun profil RSI associé à ce compte"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/external/blueprints": {
+      "post": {
+        "summary": "Synchronisation des blueprints possédés",
+        "description": "Met à jour la liste des blueprints possédés pour un profil RSI.\n\n**Fonctionnement :**\n- Les blueprints présents dans `blueprintGuids` sont marqués **possédés** (tier 1, `state = true`)\n- Les blueprints *absents* de la liste mais précédemment marqués possédés sont remis à `state = false`\n- Il s'agit d'une **synchronisation complète** : envoyer la liste exhaustive des blueprints possédés\n\n> Les GUIDs peuvent être des **slugs** (`aurora-mr`) ou des **IDs internes** (`cm9abc...`).",
+        "operationId": "syncExternalBlueprints",
+        "tags": [
+          "Blueprints"
+        ],
+        "security": [
+          {
+            "ApiKeyBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlueprintSyncRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Synchronisation effectuée avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlueprintSyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Body invalide (champs manquants ou limite dépassée)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missingField": {
+                    "summary": "Champs requis manquants",
+                    "value": {
+                      "statusCode": 400,
+                      "statusMessage": "rsiProfilGuid et blueprintGuids (tableau) sont requis"
+                    }
+                  },
+                  "tooMany": {
+                    "summary": "Trop de blueprints",
+                    "value": {
+                      "statusCode": 400,
+                      "statusMessage": "Maximum 2000 blueprints par synchronisation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Clé API manquante, invalide ou révoquée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "statusCode": 401,
+                  "statusMessage": "Clé API invalide ou révoquée"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Le profil RSI n'appartient pas au compte de la clé API",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "statusCode": 403,
+                  "statusMessage": "Ce profil RSI n'appartient pas à votre compte"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

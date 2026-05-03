@@ -4,6 +4,8 @@ using CommunityToolkit.Mvvm.Messaging;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using StarXelem.Models;
+using StarXelem.Services;
 
 namespace StarXelem.ViewModels.Popup;
 
@@ -16,18 +18,17 @@ public partial class SendToOrbitalAlliancePopupContentViewModel : ViewModelBase,
 
     [ObservableProperty] private List<BlueprintViewModel>? _blueprintsToSend;
 
-    public SendToOrbitalAlliancePopupContentViewModel()
+    // Profils chargés depuis l'API Alliance Orbital pour la sélection utilisateur
+    [ObservableProperty] private List<ProfilItem> _profiles = new();
+    [ObservableProperty] private ProfilItem? _selectedProfile;
+    [ObservableProperty] private bool _isLoadingProfiles;
+
+    private readonly IAllianceOrbitalService _allianceOrbitalService;
+
+    public SendToOrbitalAlliancePopupContentViewModel(IAllianceOrbitalService allianceOrbitalService)
     {
+        _allianceOrbitalService = allianceOrbitalService;
         BlueprintsToSend = new List<BlueprintViewModel>();
-    }
-
-    public void SetBlueprintsToList(IEnumerable<BlueprintViewModel> blueprints)
-    {
-        var filtered = blueprints.Where(b => b.Name != null && !string.IsNullOrWhiteSpace(b.Name));
-        BlueprintsToSend = filtered.ToList();
-        StatusMessage = $"Nombre de blueprints : {BlueprintsToSend.Count}";
-
-        UpdateSummaryText();
     }
 
     private void UpdateSummaryText()
@@ -55,14 +56,37 @@ public partial class SendToOrbitalAlliancePopupContentViewModel : ViewModelBase,
         WeakReferenceMessenger.Default.Send(new ClosePopupMessage());
     }
 
-    public Task OnPopupShownAsync()
+    /// <summary>
+    /// Appelé à l'ouverture de la popup. Charge les blueprints puis récupère les profils Alliance Orbital.
+    /// </summary>
+    public async Task OnPopupShownAsync()
     {
         if (BlueprintsToSend == null)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         UpdateSummaryText();
-        return Task.CompletedTask;
+
+        // Chargement asynchrone des profils depuis l'API Alliance Orbital
+        IsLoadingProfiles = true;
+        StatusMessage += "\nChargement des profils...";
+
+        try
+        {
+            var profiles = await _allianceOrbitalService.GetProfilesAsync();
+            Profiles = profiles;
+            StatusMessage = $"Profils chargés : {profiles.Count}";
+            _ = Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(task => StatusMessage = "");
+        }
+        catch (System.Exception ex)
+        {
+            // Erreur possible : token manquant, 401, erreur réseau...
+            StatusMessage = $"Erreur profils : {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingProfiles = false;
+        }
     }
 }

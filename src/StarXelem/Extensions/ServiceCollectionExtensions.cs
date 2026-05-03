@@ -55,5 +55,8 @@ public static class ServiceCollectionExtensions
         // Les services indépendants du mode design
         services.AddSingleton<IMissionMappingService, MissionMappingService>();
         services.AddSingleton<ISettingsService, RegistrySettingsService>();
+
+        // Service API externe pour la communication avec Alliance Orbital (profil utilisateur)
+        services.AddSingleton<IAllianceOrbitalService, AllianceOrbitalService>();
     }
 }
