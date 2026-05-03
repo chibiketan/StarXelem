@@ -24,4 +24,12 @@ public interface IAllianceOrbitalService
     /// <param name="rsiProfilGuid">GUID du profil RSI (obtenu via GetProfilesAsync).</param>
     /// <param name="blueprintIds">Liste des identifiants de blueprints à synchroniser.</param>
     Task<SyncResult> SyncBlueprintsAsync(string rsiProfilGuid, List<string> blueprintIds);
+
+    /// <summary>
+    /// Synchronise la liste des vaisseaux possédés pour un profil RSI.
+    /// Les vaisseaux sont regroupés par classe de vaisseau avec leur compte.
+    /// </summary>
+    /// <param name="rsiProfilGuid">GUID du profil RSI (obtenu via GetProfilesAsync).</param>
+    /// <param name="fleetItems">Liste des couples (classId, count) à synchroniser.</param>
+    Task<SyncResult> SyncFleetAsync(string rsiProfilGuid, List<FleetSyncItem> fleetItems);
 }

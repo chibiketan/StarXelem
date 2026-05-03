@@ -188,6 +188,94 @@ public class AllianceOrbitalService : IAllianceOrbitalService
     }
 
     /// <summary>
+    /// Synchronise les vaisseaux possédés pour un profil RSI via POST /api/external/fleet.
+    /// Les vaisseaux sont regroupés par classe (EntityClassGuid) avec leur compte.
+    /// Gère les codes HTTP : 200 (succès), 401/403 (token/profil invalide), 400 (validation).
+    /// </summary>
+    public async Task<SyncResult> SyncFleetAsync(string rsiProfilGuid, List<FleetSyncItem> fleetItems)
+    {
+        var token = await _settingsService.GetAsync("ApiKey");
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            _logger.LogWarning("Clé API manquante pour la synchronisation de flotte.");
+            throw new InvalidOperationException("Clé API non configurée. Veuillez la définir dans les paramètres.");
+        }
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        // Construction du body de requête : { rsiProfilGuid, spaceships = List<FleetSyncItem> }
+        var requestBody = new { rsiProfilGuid, spaceships = fleetItems };
+        var jsonBody = System.Text.Json.JsonSerializer.Serialize(requestBody);
+
+        HttpResponseMessage response;
+        try
+        {
+            using var content = new StringContent(jsonBody, null, "application/json");
+            response = await httpClient.PostAsync(ApiBaseUrl + "/spaceships", content);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erreur de connexion lors de la synchronisation de flotte.");
+            throw new InvalidOperationException("Impossible de joindre le service Alliance Orbital.", ex);
+        }
+
+        // Code 200 : retourne le résultat de synchronisation
+        if (response.StatusCode == System.Net.HttpStatusCode.OK)
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            };
+
+            var result = System.Text.Json.JsonSerializer.Deserialize<SyncResult>(json, options);
+            _logger.LogInformation("Synchronisation flotte réussie : {ItemCount} classes de vaisseaux synchronisées",
+                fleetItems.Count);
+            return result ?? new SyncResult();
+        }
+
+        // Code 401 : token invalide ou expiré
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var error = System.Text.Json.JsonSerializer.Deserialize<ApiErrorResponse>(json, options);
+            var message = error?.StatusMessage ?? "Token invalide ou expiré.";
+            _logger.LogWarning("Erreur 401 synchronisation flotte : {Message}", message);
+            throw new InvalidOperationException(message);
+        }
+
+        // Code 403 : le profil RSI n'appartient pas au compte de la clé API
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var error = System.Text.Json.JsonSerializer.Deserialize<ApiErrorResponse>(json, options);
+            var message = error?.StatusMessage ?? "Ce profil RSI n'appartient pas à votre compte.";
+            _logger.LogWarning("Erreur 403 synchronisation flotte : {Message}", message);
+            throw new InvalidOperationException(message);
+        }
+
+        // Code 400 : body invalide (champs manquants ou limite dépassée)
+        if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var error = System.Text.Json.JsonSerializer.Deserialize<ApiErrorResponse>(json, options);
+            var message = error?.StatusMessage ?? "Données invalides.";
+            _logger.LogWarning("Erreur 400 synchronisation flotte : {Message}", message);
+            throw new InvalidOperationException(message);
+        }
+
+        var statusText = ((int)response.StatusCode).ToString();
+        _logger.LogError("Erreur HTTP {StatusCode} lors de la synchronisation de flotte.", statusText);
+        throw new InvalidOperationException($"Erreur serveur ({statusText}). Réessayez plus tard.");
+    }
+
+    /// <summary>
     /// Modèle pour la réponse d'erreur (statusCode + statusMessage).
     /// </summary>
     private record ApiErrorResponse(int StatusCode, string StatusMessage);

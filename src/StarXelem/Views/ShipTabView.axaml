@@ -12,16 +12,29 @@
              x:Class="StarXelem.Views.ShipTabView">
     <Grid RowDefinitions="Auto,*" Classes="main">
         <Grid Grid.Row="0" Classes="header" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
-            <Button Grid.Column="0" Classes="btn principal" Command="{Binding LoadShipListCommand}">
-                <Grid ColumnDefinitions="Auto,*">
-                    <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync">
-                        <ic:SymbolIcon.RenderTransform>
-                            <RotateTransform Angle="90"/>
-                        </ic:SymbolIcon.RenderTransform>
-                    </ic:SymbolIcon>
-                    <TextBlock Grid.Column="1">Actualiser</TextBlock>
-                </Grid>
-            </Button>
+            <!-- Groupe boutons gauche : Sync Flotte + Actualiser -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="5">
+                <Button Classes="btn export" Command="{Binding SendFleetToOrbitalAllianceCommand}">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <ic:SymbolIcon Grid.Column="0" Symbol="ArrowUpload">
+                            <ic:SymbolIcon.RenderTransform>
+                                <RotateTransform Angle="45"/>
+                            </ic:SymbolIcon.RenderTransform>
+                        </ic:SymbolIcon>
+                        <TextBlock Grid.Column="1">Sync Flotte</TextBlock>
+                    </Grid>
+                </Button>
+                <Button Classes="btn principal" Command="{Binding LoadShipListCommand}">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync">
+                            <ic:SymbolIcon.RenderTransform>
+                                <RotateTransform Angle="90"/>
+                            </ic:SymbolIcon.RenderTransform>
+                        </ic:SymbolIcon>
+                        <TextBlock Grid.Column="1">Actualiser</TextBlock>
+                    </Grid>
+                </Button>
+            </StackPanel>
             <TextBlock Grid.Column="1" Classes="dimming" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" Text="{Binding TreatmentStatus}" />
             <Grid Grid.Column="2" HorizontalAlignment="Right" ColumnDefinitions="Auto,Auto" VerticalAlignment="Center">
                 <TextBlock Grid.Column="0" Classes="demi-dimming" Text="{Binding Spaceships^.Count, FallbackValue=-}" Margin="0 0 7 0" />

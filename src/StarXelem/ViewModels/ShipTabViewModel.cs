@@ -5,7 +5,10 @@ using Avalonia.Threading;
 using Cig.Protocols.Common;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using FluentAvalonia.UI.Controls;
+using Microsoft.Extensions.DependencyInjection;
+using Sc.External.Services.Entitlement.V1;
 using Sc.Internal.Services.UniverseHierarchy.V1;
 using StarBreaker.Common;
 using StarBreaker.DataCore;
@@ -13,6 +16,7 @@ using StarBreaker.DataCoreGenerated;
 using StarXelem.Models;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
+using StarXelem.ViewModels.Popup;
 
 namespace StarXelem.ViewModels;
 
@@ -22,17 +26,25 @@ public partial class ShipTabViewModel : PageViewModelBase
     private readonly IGrpcClientService  _clientService;
     private readonly IP4kService _p4KService;
     private readonly ILocationService _locationService;
+    private readonly IAllianceOrbitalService _allianceOrbitalService;
     public override string Name => "Mon hangar";
     public override string Icon => nameof(Symbol.Home);
-    [ObservableProperty] public Task<IList<SpaceshipModel>>? _spaceships;
+    
+    [ObservableProperty]
+    private Task<IList<SpaceshipModel>>? _spaceships;
+    
     [ObservableProperty] private bool _isLoading = false;
     [ObservableProperty] private string _treatmentStatus = "";
 
-    public ShipTabViewModel(IGrpcClientService clientService, IP4kService p4kService, ILocationService locationService)
+    /// <summary>Indique si la synchronisation de flotte est en cours.</summary>
+    [ObservableProperty] private bool _isSyncing;
+
+    public ShipTabViewModel(IGrpcClientService clientService, IP4kService p4kService, ILocationService locationService, IAllianceOrbitalService allianceOrbitalService)
     {
         _clientService = clientService;
         _p4KService = p4kService;
         _locationService = locationService;
+        _allianceOrbitalService = allianceOrbitalService;
 
         _p4KService.SelectedP4KFileChanged += OnSelectedP4KFileChanged;
         _clientService.OnConnectedChanged += (sender, b) => LoadShipNotifyCanExecuteChanged();
@@ -173,6 +185,7 @@ public partial class ShipTabViewModel : PageViewModelBase
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Terminé");
         Spaceships = Task.FromResult(spaceships);
         IsLoading = false;
+        await Dispatcher.UIThread.InvokeAsync(() => SendFleetToOrbitalAllianceCommand.NotifyCanExecuteChanged());
     }
 
     private ulong StowLocationToGeid(string urn)
@@ -202,5 +215,45 @@ public partial class ShipTabViewModel : PageViewModelBase
         {
             Dispatcher.UIThread.Post(LoadShipNotifyCanExecuteChanged);
         }
+    }
+
+    /// <summary>
+    /// Regroupe les vaisseaux par EntityClassGuid et compte le nombre par classe.
+    /// Ne retourne que les vaisseaux possédés (non Unclaimed).
+    /// </summary>
+    private List<FleetSyncItem> GetFleetSummary()
+    {
+        var ships = Spaceships?.Result ?? [];
+        return ships
+            .GroupBy(s => s.Entitlement.EntityClassGuid)
+            .Select(g => new FleetSyncItem
+            {
+                EntityClassGuid = g.Key,
+                Quantity = g.Count()
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// Ouvre la popup de synchronisation de flotte vers Alliance Orbital.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSendFleetToOrbitalAlliance))]
+    private void SendFleetToOrbitalAlliance() => OpenFleetSyncPopup();
+
+    /// <summary>Vérifie que la liste des vaisseaux est chargée et contient au moins un élément.</summary>
+    private bool CanSendFleetToOrbitalAlliance() => Spaceships?.Result is { Count: > 0 };
+
+    /// <summary>
+    /// Prépare le popup de synchronisation flotte et l'ouvre via le messager.
+    /// </summary>
+    private void OpenFleetSyncPopup()
+    {
+        var vm = App.Current.Services.GetRequiredService<FleetSyncPopupContentViewModel>();
+        vm.FleetToSend = GetFleetSummary();
+        WeakReferenceMessenger.Default.Send(new ShowPopupMessage(
+            showCloseButton: true,
+            onClose: null,
+            viewModel: vm
+        ));
     }
 }
