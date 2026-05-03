@@ -178,6 +178,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             //
             result.Add(new BlueprintViewModel
             {
+                BlueprintId = bp.BlueprintId,
                 Name = name,
                 TierLevel = 1,
                 CraftDuration = duration,
@@ -287,6 +288,8 @@ public class BlueprintStatModel
 
 public class BlueprintViewModel : ViewModelBase
 {
+    /// <summary>Identifiant unique du blueprint (CUID RSI). Utilisé pour la synchronisation API.</summary>
+    public required string BlueprintId { get; set; } = "";
     public required string Name { get; set; }
     public required uint TierLevel { get; set; }
     public required int RemainingUse { get; set; }

@@ -58,7 +58,7 @@
                 </DataTemplate>
             </ListBox.DataTemplates>
         </ListBox>
-        <Button Grid.Row="4" Command="{Binding SendToOrbitalAllianceCommand}" Margin="5 15" HorizontalAlignment="Center" >
+        <Button Grid.Row="4" Classes="btn export" Command="{Binding SendToOrbitalAllianceCommand}" Margin="5 15" HorizontalAlignment="Center" >
             <Grid ColumnDefinitions="Auto,*">
                 <ic:SymbolIcon Grid.Column="0" Symbol="ArrowUpload" Margin=" 0 0 10 0">
                     <ic:SymbolIcon.RenderTransform>

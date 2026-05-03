@@ -55,6 +55,7 @@
             <!-- badges région -->
             <SolidColorBrush x:Key="BadgeRegionEuropeForegroundColor" Color="#FF0C447C" />
             <SolidColorBrush x:Key="BadgeRegionEuropeBackgroundColor" Color="#FFE6F1FB" />
+            <SolidColorBrush x:Key="BadgeRegionEuropeHoverBackgroundBrush" Color="#D6E4F5" />
             <SolidColorBrush x:Key="BadgeRegionEuropeBorderColor" Color="#FF85B7EB" />
             <SolidColorBrush x:Key="BadgeRegionUsaForegroundColor" Color="#FF085041" />
             <SolidColorBrush x:Key="BadgeRegionUsaBackgroundColor" Color="#FFE1F5EE" />
@@ -119,6 +120,7 @@
             <!-- badges région -->
             <SolidColorBrush x:Key="BadgeRegionEuropeForegroundColor" Color="#FF85B7EB" />
             <SolidColorBrush x:Key="BadgeRegionEuropeBackgroundColor" Color="#1E378ADD" />
+            <SolidColorBrush x:Key="BadgeRegionEuropeHoverBackgroundBrush" Color="#264099" />
             <SolidColorBrush x:Key="BadgeRegionEuropeBorderColor" Color="#4D378ADD" />
             <SolidColorBrush x:Key="BadgeRegionUsaForegroundColor" Color="#FF5DCAA5" />
             <SolidColorBrush x:Key="BadgeRegionUsaBackgroundColor" Color="#1E1D9E75" />

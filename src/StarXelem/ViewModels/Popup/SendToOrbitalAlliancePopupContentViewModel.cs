@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Input; // AsyncRelayCommand, RelayCommand
 using CommunityToolkit.Mvvm.Messaging;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,9 +19,31 @@ public partial class SendToOrbitalAlliancePopupContentViewModel : ViewModelBase,
     [ObservableProperty] private List<BlueprintViewModel>? _blueprintsToSend;
 
     // Profils chargés depuis l'API Alliance Orbital pour la sélection utilisateur
-    [ObservableProperty] private List<ProfilItem> _profiles = new();
-    [ObservableProperty] private ProfilItem? _selectedProfile;
-    [ObservableProperty] private bool _isLoadingProfiles;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsProfilListEnabled))]
+    private List<ProfilItem> _profiles = new();
+    
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
+    private ProfilItem? _selectedProfile;
+
+    // Indicateur de chargement des profils (désactive le ComboBox pendant le chargement)
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanInteract))]
+    [NotifyPropertyChangedFor(nameof(IsProfilListEnabled))]
+    private bool _isLoadingProfiles = false;
+
+    // Indicateur de synchronisation en cours (désactive les boutons)
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanInteract))]
+    private bool _isSyncing;
+
+    public bool IsProfilListEnabled =>
+        !IsLoadingProfiles
+        && Profiles is { Count: >0 };
+
+    /// <summary>Indique si l'utilisateur peut interagir avec la popup (ni chargement ni synchro en cours).</summary>
+    public bool CanInteract => !IsLoadingProfiles && !IsSyncing;
 
     private readonly IAllianceOrbitalService _allianceOrbitalService;
 
@@ -43,17 +65,69 @@ public partial class SendToOrbitalAlliancePopupContentViewModel : ViewModelBase,
         Message = $"Blueprints à envoyer : {BlueprintsToSend.Count} blueprints";
     }
 
-    [RelayCommand]
-    private void OnConfirm()
+    /// <summary>
+    /// Valide l'envoi des blueprints vers Alliance Orbital.
+    /// Vérifie qu'un profil est sélectionné, synchronise les blueprints, puis affiche le résultat pendant 5s avant de fermer la popup.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanConfirm))]
+    private async Task OnConfirm()
     {
-        // La logique d'envoi sera implémentée ultérieurement
-        WeakReferenceMessenger.Default.Send(new ClosePopupMessage());
+        // Vérifier qu'un profil est sélectionné
+        if (SelectedProfile == null)
+        {
+            StatusMessage = "Veuillez sélectionner un profil à synchroniser.";
+            return;
+        }
+
+        IsSyncing = true;
+        StatusMessage = "Synchronisation en cours...";
+
+        try
+        {
+            // Extraire les IDs des blueprints à envoyer
+            var blueprintIds = BlueprintsToSend!
+                .Select(b => b.BlueprintId.ToString())
+                .ToList();
+
+            var result = await _allianceOrbitalService.SyncBlueprintsAsync(SelectedProfile.Guid, blueprintIds);
+
+            if (result.Success)
+            {
+                StatusMessage = $"Synchronisé : {result.Received} reçus, {result.Matched} reconnus, {result.Updated} mis à jour.";
+                // Attendre 5 secondes puis fermer la popup automatiquement
+                await Task.Delay(TimeSpan.FromSeconds(5));
+                WeakReferenceMessenger.Default.Send(new ClosePopupMessage());
+            }
+            else
+            {
+                StatusMessage = "La synchronisation a échoué. Vérifiez votre clé API.";
+            }
+        }
+        catch (System.Exception ex)
+        {
+            // Erreur possible : token invalide, profil non autorisé, erreur réseau...
+            StatusMessage = $"Erreur synchronisation : {ex.Message}";
+        }
+        finally
+        {
+            IsSyncing = false;
+        }
     }
 
-    [RelayCommand]
+    private bool CanConfirm()
+    {
+        return CanInteract && SelectedProfile != null;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCancel))]
     private void OnCancel()
     {
         WeakReferenceMessenger.Default.Send(new ClosePopupMessage());
+    }
+
+    private bool CanCancel()
+    {
+        return CanInteract;
     }
 
     /// <summary>

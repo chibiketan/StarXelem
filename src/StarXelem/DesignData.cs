@@ -146,6 +146,7 @@ public static class DesignData
         {
             new BlueprintViewModel
             {
+                BlueprintId = "cm9ant001helmetmoss",
                 Name = "Antium helmet moss camo",
                 TierLevel = 1,
                 RemainingUse = -1,
@@ -206,6 +207,7 @@ public static class DesignData
             },
             new BlueprintViewModel
             {
+                BlueprintId = "cm9bp002testblueprint",
                 Name = "BluePrint 2",
                 TierLevel = 1,
                 RemainingUse = 2,

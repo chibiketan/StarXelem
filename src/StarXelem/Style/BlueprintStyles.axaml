@@ -293,6 +293,18 @@
                 <Setter Property="Foreground" Value="{DynamicResource ButtonPrimaryForegroundBrush}" />
             </Style>
         </Style>
+        
+        <Style Selector="^.export">
+            <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionEuropeBorderColor}" />
+            <Setter Property="Background" Value="{DynamicResource BadgeRegionEuropeBackgroundColor}" />
+            <Setter Property="Foreground" Value="{DynamicResource BadgeRegionEuropeForegroundColor}" />
+            
+            <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="BorderBrush" Value="{DynamicResource BadgeRegionEuropeBorderColor}" />
+                <Setter Property="Background" Value="{DynamicResource BadgeRegionEuropeHoverBackgroundBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource BadgeRegionEuropeForegroundColor}" />
+            </Style>
+        </Style>
 
         <Style Selector="^.icon">
             <Setter Property="Padding" Value="0" />

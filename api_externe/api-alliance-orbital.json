@@ -28,6 +28,10 @@
     {
       "name": "Blueprints",
       "description": "Synchronisation des blueprints possédés"
+    },
+    {
+      "name": "Spaceships",
+      "description": "Synchronisation de la flotte de vaisseaux"
     }
   ],
   "components": {
@@ -140,6 +144,75 @@
           "statusMessage": {
             "type": "string",
             "example": "Clé API invalide ou révoquée"
+          }
+        }
+      },
+      "SpaceshipSyncRequest": {
+        "type": "object",
+        "required": [
+          "rsiProfilGuid",
+          "spaceships"
+        ],
+        "properties": {
+          "rsiProfilGuid": {
+            "type": "string",
+            "description": "GUID du profil RSI obtenu via `GET /api/external/profil`. Doit appartenir au compte associé à la clé API.",
+            "example": "cmb0ruqzf0001lwz8ga8ygz8q"
+          },
+          "spaceships": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "entityClassGuid",
+                "quantity"
+              ],
+              "properties": {
+                "entityClassGuid": {
+                  "type": "string",
+                  "description": "GUID du véhicule (correspond au champ `guid` de la table Vehicle)",
+                  "example": "48415834-ac12-4c28-ad01-7c210f30c2da"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Nombre d'exemplaires possédés",
+                  "example": 4
+                }
+              }
+            },
+            "maxItems": 1000,
+            "description": "Liste des vaisseaux possédés. Maximum 1 000 entrées. Il s'agit d'un **remplacement complet** : seuls les vaisseaux présents dans cette liste seront conservés."
+          }
+        }
+      },
+      "SpaceshipSyncResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "received",
+          "matched",
+          "removed"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "received": {
+            "type": "integer",
+            "description": "Nombre de GUIDs uniques reçus",
+            "example": 2
+          },
+          "matched": {
+            "type": "integer",
+            "description": "Nombre de vaisseaux reconnus et synchronisés",
+            "example": 2
+          },
+          "removed": {
+            "type": "integer",
+            "description": "Nombre de GUIDs non reconnus (ignorés)",
+            "example": 0
           }
         }
       }
@@ -255,6 +328,97 @@
                     "value": {
                       "statusCode": 400,
                       "statusMessage": "Maximum 2000 blueprints par synchronisation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Clé API manquante, invalide ou révoquée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "statusCode": 401,
+                  "statusMessage": "Clé API invalide ou révoquée"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Le profil RSI n'appartient pas au compte de la clé API",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "statusCode": 403,
+                  "statusMessage": "Ce profil RSI n'appartient pas à votre compte"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/external/spaceships": {
+      "post": {
+        "summary": "Synchronisation de la flotte de vaisseaux",
+        "description": "Remplace intégralement la flotte de vaisseaux possédés pour un profil RSI.\n\n**Fonctionnement :**\n- Les vaisseaux présents dans `spaceships` sont créés avec la quantité indiquée (`qtyIngame`)\n- Les vaisseaux *absents* de la liste sont **supprimés** du profil\n- Il s'agit d'un **remplacement complet** : envoyer la liste exhaustive de la flotte\n\n> L'`entityClassGuid` correspond au GUID du véhicule (ex : `48415834-ac12-4c28-ad01-7c210f30c2da` pour l'Aegis Avenger Stalker).",
+        "operationId": "syncExternalSpaceships",
+        "tags": [
+          "Spaceships"
+        ],
+        "security": [
+          {
+            "ApiKeyBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpaceshipSyncRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Synchronisation effectuée avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpaceshipSyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Body invalide (champs manquants ou limite dépassée)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missingField": {
+                    "summary": "Champs requis manquants",
+                    "value": {
+                      "statusCode": 400,
+                      "statusMessage": "rsiProfilGuid et spaceships (tableau) sont requis"
+                    }
+                  },
+                  "tooMany": {
+                    "summary": "Trop de vaisseaux",
+                    "value": {
+                      "statusCode": 400,
+                      "statusMessage": "Maximum 1000 vaisseaux par synchronisation"
                     }
                   }
                 }

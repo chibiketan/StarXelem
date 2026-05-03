@@ -16,4 +16,12 @@ public interface IAllianceOrbitalService
     /// Retourne une liste vide en cas de 404 (aucun profil).
     /// </summary>
     Task<List<ProfilItem>> GetProfilesAsync();
+
+    /// <summary>
+    /// Synchronise la liste des blueprints possédés pour un profil RSI.
+    /// Les blueprints présents sont marqués possédés, les absents remis à non-possédé.
+    /// </summary>
+    /// <param name="rsiProfilGuid">GUID du profil RSI (obtenu via GetProfilesAsync).</param>
+    /// <param name="blueprintIds">Liste des identifiants de blueprints à synchroniser.</param>
+    Task<SyncResult> SyncBlueprintsAsync(string rsiProfilGuid, List<string> blueprintIds);
 }

@@ -35,7 +35,7 @@
             <ComboBox Grid.Column="1"
                       ItemsSource="{Binding Profiles}"
                       SelectedItem="{Binding SelectedProfile}"
-                      IsEnabled="{Binding !IsLoadingProfiles}"
+                      IsEnabled="{Binding IsProfilListEnabled}"
                       Margin="0,5,0,0">
                 <!-- Affiche le champ Handle via un DataTemplate (DisplayMemberPath n'existe pas en Avalonia) -->
                 <ComboBox.ItemTemplate>
@@ -50,7 +50,7 @@
         <TextBlock Grid.Row="3" Grid.Column="1" Margin="0 5 0 0" Classes="caption dimming" Text="{Binding StatusMessage}"
                    MaxHeight="40" HorizontalAlignment="Left" IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
-        <!-- Boutons de confirmation -->
+        <!-- Boutons de confirmation (désactivés pendant le chargement des profils ou la synchronisation) -->
         <WrapPanel Grid.Row="4" Grid.Column="1" Margin="0 15 0 0">
             <Button Classes="btn secondaire" Command="{Binding CancelCommand}">Annuler</Button>
             <Button Classes="btn principal" Content="Confirmer l'envoi" Command="{Binding ConfirmCommand}" Margin="8 0 0 0"/>

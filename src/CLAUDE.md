@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Comportements
+
+Pipe output through head, tail, or grep to reduce result size. Avoid cat on large files — use Read with offset/limit instead.
+Utilise de préférence des commandes avec l'outil bash.
+
 ## Commands
 
 ```bash
