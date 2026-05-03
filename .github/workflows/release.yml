@@ -20,7 +20,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore src/StarXelem/StarXelem.csproj
 
       - name: Publish win-x64
         run: >
