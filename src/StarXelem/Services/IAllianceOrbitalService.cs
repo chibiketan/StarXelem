@@ -32,4 +32,12 @@ public interface IAllianceOrbitalService
     /// <param name="rsiProfilGuid">GUID du profil RSI (obtenu via GetProfilesAsync).</param>
     /// <param name="fleetItems">Liste des couples (classId, count) à synchroniser.</param>
     Task<SyncResult> SyncFleetAsync(string rsiProfilGuid, List<FleetSyncItem> fleetItems);
+
+    /// <summary>
+    /// Synchronise la liste d'objets pour un profil RSI donné.
+    /// Les objets sont regroupés par type (GUID) avec leur quantité totale.
+    /// </summary>
+    /// <param name="rsiProfilGuid">GUID du profil RSI (obtenu via GetProfilesAsync).</param>
+    /// <param name="items">Liste des couples (itemGuid, quantity) à synchroniser.</param>
+    Task<SyncResult> SyncItemsAsync(string rsiProfilGuid, List<ItemSyncItem> items);
 }

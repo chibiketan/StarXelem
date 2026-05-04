@@ -37,6 +37,8 @@ public partial class ItemViewModel : ViewModelBase
     public EntityEdgeType? EdgeType => _entityNodeProperties.EntityEdge?.Type;
     public string? EdgeLocation => _entityNodeProperties.EntityEdge?.End.HasInventoryId ?? false ? _entityNodeProperties.EntityEdge?.End.InventoryId : _entityNodeProperties.EntityEdge?.End.EntityId.ToString();
     public uint? EdgeOccupancy => _entityNodeProperties.EntityEdge?.Properties?.Physical?.Occupancy;
+    public uint ClassGuidCrc => _entityNodeProperties.EntityNodeProperties!.ClassGuidCrc;
+
     public uint? StackSize => _entityNodeProperties.EntityNodeProperties?.StackSize;
     public AttachmentType? EdgeAttachmentType => _entityNodeProperties.EntityEdge?.Properties?.AttachmentType;
 

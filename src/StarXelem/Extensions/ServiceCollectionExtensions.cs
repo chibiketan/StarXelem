@@ -35,6 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ItemComparisonPopupContentViewModel>();
         services.AddTransient<SendToOrbitalAlliancePopupContentViewModel>();
         services.AddTransient<FleetSyncPopupContentViewModel>();
+        services.AddTransient<ItemsSyncPopupContentViewModel>();
 
         if (isDesignMode)
         {

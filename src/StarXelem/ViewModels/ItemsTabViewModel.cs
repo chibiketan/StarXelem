@@ -319,6 +319,43 @@ public partial class ItemsTabViewModel : PageViewModelBase
     {
         ExportToExcelCommand.NotifyCanExecuteChanged();
         CompareDataFromImportCommand.NotifyCanExecuteChanged();
+        SendItemlistToOrbitalAllianceCommand.NotifyCanExecuteChanged();
+    }
+
+    public bool CanSendItemlistToOrbitalAlliance()
+    {
+        try
+        {
+            return _unfilteredItemList?.IsCompletedSuccessfully == true && _unfilteredItemList.Result.Count > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanSendItemlistToOrbitalAlliance))]
+    private async Task SendItemlistToOrbitalAlliance()
+    {
+        OpenItemsSyncPopup();
+    }
+
+    private void OpenItemsSyncPopup()
+    {
+        var itemsToSend = _unfilteredItemList?.Result
+            .GroupBy(i => i.ClassGuidCrc)
+            .Select(g => new ItemSyncItem
+            {
+                ItemGuid = g.Key.ToString(),
+                Quantity = (int)g.Sum(i => i.StackSize ?? 0)
+            })
+            .ToList();
+
+        if (itemsToSend == null || itemsToSend.Count == 0) return;
+
+        var vm = App.Current.Services.GetRequiredService<ItemsSyncPopupContentViewModel>();
+        vm.ItemsToSend = itemsToSend;
+        WeakReferenceMessenger.Default.Send(new ShowPopupMessage(showCloseButton: true, viewModel: vm));
     }
 
     public bool CanExportToExcel()
