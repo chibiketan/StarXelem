@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using StarXelem.Models;
 using StarXelem.Services;
@@ -72,7 +73,7 @@ public partial class ItemsSyncPopupContentViewModel : ViewModelBase, IPopupConte
 
     /// <summary>
     /// Valide l'envoi de la liste d'objets vers Alliance Orbital.
-    /// Vérifie qu'un profil est sélectionné, synchronise les données d'objets, puis affiche le résultat pendant 5s avant de fermer la popup.
+    /// Vérifie qu'un profil est sélectionné, synchronise les données d'objets par batches, puis affiche le résultat pendant 5s avant de fermer la popup.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanConfirm))]
     private async Task OnConfirm()
@@ -86,14 +87,26 @@ public partial class ItemsSyncPopupContentViewModel : ViewModelBase, IPopupConte
 
         IsSyncing = true;
         StatusMessage = "Synchronisation en cours...";
+        var syncedAt = DateTime.UtcNow;
 
         try
         {
-            var result = await _allianceOrbitalService.SyncItemsAsync(SelectedProfile.Guid, ItemsToSend!);
+            var results = await _allianceOrbitalService.SyncItemsAsync(SelectedProfile.Guid!, ItemsToSend!, syncedAt);
 
-            if (result.Success)
+            if (results.Any(r => r.Success))
             {
-                StatusMessage = $"Synchronisé : {result.Received} reçus, {result.Matched} reconnus, {result.Updated} mis à jour.";
+                var totalReceived = results.Sum(r => r.Received);
+                var totalMatched = results.Sum(r => r.Matched);
+                var totalUpdated = results.Sum(r => r.Updated);
+                var totalRemoved = results.Sum(r => r.Removed);
+                var totalFiltered = results.Sum(r => r.Filtered);
+
+                StatusMessage = $"Synchronisé : {totalReceived} reçus, {totalMatched} reconnus, {totalUpdated} mis à jour";
+                if (totalRemoved > 0)
+                    StatusMessage += $", {totalRemoved} obsolètes supprimés";
+                if (totalFiltered > 0)
+                    StatusMessage += $", {totalFiltered} rejetés";
+
                 // Attendre 5 secondes puis fermer la popup automatiquement
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 WeakReferenceMessenger.Default.Send(new ClosePopupMessage());

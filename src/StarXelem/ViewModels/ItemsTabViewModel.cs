@@ -342,14 +342,17 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     private void OpenItemsSyncPopup()
     {
-        var itemsToSend = _unfilteredItemList?.Result
-            .GroupBy(i => i.ClassGuidCrc)
-            .Select(g => new ItemSyncItem
-            {
-                ItemGuid = g.Key.ToString(),
-                Quantity = (int)g.Sum(i => i.StackSize ?? 0)
-            })
-            .ToList();
+        var itemsToSend = _unfilteredItemList?.Result.Select(i => new ItemSyncItem
+        {
+            Geid = i.Id,
+            ClassGuidCrc = i.ClassGuidCrc,
+            OwnerId = i.OwnerId,
+            ParentUrn = i.ParentUrn ?? "",
+            ItemType = (int)i.ItemType,
+            ItemSubType = (int)i.ItemSubType,
+            StowedIn = i.Edge?.End.InventoryId ??
+                       (i.Edge?.End.EntityId != null ? $"{i.Edge?.End.EntityId}:Container:0" : null) 
+        }).ToList();
 
         if (itemsToSend == null || itemsToSend.Count == 0) return;
 

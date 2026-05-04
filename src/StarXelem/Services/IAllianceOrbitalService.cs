@@ -34,10 +34,10 @@ public interface IAllianceOrbitalService
     Task<SyncResult> SyncFleetAsync(string rsiProfilGuid, List<FleetSyncItem> fleetItems);
 
     /// <summary>
-    /// Synchronise la liste d'objets pour un profil RSI donné.
-    /// Les objets sont regroupés par type (GUID) avec leur quantité totale.
+    /// Synchronise les items pour un profil RSI. Les items sont envoyés par batches de 5000 max avec le même syncedAt.
     /// </summary>
     /// <param name="rsiProfilGuid">GUID du profil RSI (obtenu via GetProfilesAsync).</param>
-    /// <param name="items">Liste des couples (itemGuid, quantity) à synchroniser.</param>
-    Task<SyncResult> SyncItemsAsync(string rsiProfilGuid, List<ItemSyncItem> items);
+    /// <param name="items">Liste des items à synchroniser.</param>
+    /// <param name="syncedAt">Horodatage ISO 8601 commun à tous les batchs. Utilisé pour détecter les items obsolètes.</param>
+    Task<List<SyncResult>> SyncItemsAsync(string rsiProfilGuid, List<ItemSyncItem> items, DateTime syncedAt);
 }

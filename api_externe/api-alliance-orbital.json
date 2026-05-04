@@ -32,6 +32,10 @@
     {
       "name": "Spaceships",
       "description": "Synchronisation de la flotte de vaisseaux"
+    },
+    {
+      "name": "Items",
+      "description": "Synchronisation de l'inventaire (items, équipements, ressources)"
     }
   ],
   "components": {
@@ -157,7 +161,7 @@
           "rsiProfilGuid": {
             "type": "string",
             "description": "GUID du profil RSI obtenu via `GET /api/external/profil`. Doit appartenir au compte associé à la clé API.",
-            "example": "cmb0ruqzf0001lwz8ga8ygz8q"
+            "example": "clxxxxxxxxx0001xxxxxxxxxxxx"
           },
           "spaceships": {
             "type": "array",
@@ -171,7 +175,7 @@
                 "entityClassGuid": {
                   "type": "string",
                   "description": "GUID du véhicule (correspond au champ `guid` de la table Vehicle)",
-                  "example": "48415834-ac12-4c28-ad01-7c210f30c2da"
+                  "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                 },
                 "quantity": {
                   "type": "integer",
@@ -213,6 +217,157 @@
             "type": "integer",
             "description": "Nombre de GUIDs non reconnus (ignorés)",
             "example": 0
+          }
+        }
+      },
+      "ItemSyncRequest": {
+        "type": "object",
+        "required": [
+          "rsiProfilGuid",
+          "syncedAt",
+          "items"
+        ],
+        "properties": {
+          "rsiProfilGuid": {
+            "type": "string",
+            "description": "GUID du profil RSI obtenu via `GET /api/external/profil`. Doit appartenir au compte associé à la clé API.",
+            "example": "clxxxxxxxxx0001xxxxxxxxxxxx"
+          },
+          "syncedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Horodatage ISO 8601 de la synchronisation. Doit être identique pour tous les batchs d'une même session de sync. Utilisé pour détecter et supprimer les items obsolètes.",
+            "example": "2026-05-04T12:00:00.000Z"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemDto"
+            },
+            "maxItems": 5000,
+            "description": "Liste des items à synchroniser (max 5 000 par requête). Envoyer plusieurs batchs avec le même `syncedAt` pour plus de 5 000 items. Après le dernier batch, les items du profil avec un `syncedAt` différent seront supprimés."
+          }
+        }
+      },
+      "ItemDto": {
+        "type": "object",
+        "required": [
+          "geid",
+          "classGuidCrc",
+          "ownerId",
+          "itemType"
+        ],
+        "description": "Représente un item de l'inventaire du joueur.\n\n**Types acceptés** (par `classGuidCrc` résolu via EntityIndex) :\n- `Cargo` — Ressources, marchandises, minerais\n- `Paints` — Skins / peintures\n- `Char_Armor_*` — Casques, torse, jambes, bras, sous-combinaisons, sacs à dos\n- `Char_Clothing_*` — Vêtements (torses, jambes, pieds, mains, chapeaux)\n- `WeaponPersonal` — Armes FPS\n- `WeaponGun` — Canons de vaisseaux\n- `WeaponAttachment` — Accessoires d'armes\n- `WeaponMining` — Outils de minage\n- `Food` / `Drink` — Nourriture et boissons\n- `FPS_Consumable` — Consommables (medpens, etc.)\n- `Gadget` — Gadgets\n- `MobiGlas` — MobiGlas\n- `Missile` — Missiles\n- `Container` / `InventoryContainer` — Conteneurs\n- `MiningModifier` — Modules de minage\n- `Grenade` — Grenades\n- `TractorBeam` — Tracteurs\n- `FPS_Deployable` — Déployables\n- `RemovableChip` — Composants amovibles\n- `Flair_*` — Décorations (surface, sol, mur, cockpit)\n- `Cooler` / `PowerPlant` / `QuantumDrive` / `Shield` / `ShieldController` / `Radar` / `Sensor` — Composants de vaisseau équipables\n- `MissileLauncher` / `Turret` / `TurretBase` — Armement vaisseau\n\n**Types filtrés** (rejetés automatiquement, ne seront PAS stockés) :\n- `Unknown` — Éléments non classifiés (mobilier, templates)\n- `UNDEFINED` — Cadavres, débris, terminaux, templates\n- `Usable` — Mobilier du monde (lits, chaises, bancs)\n- `NOITEM_Vehicle` — Véhicules (utiliser `/api/external/spaceships`)\n- `Door` / `DoorController` — Portes\n- `ManneuverThruster` / `MainThruster` — Propulseurs\n- `Seat` / `SeatAccess` / `SeatDashboard` — Sièges\n- `ShopDisplay` / `Display` / `StatusScreen` — Affichages monde\n- `ControlPanel` / `FlightController` — Panneaux de contrôle\n- `FuelTank` / `FuelIntake` / `QuantumFuelTank` / `ExternalFuelTank` / `FuelController` — Réservoirs\n- `DockingCollar` / `DockingAnimator` — Arrimage\n- `AirTrafficController` — ATC\n- `Elevator` / `Room` / `Relay` — Structure\n- `Light` / `Lightgroup` / `LightController` — Éclairage\n- `Player` — Éléments interactifs de vaisseaux (casiers, panneaux)\n- `Button` / `SelfDestruct` / `LandingSystem` / `GravityGenerator` — Systèmes internes\n- `CoolerController` / `CapacitorAssignmentController` / `RemoteConnection` — Contrôleurs\n- `Debris` — Débris\n- `Char_Head*` / `Char_Body` / `Char_Skin_Color` / `Char_Hair_*` / `Char_Flair` / `Char_Accessory_*` — Customisation personnage\n- `Decal` — Décalcomanies\n- `AIModule` / `WheeledController` / `CargoGrid` — Modules internes",
+        "properties": {
+          "geid": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Global Entity ID (identifiant unique de l'item dans l'EntityGraph)",
+            "example": "9876543210123"
+          },
+          "classGuidCrc": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "CRC32 du GUID de classe de l'item. Utilisé pour résoudre le nom et le type via l'EntityIndex.",
+            "example": 1234567890
+          },
+          "ownerId": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "GEID du propriétaire de l'item",
+            "example": "9876543210123"
+          },
+          "parentUrn": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "URN de l'entité parente (format `sc:entity:<geid>`)",
+            "example": "sc:entity:9876543210123"
+          },
+          "itemType": {
+            "type": "integer",
+            "description": "Type d'item EntityGraph : 1=Vehicle, 2=Weapon, 3=Armor, 4=Consumable, 99=Other",
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              99
+            ],
+            "example": 2
+          },
+          "itemSubType": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Sous-type : 1=Boat, 2=GroundVehicle, 3=PowerSuit, 4=Spaceship, 99=Other",
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              99,
+              null
+            ],
+            "example": null
+          },
+          "stowedIn": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Identifiant de l'inventaire parent au format `ownerId:Location:crc` ou `ownerId:Inventory:containerGeid`. Permet de reconstruire l'arbre hiérarchique de l'inventaire.",
+            "example": "9876543210123:Location:9876543210"
+          }
+        }
+      },
+      "ItemSyncResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "received",
+          "matched",
+          "updated",
+          "removed",
+          "filtered"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "received": {
+            "type": "integer",
+            "description": "Nombre total d'items reçus dans la requête",
+            "example": 5000
+          },
+          "matched": {
+            "type": "integer",
+            "description": "Nombre d'items acceptés après filtrage des types exclus",
+            "example": 3200
+          },
+          "updated": {
+            "type": "integer",
+            "description": "Nombre d'items effectivement insérés/mis à jour en base",
+            "example": 3200
+          },
+          "removed": {
+            "type": "integer",
+            "description": "Nombre d'items obsolètes supprimés (syncedAt différent)",
+            "example": 150
+          },
+          "filtered": {
+            "type": "integer",
+            "description": "Nombre d'items rejetés car leur type EntityIndex est dans la liste d'exclusion",
+            "example": 1800
           }
         }
       }
@@ -368,7 +523,7 @@
     "/api/external/spaceships": {
       "post": {
         "summary": "Synchronisation de la flotte de vaisseaux",
-        "description": "Remplace intégralement la flotte de vaisseaux possédés pour un profil RSI.\n\n**Fonctionnement :**\n- Les vaisseaux présents dans `spaceships` sont créés avec la quantité indiquée (`qtyIngame`)\n- Les vaisseaux *absents* de la liste sont **supprimés** du profil\n- Il s'agit d'un **remplacement complet** : envoyer la liste exhaustive de la flotte\n\n> L'`entityClassGuid` correspond au GUID du véhicule (ex : `48415834-ac12-4c28-ad01-7c210f30c2da` pour l'Aegis Avenger Stalker).",
+        "description": "Remplace intégralement la flotte de vaisseaux possédés pour un profil RSI.\n\n**Fonctionnement :**\n- Les vaisseaux présents dans `spaceships` sont créés avec la quantité indiquée (`qtyIngame`)\n- Les vaisseaux *absents* de la liste sont **supprimés** du profil\n- Il s'agit d'un **remplacement complet** : envoyer la liste exhaustive de la flotte\n\n> L'`entityClassGuid` correspond au GUID du véhicule (ex : `a1b2c3d4-e5f6-7890-abcd-ef1234567890` pour l'Aegis Avenger Stalker).",
         "operationId": "syncExternalSpaceships",
         "tags": [
           "Spaceships"
@@ -419,6 +574,104 @@
                     "value": {
                       "statusCode": 400,
                       "statusMessage": "Maximum 1000 vaisseaux par synchronisation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Clé API manquante, invalide ou révoquée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "statusCode": 401,
+                  "statusMessage": "Clé API invalide ou révoquée"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Le profil RSI n'appartient pas au compte de la clé API",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "statusCode": 403,
+                  "statusMessage": "Ce profil RSI n'appartient pas à votre compte"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/external/items": {
+      "post": {
+        "summary": "Synchronisation de l'inventaire (items)",
+        "description": "Synchronise les items de l'inventaire du joueur pour un profil RSI.\n\n**Fonctionnement :**\n- Les items sont validés puis filtrés par type (voir `ItemDto` pour la liste des types acceptés/rejetés)\n- Les items acceptés sont insérés ou mis à jour (upsert par `geid`)\n- Après le dernier batch, les items du profil avec un `syncedAt` différent sont **supprimés** (détection des items obsolètes)\n- Envoyer plusieurs batchs de max 5 000 items avec le **même** `syncedAt` pour les inventaires volumineux\n\n**Filtrage automatique :**\n- Chaque `classGuidCrc` est résolu via l'EntityIndex interne\n- Les items dont le type résolu est dans la liste d'exclusion sont rejetés silencieusement\n- Le champ `filtered` de la réponse indique combien d'items ont été rejetés\n\n> Les véhicules (`itemType = 1`) doivent être synchronisés via `/api/external/spaceships`, pas ici.",
+        "operationId": "syncExternalItems",
+        "tags": [
+          "Items"
+        ],
+        "security": [
+          {
+            "ApiKeyBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemSyncRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Synchronisation effectuée avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemSyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Body invalide (champs manquants ou limite dépassée)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missingField": {
+                    "summary": "Champs requis manquants",
+                    "value": {
+                      "statusCode": 400,
+                      "statusMessage": "rsiProfilGuid, syncedAt et items (tableau) sont requis"
+                    }
+                  },
+                  "tooMany": {
+                    "summary": "Trop d'items",
+                    "value": {
+                      "statusCode": 400,
+                      "statusMessage": "Maximum 5000 items par requête"
+                    }
+                  },
+                  "invalidDate": {
+                    "summary": "Date invalide",
+                    "value": {
+                      "statusCode": 400,
+                      "statusMessage": "syncedAt doit être une date ISO valide"
                     }
                   }
                 }
