@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<title>Connection Status Bar — StarXelem</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #e8e8e8; font-family: system-ui, -apple-system, sans-serif; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  .state-label { font-size: 10px; font-weight: 500; color: #888; letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 8px; }
+  .theme-row { display: flex; gap: 12px; }
+  .theme-col { flex: 1; }
+  .theme-title { font-size: 10px; color: #999; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .dot-th { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-th.dk { background: #1a1a2e; border: 1px solid #555; }
+  .dot-th.lt { background: #f3f3f3; border: 1px solid #ccc; }
+
+  .titlebar { height: 42px; border: 0.5px solid #d0d0d0; border-radius: 8px; display: flex; align-items: center; padding: 0 14px; gap: 8px; background: #f0f0f0; overflow: visible; position: relative; }
+  .titlebar.dark { background: #0f1117; border-color: rgba(255,255,255,0.08); }
+
+  .tb-version { display: flex; align-items: center; gap: 6px; background: #fff; border: 0.5px solid #c8c8c8; border-radius: 6px; padding: 4px 8px 4px 10px; }
+  .dark .tb-version { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+  .tb-version span { font-size: 11px; color: #3a3a3a; max-width: 170px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dark .tb-version span { color: rgba(255,255,255,0.6); }
+  .tb-version svg { width: 10px; height: 10px; stroke: #888; fill: none; stroke-width: 2; flex-shrink: 0; }
+  .tb-btn { width: 30px; height: 30px; border-radius: 6px; background: #fff; border: 0.5px solid #c8c8c8; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .dark .tb-btn { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+  .tb-btn svg { width: 14px; height: 14px; stroke: #555; fill: none; stroke-width: 1.5; }
+  .dark .tb-btn svg { stroke: rgba(255,255,255,0.4); }
+  .tb-spacer { flex: 1; }
+
+  .conn { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; border: 0.5px solid transparent; }
+  .conn-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .conn-text { font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .conn-sep  { font-size: 10px; opacity: 0.35; }
+  .conn-shard { font-size: 10px; font-family: monospace; white-space: nowrap; }
+
+  .s-none  { background: rgba(0,0,0,0.04);    border-color: rgba(0,0,0,0.09); }
+  .s-none  .conn-dot  { background: #c0c0c0; }
+  .s-none  .conn-text { color: #aaa; font-weight: normal; }
+  .s-conn  { background: rgba(239,159,39,0.1); border-color: rgba(239,159,39,0.3); }
+  .s-conn  .conn-dot  { background: #EF9F27; animation: pulse 1.2s ease-in-out infinite; }
+  .s-conn  .conn-text { color: #854F0B; }
+  .s-ok    { background: rgba(29,158,117,0.1); border-color: rgba(29,158,117,0.3); }
+  .s-ok    .conn-dot  { background: #1D9E75; }
+  .s-ok    .conn-text { color: #085041; }
+  .s-shard { background: rgba(139,92,246,0.1); border-color: rgba(139,92,246,0.3); }
+  .s-shard .conn-dot  { background: #7F77DD; }
+  .s-shard .conn-text { color: #3C3489; }
+  .s-shard .conn-shard { color: #534AB7; }
+  .s-error { background: rgba(226,75,74,0.08); border-color: rgba(226,75,74,0.3); cursor: help; }
+  .s-error .conn-dot  { background: #E24B4A; }
+  .s-error .conn-text { color: #A32D2D; }
+  .s-error .conn-icon { width: 11px; height: 11px; stroke: #A32D2D; fill: none; stroke-width: 2.5; flex-shrink: 0; }
+  .s-error .conn-msg  { font-size: 11px; color: #A32D2D; opacity: 0.65; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: normal; }
+
+  .dark .s-none  { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
+  .dark .s-none  .conn-dot  { background: rgba(255,255,255,0.2); }
+  .dark .s-none  .conn-text { color: rgba(255,255,255,0.3); font-weight: normal; }
+  .dark .s-conn  { background: rgba(239,159,39,0.12); border-color: rgba(239,159,39,0.3); }
+  .dark .s-conn  .conn-dot  { background: #EF9F27; }
+  .dark .s-conn  .conn-text { color: #EF9F27; }
+  .dark .s-ok    { background: rgba(29,158,117,0.12); border-color: rgba(29,158,117,0.3); }
+  .dark .s-ok    .conn-dot  { background: #5dcaa5; }
+  .dark .s-ok    .conn-text { color: #5dcaa5; }
+  .dark .s-shard { background: rgba(139,92,246,0.15); border-color: rgba(139,92,246,0.35); }
+  .dark .s-shard .conn-dot  { background: #a78bfa; }
+  .dark .s-shard .conn-text { color: #a78bfa; }
+  .dark .s-shard .conn-shard { color: rgba(167,139,250,0.65); }
+  .dark .s-error { background: rgba(226,75,74,0.12); border-color: rgba(226,75,74,0.3); }
+  .dark .s-error .conn-dot  { background: #f09595; }
+  .dark .s-error .conn-text { color: #f09595; }
+  .dark .s-error .conn-icon { stroke: #f09595; }
+  .dark .s-error .conn-msg  { color: #f09595; opacity: 0.5; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+  .conn-wrap { position: relative; display: flex; align-items: center; }
+  .tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    right: 0;
+    min-width: 260px;
+    max-width: 360px;
+    background: #1c1c2e;
+    border: 0.5px solid rgba(240,149,149,0.35);
+    border-radius: 8px;
+    padding: 10px 13px;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    right: 18px;
+    border: 6px solid transparent;
+    border-top-color: #1c1c2e;
+  }
+  .tooltip-label { font-size: 10px; font-weight: 500; color: #f09595; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 5px; }
+  .tooltip-msg { font-size: 11px; color: rgba(255,255,255,0.7); line-height: 1.55; word-break: break-word; font-family: monospace; }
+  .conn-wrap:hover .tooltip { display: block; }
+
+  .lt-tip .tooltip { background: #fff; border-color: rgba(226,75,74,0.2); }
+  .lt-tip .tooltip::after { border-top-color: #fff; }
+  .lt-tip .tooltip-label { color: #A32D2D; }
+  .lt-tip .tooltip-msg { color: #555; }
+</style>
+</head>
+<body>
+
+  <div>
+    <div class="state-label">Jeu non lancé — fichier absent</div>
+    <div class="theme-row">
+      <div class="theme-col">
+        <div class="theme-title"><div class="dot-th lt"></div>Light</div>
+        <div class="titlebar">
+          <div class="tb-version"><span>HOTFIX - sc-alpha-4.7.0-hotfix</span><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+          <div class="tb-spacer"></div>
+          <div class="conn s-none"><div class="conn-dot"></div><span class="conn-text">Jeu non détecté</span></div>
+        </div>
+      </div>
+      <div class="theme-col">
+        <div class="theme-title"><div class="dot-th dk"></div>Dark</div>
+        <div class="titlebar dark">
+          <div class="tb-version"><span>HOTFIX - sc-alpha-4.7.0-hotfix</span><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+          <div class="tb-spacer"></div>
+          <div class="conn s-none"><div class="conn-dot"></div><span class="conn-text">Jeu non détecté</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="state-label">Connexion gRPC en cours</div>
+    <div class="theme-row">
+      <div class="theme-col">
+        <div class="theme-title"><div class="dot-th lt"></div>Light</div>
+        <div class="titlebar">
+          <div class="tb-version"><span>HOTFIX - sc-alpha-4.7.0-hotfix</span><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+          <div class="tb-spacer"></div>
+          <div class="conn s-conn"><div class="conn-dot"></div><span class="conn-text">Connexion en cours…</span></div>
+        </div>
+      </div>
+      <div class="theme-col">
+        <div class="theme-title"><div class="dot-th dk"></div>Dark</div>
+        <div class="titlebar dark">
+          <div class="tb-version"><span>HOTFIX - sc-alpha-4.7.0-hotfix</span><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+          <div class="tb-spacer"></div>
+          <div class="conn s-conn"><div class="conn-dot"></div><span class="conn-text">Connexion en cours…</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="state-label">Connecté — pas de shard active</div>
+    <div class="theme-row">
+      <div class="theme-col">
+        <div class="theme-title"><div class="dot-th lt"></div>Light</div>
+        <div class="titlebar">
+          <div class="tb-version"><span>HOTFIX - sc-alpha-4.7.0-hotfix</span><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+          <div class="tb-spacer"></div>
+          <div class="conn s-ok"><div class="conn-dot"></div><span class="conn-text">Connecté</span></div>
+        </div>
+      </div>
+      <div class="theme-col">
+        <div class="theme-title"><div class="dot-th dk"></div>Dark</div>
+        <div class="titlebar dark">
+          <div class="tb-version"><span>HOTFIX - sc-alpha-4.7.0-hotfix</span><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+          <div class="tb-spacer"></div>
+          <div class="conn s-ok"><div class="conn-dot"></div><span class="conn-text">Connecté</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="state-label">Connecté — shard active</div>
+    <div class="theme-row">
+      <div class="theme-col">
+        <div class="theme-title"><div class="dot-th lt"></div>Light</div>
+        <div class="titlebar">
+          <div class="tb-version"><span>HOTFIX - sc-alpha-4.7.0-hotfix</span><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+          <div class="tb-spacer"></div>
+          <div class="conn s-shard">
+            <div class="conn-dot"></div><span class="conn-text">En jeu</span>
+            <span class="conn-sep">·</span>
+            <span class="conn-shard">pub_euw1b_11523279_080</span>
+          </div>
+        </div>
+      </div>
+      <div class="theme-col">
+        <div class="theme-title"><div class="dot-th dk"></div>Dark</div>
+        <div class="titlebar dark">
+          <div class="tb-version"><span>HOTFIX - sc-alpha-4.7.0-hotfix</span><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+          <div class="tb-spacer"></div>
+          <div class="conn s-shard">
+            <div class="conn-dot"></div><span class="conn-text">En jeu</span>
+            <span class="conn-sep">·</span>
+            <span class="conn-shard">pub_euw1b_11523279_080</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="state-label">Erreur — survoler l'indicateur pour le message complet</div>
+    <div class="theme-row">
+      <div class="theme-col">
+        <div class="theme-title"><div class="dot-th lt"></div>Light</div>
+        <div class="titlebar">
+          <div class="tb-version"><span>HOTFIX - sc-alpha-4.7.0-hotfix</span><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+          <div class="tb-spacer"></div>
+          <div class="conn-wrap lt-tip">
+            <div class="conn s-error">
+              <div class="conn-dot"></div>
+              <span class="conn-text">Erreur</span>
+              <span class="conn-sep">·</span>
+              <svg class="conn-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span class="conn-msg">StatusCode=Unauthenticated, token expired…</span>
+            </div>
+            <div class="tooltip">
+              <div class="tooltip-label">Message d'erreur</div>
+              <div class="tooltip-msg">StatusCode=Unauthenticated, Detail="Your session token has expired. Please re-authenticate.", Debug="token_expired at 2025-04-14T08:32:11Z"</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="theme-col">
+        <div class="theme-title"><div class="dot-th dk"></div>Dark</div>
+        <div class="titlebar dark">
+          <div class="tb-version"><span>HOTFIX - sc-alpha-4.7.0-hotfix</span><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <div class="tb-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+          <div class="tb-spacer"></div>
+          <div class="conn-wrap">
+            <div class="conn s-error">
+              <div class="conn-dot"></div>
+              <span class="conn-text">Erreur</span>
+              <span class="conn-sep">·</span>
+              <svg class="conn-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span class="conn-msg">StatusCode=Unauthenticated, token expired…</span>
+            </div>
+            <div class="tooltip">
+              <div class="tooltip-label">Message d'erreur</div>
+              <div class="tooltip-msg">StatusCode=Unauthenticated, Detail="Your session token has expired. Please re-authenticate.", Debug="token_expired at 2025-04-14T08:32:11Z"</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

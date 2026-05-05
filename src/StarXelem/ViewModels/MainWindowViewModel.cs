@@ -35,6 +35,48 @@ public partial class MainWindowViewModel : ViewModelBase
     
     [ObservableProperty]private string _p4kStatus = "";
 
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GrpcStatusDisplay))]
+    [NotifyPropertyChangedFor(nameof(IsDisconnected))]
+    [NotifyPropertyChangedFor(nameof(IsConnecting))]
+    [NotifyPropertyChangedFor(nameof(IsConnected))]
+    [NotifyPropertyChangedFor(nameof(IsInGame))]
+    [NotifyPropertyChangedFor(nameof(IsError))]
+    private GrpcConnectionStatus _grpcStatus = GrpcConnectionStatus.Disconnected;
+    [ObservableProperty] private string? _grpcErrorMessage;
+    [ObservableProperty] private string? _currentShardName;
+    
+    public bool IsDisconnected => GrpcStatus == GrpcConnectionStatus.Disconnected;
+    public bool IsConnecting => GrpcStatus == GrpcConnectionStatus.Connecting;
+    public bool IsConnected => GrpcStatus == GrpcConnectionStatus.Connected;
+    public bool IsInGame => GrpcStatus == GrpcConnectionStatus.InGame;
+    public bool IsError => GrpcStatus == GrpcConnectionStatus.Error;
+
+    public string? GrpcStatusDisplay
+    {
+        get
+        {
+            var statusText = GrpcStatus switch
+            {
+                GrpcConnectionStatus.Disconnected => "Jeu non détecté",
+                GrpcConnectionStatus.Connecting => "Connexion en cours…",
+                GrpcConnectionStatus.Connected => "Connecté",
+                GrpcConnectionStatus.InGame => "En jeu",
+                GrpcConnectionStatus.Error => "Erreur",
+                _ => null,
+            };
+
+            return statusText;
+        }
+    }
+
+    private void OnGrpcConnectionStatusChanged(object? sender, GrpcConnectionStatus status)
+    {
+        GrpcStatus = status;
+        GrpcErrorMessage = status == GrpcConnectionStatus.Error ? _grpcClientService.ErrorMessage : null;
+        CurrentShardName = status == GrpcConnectionStatus.InGame ? _grpcClientService.CurrentShardInfo?.DgsId : null;
+    }
     [ObservableProperty]
     private PopupViewModel _popupViewModel;
 
@@ -125,6 +167,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(P4kStatusTooltip));
             }
         };
+
+        // Abonnement au statut de connexion gRPC
+        _grpcClientService.OnStatusChanged += OnGrpcConnectionStatusChanged;
 
     }
     

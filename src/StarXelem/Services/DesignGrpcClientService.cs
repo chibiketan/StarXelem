@@ -11,7 +11,7 @@ namespace StarXelem;
 
 public class DesignGrpcClientService : IGrpcClientService
 {
-    public event EventHandler<bool>? OnConnectedChanged;
+    public event EventHandler<GrpcConnectionStatus>? OnStatusChanged;
     public Task InitClient(P4kFileModel p4kFile)
     {
         return Task.CompletedTask;
@@ -80,7 +80,9 @@ public class DesignGrpcClientService : IGrpcClientService
         return Task.CompletedTask;
     }
 
-    public bool IsConnected => true;
+    public GrpcConnectionStatus Status => GrpcConnectionStatus.Connected;
+    public string? ErrorMessage => null;
+    public ShardInfo? CurrentShardInfo => null;
     public Task<IList<Contact>> GetFriendList()
     {
         return Task.FromResult<IList<Contact>>(new List<Contact>

@@ -94,7 +94,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         _p4KService = p4kService;
         _locationService = locationService;
 
-        _clientService.OnConnectedChanged += (sender, b) => { OnConnectedStatusChanged(b); };
+        _clientService.OnStatusChanged += (sender, status) => { OnConnectedStatusChanged(status); };
         // Initialize filter options for multi-select type filter
         _filterTypeList = new ObservableCollection<FilterTypeOption>(
             Enum.GetValues<EItemType>().Select(t =>
@@ -121,22 +121,22 @@ public partial class ItemsTabViewModel : PageViewModelBase
         // TODO for testing purpose
         //SearchTypeList.First(t => t.Type == EItemType.Drink).IsSelected = true;
 
-        if (clientService.IsConnected)
+        if (clientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame)
         {
             ReloadLocationList();
         }
     }
 
-    private void OnConnectedStatusChanged(bool b)
+    private void OnConnectedStatusChanged(GrpcConnectionStatus status)
     {
         if (!Dispatcher.UIThread.CheckAccess())
         {
-            Dispatcher.UIThread.Post(() => OnConnectedStatusChanged(b));
+            Dispatcher.UIThread.Post(() => OnConnectedStatusChanged(status));
             return;
         }
         ReloadLocationListCommand?.NotifyCanExecuteChanged();
         loadItemListCommand?.NotifyCanExecuteChanged();
-        if (b)
+        if (status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame)
         {
             ReloadLocationList();
         }
@@ -183,7 +183,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     
     public bool CanLoadItemList()
     {
-        return _clientService.IsConnected && !IsLoading;
+        return _clientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame && !IsLoading;
     }
 
     [RelayCommand(CanExecute = nameof(CanLoadItemList))]
@@ -274,7 +274,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     public bool CanReloadLocationList()
     {
-        return _clientService.IsConnected && (LocationList == null || LocationList.IsCompleted);
+        return _clientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame && (LocationList == null || LocationList.IsCompleted);
     }
 
     partial void OnNameFilterChanged(string value)

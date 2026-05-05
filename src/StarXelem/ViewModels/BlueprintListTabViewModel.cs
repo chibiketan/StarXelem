@@ -38,17 +38,17 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         _p4KService = p4kService;
         _entityClassDefinitionService = entityClassDefinitionService;
 
-        _clientService.OnConnectedChanged += (sender, b) => { OnConnectedStatusChanged(b); };
+        _clientService.OnStatusChanged += (sender, status) => { OnConnectedStatusChanged(status); };
     }
 
-    private void OnConnectedStatusChanged(bool b)
+    private void OnConnectedStatusChanged(GrpcConnectionStatus status)
     {
         LoadItemListCommand.NotifyCanExecuteChanged();
     }
 
     public bool CanLoadItemList()
     {
-        return _clientService.IsConnected && !IsLoading;
+        return _clientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame && !IsLoading;
     }
 
     [RelayCommand(CanExecute = nameof(CanLoadItemList))]

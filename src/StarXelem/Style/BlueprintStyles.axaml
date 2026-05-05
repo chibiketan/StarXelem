@@ -675,4 +675,112 @@
             <Setter Property="FontSize" Value="16" />
         </Style>
     </Style>
+
+    <!-- Connection Status Indicator — base styles -->
+    <Style Selector="Border.conn-indicator">
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="10,10"/>
+        
+        <Style Selector="^ Ellipse.conn-dot">
+            <Setter Property="Width" Value="7"/>
+            <Setter Property="Height" Value="7"/>
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="^ TextBlock.conn-text">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="DemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="^ TextBlock.shard">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </Style>
+
+    <!-- Connection Status Indicator — state classes (Light) -->
+    <Style Selector="Border.conn-indicator.conn-disconnected">
+        <Setter Property="Background" Value="{DynamicResource ConnDisconnectedBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ConnDisconnectedBorderBrush}"/>
+
+        <Style Selector="^ Ellipse.conn-dot">
+            <Setter Property="Fill" Value="{DynamicResource ConnDisconnectedDotBrush}"/>
+        </Style>
+        <Style Selector="^ TextBlock.conn-text">
+            <Setter Property="Foreground" Value="{DynamicResource ConnDisconnectedTextBrush}"/>
+        </Style>
+    </Style>
+
+    <Style Selector="Border.conn-indicator.conn-connecting">
+        <Setter Property="Background" Value="{DynamicResource ConnConnectingBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ConnConnectingBorderBrush}"/>
+
+        <Style Selector="^ Ellipse.conn-dot">
+            <Setter Property="Fill" Value="{DynamicResource ConnConnectingDotBrush}"/>
+            <Style.Animations>
+                <Animation Duration="0:0:1.2"
+                           IterationCount="Infinite"
+                           Easing="SineEaseInOut">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Opacity" Value="1" />
+                    </KeyFrame>
+                    <KeyFrame Cue="50%">
+                        <Setter Property="Opacity" Value="0.3" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Opacity" Value="1" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="^ TextBlock.conn-text">
+            <Setter Property="Foreground" Value="{DynamicResource ConnConnectingTextBrush}"/>
+        </Style>
+    </Style>
+
+    <Style Selector="Border.conn-indicator.conn-connected">
+        <Setter Property="Background" Value="{DynamicResource ConnConnectedBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ConnConnectedBorderBrush}"/>
+
+        <Style Selector="^ Ellipse.conn-dot">
+            <Setter Property="Fill" Value="{DynamicResource ConnConnectedDotBrush}"/>
+        </Style>
+        <Style Selector="^ TextBlock.conn-text">
+            <Setter Property="Foreground" Value="{DynamicResource ConnConnectedTextBrush}"/>
+        </Style>
+    </Style>
+
+    <Style Selector="Border.conn-indicator.conn-in-game">
+        <Setter Property="Background" Value="{DynamicResource ConnInGameBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ConnInGameBorderBrush}"/>
+
+        <Style Selector="^ Ellipse.conn-dot">
+            <Setter Property="Fill" Value="{DynamicResource ConnInGameDotBrush}"/>
+        </Style>
+        <Style Selector="^ TextBlock.conn-text">
+            <Setter Property="Foreground" Value="{DynamicResource ConnInGameTextBrush}"/>
+        </Style>
+        <!-- Shard name dans état InGame -->
+        <Style Selector="^ TextBlock.shard">
+            <Setter Property="Foreground" Value="{DynamicResource ConnInGameShardTextBrush}"/>
+        </Style>
+
+    </Style>
+
+    <Style Selector="Border.conn-indicator.conn-error">
+        <Setter Property="Background" Value="{DynamicResource ConnErrorBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ConnErrorBorderBrush}"/>
+
+        <Style Selector="^ Ellipse.conn-dot">
+            <Setter Property="Fill" Value="{DynamicResource ConnErrorDotBrush}"/>
+        </Style>
+        <Style Selector="^ TextBlock.conn-text">
+            <Setter Property="Foreground" Value="{DynamicResource ConnErrorTextBrush}"/>
+        </Style>
+        <Style Selector="^ TextBlock.error-msg">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Opacity" Value="0.5"></Setter>
+            <Setter Property="Foreground" Value="{DynamicResource ConnErrorTextBrush}"/>
+        </Style>
+    </Style>
+
+
 </Styles>

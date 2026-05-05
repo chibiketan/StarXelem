@@ -11,6 +11,8 @@ using Sc.External.Services.Contacts.V1;
 using Sc.External.Services.Entitlement.V1;
 using Sc.External.Services.Entitygraph.V1;
 using Sc.External.Services.Identity.V1;
+using Sc.External.Services.Presence.V1;
+using Sc.External.Services.Social.V1;
 using Sc.Internal.Services.Entitlement.V1;
 using Sc.Internal.Services.MissionLocation.V1;
 using StarBreaker.Common;
@@ -34,41 +36,111 @@ public class GrpcClientService : IGrpcClientService
     private Metadata? _authHeaders;
     private GrpcChannel? _channel;
     private readonly IP4kService _p4kService;
+    private CancellationTokenSource? _pollCts;
 
-    public event EventHandler<bool>? OnConnectedChanged;
+    public event EventHandler<GrpcConnectionStatus>? OnStatusChanged;
+
+    public GrpcConnectionStatus Status { get; private set; } = GrpcConnectionStatus.Disconnected;
+    public string? ErrorMessage { get; private set; }
+    public ShardInfo? CurrentShardInfo { get; private set; }
 
     public GrpcClientService(ILogger<GrpcClientService> logger, IP4kService p4kService)
     {
         _watcher = null;
         _authHeaders = null;
         _logger = logger;
-        IsConnected = false;
         _p4kService = p4kService;
     }
 
     public async Task InitClient(P4kFileModel p4kFile)
     {
         CleanWatch();
+
         var dir = new FileInfo(p4kFile.Path).Directory?.FullName;
         _watcher = new StarCitizenClientWatcher(dir ?? "");
         _watcher.Start();
         var loginData = await _watcher.WaitForLoginData().ConfigureAwait(false);
-        
+
+        SetStatus(GrpcConnectionStatus.Connecting);
         _logger.LogInformation("Got Login data for user: \"{Username}\" on server: \"{ServicesEndpoint}\"", loginData.Username, loginData.StarNetwork.ServicesEndpoint);
-        
-        _channel = GrpcChannel.ForAddress(new Uri(loginData.StarNetwork.ServicesEndpoint));
-        var identityClient = new IdentityService.IdentityServiceClient(_channel);
-        
-        var currentPlayer = await identityClient.GetCurrentPlayerAsync(new GetCurrentPlayerRequest(), new Metadata { { "Authorization", $"Bearer {loginData.AuthToken}" } }).ConfigureAwait(false);
-        
-        _playerInfo = currentPlayer;
-        _authHeaders = new Metadata { 
-            { "Authorization", $"Bearer {currentPlayer.Jwt}" },
-            { "grpc-timeout", "60S" }
-        };
-        _logger.LogDebug("player jwt : {jwt}", currentPlayer.Jwt);
-        IsConnected = true;
-        OnConnectedChanged?.Invoke(this, IsConnected);
+
+        try
+        {
+            _channel = GrpcChannel.ForAddress(new Uri(loginData.StarNetwork.ServicesEndpoint));
+            var identityClient = new IdentityService.IdentityServiceClient(_channel);
+
+            var currentPlayer = await identityClient.GetCurrentPlayerAsync(new GetCurrentPlayerRequest(), new Metadata { { "Authorization", $"Bearer {loginData.AuthToken}" } }).ConfigureAwait(false);
+
+            _playerInfo = currentPlayer;
+            _authHeaders = new Metadata {
+                { "Authorization", $"Bearer {currentPlayer.Jwt}" },
+                { "grpc-timeout", "60S" }
+            };
+            _logger.LogDebug("player jwt : {jwt}", currentPlayer.Jwt);
+
+            SetStatus(GrpcConnectionStatus.Connected);
+            StartShardPolling();
+        }
+        catch (RpcException ex)
+        {
+            _logger.LogError(ex, "gRPC error during InitClient");
+            SetStatus(GrpcConnectionStatus.Error, ex.Status.Detail);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during InitClient");
+            SetStatus(GrpcConnectionStatus.Error, ex.Message);
+        }
+    }
+
+    private void SetStatus(GrpcConnectionStatus newStatus, string? errorMessage = null)
+    {
+        if (Status == newStatus && ErrorMessage == errorMessage)
+            return;
+        Status = newStatus;
+        ErrorMessage = errorMessage;
+        OnStatusChanged?.Invoke(this, newStatus);
+    }
+
+    private void StartShardPolling()
+    {
+        _pollCts?.Cancel();
+        _pollCts?.Dispose();
+        _pollCts = new CancellationTokenSource();
+        _ = Task.Run(() => PollShardStatusAsync(_pollCts.Token));
+    }
+
+    private async Task PollShardStatusAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(15), ct).ConfigureAwait(false);
+                if (ct.IsCancellationRequested) break;
+
+//                var shardInfo = await GetShardInfo((int)_playerInfo!.Player.AccountId).ConfigureAwait(false);
+                // var shardInfo = await GetUserShard((int)_playerInfo!.Player.AccountId).ConfigureAwait(false);
+                // if (!string.IsNullOrEmpty(shardInfo?.Id))
+                // {
+                //     CurrentShardInfo = shardInfo;
+                //     SetStatus(GrpcConnectionStatus.InGame);
+                // }
+                // else
+                // {
+                //     CurrentShardInfo = null;
+                //     SetStatus(GrpcConnectionStatus.Connected);
+                // }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error polling shard status — statut inchangé");
+            }
+        }
     }
 
     public async Task<IList<SpaceshipModel>> GetSpaceships()
@@ -1027,8 +1099,6 @@ public class GrpcClientService : IGrpcClientService
         }
     }
     
-    public bool IsConnected { get; private set; }
-
     public async Task<IList<Contact>> GetFriendList()
     {
         var service = new ContactsService.ContactsServiceClient(_channel);
@@ -1064,21 +1134,46 @@ public class GrpcClientService : IGrpcClientService
             semaphoreSlim.Release();
         }
     }
-    
+
+    private async Task<ShardInfo> GetUserShard(int accountId)
+    {
+        return null;
+        // var request = new GetInstanceInfoRequest();
+        //
+        // request.PlayerUrn = accountId.ToString();
+        //
+        // var service = new PresenceService.PresenceServiceClient(_channel);
+        // await semaphoreSlim.WaitAsync();
+        // try
+        // {
+        //     var toto = service.PresenceStream(_authHeaders);
+        //     
+        //     //toto.RequestStream.WriteAsync()
+        //     var response = await service.GetInstanceInfoAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+        //
+        //     return response.ShardInfo;
+        // }
+        // finally
+        // {
+        //     semaphoreSlim.Release();
+        // }
+    }
+
 
     private void CleanWatch()
     {
+        SetStatus(GrpcConnectionStatus.Disconnected);
+        _pollCts?.Cancel();
+        _pollCts?.Dispose();
+        _pollCts = null;
+
         if (_watcher != null)
         {
             _watcher.Dispose();
             _watcher = null;
             _authHeaders = null;
             _playerInfo = null;
-            if (IsConnected)
-            {
-                IsConnected = false;
-                OnConnectedChanged?.Invoke(this, IsConnected);
-            }
+            CurrentShardInfo = null;
         }
 
         if (null != _channel)

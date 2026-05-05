@@ -4,6 +4,7 @@ using Sc.External.Common.Shard.V1;
 using Sc.External.Services.Entitlement.V1;
 using Sc.External.Services.Entitygraph.V1;
 using StarXelem.Models;
+using StarXelem.Services;
 using StarXelem.ViewModels;
 using StarXelem.ViewModels.Popup;
 
@@ -27,6 +28,7 @@ public static class DesignData
 
     static DesignData()
     {
+        PopupateMainWindowViewModel();
         // Initialisation de ItemComparisonPopupContentViewModel pour le design
         var list = new List<ItemTypeComparisonResult>
         {
@@ -275,5 +277,11 @@ public static class DesignData
             },
         });
     }
-    
+
+    private static void PopupateMainWindowViewModel()
+    {
+        MainWindowViewModel.GrpcStatus = GrpcConnectionStatus.Error;
+        MainWindowViewModel.CurrentShardName = "pub_euw1b_3.24_12345";
+        MainWindowViewModel.GrpcErrorMessage = "Une message d'erreur\n avec saut de ligne et une ligne plutôt longue.";
+    }
 }
