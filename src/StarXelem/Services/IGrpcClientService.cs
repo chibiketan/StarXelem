@@ -9,8 +9,8 @@ namespace StarXelem.Services;
 
 public interface IGrpcClientService
 {
-    event EventHandler<bool> OnConnectedChanged;
-    
+    event EventHandler<GrpcConnectionStatus> OnStatusChanged;
+
     Task InitClient(P4kFileModel p4kFile);
     Task<IList<SpaceshipModel>> GetSpaceships();
     Task<IList<EntityItemQueryResult>> QueryGraphBySearch(ItemQueryModel queryModel);
@@ -23,7 +23,9 @@ public interface IGrpcClientService
     Task<IList<Node>> QueryInventoryBisById(String id);
     Task<IList<InventoryNodeProperties>> QueryInventories();
     Task TestRequest();
-    bool IsConnected { get; }
+    GrpcConnectionStatus Status { get; }
+    string? ErrorMessage { get; }
+    ShardInfo? CurrentShardInfo { get; }
     Task<IList<Contact>> GetFriendList();
     Task<ShardInfo> GetShardInfo(int accountId);
     Task<IList<EntityStowContext>> GetEntityStowContextByParentUrnList(IList<string> urnList, List<uint> crcTypeList);

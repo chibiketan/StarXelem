@@ -24,7 +24,7 @@ public partial class ContainerTabViewModel : PageViewModelBase
         _p4KService = p4kService;
 
         _p4KService.SelectedP4KFileChanged += OnSelectedP4KFileChanged;
-        _clientService.OnConnectedChanged += (sender, b) => LoadShipNotifyCanExecuteChanged();
+        _clientService.OnStatusChanged += (sender, _) => LoadShipNotifyCanExecuteChanged();
     }
     
     [RelayCommand(CanExecute = nameof(CanLoadShipList))]
@@ -42,7 +42,7 @@ public partial class ContainerTabViewModel : PageViewModelBase
 
     public bool CanLoadShipList()
     {
-        return _clientService.IsConnected && !IsLoading;
+        return _clientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame && !IsLoading;
     }
 
     private void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)

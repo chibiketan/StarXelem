@@ -31,7 +31,7 @@ public partial class FriendListTabViewModel : PageViewModelBase
     {
         _clientService = clientService;
 
-        _clientService.OnConnectedChanged += (sender, b) => LoadFriendNotifyCanExecuteChanged();
+        _clientService.OnStatusChanged += (sender, _) => LoadFriendNotifyCanExecuteChanged();
     }
     
     [RelayCommand(CanExecute = nameof(CanLoadFriendList))]
@@ -56,7 +56,7 @@ public partial class FriendListTabViewModel : PageViewModelBase
 
     public bool CanLoadFriendList()
     {
-        return _clientService.IsConnected && !IsLoading;
+        return _clientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame && !IsLoading;
     }
 
     private async Task<List<FriendViewModel>> GetFriendListSafe()

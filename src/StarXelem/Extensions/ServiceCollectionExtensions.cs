@@ -14,7 +14,7 @@ public static class ServiceCollectionExtensions
         services.AddLogging(b =>
         {
 #if DEBUG
-            b.SetMinimumLevel(LogLevel.Trace);
+            b.SetMinimumLevel(LogLevel.Warning);
             b.AddDebug();
 #else
             b.SetMinimumLevel(LogLevel.Warning);

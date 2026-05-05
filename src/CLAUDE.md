@@ -4,26 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Comportements
 
-Pipe output through head, tail, or grep to reduce result size. Avoid cat on large files — use Read with offset/limit instead.
-Utilise de préférence des commandes avec l'outil bash.
 
-## Commands
 
-```bash
-dotnet build                      # Build the solution
-dotnet run --project StarXelem    # Run in debug mode
-dotnet publish -c Release         # Publish release build
-```
-
-There are no automated tests in this project.
-
-To update game data files from a Star Citizen installation, use the PowerShell scripts in `../scripts/`:
-- `update_live.ps1` — extracts from LIVE channel
-- `update_ptu.ps1` — extracts from PTU channel
 
 ## Architecture
 
 **StarXelem** is a Windows desktop application (Avalonia 11 + FluentAvalonia) for browsing Star Citizen game data. It reads game archives (`.p4k` files) and communicates with the game's gRPC backend.
+
+There are no automated tests in this project.
 
 ### Technology Stack
 
@@ -79,3 +67,7 @@ Each service has a `Design*` implementation (e.g. `DesignP4kService`) registered
 - Add new services to `ServiceCollectionExtensions.RegisterServices()` and provide a `Design*` counterpart
 - New tab pages: create `XyzTabViewModel : PageViewModelBase` + `XyzTabView.axaml`, then register the view in `ViewLocator` and add the tab to `MainWindowViewModel`
 - Line length limit: 200 characters (see `.editorconfig`)
+
+### UI
+
+Toutes les conventions, couleurs et règles pour l'interface graphique sont présentes dans le fichier @CLAUDE_design_convention.md

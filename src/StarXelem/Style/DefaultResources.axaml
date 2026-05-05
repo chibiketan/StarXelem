@@ -67,6 +67,39 @@
             <SolidColorBrush x:Key="BadgeRegionAustralieBackgroundColor" Color="#FFFAECE7" />
             <SolidColorBrush x:Key="BadgeRegionAustralieBorderColor" Color="#FFF0997B" />
 
+            <!-- connexion gRPC —Disconnected -->
+            <SolidColorBrush x:Key="ConnDisconnectedBackgroundBrush" Color="#0A0A0A0A" />
+            <SolidColorBrush x:Key="ConnDisconnectedBorderBrush" Color="#16161616" />
+            <SolidColorBrush x:Key="ConnDisconnectedDotBrush" Color="#FFC0C0C0" />
+
+            <!-- connexion gRPC —Connecting -->
+            <SolidColorBrush x:Key="ConnConnectingBackgroundBrush" Color="#1AEF9F27" />
+            <SolidColorBrush x:Key="ConnConnectingBorderBrush" Color="#4CEF9F27" />
+            <SolidColorBrush x:Key="ConnConnectingDotBrush" Color="#FFEF9F27" />
+
+            <!-- connexion gRPC —Connected -->
+            <SolidColorBrush x:Key="ConnConnectedBackgroundBrush" Color="#1A1D9E75" />
+            <SolidColorBrush x:Key="ConnConnectedBorderBrush" Color="#4D1D9E75" />
+            <SolidColorBrush x:Key="ConnConnectedDotBrush" Color="#FF1D9E75" />
+
+            <!-- connexion gRPC —InGame -->
+            <SolidColorBrush x:Key="ConnInGameBackgroundBrush" Color="#1A8B5CF6" />
+            <SolidColorBrush x:Key="ConnInGameBorderBrush" Color="#4D8B5CF6" />
+            <SolidColorBrush x:Key="ConnInGameDotBrush" Color="#FF7F77DD" />
+
+            <!-- connexion gRPC —Error -->
+            <SolidColorBrush x:Key="ConnErrorBackgroundBrush" Color="#14E24B4A" />
+            <SolidColorBrush x:Key="ConnErrorBorderBrush" Color="#4DE24B4A" />
+            <SolidColorBrush x:Key="ConnErrorDotBrush" Color="#FFE24B4A" />
+
+            <!-- connexion gRPC — texte -->
+            <SolidColorBrush x:Key="ConnDisconnectedTextBrush" Color="#FFAAAAAA" />
+            <SolidColorBrush x:Key="ConnConnectingTextBrush" Color="#FF854F0B" />
+            <SolidColorBrush x:Key="ConnConnectedTextBrush" Color="#FF085041" />
+            <SolidColorBrush x:Key="ConnInGameTextBrush" Color="#FF3C3489" />
+            <SolidColorBrush x:Key="ConnInGameShardTextBrush" Color="#FF534AB7" />
+            <SolidColorBrush x:Key="ConnErrorTextBrush" Color="#FFA32D2D" />
+
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <!-- Pour le thème sombre -->
@@ -131,6 +164,40 @@
             <SolidColorBrush x:Key="BadgeRegionAustralieForegroundColor" Color="#FFF0997B" />
             <SolidColorBrush x:Key="BadgeRegionAustralieBackgroundColor" Color="#1ED85A30" />
             <SolidColorBrush x:Key="BadgeRegionAustralieBorderColor" Color="#4DD85A30" />
+
+            <!-- connexion gRPC —Disconnected -->
+            <SolidColorBrush x:Key="ConnDisconnectedBackgroundBrush" Color="#0AFFFFFF" />
+            <SolidColorBrush x:Key="ConnDisconnectedBorderBrush" Color="#14FFFFFF" />
+            <SolidColorBrush x:Key="ConnDisconnectedDotBrush" Color="#33FFFFFF" />
+
+            <!-- connexion gRPC —Connecting -->
+            <SolidColorBrush x:Key="ConnConnectingBackgroundBrush" Color="#1CEF9F27" />
+            <SolidColorBrush x:Key="ConnConnectingBorderBrush" Color="#4CEF9F27" />
+            <SolidColorBrush x:Key="ConnConnectingDotBrush" Color="#FFEF9F27" />
+
+            <!-- connexion gRPC —Connected -->
+            <SolidColorBrush x:Key="ConnConnectedBackgroundBrush" Color="#1A5DCAA5" />
+            <SolidColorBrush x:Key="ConnConnectedBorderBrush" Color="#4D5DCAA5" />
+            <SolidColorBrush x:Key="ConnConnectedDotBrush" Color="#FF5DCAA5" />
+
+            <!-- connexion gRPC —InGame -->
+            <SolidColorBrush x:Key="ConnInGameBackgroundBrush" Color="#178B5CF6" />
+            <SolidColorBrush x:Key="ConnInGameBorderBrush" Color="#308B5CF6" />
+            <SolidColorBrush x:Key="ConnInGameDotBrush" Color="#FFA78bfa" />
+
+            <!-- connexion gRPC —Error -->
+            <SolidColorBrush x:Key="ConnErrorBackgroundBrush" Color="#1EE24B4A" />
+            <SolidColorBrush x:Key="ConnErrorBorderBrush" Color="#4DE24B4A" />
+            <SolidColorBrush x:Key="ConnErrorDotBrush" Color="#FFF09595" />
+
+            <!-- connexion gRPC — texte -->
+            <SolidColorBrush x:Key="ConnDisconnectedTextBrush" Color="#4DFFFFFF" />
+            <SolidColorBrush x:Key="ConnConnectingTextBrush" Color="#FFEF9F27" />
+            <SolidColorBrush x:Key="ConnConnectedTextBrush" Color="#FF5DCAA5" />
+            <SolidColorBrush x:Key="ConnInGameTextBrush" Color="#FFA78BFA" />
+            <SolidColorBrush x:Key="ConnInGameShardTextBrush" Color="#A6A78BFA" />
+            <SolidColorBrush x:Key="ConnErrorTextBrush" Color="#FFF09595" />
+
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
     <!-- Pour les règles générales -->
