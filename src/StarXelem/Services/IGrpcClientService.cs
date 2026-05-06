@@ -25,7 +25,7 @@ public interface IGrpcClientService
     Task TestRequest();
     GrpcConnectionStatus Status { get; }
     string? ErrorMessage { get; }
-    ShardInfo? CurrentShardInfo { get; }
+    string? CurrentShard { get; }
     Task<IList<Contact>> GetFriendList();
     Task<ShardInfo> GetShardInfo(int accountId);
     Task<IList<EntityStowContext>> GetEntityStowContextByParentUrnList(IList<string> urnList, List<uint> crcTypeList);

@@ -35,7 +35,7 @@ public class GrpcClientService : IGrpcClientService
 
     public GrpcConnectionStatus Status { get; private set; } = GrpcConnectionStatus.Disconnected;
     public string? ErrorMessage { get; private set; }
-    public ShardInfo? CurrentShardInfo { get; private set; }
+    public string? CurrentShard { get; private set; }
 
     public GrpcClientService(ILogger<GrpcClientService> logger, IP4kService p4kService)
     {
@@ -1155,16 +1155,54 @@ public class GrpcClientService : IGrpcClientService
     {
         if (state == FileState.Missing && Status == GrpcConnectionStatus.InGame)
         {
-            // Le fichier a disparu pendant que le joueur était en jeu → reset vers Connected
             _logger.LogInformation("Game.log disappeared while InGame — resetting to Connected");
+            CurrentShard = null;
             SetStatus(GrpcConnectionStatus.Connected);
         }
     }
 
     private void OnLogLineReceived(object? sender, FileTailEventArgs e)
     {
-        // TODO: Interpréter les lignes du log pour détecter l'état "En jeu"
-        // Exemple : "Server changed to [shard_name]" → passer en InGame avec nom de shard
+        var line = e.Line;
+
+        if (line.Contains("<Join PU>") && line.Contains("shard["))
+        {
+            CurrentShard = ExtractBracketValue(line, "shard[");
+            SetStatus(GrpcConnectionStatus.InGame);
+            _logger.LogInformation("Player joined shard: {Shard}", CurrentShard);
+            return;
+        }
+
+        if (line.Contains("<Channel Disconnected>")
+            && line.Contains("Remote Disconnect - Player requested disconnect")
+            && line.Contains("SC_Default"))
+        {
+            CurrentShard = null;
+            SetStatus(GrpcConnectionStatus.Connected);
+            _logger.LogInformation("Player disconnected from shard (player requested)");
+            return;
+        }
+
+        if (line.Contains("Client quitting game") || line.Contains("Fast Shutdown"))
+        {
+            CurrentShard = null;
+            SetStatus(GrpcConnectionStatus.Connected);
+            _logger.LogInformation("Game closed");
+        }
+    }
+
+    private static string? ExtractBracketValue(string line, string prefix)
+    {
+        int start = line.IndexOf(prefix, StringComparison.Ordinal);
+        if (start < 0)
+            return null;
+
+        start += prefix.Length;
+        int end = line.IndexOf(']', start);
+        if (end < 0)
+            return null;
+
+        return line[start..end];
     }
 
     private void CleanWatch()
@@ -1181,7 +1219,7 @@ public class GrpcClientService : IGrpcClientService
             _watcher = null;
             _authHeaders = null;
             _playerInfo = null;
-            CurrentShardInfo = null;
+            CurrentShard = null;
         }
 
         if (null != _channel)

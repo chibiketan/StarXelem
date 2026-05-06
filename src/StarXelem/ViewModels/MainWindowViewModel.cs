@@ -75,7 +75,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         GrpcStatus = status;
         GrpcErrorMessage = status == GrpcConnectionStatus.Error ? _grpcClientService.ErrorMessage : null;
-        CurrentShardName = status == GrpcConnectionStatus.InGame ? _grpcClientService.CurrentShardInfo?.DgsId : null;
+        CurrentShardName = status == GrpcConnectionStatus.InGame ? _grpcClientService.CurrentShard : null;
     }
     [ObservableProperty]
     private PopupViewModel _popupViewModel;

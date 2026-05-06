@@ -83,6 +83,7 @@ public class DesignGrpcClientService : IGrpcClientService
     public GrpcConnectionStatus Status => GrpcConnectionStatus.Connected;
     public string? ErrorMessage => null;
     public ShardInfo? CurrentShardInfo => null;
+    public string? CurrentShard => null;
     public Task<IList<Contact>> GetFriendList()
     {
         return Task.FromResult<IList<Contact>>(new List<Contact>
