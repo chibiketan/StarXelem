@@ -7,10 +7,15 @@ namespace StarXelem;
 
 public class ViewLocator : IDataTemplate
 {
+    private static bool _registered = false;
     private static readonly Dictionary<Type, Func<Control>> Registration = new();
 
     public static void RegisterViews()
     {
+        // Register all views only once
+        if (_registered)
+            return;
+        
         var viewModelType = typeof(ViewModelBase);
         var controlType = typeof(Control);
 
@@ -32,6 +37,8 @@ public class ViewLocator : IDataTemplate
                 Registration.Add(viewModel, () => control);
             }
         }
+        
+        _registered = true;
     }
 
     public Control? Build(object? param)

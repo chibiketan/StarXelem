@@ -38,9 +38,9 @@ public partial class FriendListTabViewModel : PageViewModelBase
     public async Task LoadFriendList()
     {
         IsLoading = true;
-        TreatmentStatus = "Appel RSI";
-        var friendList = await _clientService.GetFriendList();
-        await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Terminé");
+        await SetTreatmentStatus("Appel RSI").ConfigureAwait(false);
+        var friendList = await _clientService.GetFriendList().ConfigureAwait(false);
+        await SetTreatmentStatus("Terminé").ConfigureAwait(false);
         FriendList = Task.FromResult(friendList.Select(f => new FriendViewModel(
             displayName: f.Account?.DisplayName ?? "Unknown",
             tokenName: f.Account?.Nickname ?? "Unknown",
@@ -52,6 +52,17 @@ public partial class FriendListTabViewModel : PageViewModelBase
         )).ToList())!;
         IsLoading = false;
         AppliFilterOnSearchresult();
+    }
+
+    private Task SetTreatmentStatus(string treatmentStatus)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            TreatmentStatus = treatmentStatus;
+            return Task.CompletedTask;
+        }
+        
+        return Dispatcher.UIThread.InvokeAsync(() => SetTreatmentStatus(treatmentStatus));
     }
 
     public bool CanLoadFriendList()

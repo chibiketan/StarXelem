@@ -1,8 +1,12 @@
 using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using StarXelem.Design;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
+using StarXelem.Tests.Visual.Services;
 using StarXelem.ViewModels;
+using StarXelem.ViewModels.Popup;
 
 namespace StarXelem.Tests;
 
@@ -26,8 +30,15 @@ public class HeadlessAppFixture : IDisposable
     /// </summary>
     internal static void RegisterTestServices(ServiceCollection services)
     {
+        services.AddLogging(b =>
+        {
+            // Disable logs
+            b.SetMinimumLevel(LogLevel.None);
+        });
+
+        
         // Mock IGrpcClientService avec données prévisibles (du projet principal)
-        services.AddSingleton<IGrpcClientService, DesignGrpcClientService>();
+        services.AddSingleton<IGrpcClientService, TestGrpcClientService>();
 
         // Mock P4kService
         services.AddSingleton<IP4kService, DesignP4kService>();
@@ -38,9 +49,16 @@ public class HeadlessAppFixture : IDisposable
         // Entity class definition
         services.AddSingleton<IEntityClassDefinitionService, EntityClassDefinitionService>();
 
+        services.AddSingleton<ISettingsService, DesignSettingService>();
+
         // ViewModels nécessaires pour FriendListTabViewModel et ses dépendances transitives
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<FriendListTabViewModel>();
+        services.AddTransient<BlueprintListTabViewModel>();
+        services.AddTransient<P4kShipTabViewModel>();
+        services.AddTransient<MissionsTabViewModel>();
+        services.AddTransient<SettingsTabViewModel>();
+        services.AddTransient<PopupViewModel>();
     }
 
     public void Dispose() { }
