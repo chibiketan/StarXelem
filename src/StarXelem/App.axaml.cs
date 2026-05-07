@@ -1,9 +1,6 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
-using System.Linq;
-using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
@@ -19,7 +16,7 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
-        if (Design.IsDesignMode)
+        if (Avalonia.Controls.Design.IsDesignMode)
         {
             RequestedThemeVariant = ThemeVariant.Dark;
         }
@@ -29,7 +26,8 @@ public partial class App : Application
     {
         var collection = new ServiceCollection();
 
-        collection.RegisterServices(Design.IsDesignMode);
+        var isTest = ProgramRegistry.IsTestMode;
+        collection.RegisterServices(Avalonia.Controls.Design.IsDesignMode, isTest);
         ViewLocator.RegisterViews();
 
         Services = collection.BuildServiceProvider();
@@ -46,7 +44,7 @@ public partial class App : Application
             };
         }
 
-        if (Design.IsDesignMode)
+        if (Avalonia.Controls.Design.IsDesignMode)
         {
             // On trigger les données de design
             Console.WriteLine("NB blueprint au lancement {0}", DesignData.BlueprintListTabViewModel.BlueprintList?.Count);

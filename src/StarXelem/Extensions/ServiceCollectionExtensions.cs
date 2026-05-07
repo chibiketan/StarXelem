@@ -3,13 +3,14 @@ using Microsoft.Extensions.Logging;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
 using StarXelem.ViewModels;
+using StarXelem.Design;
 using StarXelem.ViewModels.Popup;
 
 namespace StarXelem.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static void RegisterServices(this ServiceCollection services, bool isDesignMode)
+    public static void RegisterServices(this ServiceCollection services, bool isDesignMode, bool isTestMode)
     {
         services.AddLogging(b =>
         {
@@ -37,13 +38,21 @@ public static class ServiceCollectionExtensions
         services.AddTransient<FleetSyncPopupContentViewModel>();
         services.AddTransient<ItemsSyncPopupContentViewModel>();
 
-        if (isDesignMode)
+        if (isTestMode)
         {
+            // En mode test headless on injecte des mocks prévisibles pour des états reproductibles.
+            services.AddSingleton<IP4kService, DesignP4kService>();
+            services.AddSingleton<IGrpcClientService, TestGrpcClientService>();
+            services.AddSingleton<ILocationService, DesignLocationService>();
+            services.AddSingleton<IEntityClassDefinitionService, EntityClassDefinitionService>();
+        }
+        else if (isDesignMode)
+        {
+            // En mode design-time on injecte des mocks pour les données de conception.
             services.AddSingleton<IP4kService, DesignP4kService>();
             services.AddSingleton<IGrpcClientService, DesignGrpcClientService>();
             services.AddSingleton<ILocationService, DesignLocationService>();
             services.AddSingleton<IEntityClassDefinitionService, EntityClassDefinitionService>();
-            services.AddSingleton<BlueprintListTabViewModel>();
         }
         else
         {

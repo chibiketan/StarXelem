@@ -1,0 +1,6 @@
+<Project>
+  <!-- Override global.json test runner for xUnit 2.x which uses vstest -->
+  <PropertyGroup>
+    <TestingPlatformDotnetTestSupport>false</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+</Project>

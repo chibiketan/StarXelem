@@ -7,7 +7,7 @@ using Sc.External.Services.Friends.V1;
 using StarXelem.Models;
 using StarXelem.Services;
 
-namespace StarXelem;
+namespace StarXelem.Services;
 
 public class DesignGrpcClientService : IGrpcClientService
 {

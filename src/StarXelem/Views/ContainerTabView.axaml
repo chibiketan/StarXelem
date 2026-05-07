@@ -21,7 +21,7 @@
         <Grid Grid.Row="1">
             <DataGrid  ItemsSource="{Binding InventoryList^}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="All">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Id" Binding="{Binding Id}" />
+                    <DataGridTextColumn  Header="Id" Binding="{Binding Id}" />
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" />
                     <DataGridTextColumn Header="Context" Binding="{Binding Context}" />
                     <DataGridTextColumn Header="SubjectId" Binding="{Binding SubjectId}" />

@@ -15,12 +15,12 @@ The system is composed of three specialized agents orchestrated via a CLI tool.
 
 ### 1. Agent A: The Pilot (Execution)
 **Purpose:** To drive the application to a specific state and capture its visual output.
-*   **Technology:** C# with **FlaUI** (for Windows/Avalonia automation).
+*   **Technology:** **Avalonia Headless** (In-process testing).
 *   **Mechanism:** 
-    *   Launches the StarXelem process with specific CLI flags (`--test-mode`, `--mock-data`).
-    *   Navigates through the UI using `AutomationId` for stability.
-    *   Triggers `IScreenshotService` to capture the final view.
-*   **Input:** Target page/component name, configuration flags.
+    *   Runs the application in a headless environment, bypassing the need for a physical window.
+    *   Navigates through the UI by searching the Visual Tree (e.g., using `AutomationId`).
+    *   Uses the internal Skia rendering engine to capture screenshots directly from the rendered controls/window.
+*   **Input:** Target page/component name, configuration flags (`--mock-data`, `--test-mode`).
 *   **Output:** A high-resolution `.png` of the actual application state.
 
 ### 2. Agent B: The Reference Generator (Truth)
@@ -61,18 +61,15 @@ The report will be a standalone HTML file containing:
 
 ## Implementation Strategy
 
-### Phase 1: Foundation
-*   Implement CLI argument parsing in a new test project.
-*   Extend `IScreenshotService` to support automated capture.
-*   Set up the `FlaUI` pilot logic for basic navigation.
+### Phase 1: Foundation & Headless Setup
+*   Create a new test project using `Avalonia.Headless`.
+*   Implement the CLI entry point to handle `--test-mode` and `--mock-data`.
+*   Configure the DI container to allow swapping real services for mocks when the headless flag is present.
 
-### Phase 2: Reference & Comparison
-*   Integrate Playwright for HTML rendering.
-*   Implement the side-by-side comparison logic.
+### Phase 2: Pilot & Reference Generation
+*   Develop the "Pilot" logic using Avalonia Headless to navigate the Visual Tree via `AutomationId`.
+*   Integrate `Playwright` to render HTML mockups and generate "Golden Images".
 
-### Phase 3: Intelligence Integration
-*   Connect to a local Ollama instance.
-*   Develop the prompt engineering required to make Agent C effective at visual auditing.
-
-### Phase 4: Reporting
-*   Build the HTML report generator.
+### Phase 3: Intelligence & Reporting
+*   Integrate a local multimodal LLM (via Ollama) for semantic analysis.
+*   Implement the HTML reporting engine with side-by-side comparison and heatmap overlays.
