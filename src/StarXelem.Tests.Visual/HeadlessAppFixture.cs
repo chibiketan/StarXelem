@@ -1,4 +1,3 @@
-using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StarXelem.Design;
@@ -51,11 +50,15 @@ public class HeadlessAppFixture : IDisposable
 
         services.AddSingleton<ISettingsService, DesignSettingService>();
 
-        // ViewModels nécessaires pour FriendListTabViewModel et ses dépendances transitives
+        // ViewModels nécessaires pour tous les onglets de l'application
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<FriendListTabViewModel>();
         services.AddTransient<BlueprintListTabViewModel>();
         services.AddTransient<P4kShipTabViewModel>();
+        services.AddTransient<ShipTabViewModel>();
+        services.AddTransient<ItemsTabViewModel>();
+        services.AddTransient<ContainerTabViewModel>();
+        services.AddTransient<ExtractionTabViewModel>();
         services.AddTransient<MissionsTabViewModel>();
         services.AddTransient<SettingsTabViewModel>();
         services.AddTransient<PopupViewModel>();
