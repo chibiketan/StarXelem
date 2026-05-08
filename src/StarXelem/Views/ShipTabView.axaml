@@ -24,7 +24,7 @@
                         <TextBlock Grid.Column="1">Sync Flotte</TextBlock>
                     </Grid>
                 </Button>
-                <Button Classes="btn principal" Command="{Binding LoadShipListCommand}">
+                <Button Name="LoadButton" Classes="btn principal" Command="{Binding LoadShipListCommand}">
                     <Grid ColumnDefinitions="Auto,*">
                         <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync">
                             <ic:SymbolIcon.RenderTransform>
@@ -42,7 +42,7 @@
             </Grid>
         </Grid>
         <Grid Grid.Row="1">
-            <DataGrid  ItemsSource="{Binding Spaceships^}" AutoGenerateColumns="False" IsReadOnly="True" >
+            <DataGrid Name="ShipDataGrid" ItemsSource="{Binding Spaceships^}" AutoGenerateColumns="False" IsReadOnly="True" >
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="NOM" Binding="{Binding Name}" />
                     <DataGridTextColumn Header="MODÈLE" Binding="{Binding Shipname}" CellStyleClasses="demi-dimming" />

@@ -13,7 +13,7 @@
              x:Class="StarXelem.Views.FriendListTabView">
     <Grid RowDefinitions="Auto,*" Classes="main">
         <Grid Grid.Row="0" ColumnSpacing="15" Classes="header" ColumnDefinitions="Auto, Auto, *,Auto" Height="45">
-            <Button Classes="btn principal" Command="{Binding LoadFriendListCommand}">
+            <Button Name="LoadButton" Classes="btn principal" Command="{Binding LoadFriendListCommand}">
                 <Grid ColumnDefinitions="Auto,*">
                     <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync">
                         <ic:SymbolIcon.RenderTransform>
@@ -24,14 +24,14 @@
                 </Grid>
             </Button>
             <Separator Grid.Column="1" Classes="vertical" />
-            <ToggleSwitch Grid.Column="2" OffContent="Tous les amis" OnContent="Uniquement les amis connectés" IsChecked="{Binding OnlyConnected}" VerticalAlignment="Center"  VerticalContentAlignment="Center" />
+            <ToggleSwitch Name="OnlyConnectedToggle" Grid.Column="2" OffContent="Tous les amis" OnContent="Uniquement les amis connectés" IsChecked="{Binding OnlyConnected}" VerticalAlignment="Center"  VerticalContentAlignment="Center" />
             <Grid Grid.Column="3" ColumnDefinitions="Auto,Auto" VerticalAlignment="Center" Margin="0 0 15 0">
                 <TextBlock Grid.Column="0" Text="{Binding FilteredFriendList.Count, FallbackValue=''}" />
                 <TextBlock Grid.Column="1" Classes="dimming" Text="{Binding FriendList^.Count, StringFormat=' / {0} amis', FallbackValue=0 amis}" />
             </Grid>
         </Grid>
         <Grid Grid.Row="1">
-            <DataGrid ItemsSource="{Binding FilteredFriendList}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal" >
+            <DataGrid Name="FriendDataGrid" ItemsSource="{Binding FilteredFriendList}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal" >
                 <DataGrid.Resources>
                     <!-- Permet de ne plus réserver d'espace à droite pour l'icone de tri -->
                     <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>

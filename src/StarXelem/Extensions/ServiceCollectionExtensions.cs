@@ -45,6 +45,7 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IGrpcClientService, TestGrpcClientService>();
             services.AddSingleton<ILocationService, DesignLocationService>();
             services.AddSingleton<IEntityClassDefinitionService, EntityClassDefinitionService>();
+            services.AddTransient<BlueprintListTabViewModel>();
         }
         else if (isDesignMode)
         {

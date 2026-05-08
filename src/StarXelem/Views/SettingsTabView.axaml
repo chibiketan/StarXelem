@@ -96,12 +96,12 @@
                                 <TextBlock Classes="action-desc"
                                            Text="Saisissez votre clé API pour accéder aux services externes." />
                             </StackPanel>
-                            <TextBox Classes="txt-api-key"
+                            <TextBox Name="ApiKeyField" Classes="txt-api-key"
                                      Watermark="Entrez votre clé API…"
                                      Text="{Binding ApiKey}" />
                         </StackPanel>
 
-                        <Button Grid.Column="2"
+                        <Button Name="SaveApiKeyButton" Grid.Column="2"
                                 Classes="btn-save"
                                 Command="{Binding SaveApiKeyCommand}"
                                 VerticalAlignment="Center"

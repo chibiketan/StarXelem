@@ -24,7 +24,7 @@
     <Grid Grid.Row="0" Grid.Column="1" Classes="master" RowDefinitions="Auto,Auto,Auto,*,Auto" ColumnDefinitions="*">
         <Grid Grid.Row="0" RowDefinitions="*,*,*" ColumnDefinitions="*,Auto">
             <TextBlock Grid.Column="0" Classes="title">BLUEPRINT</TextBlock>
-            <Button Grid.Row="0" Grid.Column="1" Classes="btn principal" Command="{Binding LoadItemListCommand}">
+            <Button Name="LoadButton" Grid.Row="0" Grid.Column="1" Classes="btn principal" Command="{Binding LoadItemListCommand}">
                 <Grid ColumnDefinitions="Auto,*,Auto">
                     <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync">
                         <ic:SymbolIcon.RenderTransform>
@@ -45,7 +45,7 @@
             </Button>
         </RelativePanel>
         <Separator Grid.Row="2" Classes="horizontal" />
-        <ListBox Grid.Row="3" Classes="bp-list" ItemsSource="{Binding BlueprintList}" SelectedItem="{Binding SelectedBluePrint}">
+        <ListBox Name="BlueprintListBox" Grid.Row="3" Classes="bp-list" ItemsSource="{Binding BlueprintList}" SelectedItem="{Binding SelectedBluePrint}">
             <ListBox.DataTemplates>
                 <DataTemplate DataType="{x:Type vm:BlueprintViewModel}">
                     <Grid Classes="bp-list-row" RowDefinitions="*" ColumnDefinitions="Auto,*,Auto">

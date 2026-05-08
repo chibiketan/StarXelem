@@ -109,7 +109,7 @@
                                        Text="Génère un fichier CSV contenant l'ensemble des IDs CIG et leur valeur CRC32." />
                         </StackPanel>
 
-                        <Button Grid.Column="2"
+                        <Button Name="ExtractCsvButton" Grid.Column="2"
                                 Classes="btn-csv"
                                 Command="{Binding ExtractCigIdsCommand}"
                                 VerticalAlignment="Center">
@@ -172,7 +172,7 @@
                                        Text="Extrait les libellés des fichiers du jeu, identifie les composants, ajoute le type, la taille et le rang, puis dépose le fichier au bon endroit pour être utilisé par le jeu." />
                         </StackPanel>
 
-                        <Button Grid.Column="2"
+                        <Button Name="UpdateLangButton" Grid.Column="2"
                                 Classes="btn-lang"
                                 Command="{Binding UpdateLocalisationCommand}"
                                 VerticalAlignment="Center">

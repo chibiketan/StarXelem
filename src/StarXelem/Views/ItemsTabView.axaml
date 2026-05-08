@@ -31,7 +31,7 @@
                 <TextBox Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Text="{Binding OwnerId}" IsEnabled="{Binding !UseConnectedProfilAsOwner}" />
                 <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center">id</TextBlock>
                 <TextBox Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Id}" />
-                <Button Grid.Row="5" Grid.Column="5" HorizontalAlignment="Center" Command="{Binding LoadItemListCommand}">Chercher</Button>
+                <Button Name="SearchButton" Grid.Row="5" Grid.Column="5" HorizontalAlignment="Center" Command="{Binding LoadItemListCommand}">Chercher</Button>
                 
                 <TextBlock Grid.Column="2" VerticalAlignment="Center">Type:</TextBlock>
                 <ScrollViewer Grid.Row="1" Grid.Column="2" Grid.RowSpan="4" >
@@ -122,7 +122,7 @@
             <Button Grid.Column="2" Classes="btn export" Command="{Binding ExportToExcelCommand}" >Exporter Excel</Button>
             <Button Grid.Column="3" Command="{Binding CompareDataFromImportCommand}">Comparaison depuis export</Button>
         </Grid>
-        <DataGrid Grid.Row="3" ItemsSource="{Binding ItemList^}" SelectedItem="{Binding SelectedItem}" Margin="0,5,0,0">
+        <DataGrid Name="ItemsDataGrid" Grid.Row="3" ItemsSource="{Binding ItemList^}" SelectedItem="{Binding SelectedItem}" Margin="0,5,0,0">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="id" Binding="{Binding Id}" />
                 <!-- <DataGridTextColumn Header="ownerId" Binding="{Binding OwnerId}" IsVisible="{Binding IsInDebugMode}" /> -->
