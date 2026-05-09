@@ -85,4 +85,9 @@
     <ItemGroup>
       <Folder Include="maquettes\" />
     </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="ReportCLI\**\*.cs" />
+      <Compile Remove="VisualJudge\**\*.cs" />
+    </ItemGroup>
 </Project>

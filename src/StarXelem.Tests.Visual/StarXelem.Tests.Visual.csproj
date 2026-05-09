@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Playwright" Version="1.50.0" />
     <PackageReference Include="Avalonia.Headless.XUnit" Version="11.3.14" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.6" />
     <PackageReference Include="Avalonia.Skia" Version="11.3.14" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="FluentIcons.Avalonia.Fluent" Version="2.0.325" />
@@ -27,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\StarXelem\StarXelem.csproj" />
+    <ProjectReference Include="..\StarXelem.VisualJudge\StarXelem.VisualJudge.csproj" />
   </ItemGroup>
 
   <ItemGroup>

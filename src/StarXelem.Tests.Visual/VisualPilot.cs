@@ -40,8 +40,11 @@ public static class VisualPilot
         var viewModel = App.Current.Services.GetRequiredService<MainWindowViewModel>();
         var window = new StarXelem.Views.MainWindow { DataContext = viewModel };
         window.Show();
-        window.Measure(Size.Infinity);
-        window.Arrange(new Rect(default, window.DesiredSize));
+
+        // Force 1920x1080 for pixel-perfect comparison consistency across runs
+        Size targetSize = ScreenshotHelper.ScreenshotSize;
+        window.Measure(targetSize);
+        window.Arrange(new Rect(default, targetSize));
 
         await Dispatcher.UIThread.InvokeAsync(() => { });
         return window;
