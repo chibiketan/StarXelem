@@ -149,7 +149,8 @@ public class DesignP4kService : IP4kService
                             modifierOverrides =
                             [
                             ],
-                            missionTypeOverride = null
+                            missionTypeOverride = null,
+                            overridePhaseMissionDetailsDisplayInfo = []
                         },
                         required_active_scenarios = [],
                         notForRelease = false,
@@ -182,7 +183,8 @@ public class DesignP4kService : IP4kService
                                     propertyTagReplacement = [],
                                     propertyOverrides = [],
                                     modifierOverrides = [],
-                                    missionTypeOverride = null
+                                    missionTypeOverride = null,
+                                    overridePhaseMissionDetailsDisplayInfo = []
                                 },
                                 subContracts = [],
                                 additionalPrerequisites = [],
