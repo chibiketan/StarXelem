@@ -5,14 +5,13 @@ using Sc.External.Common.Api.V1;
 using Sc.External.Common.Shard.V1;
 using Sc.External.Services.BlueprintLibrary.V1;
 using Sc.External.Services.Contacts.V1;
-using Sc.External.Services.Entitlement.V1;
+using Sc.External.Services.Entitlement.V2;
 using Sc.External.Services.Entitygraph.V1;
 using Sc.External.Services.Identity.V1;
 using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Models;
 using DateTime = System.DateTime;
-using EntitlementItemType = Sc.External.Services.Entitlement.V1.EntitlementItemType;
 using EntityFilter = Sc.External.Services.Entitygraph.V1.EntityFilter;
 using PropertyFilter = Sc.External.Common.Api.V1.PropertyFilter;
 
@@ -106,150 +105,33 @@ public class GrpcClientService : IGrpcClientService
     public async Task<IList<SpaceshipModel>> GetSpaceships()
     {
         var entitlementServiceClient = new ExternalEntitlementService.ExternalEntitlementServiceClient(_channel);
-
-        var request = new Sc.External.Services.Entitlement.V1.QueryRequest();
-        request.Query = new Query();
-        request.Query.Filter = new Filter();
-
-        var baseFilter = new CompositeFilter();
-
-        baseFilter.Operator = CompositeFilter.Types.LogicalOperator.And;
-        request.Query.Filter.CompositeFilter = baseFilter;
-
-        // status filter
-        var statusCompositeFilter = new CompositeFilter();
-        statusCompositeFilter.Operator = CompositeFilter.Types.LogicalOperator.Or;
-        statusCompositeFilter.Filters.Add(new Filter
-        {
-            PropertyFilter = new PropertyFilter{
-                Operator = PropertyFilter.Types.ComparisonOperator.Equals,
-                Property = "status",
-                Value = ((int)EntitlementStatus.Fulfilled).ToString()
-                
-            }
-        });
-        statusCompositeFilter.Filters.Add(new Filter
-        {
-            PropertyFilter = new PropertyFilter
-            {
-                Operator = PropertyFilter.Types.ComparisonOperator.Equals,
-                Property = "status",
-                Value = ((int)EntitlementStatus.Unclaimed).ToString()
-            } 
-        });
-
-        request.Query.Filter.CompositeFilter.Filters.Add(new Filter
-        {
-          CompositeFilter = statusCompositeFilter  
-        });
+        var result = new List<SpaceshipModel>(50);
         
-        
-        // policy filter
-        var policyCompositeFilter = new CompositeFilter();
-        policyCompositeFilter.Operator = CompositeFilter.Types.LogicalOperator.Or;
-        policyCompositeFilter.Filters.Add(new Filter
-        {
-            PropertyFilter = new PropertyFilter{
-                Operator = PropertyFilter.Types.ComparisonOperator.Equals,
-                Property = "insurance.policy.coverage",
-                Value = "lifetime"
-                
-            }
-        });
-        policyCompositeFilter.Filters.Add(new Filter
-        {
-            PropertyFilter = new PropertyFilter
-            {
-                Operator = PropertyFilter.Types.ComparisonOperator.Equals,
-                Property = "insurance.policy.coverage",
-                Value = "duration"
-            }
-        });
-
-        request.Query.Filter.CompositeFilter.Filters.Add(new Filter
-        {
-            CompositeFilter = policyCompositeFilter  
-        });
-        
-        
-        // source filter
-        var sourceCompositeFilter = new CompositeFilter();
-        sourceCompositeFilter.Operator = CompositeFilter.Types.LogicalOperator.Or;
-        sourceCompositeFilter.Filters.Add(new Filter
-        {
-            PropertyFilter = new PropertyFilter
-            {
-                Operator = PropertyFilter.Types.ComparisonOperator.Equals,
-                Property = "source",
-                Value = ((int)EntitlementSource.Platform).ToString()
-            }
-        });
-        sourceCompositeFilter.Filters.Add(new Filter
-        {
-            PropertyFilter = new PropertyFilter
-            {
-                Operator = PropertyFilter.Types.ComparisonOperator.Equals,
-                Property = "source",
-                Value = ((int)EntitlementSource.PersistentUniverse).ToString()
-            }
-        });
-        sourceCompositeFilter.Filters.Add(new Filter
-        {
-            PropertyFilter = new PropertyFilter
-            {
-                Operator = PropertyFilter.Types.ComparisonOperator.Equals,
-                Property = "source",
-                Value = ((int)EntitlementSource.LongtermPersistence).ToString()
-            }
-        });
-
-        request.Query.Filter.CompositeFilter.Filters.Add(new Filter
-        {
-            CompositeFilter = sourceCompositeFilter  
-        });
-        
-        // itemType filter
-        request.Query.Filter.CompositeFilter.Filters.Add(new Filter
-        {
-            PropertyFilter = new PropertyFilter
-            {
-                Operator = PropertyFilter.Types.ComparisonOperator.Equals,
-                Property = "itemType",
-                Value = ((int)EntitlementItemType.Ship).ToString()
-            }  
-        });
-
-        // player filter
-        request.Query.Filter.CompositeFilter.Filters.Add(new Filter
-        {
-            PropertyFilter = new PropertyFilter
-            {
-                Operator = PropertyFilter.Types.ComparisonOperator.Equals,
-                Property = "playerUrn",
-                Value = $"urn:sc:global:player:geid:{_playerInfo.Player.Geid}"
-            }  
-        });
-
-            
         // Appel réel
         Console.WriteLine($"{DateTime.Now} avant la requête");
         await semaphoreSlim.WaitAsync();
-        Sc.External.Services.Entitlement.V1.QueryResponse response;
         try
         {
-            response = await entitlementServiceClient.QueryAsync(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+            // On ne récupère que les véhicules
+            using var response = entitlementServiceClient.QueryEntitlementsByItemTypeStream(new QueryEntitlementsByItemTypeStreamRequest
+            {
+                ItemType = nameof(EItemType.NOITEM_Vehicle)
+            }, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(10));
+
+            while (await response.ResponseStream.MoveNext(CancellationToken.None))
+            {
+                var current = response.ResponseStream.Current;
+                
+                result.AddRange(current.Results.Select(e => new SpaceshipModel(e)));
+            }
         }
         finally
         {
             semaphoreSlim.Release();
         }
         
-        Console.WriteLine($"{DateTime.Now} après la requête, {response.Results.Count} résultats");
-
-
-        var results = response.Results.Select(r => new SpaceshipModel(r)).ToList();
-        
-        return results;
+        Console.WriteLine($"{DateTime.Now} après la requête, {result.Count} résultats");
+        return result;
     }
     
     public async Task<IList<EntityItemQueryResult>> QueryGraphBySearch(ItemQueryModel itemQueryModel)

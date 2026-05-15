@@ -1,7 +1,7 @@
 ﻿using DocumentFormat.OpenXml.InkML;
 using Microsoft.Extensions.DependencyInjection;
 using Sc.External.Common.Shard.V1;
-using Sc.External.Services.Entitlement.V1;
+using Sc.External.Services.Entitlement.V2;
 using Sc.External.Services.Entitygraph.V1;
 using StarXelem.Models;
 using StarXelem.Services;
@@ -244,32 +244,32 @@ public static class DesignData
         ShipTabViewModel.Spaceships = Task.FromResult<IList<SpaceshipModel>>(new List<SpaceshipModel>
         {
             // STOWED — achat réel, dans un hangar
-            new(new Entitlement { Name = "Idris-P", SourceSku = "PackageName", EntityClassGuid = "GUID1", RealMoney = true, Status = EntitlementStatus.Fulfilled })
+            new(new Entitlement { EntityClassGuid = "GUID1", Status = EntitlementStatus.Delivered, Metadata = new EntitlementMetadata { Name = "Idris-P", SourceSku = "PackageName", RealMoney = true}})
             {
                 Shipname = "AEGS_Idris_P",
                 ReadableLocation = "[HANGAR] Area 18 - ArcCorp",
                 StowContext = new EntityStowContext { IsStowed = true, ShardId = "pub_use1b_3.24_12345" }
             },
             // UNSTOWED — porté sur le joueur
-            new(new Entitlement { Name = "", SourceSku = "Aurora MR Starter Pack", EntityClassGuid = "GUID2", RealMoney = true, Status = EntitlementStatus.Fulfilled })
+            new(new Entitlement { EntityClassGuid = "GUID2", Status = EntitlementStatus.Delivered, Metadata = new EntitlementMetadata { Name = "", SourceSku = "Aurora MR Starter Pack", RealMoney = true } })
             {
                 Shipname = "RSIN_AuroraMR",
                 ReadableLocation = "Porté",
                 StowContext = new EntityStowContext { IsStowed = false, ShardId = "pub_euw1b_3.24_67890" }
             },
             // DESTROYED — StowContext null
-            new(new Entitlement { Name = "Cutlass Black", SourceSku = "PackageName", EntityClassGuid = "GUID3", RealMoney = false, Status = EntitlementStatus.Fulfilled })
+            new(new Entitlement { EntityClassGuid = "GUID3", Status = EntitlementStatus.Delivered, Metadata = new EntitlementMetadata { Name = "Cutlass Black", SourceSku = "PackageName", RealMoney = false }})
             {
                 Shipname = "DRAK_Cutlass_Black"
             },
             // UNCLAIMED — jamais réclamé
-            new(new Entitlement { Name = "Avenger Titan", SourceSku = "PackageName", EntityClassGuid = "GUID4", RealMoney = true, Status = EntitlementStatus.Unclaimed })
+            new(new Entitlement { EntityClassGuid = "GUID4", Status = EntitlementStatus.Undelivered, Metadata = new EntitlementMetadata { Name = "Avenger Titan", SourceSku = "PackageName", RealMoney = true} })
             {
                 Shipname = "AEGS_Avenger_Titan",
                 ReadableLocation = "[123456] Idris-P",
             },
             // STOWED — achat CCU (pas d'argent réel)
-            new(new Entitlement { Name = "Carrack", SourceSku = "PackageName", EntityClassGuid = "GUID5", RealMoney = false, Status = EntitlementStatus.Fulfilled })
+            new(new Entitlement { EntityClassGuid = "GUID5", Status = EntitlementStatus.Delivered, Metadata = new EntitlementMetadata { Name = "Carrack", SourceSku = "PackageName", RealMoney = false }})
             {
                 Shipname = "MISC_Carrack",
                 ReadableLocation = "[LOCATION] Lorville - Hurston",
