@@ -1,5 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using Sc.External.Services.Entitlement.V1;
+using Sc.External.Services.Entitlement.V2;
 using Sc.External.Services.Entitygraph.V1;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Extensions;
@@ -8,11 +8,11 @@ namespace StarXelem.Models;
 
 public class SpaceshipModel
 {
-    public string Name => !IsNameValid(Entitlement.Name) ? "" : Entitlement.Name;
+    public string Name => !IsNameValid(Entitlement.Metadata.Name) ? "" : Entitlement.Metadata.Name;
     public string Ship => (EntityClassDefinition?.Components.FirstOrDefault(c => c is VehicleComponentParams) as VehicleComponentParams)?.vehicleName ?? Entitlement.EntityClassGuid;
-    public string? PackageSource => Entitlement.SourceSku;
+    public string? PackageSource => Entitlement.Metadata.SourceSku;
     public string Shipname { get; set; }
-    public bool IsRealPurchase => Entitlement.RealMoney;
+    public bool IsRealPurchase => Entitlement.Metadata.RealMoney;
     public SpaceshipState State => GetState();
     public string? DisplayState => GetState().GetDisplayName();
     public string? Location => EntityProperties?.EntityEdge?.End?.InventoryId;
@@ -32,6 +32,7 @@ public class SpaceshipModel
     public bool IsLocationTypeId       => LocationPrefixInner != null && System.Text.RegularExpressions.Regex.IsMatch(LocationPrefixInner, @"^\d+$");
     public bool IsLocationTypeOther    => IsStandardLocation && !IsLocationTypeLocation && !IsLocationTypeHangar && !IsLocationTypeId;
     public string? Shard => StowContext?.ShardId;
+    public string? ClassRecordName { get; set; }
 
     public Entitlement Entitlement { get; }
     public EntityClassDefinition? EntityClassDefinition { get; set; }
@@ -67,25 +68,15 @@ public class SpaceshipModel
 
     private SpaceshipState GetState()
     {
-        if (Entitlement.Status == EntitlementStatus.Unclaimed)
-            return SpaceshipState.UNCLAIMED;
-        if (Entitlement.Status == EntitlementStatus.Fulfilled)
+        return Entitlement.Status switch
         {
-            if (null == StowContext)
-            {
-                // Pas d'entité, le vaisseau est détruit
-                return SpaceshipState.DESTROYED;
-            }
-
-            if (StowContext.IsStowed)
-            {
-                return SpaceshipState.STOWED;
-            }
-            
-            return SpaceshipState.UNSTOWED;
-        }
-        
-        return SpaceshipState.UNKNOWN;
+            EntitlementStatus.Undelivered => SpaceshipState.UNCLAIMED,
+            EntitlementStatus.Delivered when null == StowContext => SpaceshipState.DESTROYED,
+            EntitlementStatus.Delivered when StowContext.IsStowed => SpaceshipState.STOWED,
+            EntitlementStatus.Delivered => SpaceshipState.UNSTOWED,
+            EntitlementStatus.Packaged => SpaceshipState.UNCLAIMED,
+            _ => SpaceshipState.UNKNOWN
+        };
     }
 
     private bool IsNameValid(string entitlementName)
@@ -100,11 +91,16 @@ public class SpaceshipModel
             return false;
         }
 
-        if (entitlementName.Equals(Entitlement.SourceSku, StringComparison.CurrentCultureIgnoreCase))
+        if (entitlementName.Equals(Entitlement.Metadata.SourceSku, StringComparison.CurrentCultureIgnoreCase))
         {
             return false;
         }
-        
+
+        if (entitlementName.Equals(ClassRecordName, StringComparison.CurrentCultureIgnoreCase))
+        {
+            return false;
+        }
+
         return true;
     }
 }

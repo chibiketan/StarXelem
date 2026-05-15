@@ -57,62 +57,18 @@ public partial class ShipTabViewModel : PageViewModelBase
         _locationService.ClearCache();
         TreatmentStatus = "Appel RSI";
         var spaceships = await _clientService.GetSpaceships();
-        await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement p4k");
-        // chargement du fichier p4k
-        await _p4KService.OpenP4k(_p4KService.SelectedP4KFile.Path, new Progress<double>(), new Progress<double>());
-        //  chargement de la traduction
-        await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement traduction");
-        var globalEntry = _p4KService.P4KFileSystem.OpenRead(@"Data\Localization\english\global.ini");
-        Dictionary<string, string> lang = new Dictionary<string, string>(500);
-        string iniFile;
-        using (var sr = new StreamReader(globalEntry, Encoding.UTF8, true))
-        {
-            while (await sr.ReadLineAsync() is { } line) {
-
-                if (!String.IsNullOrEmpty(line))
-                {
-                    var parts = line.Split('=', 2, StringSplitOptions.TrimEntries);
-                    var key = parts[0];
-                    var value = parts[1];
-                    
-                    if (key.EndsWith(",P"))
-                        key = key[..^2];
-                    lang.Add($"@{key}", value);
-                }
-            }
-        }
-        await globalEntry.DisposeAsync();
-        
         // Chargement des informations de classes sur les vaisseaux
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement classes des vaisseaux");
-        var entry = _p4KService.P4KFileSystem.OpenRead(dataCorePath);
-        var dcb = new DataCoreDatabase(entry);
-        var df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
-        await entry.DisposeAsync();
 
-        //var titi = df.DataCore.Database.RecordDefinitions.FirstOrDefault(r => r.FileName.Contains("2273540638"));
-        
-        
         foreach (var spaceship in spaceships)
         {
-            var record = df.GetFromRecord(new CigGuid(spaceship.Entitlement.EntityClassGuid));
+            var record = await _p4KService.GetRecordWithSpecificDepth(new CigGuid(spaceship.Entitlement.EntityClassGuid), 1);
 
             if (null != record)
             {
+                spaceship.ClassRecordName = record.RecordName.Split('.', 2).Last();
                 spaceship.EntityClassDefinition = record.Data as EntityClassDefinition;
-                var toto = (record.Data as EntityClassDefinition).Components.FirstOrDefault(t => t is SCItemPurchasableParams) as SCItemPurchasableParams;
-
-                if (null != toto)
-                {
-                    try
-                    {
-                        spaceship.Shipname = lang[toto.displayName];
-                    }
-                    catch (Exception)
-                    {
-                        // Ignore for now
-                    }
-                }
+                spaceship.Shipname = await _p4KService.GetEntityClassName(record.Data as EntityClassDefinition) ?? "inconnue";
             }
         }
         
@@ -127,7 +83,6 @@ public partial class ShipTabViewModel : PageViewModelBase
             TypeList = [EItemType.NOITEM_Vehicle]
         };
         
-        //var spaceshipEntityList = await _clientService.QueryGraphByParentUrnList(spaceshipUrnList);
         var spaceshipEntityList = await _clientService.QueryGraphBySearch(queryParameters);
 
         foreach (var spaceship in spaceships)
@@ -164,23 +119,6 @@ public partial class ShipTabViewModel : PageViewModelBase
                 ss.StowContext = stowContext;
             }
         }
-        
-        // var locationGeidList = spaceships.Where(s => s.EntityProperties?.StowCtx?.Inv != null).Select(s => StowLocationToGeid(s.EntityProperties.StowCtx.Inv)).ToList();
-        // // var response = await _clientService.QueryGraphByGeidListWithoutOwner(locationGeidList);
-        //
-        // await _clientService.TestRequest();
-        //
-        //  // var responseZones = await _clientService.QueryGraphByGeidListWithoutOwner(new List<ulong> { 2273540638, 3490636373 });
-        // //
-        // // var responseStowShips = await _clientService.QueryStowContextByGeidList(spaceshipEntityList.Select(s => s.Geid).ToList());
-        // //
-        // // var responseStowAll = await _clientService.QueryStowContextByOwnerId(spaceshipEntityList.First().OwnerId);
-        //
-        // // var responseInventory = await _clientService.QueryInventoryById(spaceshipEntityList.First().StowCtx.Inv);
-        // // var responseInventory = await _clientService.QueryInventoryById("201962463294:Location:3490636373");
-        //
-        // //var responseInventoryBis = await _clientService.QueryInventoryBisById("TOTO");
-        
         
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Terminé");
         Spaceships = Task.FromResult(spaceships);

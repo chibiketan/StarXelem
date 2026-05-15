@@ -1,7 +1,7 @@
 ﻿using Sc.External.Common.Shard.V1;
 using Sc.External.Services.BlueprintLibrary.V1;
 using Sc.External.Services.Contacts.V1;
-using Sc.External.Services.Entitlement.V1;
+using Sc.External.Services.Entitlement.V2;
 using Sc.External.Services.Entitygraph.V1;
 using Sc.External.Services.Friends.V1;
 using StarXelem.Models;
@@ -22,11 +22,14 @@ public class DesignGrpcClientService : IGrpcClientService
         await Task.Delay(2000);
         return new List<SpaceshipModel>{new(new Entitlement
         {
-            Name = "My test ship",
             EntityClassGuid = "GUIDOfTestShip",
-            RealMoney = false,
-            ItemType = EntitlementItemType.Ship,
-            Status = EntitlementStatus.Unclaimed
+//            ItemType = EntitlementItemType.Ship,
+            Status = EntitlementStatus.Undelivered,
+            Metadata = new EntitlementMetadata
+            {
+                Name = "My test ship",
+                RealMoney = false,
+            }
         })};
     }
 
