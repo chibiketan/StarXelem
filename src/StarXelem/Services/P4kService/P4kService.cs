@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -97,54 +97,50 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         _logger = logger;
     }
 
-    public Task OpenP4k(string path, IProgress<double> p4kProgress, IProgress<double> fileSystemProgress)
+    public async Task OpenP4k(string path, IProgress<double> p4kProgress, IProgress<double> fileSystemProgress)
     {
         if (_p4KFile != null)
         {
             // _logger.LogWarning("P4k file already open");
             if (FileLoadState != P4kFileLoadState.Loaded)
             {
-                FileLoadState = P4kFileLoadState.Loaded;
+                UpdateState(P4kFileLoadState.Loaded);
             }
-            return Task.FromResult(_p4KFile);
+            return;
         }
         
         // On réinitialise la source de token vu que c'est un nouveau fichier
         _cancellationTokenSource = new CancellationTokenSource();
         _lastErrorMessage = null;
-        FileLoadState = P4kFileLoadState.Loading;
-        _openP4kTask = Task.Run(() =>
+        UpdateState(P4kFileLoadState.Loading);
+
+        try
         {
-            _p4KFile = P4kDirectoryNode.FromP4k(P4kFile.FromFile(path, p4kProgress), null, fileSystemProgress);
-            // Chargement des données
-            var entry = P4KFileSystem.OpenRead(dataCorePath);
-            var dcb = new DataCoreDatabase(entry);
-            df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
-            entry.Dispose();
-        }, _cancellationTokenSource.Token)
-            // Une fois ouvert on supprime la task
-            .ContinueWith(t =>
+            await Task.Run(() =>
             {
-                _openP4kTask = null;
-                if (t.IsFaulted)
-                {
-                    var ex = t.Exception?.GetBaseException() ?? t.Exception!;
-                    _lastErrorMessage = ex.Message;
-                    FileLoadState = P4kFileLoadState.Error;
-                    throw ex;
-                }
-                else if (t.IsCanceled)
-                {
-                    FileLoadState = P4kFileLoadState.Cancelled;
-                }
-                else
-                {
-                    FileLoadState = P4kFileLoadState.Loaded;
-                }
-            });
-        
-        
-        return _openP4kTask;
+                _p4KFile = P4kDirectoryNode.FromP4k(P4kFile.FromFile(path, p4kProgress), null, fileSystemProgress);
+                // Chargement des donnees
+                var entry = P4KFileSystem.OpenRead(dataCorePath);
+                var dcb = new DataCoreDatabase(entry);
+                df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
+                entry.Dispose();
+            }, _cancellationTokenSource.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            UpdateState(P4kFileLoadState.Cancelled);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _lastErrorMessage = ex.Message;
+            UpdateState(P4kFileLoadState.Error);
+            throw;
+        }
+        finally
+        {
+            _openP4kTask = null;
+        }
     }
     
     public async Task<IList<P4kFileModel>> LoadDefaultP4kLocations()
