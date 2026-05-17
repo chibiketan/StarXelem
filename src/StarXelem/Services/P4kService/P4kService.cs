@@ -580,7 +580,7 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         // reset file
         _p4KFile = null;
         _lastErrorMessage = null;
-        FileLoadState = P4kFileLoadState.NotLoaded;
+        UpdateState(P4kFileLoadState.NotLoaded);
     }
 
     private void UpdateCacheStateFromTasks()
