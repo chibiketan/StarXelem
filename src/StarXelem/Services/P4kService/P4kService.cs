@@ -469,32 +469,28 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         // }
     }
 
-    public Task FillDataCache()
+    public async Task FillDataCache()
     {
-        FileLoadState = P4kFileLoadState.CacheLoading;
+        UpdateState(P4kFileLoadState.CacheLoading);
         var task1 = LoadDatabaseIfNeeded();
         var task2 = LoadLangFileIfNeeded();
-        var all = Task.WhenAll(task1, task2);
 
-        all.ContinueWith(t =>
+        try
         {
-            if (t.IsFaulted)
-            {
-                var ex = t.Exception?.GetBaseException() ?? t.Exception!;
-                _lastErrorMessage = ex.Message;
-                FileLoadState = P4kFileLoadState.Error;
-            }
-            else if (t.IsCanceled)
-            {
-                FileLoadState = P4kFileLoadState.Cancelled;
-            }
-            else
-            {
-                FileLoadState = P4kFileLoadState.CacheLoaded;
-            }
-        });
-        
-        return all;
+            await Task.WhenAll(task1, task2).ConfigureAwait(false);
+            UpdateState(P4kFileLoadState.CacheLoaded);
+        }
+        catch (OperationCanceledException)
+        {
+            UpdateState(P4kFileLoadState.Cancelled);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _lastErrorMessage = ex.Message;
+            UpdateState(P4kFileLoadState.Error);
+            throw;
+        }
     }
 
     public async Task<List<DataCoreTypedRecord>> GetAllContractGenerator()
