@@ -621,11 +621,6 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         
         // chargement du fichier p4k
         await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
-        // Chargement des données
-        // var entry = P4KFileSystem.OpenRead(dataCorePath);
-        // var dcb = new DataCoreDatabase(entry);
-        // df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
-        // await entry.DisposeAsync().ConfigureAwait(false);
 
         var oldval = DataCoreBinaryGenerated.s_maxRecursiveLoad;
         try
@@ -639,6 +634,13 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         finally
         {
             DataCoreBinaryGenerated.s_maxRecursiveLoad = oldval;
+        }
+
+        // After an individual record refresh, ensure we stay in CacheLoaded state.
+        // This prevents the UI indicator from showing wrong state after depth updates.
+        if (FileLoadState is P4kFileLoadState.CacheLoaded or P4kFileLoadState.CacheLoading)
+        {
+            UpdateState(P4kFileLoadState.CacheLoaded);
         }
     }
 
