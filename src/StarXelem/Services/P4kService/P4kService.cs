@@ -352,64 +352,69 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         return _locale.GetValueOrDefault(key, key);
     }
 
-    private Task LoadDatabaseIfNeeded()
+    private async Task LoadDatabaseIfNeeded()
     {
-        if (null == _loadingDatabaseTask)
+        if (_loadingDatabaseTask != null)
         {
-            // Démarrage du chargement de cache (database)
-            FileLoadState = P4kFileLoadState.CacheLoading;
-            _loadingDatabaseTask = Task.Run(async () =>
-            {
-                // chargement du fichier p4k
-                await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
-                // Chargement des données
-
-                var sw = Stopwatch.StartNew();
-                var allRecords = df.DataCore.Database.RecordDefinitions.AsParallel()
-                    .Select(record =>
-                    {
-                        // On initialise uniquement les données vides, comme ça on a juste la structure sans la charge du traitement
-                        return df.DataCore.GetEmptyRecord(record);
-                    });
-                sw.Stop();
-                _logger.LogTrace("Extracted all records in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
-
-                sw = Stopwatch.StartNew();
-                foreach (var record in allRecords)
-                {
-                    if (_cancellationTokenSource.IsCancellationRequested)
-                    {
-                        // une demande d'annulation est arrivée
-                        break;
-                    }
-                    
-                    var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record!.RecordId]));
-                    var cacheEntry = new CacheEntry
-                    {
-                        depth = -1,
-                        Record = record
-                    };
-                    _EntityClassDict.Add(crc, cacheEntry);
-                    _entityClassGuidDict.Add(record.RecordId, cacheEntry);
-                }
-                sw.Stop();
-                _logger.LogTrace("Extracted all entity classes in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
-            }, _cancellationTokenSource.Token);
-
-            // Mise à jour de l'état de cache à la fin
-            _loadingDatabaseTask.ContinueWith(t =>
-            {
-                UpdateCacheStateFromTasks();
-                if (t.IsFaulted)
-                {
-                    var ex = t.Exception?.GetBaseException() ?? t.Exception!;
-                    _lastErrorMessage = ex.Message;
-                    FileLoadState = P4kFileLoadState.Error;
-                }
-            });
+            await _loadingDatabaseTask.ConfigureAwait(false);
+            return;
         }
-        
-        return _loadingDatabaseTask;        
+
+        // Démarrage du chargement de cache (database)
+        UpdateState(P4kFileLoadState.CacheLoading);
+
+        try
+        {
+            // chargement du fichier p4k
+            await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
+            // Chargement des données
+
+            var sw = Stopwatch.StartNew();
+            var allRecords = df.DataCore.Database.RecordDefinitions.AsParallel()
+                .Select(record =>
+                {
+                    // On initialise uniquement les données vides, comme ça on a juste la structure sans la charge du traitement
+                    return df.DataCore.GetEmptyRecord(record);
+                });
+            sw.Stop();
+            _logger.LogTrace("Extracted all records in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
+
+            sw = Stopwatch.StartNew();
+            foreach (var record in allRecords)
+            {
+                if (_cancellationTokenSource.IsCancellationRequested)
+                {
+                    // une demande d'annulation est arrivée
+                    break;
+                }
+
+                var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record!.RecordId]));
+                var cacheEntry = new CacheEntry
+                {
+                    depth = -1,
+                    Record = record
+                };
+                _EntityClassDict.Add(crc, cacheEntry);
+                _entityClassGuidDict.Add(record.RecordId, cacheEntry);
+            }
+            sw.Stop();
+            _logger.LogTrace("Extracted all entity classes in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
+        }
+        catch (OperationCanceledException)
+        {
+            UpdateState(P4kFileLoadState.Cancelled);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _lastErrorMessage = ex.Message;
+            UpdateState(P4kFileLoadState.Error);
+            throw;
+        }
+        finally
+        {
+            UpdateCacheStateFromTasks();
+        }
     }
 
     public Task<DataCoreTypedRecord?> GetEntityType(uint guidCrc)
