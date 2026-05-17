@@ -277,62 +277,67 @@ public class P4kService : IP4kService, INotifyPropertyChanged
 
     }
 
-    private Task LoadLangFileIfNeeded()
+    private async Task LoadLangFileIfNeeded()
     {
-        if (null == _loadingLocalTask)
+        if (_loadingLocalTask != null)
         {
-            // Démarrage du chargement de cache (locale)
-            FileLoadState = P4kFileLoadState.CacheLoading;
-            _loadingLocalTask = Task.Run(async () =>
-            {
-                var sw = Stopwatch.StartNew();
-                // chargement du fichier p4k
-                await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
-                //  chargement de la traduction
-                var globalEntry = P4KFileSystem.OpenRead(@"Data\Localization\english\global.ini");
-                _locale.Clear();
-                using (var sr = new StreamReader(globalEntry, Encoding.UTF8, true))
-                {
-                    while (await sr.ReadLineAsync().ConfigureAwait(false) is { } line)
-                    {
-                        if (_cancellationTokenSource.IsCancellationRequested)
-                        {
-                            // on demande l'arrêt du traitement, on s'arrête la
-                            break;
-                        }
-                        
-                        if (!String.IsNullOrEmpty(line))
-                        {
-                            var parts = line.Split('=', 2, StringSplitOptions.TrimEntries);
-                            var key = parts[0];
-                            var value = parts[1];
+            await _loadingLocalTask.ConfigureAwait(false);
+            return;
+        }
 
-                            if (key.EndsWith(",P"))
-                                key = key[..^2];
-                            _locale.Add($"@{key}", value);
-                        }
+        // Démarrage du chargement de cache (locale)
+        UpdateState(P4kFileLoadState.CacheLoading);
+
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            // chargement du fichier p4k
+            await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
+            //  chargement de la traduction
+            var globalEntry = P4KFileSystem.OpenRead(@"Data\Localization\english\global.ini");
+            _locale.Clear();
+            using (var sr = new StreamReader(globalEntry, Encoding.UTF8, true))
+            {
+                while (await sr.ReadLineAsync().ConfigureAwait(false) is { } line)
+                {
+                    if (_cancellationTokenSource.IsCancellationRequested)
+                    {
+                        // on demande l'arrêt du traitement, on s'arrête la
+                        break;
+                    }
+
+                    if (!string.IsNullOrEmpty(line))
+                    {
+                        var parts = line.Split('=', 2, StringSplitOptions.TrimEntries);
+                        var key = parts[0];
+                        var value = parts[1];
+
+                        if (key.EndsWith(",P"))
+                            key = key[..^2];
+                        _locale.Add($"@{key}", value);
                     }
                 }
-                sw.Stop();
-                _logger.LogTrace("Extracted all locale values in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
-                
-                await globalEntry.DisposeAsync().ConfigureAwait(false);
-            }, _cancellationTokenSource.Token);
+            }
+            sw.Stop();
+            _logger.LogTrace("Extracted all locale values in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
 
-            // Mise à jour de l'état de cache à la fin
-            _loadingLocalTask.ContinueWith(t =>
-            {
-                UpdateCacheStateFromTasks();
-                if (t.IsFaulted)
-                {
-                    var ex = t.Exception?.GetBaseException() ?? t.Exception!;
-                    _lastErrorMessage = ex.Message;
-                    FileLoadState = P4kFileLoadState.Error;
-                }
-            });
+            await globalEntry.DisposeAsync().ConfigureAwait(false);
         }
-        
-        return _loadingLocalTask;
+        catch (OperationCanceledException)
+        {
+            UpdateState(P4kFileLoadState.Cancelled);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _lastErrorMessage = ex.Message;
+            UpdateState(P4kFileLoadState.Error);
+            throw;
+        }
+        finally
+        {
+            UpdateCacheStateFromTasks();
+        }
     }
 
     public async Task<string?> GetLocaleValue(string? key)
