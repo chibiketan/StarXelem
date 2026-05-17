@@ -53,7 +53,7 @@ public class P4kService : IP4kService, INotifyPropertyChanged
     public P4kFileLoadState FileLoadState
     {
         get => _fileLoadState;
-        private set => SetFileLoadState(value);
+        private set => UpdateState(value);
     }
 
     public string? GetLastErrorMessage()
@@ -61,7 +61,10 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         return _fileLoadState == P4kFileLoadState.Error ? _lastErrorMessage : null;
     }
 
-    private void SetFileLoadState(P4kFileLoadState newState)
+    /// <summary>
+    /// Transition vers un nouvel état — ignore les transitions redondantes.
+    /// </summary>
+    private void UpdateState(P4kFileLoadState newState)
     {
         if (_fileLoadState == newState) return;
         _fileLoadState = newState;
