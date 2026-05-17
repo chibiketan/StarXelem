@@ -359,37 +359,19 @@ public class P4kService : IP4kService, INotifyPropertyChanged
                 // chargement du fichier p4k
                 await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
                 // Chargement des données
-                // var entry = P4KFileSystem.OpenRead(dataCorePath);
-                // var dcb = new DataCoreDatabase(entry);
-                // var df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
-                // await entry.DisposeAsync().ConfigureAwait(false);
 
                 var sw = Stopwatch.StartNew();
-                var allRecords = df.DataCore.Database.MainRecords
-                    .AsParallel()
-                    .Select(x =>
+                var allRecords = df.DataCore.Database.RecordDefinitions.AsParallel()
+                    .Select(record =>
                     {
-                        if (_cancellationTokenSource.IsCancellationRequested) return null;
-                        var savedDepth = DataCoreBinaryGenerated.s_maxRecursiveLoad;
-                        // Pas de chargement récursif pour le chargement initial
-                        DataCoreBinaryGenerated.s_maxRecursiveLoad = 0;
-                        try
-                        {
-                            var result = df.GetFromRecord(x);
-                            
-                            return result;
-                        }
-                        finally
-                        {
-                            DataCoreBinaryGenerated.s_maxRecursiveLoad = savedDepth;
-                        }
-                    })
-                    ;
+                        // On initialise uniquement les données vides, comme ça on a juste la structure sans la charge du traitement
+                        return df.DataCore.GetEmptyRecord(record);
+                    });
                 sw.Stop();
                 _logger.LogTrace("Extracted all records in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
 
                 sw = Stopwatch.StartNew();
-                foreach (var record in allRecords.Where(r => r?.Data is EntityClassDefinition or StarMapObject or ContractGenerator or CraftingBlueprintRecord or BlueprintCategoryDatabaseRecord or GameMode))
+                foreach (var record in allRecords)
                 {
                     if (_cancellationTokenSource.IsCancellationRequested)
                     {
@@ -400,7 +382,7 @@ public class P4kService : IP4kService, INotifyPropertyChanged
                     var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record!.RecordId]));
                     var cacheEntry = new CacheEntry
                     {
-                        depth = 0,
+                        depth = -1,
                         Record = record
                     };
                     _EntityClassDict.Add(crc, cacheEntry);
