@@ -585,8 +585,9 @@ public class P4kService : IP4kService, INotifyPropertyChanged
 
     private void UpdateCacheStateFromTasks()
     {
-        // Si déjà en erreur, ne pas surcharger l'état
-        if (FileLoadState == P4kFileLoadState.Error) return;
+        // Guard: never downgrade from Error or CacheLoaded
+        if (FileLoadState == P4kFileLoadState.Error || FileLoadState == P4kFileLoadState.CacheLoaded)
+            return;
 
         bool anyStarted = _loadingLocalTask != null || _loadingDatabaseTask != null;
         bool anyFaulted = (_loadingLocalTask?.IsFaulted ?? false) || (_loadingDatabaseTask?.IsFaulted ?? false);
@@ -598,15 +599,15 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         {
             var ex = _loadingLocalTask?.Exception?.GetBaseException() ?? _loadingDatabaseTask?.Exception?.GetBaseException();
             _lastErrorMessage = ex?.Message;
-            FileLoadState = P4kFileLoadState.Error;
+            UpdateState(P4kFileLoadState.Error);
         }
         else if (anyRunning)
         {
-            FileLoadState = P4kFileLoadState.CacheLoading;
+            UpdateState(P4kFileLoadState.CacheLoading);
         }
         else if (anyStarted && allCompletedForStarted)
         {
-            FileLoadState = P4kFileLoadState.CacheLoaded;
+            UpdateState(P4kFileLoadState.CacheLoaded);
         }
     }
 
