@@ -120,6 +120,8 @@
                                 <TextBlock Grid.Row="0" Grid.Column="2" Classes="h1 dimming bold">Propriétés :</TextBlock>
                                 <ItemsControl Grid.Row="1" Grid.Column="2" ItemsSource="{Binding StatModifierList}">
                                     <ItemsControl.DataTemplates>
+
+                                        <!-- Modificateur multiplicatif linéaire (ex: 80% → 120%) -->
                                         <DataTemplate DataType="{x:Type vm:BlueprintStatLinearModel}">
                                             <Grid ColumnDefinitions="*,Auto">
                                                 <TextBlock Grid.Column="0" Classes="demi-dimming" Text="{Binding Name}" />
@@ -130,6 +132,29 @@
                                                 </Grid>
                                             </Grid>
                                         </DataTemplate>
+
+                                        <!-- Modificateur additif entier par plages de qualité (ex: -2 | -1 | 0 | +1 | +2) -->
+                                        <DataTemplate DataType="{x:Type vm:BlueprintStatAdditiveModel}">
+                                            <Grid RowDefinitions="Auto,Auto" Margin="0 2 0 4">
+                                                <TextBlock Grid.Row="0" Classes="demi-dimming" Text="{Binding Name}" />
+                                                <ItemsControl Grid.Row="1" ItemsSource="{Binding Bands}" Margin="0 2 0 0">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel Orientation="Horizontal" Spacing="6" />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.DataTemplates>
+                                                        <DataTemplate DataType="{x:Type vm:BlueprintStatBandModel}">
+                                                            <StackPanel Orientation="Vertical" Spacing="1">
+                                                                <TextBlock Classes="demi-dimming" FontSize="10" Text="{Binding QualityLabel}" HorizontalAlignment="Center" />
+                                                                <TextBlock Classes="demi-bold" Text="{Binding FormattedValue}" HorizontalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.DataTemplates>
+                                                </ItemsControl>
+                                            </Grid>
+                                        </DataTemplate>
+
                                     </ItemsControl.DataTemplates>
                                 </ItemsControl>
                             </Grid>
