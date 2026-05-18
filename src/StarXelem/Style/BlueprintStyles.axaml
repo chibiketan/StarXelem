@@ -642,6 +642,7 @@
 
             <Style Selector="^:selected > Grid.bp-list-row > TextBlock">
                 <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}"/>
+                <Setter Property="FontWeight" Value="Bold" />
 
                 <Style Selector="^:nth-last-child()">
                     <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}"/>
@@ -649,7 +650,9 @@
             </Style>
 
             <Style Selector="^:not(:selected) > Grid.bp-list-row > TextBlock">
-                <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}"/>
+                <!-- <Setter Property="Foreground" Value="{DynamicResource DemiDimmingBrush}"/> -->
+                <Setter Property="Opacity" Value="0.75" />
+                <Setter Property="FontWeight" Value="500" />
             </Style>
         </Style>
     </Style>
