@@ -170,6 +170,18 @@ public static class DesignData
                                 Name = "Vitesse",
                                 Min = 0.97f,
                                 Max = 1.10f
+                            },
+                            new BlueprintStatAdditiveModel
+                            {
+                                Name = "Power Generation",
+                                Bands =
+                                [
+                                    new BlueprintStatBandModel { StartQuality = 0, EndQuality = 249, Value = -2 },
+                                    new BlueprintStatBandModel { StartQuality = 250, EndQuality = 499, Value = -1 },
+                                    new BlueprintStatBandModel { StartQuality = 500, EndQuality = 699, Value = 0 },
+                                    new BlueprintStatBandModel { StartQuality = 700, EndQuality = 899, Value = 1 },
+                                    new BlueprintStatBandModel { StartQuality = 900, EndQuality = 1000, Value = 2 },
+                                ]
                             }
                         ]
                     },

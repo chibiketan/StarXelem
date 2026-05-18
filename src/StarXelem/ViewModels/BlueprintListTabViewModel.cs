@@ -138,28 +138,30 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                             {
                                 var rrrr = (tttt as CraftingGameplayPropertyModifierCommon);
 
-                                var propertyName = await _p4KService.GetLocaleValue(rrrr?.gameplayPropertyRecord?.propertyName);
-                                var statName = propertyName ?? "Inconnu";
-
                                 if (rrrr is null)
                                 {
                                     _logger.LogWarning("Modificateur non castable en CraftingGameplayPropertyModifierCommon pour {Type}", tttt?.GetType().FullName);
                                     continue;
                                 }
 
-                                var linearRanges = rrrr?.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_Linear>().ToList();
+                                var propertyName = await _p4KService.GetLocaleValue(rrrr.gameplayPropertyRecord?.propertyName);
+                                var statName = propertyName ?? "Inconnu";
+
+                                var linearRanges = rrrr.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_Linear>().ToList();
                                 if (linearRanges is { Count: > 0 })
                                 {
                                     statModifierList.Add(new BlueprintStatLinearModel
                                     {
                                         Name = statName,
+                                        // En SC 4.8, les plages linéaires forment une progression continue ;
+                                        // on affiche uniquement le début de la première plage et la fin de la dernière.
                                         Min = linearRanges[0].modifierAtStart,
                                         Max = linearRanges[^1].modifierAtEnd
                                     });
                                 }
                                 else
                                 {
-                                    var additiveRanges = rrrr?.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_LinearIntegerAdditive>().ToList();
+                                    var additiveRanges = rrrr.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_LinearIntegerAdditive>().ToList();
                                     if (additiveRanges is { Count: > 0 })
                                     {
                                         statModifierList.Add(new BlueprintStatAdditiveModel
