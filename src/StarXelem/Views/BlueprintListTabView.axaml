@@ -146,7 +146,7 @@
                                                     <ItemsControl.DataTemplates>
                                                         <DataTemplate DataType="{x:Type vm:BlueprintStatBandModel}">
                                                             <StackPanel Orientation="Vertical" Spacing="1">
-                                                                <TextBlock Classes="demi-dimming" FontSize="10" Text="{Binding QualityLabel}" HorizontalAlignment="Center" />
+                                                                <TextBlock Classes="demi-dimming quality-label" Text="{Binding QualityLabel}" HorizontalAlignment="Center" />
                                                                 <TextBlock Classes="demi-bold" Text="{Binding FormattedValue}" HorizontalAlignment="Center" />
                                                             </StackPanel>
                                                         </DataTemplate>

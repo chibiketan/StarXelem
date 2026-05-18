@@ -162,12 +162,37 @@
                                                                 </Grid>
                                                             </Grid>
                                                             <Grid ColumnDefinitions="*,Auto">
-                                                                <TextBlock Grid.Column="0" Classes="demi-dimming" >Min Temp</TextBlock>
+                                                                <TextBlock Grid.Column="0" Classes="demi-dimming">Min Temp</TextBlock>
                                                                 <Grid Grid.Column="1" ColumnDefinitions="Auto,25,Auto">
                                                                     <TextBlock Grid.Column="0" Classes="demi-bold">0.8</TextBlock>
                                                                     <Separator Grid.Column="1" Classes="horizontal" Margin="5 0" />
                                                                     <TextBlock Grid.Column="2" Classes="demi-bold">1.2</TextBlock>
                                                                 </Grid>
+                                                            </Grid>
+                                                            <Grid RowDefinitions="Auto,Auto" Margin="0 2 0 4">
+                                                                <TextBlock Grid.Row="0" Classes="demi-dimming">Power Generation</TextBlock>
+                                                                <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="6" Margin="0 2 0 0">
+                                                                    <StackPanel Spacing="1">
+                                                                        <TextBlock Classes="demi-dimming quality-label" HorizontalAlignment="Center">0-249</TextBlock>
+                                                                        <TextBlock Classes="demi-bold" HorizontalAlignment="Center">-2</TextBlock>
+                                                                    </StackPanel>
+                                                                    <StackPanel Spacing="1">
+                                                                        <TextBlock Classes="demi-dimming quality-label" HorizontalAlignment="Center">250-499</TextBlock>
+                                                                        <TextBlock Classes="demi-bold" HorizontalAlignment="Center">-1</TextBlock>
+                                                                    </StackPanel>
+                                                                    <StackPanel Spacing="1">
+                                                                        <TextBlock Classes="demi-dimming quality-label" HorizontalAlignment="Center">500-699</TextBlock>
+                                                                        <TextBlock Classes="demi-bold" HorizontalAlignment="Center">0</TextBlock>
+                                                                    </StackPanel>
+                                                                    <StackPanel Spacing="1">
+                                                                        <TextBlock Classes="demi-dimming quality-label" HorizontalAlignment="Center">700-899</TextBlock>
+                                                                        <TextBlock Classes="demi-bold" HorizontalAlignment="Center">+1</TextBlock>
+                                                                    </StackPanel>
+                                                                    <StackPanel Spacing="1">
+                                                                        <TextBlock Classes="demi-dimming quality-label" HorizontalAlignment="Center">900-1000</TextBlock>
+                                                                        <TextBlock Classes="demi-bold" HorizontalAlignment="Center">+2</TextBlock>
+                                                                    </StackPanel>
+                                                                </StackPanel>
                                                             </Grid>
 
                                                         </ItemsControl.Items>
@@ -215,6 +240,10 @@
 
     <Style Selector="TextBlock.h1, :is(Panel) TextBlock.h1">
         <Setter Property="FontSize" Value="{DynamicResource H1FontSize}" />
+    </Style>
+
+    <Style Selector="TextBlock.quality-label">
+        <Setter Property="FontSize" Value="10" />
     </Style>
 
     <Style Selector="TextBlock.h2, :is(Panel) TextBlock.h2">
