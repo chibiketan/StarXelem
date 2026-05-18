@@ -227,7 +227,7 @@
     </Style>
 
     <Style Selector="TextBlock.demi-bold">
-        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="FontWeight" Value="DemiBold" />
     </Style>
 
     <Style Selector="TextBlock.dimming">
@@ -235,7 +235,8 @@
     </Style>
 
     <Style Selector="TextBlock.demi-dimming">
-        <Setter Property="Foreground" Value="{DynamicResource DemiDimmingBrush}" />
+        <!-- <Setter Property="Foreground" Value="{DynamicResource DemiDimmingBrush}" /> -->
+        <Setter Property="Opacity" Value="0.75"></Setter>
     </Style>
 
     <Style Selector="TextBlock.h1, :is(Panel) TextBlock.h1">
