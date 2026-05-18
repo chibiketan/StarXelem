@@ -139,12 +139,39 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                                 var rrrr = (tttt as CraftingGameplayPropertyModifierCommon);
 
                                 var propertyName = await _p4KService.GetLocaleValue(rrrr?.gameplayPropertyRecord?.propertyName);
-                                statModifierList.Add(new BlueprintStatLinearModel
+                                var statName = propertyName ?? "Inconnu";
+
+                                var linearRanges = rrrr?.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_Linear>().ToList();
+                                if (linearRanges is { Count: > 0 })
                                 {
-                                    Name = propertyName ?? "Inconnu",
-                                    Min = rrrr?.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_Linear>().FirstOrDefault()?.modifierAtStart ?? -1.0f,
-                                    Max = rrrr?.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_Linear>().FirstOrDefault()?.modifierAtEnd ?? -1.0f
-                                });
+                                    statModifierList.Add(new BlueprintStatLinearModel
+                                    {
+                                        Name = statName,
+                                        Min = linearRanges[0].modifierAtStart,
+                                        Max = linearRanges[^1].modifierAtEnd
+                                    });
+                                }
+                                else
+                                {
+                                    var additiveRanges = rrrr?.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_LinearIntegerAdditive>().ToList();
+                                    if (additiveRanges is { Count: > 0 })
+                                    {
+                                        statModifierList.Add(new BlueprintStatAdditiveModel
+                                        {
+                                            Name = statName,
+                                            Bands = additiveRanges.Select(r => new BlueprintStatBandModel
+                                            {
+                                                StartQuality = r.startQuality,
+                                                EndQuality = r.endQuality,
+                                                Value = r.additiveModifierAtStart
+                                            }).ToList()
+                                        });
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning("Aucun range de modificateur reconnu pour la propriété {Name}", statName);
+                                    }
+                                }
                             }
 
 
