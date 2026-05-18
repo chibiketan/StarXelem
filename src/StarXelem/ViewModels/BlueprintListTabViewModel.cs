@@ -141,6 +141,12 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                                 var propertyName = await _p4KService.GetLocaleValue(rrrr?.gameplayPropertyRecord?.propertyName);
                                 var statName = propertyName ?? "Inconnu";
 
+                                if (rrrr is null)
+                                {
+                                    _logger.LogWarning("Modificateur non castable en CraftingGameplayPropertyModifierCommon pour {Type}", tttt?.GetType().FullName);
+                                    continue;
+                                }
+
                                 var linearRanges = rrrr?.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_Linear>().ToList();
                                 if (linearRanges is { Count: > 0 })
                                 {
@@ -163,6 +169,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                                             {
                                                 StartQuality = r.startQuality,
                                                 EndQuality = r.endQuality,
+                                                // En SC 4.8, additiveModifierAtStart == additiveModifierAtEnd pour toutes les bandes ; start est utilisé par convention.
                                                 Value = r.additiveModifierAtStart
                                             }).ToList()
                                         });
