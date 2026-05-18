@@ -165,7 +165,7 @@ public static class DesignData
                             }
                         ],
                         StatModifierList = [
-                            new BlueprintStatModel
+                            new BlueprintStatLinearModel
                             {
                                 Name = "Vitesse",
                                 Min = 0.97f,
@@ -190,13 +190,13 @@ public static class DesignData
 
                         ],
                         StatModifierList = [
-                            new BlueprintStatModel
+                            new BlueprintStatLinearModel
                             {
                                 Name = "température Min.",
                                 Min = 0.8f,
                                 Max = 1.2f
                             },
-                            new BlueprintStatModel
+                            new BlueprintStatLinearModel
                             {
                                 Name = "température Max.",
                                 Min = 0.8f,

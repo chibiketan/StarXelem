@@ -120,7 +120,7 @@
                                 <TextBlock Grid.Row="0" Grid.Column="2" Classes="h1 dimming bold">Propriétés :</TextBlock>
                                 <ItemsControl Grid.Row="1" Grid.Column="2" ItemsSource="{Binding StatModifierList}">
                                     <ItemsControl.DataTemplates>
-                                        <DataTemplate DataType="{x:Type vm:BlueprintStatModel}">
+                                        <DataTemplate DataType="{x:Type vm:BlueprintStatLinearModel}">
                                             <Grid ColumnDefinitions="*,Auto">
                                                 <TextBlock Grid.Column="0" Classes="demi-dimming" Text="{Binding Name}" />
                                                 <Grid Grid.Column="1" ColumnDefinitions="Auto,25,Auto">

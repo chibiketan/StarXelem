@@ -129,7 +129,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                             });
                         }
 
-                        var statModifierList = new List<BlueprintStatModel>();
+                        var statModifierList = new List<BlueprintStatModelBase>();
                         var dssfsd = craftingCostSelect.context.OfType<CraftingCostContext_ResultGameplayPropertyModifiers>();
 
                         foreach (var ttt in dssfsd)
@@ -139,7 +139,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                                 var rrrr = (tttt as CraftingGameplayPropertyModifierCommon);
 
                                 var propertyName = await _p4KService.GetLocaleValue(rrrr?.gameplayPropertyRecord?.propertyName);
-                                statModifierList.Add(new BlueprintStatModel
+                                statModifierList.Add(new BlueprintStatLinearModel
                                 {
                                     Name = propertyName ?? "Inconnu",
                                     Min = rrrr?.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_Linear>().FirstOrDefault()?.modifierAtStart ?? -1.0f,
@@ -270,7 +270,7 @@ public class BlueprintCategoryModel
 {
     public required string Name { get; set; }
     public required List<BlueprintMaterialModel> MaterialList { get; set; }
-    public required List<BlueprintStatModel> StatModifierList { get; set; }
+    public required List<BlueprintStatModelBase> StatModifierList { get; set; }
 }
 
 public class BlueprintMaterialModel
@@ -279,11 +279,29 @@ public class BlueprintMaterialModel
     public required float QuantityInScu { get; set; }
 }
 
-public class BlueprintStatModel
+public abstract class BlueprintStatModelBase
 {
     public required string Name { get; set; }
+}
+
+public class BlueprintStatLinearModel : BlueprintStatModelBase
+{
     public required float Min { get; set; }
     public required float Max { get; set; }
+}
+
+public class BlueprintStatBandModel
+{
+    public required int StartQuality { get; set; }
+    public required int EndQuality { get; set; }
+    public required int Value { get; set; }
+    public string QualityLabel => $"{StartQuality}-{EndQuality}";
+    public string FormattedValue => Value > 0 ? $"+{Value}" : Value.ToString();
+}
+
+public class BlueprintStatAdditiveModel : BlueprintStatModelBase
+{
+    public required List<BlueprintStatBandModel> Bands { get; set; }
 }
 
 public class BlueprintViewModel : ViewModelBase
