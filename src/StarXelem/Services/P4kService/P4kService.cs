@@ -31,7 +31,6 @@ public class P4kService : IP4kService, INotifyPropertyChanged
     private Task? _loadingLocalTask;
     private Task? _loadingDatabaseTask;
     private CancellationTokenSource _cancellationTokenSource = new();
-    private Task? _openP4kTask;
     private DataForge<DataCoreTypedRecord> df;
     private string? _lastErrorMessage;
 
@@ -39,13 +38,13 @@ public class P4kService : IP4kService, INotifyPropertyChanged
 
     public enum P4kFileLoadState
     {
-        NotLoaded,
+        NotLoaded = 0,
+        Cancelled,
+        Error,
         Loading,
         Loaded,
-        Cancelled,
         CacheLoading,
-        CacheLoaded,
-        Error
+        CacheLoaded
     }
 
     private P4kFileLoadState _fileLoadState = P4kFileLoadState.NotLoaded;
@@ -102,7 +101,7 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         if (_p4KFile != null)
         {
             // _logger.LogWarning("P4k file already open");
-            if (FileLoadState != P4kFileLoadState.Loaded)
+            if ((int)FileLoadState < (int)P4kFileLoadState.Loaded)
             {
                 UpdateState(P4kFileLoadState.Loaded);
             }
@@ -110,9 +109,11 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         }
         
         // On réinitialise la source de token vu que c'est un nouveau fichier
+        _cancellationTokenSource.Dispose();
         _cancellationTokenSource = new CancellationTokenSource();
         _lastErrorMessage = null;
-        UpdateState(P4kFileLoadState.Loading);
+        if ((int)FileLoadState < (int)P4kFileLoadState.Loading)
+            UpdateState(P4kFileLoadState.Loading);
 
         try
         {
@@ -125,6 +126,8 @@ public class P4kService : IP4kService, INotifyPropertyChanged
                 df = new DataForge<DataCoreTypedRecord>(new DataCoreBinaryGenerated(dcb));
                 entry.Dispose();
             }, _cancellationTokenSource.Token).ConfigureAwait(false);
+            if ((int)FileLoadState < (int)P4kFileLoadState.Loaded)
+                UpdateState(P4kFileLoadState.Loaded);
         }
         catch (OperationCanceledException)
         {
@@ -136,10 +139,6 @@ public class P4kService : IP4kService, INotifyPropertyChanged
             _lastErrorMessage = ex.Message;
             UpdateState(P4kFileLoadState.Error);
             throw;
-        }
-        finally
-        {
-            _openP4kTask = null;
         }
     }
     
@@ -285,6 +284,10 @@ public class P4kService : IP4kService, INotifyPropertyChanged
             return;
         }
 
+        // On crée une source que l'on pourra utiliser pour remonter la tâche comme chargée
+        var tcs = new TaskCompletionSource();
+        _loadingLocalTask = tcs.Task;
+
         // Démarrage du chargement de cache (locale)
         UpdateState(P4kFileLoadState.CacheLoading);
 
@@ -336,6 +339,7 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         }
         finally
         {
+            tcs.SetResult();
             UpdateCacheStateFromTasks();
         }
     }
@@ -359,6 +363,10 @@ public class P4kService : IP4kService, INotifyPropertyChanged
             await _loadingDatabaseTask.ConfigureAwait(false);
             return;
         }
+
+        // On crée une source que l'on pourra utiliser pour remonter la tâche comme chargée
+        var tcs = new TaskCompletionSource();
+        _loadingDatabaseTask = tcs.Task;
 
         // Démarrage du chargement de cache (database)
         UpdateState(P4kFileLoadState.CacheLoading);
@@ -413,6 +421,7 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         }
         finally
         {
+            tcs.SetResult();
             UpdateCacheStateFromTasks();
         }
     }
@@ -441,32 +450,22 @@ public class P4kService : IP4kService, INotifyPropertyChanged
     {
         await LoadDatabaseIfNeeded().ConfigureAwait(false);
 
-        var it = _EntityClassDict.Values
-            .Where(r => r.Record.Data is EntityClassDefinition)
+        // Avec le as parallel
+        var records = _EntityClassDict.Values
             .AsParallel()
-            .Select(r =>
-            {
-                UpdateCacheRecordWithDepth(r, depth).Wait();
-                return r.Record;
-            });
-
-        foreach (var record in it)
-        {
-            yield return record;       
-        }
+            .Where(r => r.Record.Data is EntityClassDefinition)
+            .ToList();
         
-        // foreach (var record in _EntityClassDict.Values)
-        // {
-        //     if (record.Record.Data is EntityClassDefinition)
-        //     {
-        //         if (record.depth < depth)
-        //         {
-        //             await UpdateCacheRecordWithDepth(record, depth).ConfigureAwait(false);
-        //         }
-        //         
-        //         yield return record.Record;
-        //     }
-        // }
+        await Task.WhenAll(records.AsParallel().Select(async r =>
+        {
+            if (r.depth < depth)
+                await UpdateCacheRecordWithDepth(r, depth).ConfigureAwait(false);
+        })).ConfigureAwait(false);
+        
+        foreach (var record in records)
+        {
+            yield return record.Record;
+        }
     }
 
     public async Task FillDataCache()
@@ -625,6 +624,7 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         var oldval = DataCoreBinaryGenerated.s_maxRecursiveLoad;
         try
         {
+            UpdateState(P4kFileLoadState.CacheLoading);
             DataCoreBinaryGenerated.s_maxRecursiveLoad = newDepth;
             var record = df.GetFromRecord(cacheEntry.Record.RecordId);
             
