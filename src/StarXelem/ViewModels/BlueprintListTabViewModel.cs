@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -175,7 +177,7 @@ public class BlueprintStatAdditiveModel : BlueprintStatModelBase
     public required List<BlueprintStatBandModel> Bands { get; set; }
 }
 
-public class BlueprintViewModel : ViewModelBase
+public partial class BlueprintViewModel : ViewModelBase
 {
     /// <summary>Identifiant unique du blueprint (CUID RSI). Utilisé pour la synchronisation API.</summary>
     public required string BlueprintId { get; set; } = "";
@@ -198,4 +200,13 @@ public class BlueprintViewModel : ViewModelBase
         (EItemType.Char_Armor_Helmet, _) => "Icon.Helmet",
         _ => "Icon.Ammunition"
     };
+
+    [RelayCommand]
+    private async Task CopyIdAsync()
+    {
+        var lifetime = Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+        var clipboard = lifetime?.MainWindow?.Clipboard;
+        if (clipboard != null)
+            await clipboard.SetTextAsync(BlueprintId);
+    }
 }

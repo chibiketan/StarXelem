@@ -49,6 +49,11 @@
             <ListBox.DataTemplates>
                 <DataTemplate DataType="{x:Type vm:BlueprintViewModel}">
                     <Grid Classes="bp-list-row" RowDefinitions="*" ColumnDefinitions="Auto,*,Auto">
+                        <Grid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Copier GUID" Command="{Binding CopyIdCommand}" />
+                            </ContextMenu>
+                        </Grid.ContextMenu>
                         <Border Classes="badge tiers-1" Grid.Row="0" Grid.Column="0">
                             <TextBlock Text="{Binding TierLevel, StringFormat=T{0}}" />
                         </Border>
