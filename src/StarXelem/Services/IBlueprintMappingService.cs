@@ -1,0 +1,26 @@
+﻿using Sc.External.Services.BlueprintLibrary.V1;
+using StarXelem.ViewModels;
+
+namespace StarXelem.Services;
+
+/// <summary>                                                                                                                                                                                                                                                                                      
+/// Service de transformation des entrées blueprint brutes (RSI) vers des ViewModel prêts à l'affichage.                                                                                                                                                                                           
+/// </summary>                                                                                                                                                                                                                                                                                     
+/// <remarks>                                                                                                                                                                                                                                                                                      
+/// Ce service centralise le parsing des données <c>CraftingBlueprintRecord</c> issues du P4K :                                                                                                                                                                                                    
+/// résolution des noms localisés, extraction des coûts en ressources, calcul de la durée de fabrication,                                                                                                                                                                                          
+/// et collecte des modificateurs de stats (linéaires et additifs).                                                                                                                                                                                                                                
+/// Il fonctionne indifféremment en mode design et en production.                                                                                                                                                                                                                                  
+/// </remarks>                                                                                                                                                                                                                                                                                     
+public interface IBlueprintMappingService
+{
+    /// <summary>                                                                                                                                                                                                                                                                                  
+    /// Transforme une collection d'entrées blueprint brutes en ViewModel.                                                                                                                                                                                                                         
+    /// </summary>                                                                                                                                                                                                                                                                                 
+    /// <param name="entries">La liste des <c>BlueprintEntry</c> retournée par l'API gRPC du jeu.</param>                                                                                                                                                                                          
+    /// <returns>                                                                                                                                                                                                                                                                                  
+    /// Une liste de <c>BlueprintViewModel</c>. Les entrées dont le record P4K est introuvable                                                                                                                                                                                                     
+    /// ou invalide sont omises (un avertissement est journalisé).                                                                                                                                                                                                                                 
+    /// </returns>                                                                                                                                                                                                                                                                                 
+    Task<List<BlueprintViewModel>> TransformBlueprintsAsync(IEnumerable<BlueprintEntry> entries);
+}
