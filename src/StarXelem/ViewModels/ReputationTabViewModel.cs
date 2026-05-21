@@ -23,12 +23,9 @@ public partial class ReputationTabViewModel : PageViewModelBase
 
     public ObservableCollection<ContractorModel> FilteredContractors { get; } = new();
 
-    public IAsyncRelayCommand LoadDataCommand { get; }
-
     public ReputationTabViewModel(IReputationService reputationService)
     {
         _reputationService = reputationService;
-        LoadDataCommand = new AsyncRelayCommand(LoadDataAsync);
     }
 
     partial void OnSearchTextChanged(string value)
@@ -41,7 +38,8 @@ public partial class ReputationTabViewModel : PageViewModelBase
         await LoadDataCommand.ExecuteAsync(null);
     }
 
-    private async Task LoadDataAsync()
+    [RelayCommand]
+    private async Task LoadData()
     {
         try
         {
