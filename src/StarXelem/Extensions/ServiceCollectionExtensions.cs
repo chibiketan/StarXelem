@@ -58,6 +58,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IBlueprintMappingService, BlueprintMappingService>();
         services.AddSingleton<IMissionMappingService, MissionMappingService>();
         services.AddSingleton<ISettingsService, RegistrySettingsService>();
+        services.AddSingleton<IReputationService, ReputationService>();
 
         // Service API externe pour la communication avec Alliance Orbital (profil utilisateur)
         services.AddSingleton<IAllianceOrbitalService, AllianceOrbitalService>();
