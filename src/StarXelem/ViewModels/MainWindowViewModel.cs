@@ -145,6 +145,7 @@ public partial class MainWindowViewModel : ViewModelBase
             App.Current.Services.GetRequiredService<P4kShipTabViewModel>(),
             App.Current.Services.GetRequiredService<MissionsTabViewModel>(),
             App.Current.Services.GetRequiredService<ExtractionTabViewModel>(),
+            App.Current.Services.GetRequiredService<ReputationTabViewModel>(),
             App.Current.Services.GetRequiredService<SettingsTabViewModel>()
         ];
         
