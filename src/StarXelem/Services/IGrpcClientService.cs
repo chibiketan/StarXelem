@@ -29,5 +29,6 @@ public interface IGrpcClientService
     Task<IList<Contact>> GetFriendList();
     Task<ShardInfo> GetShardInfo(int accountId);
     Task<IList<EntityStowContext>> GetEntityStowContextByParentUrnList(IList<string> urnList, List<uint> crcTypeList);
+    Task<List<VersionedReputation>> QueryReputationsAsync();
     Task<List<BlueprintEntry>> GetBlueprintList();
 }

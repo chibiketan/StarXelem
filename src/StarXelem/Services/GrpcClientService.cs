@@ -835,6 +835,12 @@ public class GrpcClientService : IGrpcClientService
 
     }
 
+    public async Task<List<VersionedReputation>> QueryReputationsAsync()
+    {
+        var response = await _grpcClient.QueryReputationsAsync(new QueryReputationsRequest());
+        return response.Reputations.ToList();
+    }
+
     public async Task<List<BlueprintEntry>> GetBlueprintList()
     {
         var service = new BlueprintLibraryService.BlueprintLibraryServiceClient(_channel);
