@@ -3,6 +3,7 @@ using Sc.External.Services.BlueprintLibrary.V1;
 using Sc.External.Services.Contacts.V1;
 using Sc.External.Services.Entitygraph.V1;
 using Sc.External.Services.Friends.V1;
+using Sc.External.Services.Reputation.V1;
 using StarXelem.Models;
 
 namespace StarXelem.Services;

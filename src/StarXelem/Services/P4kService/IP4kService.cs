@@ -1,3 +1,4 @@
+using System.Collections;
 using System.ComponentModel;
 using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
@@ -61,5 +62,6 @@ public interface IP4kService : INotifyPropertyChanged
     /// <param name="depth">Profondeur d'historique de données minium</param>
     /// <returns>L'enregistrement demandé</returns>
     Task<DataCoreTypedRecord?> GetRecordWithSpecificDepth(CigGuid recordId, int depth);
-    
+
+    Task<List<DataCoreTypedRecord>> GetAllFactions();
 }

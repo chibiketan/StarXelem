@@ -1,10 +1,62 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:conv="using:StarXelem.Converters"
+             xmlns:beh="using:StarXelem.Behaviors"
              xmlns:vm="using:StarXelem.ViewModels"
+             xmlns:local="clr-namespace:StarXelem"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
+             d:DataContext="{x:Static local:DesignData.ReputationTabViewModel}"
              x:Class="StarXelem.Views.ReputationTabView"
              x:DataType="vm:ReputationTabViewModel">
 
-    <DockPanel LastChildFill="True">
+    <UserControl.Styles>
+        <Style Selector="Border.reputation-card">
+            <Setter Property="Background" Value="{DynamicResource BackgroundGrade4Brush}" />
+            <Setter Property="BorderThickness" Value="3 0.5 0.5 0.5" />
+            <Setter Property="CornerRadius" Value="8" />
+
+            <Style Selector="^.notloaded" >
+                <Setter Property="BorderBrush" Value="#14FFFFFF" />
+
+                <Style Selector="^ > StackPanel">
+                    <Setter Property="Opacity" Value="0.55"></Setter>
+                </Style>
+
+                
+                <Style Selector="^ TextBlock.relationship-color">
+                    <Setter Property="Foreground" Value="#FF777777" />
+                    <Setter Property="FontWeight" Value="ExtraBold" />
+                </Style>
+            </Style>
+
+            <Style Selector="^.ally" >
+                <Setter Property="BorderBrush" Value="#FF1D9E75" />
+                <Style Selector="^ TextBlock.relationship-color">
+                    <Setter Property="Foreground" Value="#FF1D9E75" />
+                </Style>
+            </Style>
+            <Style Selector="^.neutral">
+                <Setter Property="BorderBrush" Value="#30FFFFFF" />
+                <Style Selector="^ TextBlock.relationship-color">
+                    <Setter Property="Foreground" Value="#30FFFFFF" />
+                </Style>
+            </Style>
+            <Style Selector="^.hostile">
+                <Setter Property="BorderBrush" Value="#FFE24B4A" />
+                <Style Selector="^ TextBlock.relationship-color">
+                    <Setter Property="Foreground" Value="#FFE24B4A" />
+                </Style>
+            </Style>
+        </Style>
+    </UserControl.Styles>
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <conv:EnumToTextConverter x:Key="EnumToTextConverter" />
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <DockPanel LastChildFill="True" Classes="main">
         <!-- Toolbar Section -->
         <StackPanel DockPanel.Dock="Top"
                     Orientation="Horizontal"
@@ -44,18 +96,15 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <!-- Contractor Card (Design System Section 15) -->
-                        <Border Width="300"
-                                Margin="10"
-                                CornerRadius="8"
-                                BorderThickness="0.5"
-                                BorderBrush="{DynamicResource BorderBrush}"
-                                Background="{DynamicResource SurfaceCardBrush}">
-
-                            <StackPanel Padding="16" Spacing="12">
+                        <Border Classes="reputation-card" beh:DynamicClass.Names="{Binding StateClasses}" Width="300" Margin="10">
+                            <StackPanel Margin="16" Spacing="12">
                                 <!-- Header -->
-                                <TextBlock Text="{Binding Name}"
-                                           FontSize="13"
-                                           FontWeight="500"
+                                <TextBlock Classes="bold h1"  Text="{Binding Name}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,4"/>
+
+                                <!-- Status -->
+                                <TextBlock Classes="bold h2 relationship-color"  Text="{Binding FactionStatus, Converter={StaticResource EnumToTextConverter}}"
                                            HorizontalAlignment="Center"
                                            Margin="0,0,0,4"/>
 
@@ -65,22 +114,27 @@
                                         <DataTemplate>
                                             <StackPanel Margin="0,0,0,10">
                                                 <DockPanel LastChildFill="False">
-                                                    <TextBlock Text="{Binding Category}"
-                                                               FontSize="12"
-                                                               FontWeight="500"
+                                                    <TextBlock Classes="demi-bold" Text="{Binding DisplayName}"
                                                                DockPanel.Dock="Left" />
-                                                    <TextBlock Text="{Binding TierName}"
-                                                               FontSize="11"
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                    <TextBlock Classes="dimming" Text="{Binding CurrentStanding.DisplayName}"
                                                                DockPanel.Dock="Right" />
                                                 </DockPanel>
 
                                                 <ProgressBar Value="{Binding CurrentValue}"
-                                                             Maximum="{Binding MaxValue}"
-                                                             Height="4"
-                                                             Margin="0,4,0,0"
+                                                             Minimum="{Binding CurrentStanding.Min}"
+                                                             Maximum="{Binding CurrentStanding.Max}"
+                                                             ToolTip.Tip="{Binding CurrentValue}"
+                                                             Height="6"
+                                                             Margin="0,6,0,6"
                                                              Foreground="{DynamicResource AccentBrush}"
-                                                             Background="{DynamicResource SurfaceBrush}" />
+                                                             Background="{DynamicResource BackgroundGrade4Brush}" />
+                                                <DockPanel LastChildFill="False">
+                                                    <TextBlock Classes="demi-bold" Text="{Binding CurrentValue}"
+                                                               DockPanel.Dock="Left" />
+                                                    <TextBlock Classes="dimming" Text="{Binding CurrentStanding.Max}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               DockPanel.Dock="Right" />
+                                                </DockPanel>
                                             </StackPanel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>

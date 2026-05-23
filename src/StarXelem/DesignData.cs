@@ -1,4 +1,5 @@
-﻿using DocumentFormat.OpenXml.InkML;
+﻿using System.Collections.ObjectModel;
+using DocumentFormat.OpenXml.InkML;
 using Microsoft.Extensions.DependencyInjection;
 using Sc.External.Common.Shard.V1;
 using Sc.External.Services.Entitlement.V2;
@@ -24,6 +25,7 @@ public static class DesignData
     public static ItemComparisonPopupContentViewModel ItemComparisonPopupContentViewModel { get; } = App.Current.Services.GetRequiredService<ItemComparisonPopupContentViewModel>();
     public static P4kShipTabViewModel P4kShipTabViewModel { get; } = App.Current.Services.GetRequiredService<P4kShipTabViewModel>();
     public static MissionsTabViewModel MissionsTabViewModel { get; } = App.Current.Services.GetRequiredService<MissionsTabViewModel>();
+    public static ReputationTabViewModel ReputationTabViewModel { get; } = App.Current.Services.GetRequiredService<ReputationTabViewModel>();
 
 
     static DesignData()
@@ -293,6 +295,8 @@ public static class DesignData
                 StowContext = new EntityStowContext { IsStowed = true, ShardId = "pub_use1b_3.24_99999" }
             },
         });
+        
+        PopupateReputationTabViewModel();
     }
 
     private static void PopupateMainWindowViewModel()
@@ -300,5 +304,120 @@ public static class DesignData
         MainWindowViewModel.GrpcStatus = GrpcConnectionStatus.Error;
         MainWindowViewModel.CurrentShardName = "pub_euw1b_3.24_12345";
         MainWindowViewModel.GrpcErrorMessage = "Une message d'erreur\n avec saut de ligne et une ligne plutôt longue.";
+    }
+
+    private static void PopupateReputationTabViewModel()
+    {
+        ReputationTabViewModel.FilteredContractors.Add(new ContractorModel
+        {
+           Id = default,
+           Name = "Contractor 1",
+           FactionStatus = FactionStatus.NotLoaded,
+           Reputations = new List<ReputationModel>
+           {
+               new()
+               {
+                   DisplayName = "Reputation 1 Display",
+                   MaxValue = 2000,
+                   Category = "Reputation 1",
+                   CurrentValue = null,
+                   TierName = "Tier 1",
+                   CurrentStanding = new StandingModel
+                   {
+                   Name = "Covalex_standing1",
+                   DisplayName = "Manager",
+                   Min = 100,
+                   Max = 500
+               }
+               },
+               new()
+               {
+                   DisplayName = "Reputation 2 Display",
+                   MaxValue = 500,
+                   Category = "Reputation 2",
+                   CurrentValue = null,
+                   TierName = "Tier 2",
+                   CurrentStanding = new StandingModel
+                   {
+                   Name = "Covalex_standing1",
+                   DisplayName = "recrue",
+                   Min = 0,
+                   Max = 99
+               }
+               }
+           }
+        });
+        ReputationTabViewModel.FilteredContractors.Add(new ContractorModel
+        {
+            Id = default,
+            Name = "Covalex",
+            FactionStatus = FactionStatus.Friendly,
+            Reputations = new List<ReputationModel>
+            {
+                new()
+                {
+                    DisplayName = "Reputation 1 Display",
+                    MaxValue = 2000,
+                    Category = "Reputation 1",
+                    CurrentValue = 240,
+                    TierName = "Tier 1",
+                    CurrentStanding = new StandingModel
+                    {
+                        Name = "Covalex_standing1",
+                        DisplayName = "Manager",
+                        Min = 100,
+                        Max = 500
+                    }
+                }
+            }
+        });
+        ReputationTabViewModel.FilteredContractors.Add(new ContractorModel
+        {
+            Id = default,
+            Name = "Citizen for prosperity",
+            FactionStatus = FactionStatus.Neutral,
+            Reputations = new List<ReputationModel>
+            {
+                new()
+                {
+                    DisplayName = "Reputation 1 Display",
+                    MaxValue = 2000,
+                    Category = "Reputation 1",
+                    CurrentValue = 150,
+                    TierName = "Tier 1",
+                    CurrentStanding = new StandingModel
+                    {
+                        Name = "Covalex_standing1",
+                        DisplayName = "Manager",
+                        Min = 100,
+                        Max = 500
+                    }
+                }
+            }
+        });
+        ReputationTabViewModel.FilteredContractors.Add(new ContractorModel
+        {
+            Id = default,
+            Name = "Head Hunter",
+            FactionStatus = FactionStatus.Hostile,
+            Reputations = new List<ReputationModel>
+            {
+                new()
+                {
+                    DisplayName = "Reputation 0 Display",
+                    MaxValue = 2000,
+                    Category = "Reputation 1",
+                    CurrentValue = -1,
+                    TierName = "Tier 1",
+                    CurrentStanding = new StandingModel
+                    {
+                        Name = "HH_standing0",
+                        DisplayName = "Hostile",
+                        Min = -10,
+                        Max = 0
+                    }
+                }
+            }
+        });
     }
 }

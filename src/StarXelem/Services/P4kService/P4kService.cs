@@ -563,6 +563,29 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         return cacheEntry?.Record;
     }
 
+    public async Task<List<DataCoreTypedRecord>> GetAllFactions()
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+
+        var targetDepth = 4;
+        var results = _EntityClassDict.Values
+            .Where(r => r.Record.Data is Faction)
+            .ToList();
+
+        // On met à jour les entrées si besoin
+        await Task.WhenAll(results
+            .AsParallel()
+            .Select(async p =>
+            {
+                if (p.depth < targetDepth)
+                {
+                    await UpdateCacheRecordWithDepth(p, targetDepth).ConfigureAwait(false);
+                }
+            }));
+        
+        return results.Select(r => r.Record).ToList();
+    }
+
     private void ResetSelectedFile()
     {
         // stop previous loading if any
