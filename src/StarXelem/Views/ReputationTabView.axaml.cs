@@ -49,8 +49,6 @@ namespace StarXelem.Views
                 var container = standingsList.ContainerFromItem(item!);
                 if (container is not Border border)
                     continue;
-                if (standing is null)
-                    continue;
 
                 // Current standing: highlighted (§17.7)
                 if (standing.Name == scopeData.CurrentStanding?.Name)

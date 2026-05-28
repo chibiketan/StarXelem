@@ -161,6 +161,7 @@
                                                     <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}"
                                                                   Classes="scope-toggle"
                                                                   DockPanel.Dock="Left">
+                                                        <PathIcon />
                                                     </ToggleButton>
                                                     <TextBlock Text="{Binding DisplayName}"
                                                                DockPanel.Dock="Left"
