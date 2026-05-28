@@ -23,56 +23,53 @@ public class ReputationService : IReputationService
 
     public async Task<List<ContractorModel>> GetSynchronizedReputationsAsync()
     {
-        // TODO ne plus partir des faction mais partir carrément des FactionReputation !
         // 1. Retrieve static data from P4K
-        var reputationContextRecordList = await _p4kService.GetAllFactions().ConfigureAwait(false);
+        var factionReputationRecordList = await _p4kService.GetAllFactionReputations().ConfigureAwait(false);
 
         // 2. Retrieve player data from gRPC
         var playerReputations = await _grpcClientService.QueryReputationsAsync().ConfigureAwait(false);
 
         var contractorMap = new Dictionary<ulong, ContractorModel>();
 
-        foreach (var dataCoreTypedRecord in reputationContextRecordList)
+        foreach (var dataCoreTypedRecord in factionReputationRecordList)
         {
-            if (dataCoreTypedRecord.Data is not Faction faction)
+            if (dataCoreTypedRecord.Data is not FactionReputation factionReputation)
             {
-                // pas de données, pourquoi ?
-                _logger.LogWarning("No faction found for record {RecordId}", dataCoreTypedRecord.RecordId);
+                _logger.LogWarning("No faction reputation found for record {RecordId}", dataCoreTypedRecord.RecordId);
                 continue;
             }
 
-            if (faction.factionReputationRef?.reputationContextPropertiesUI is null)
+            if (factionReputation.reputationContextPropertiesUI is null)
             {
-                // pas une faction avec réputation affichée in-game on dirait
-                _logger.LogInformation("No reputation context found for faction {RecordId}", dataCoreTypedRecord.RecordId);
+                _logger.LogInformation("No reputation context found for faction reputation {RecordId}", dataCoreTypedRecord.RecordId);
                 continue;
             }
 
-            if (faction.factionReputationRef.hideInDelpihApp)
+            if (factionReputation.hideInDelpihApp)
             {
-                // Caché d'après la configuration
                 continue;
             }
 
             var contractor = new ContractorModel
             {
                 Id = dataCoreTypedRecord.RecordId,
-                Name = await _p4kService.GetLocaleValue(faction.factionReputationRef.displayName),
-                Geid = faction.factionReputationRef.GEID
+                Name = await _p4kService.GetLocaleValue(factionReputation.displayName),
+                Geid = factionReputation.GEID
             };
 
-            foreach (var scopeContext in faction.factionReputationRef.reputationContextPropertiesUI.scopeContextList)
+            foreach (var scopeContext in factionReputation.reputationContextPropertiesUI.scopeContextList)
             {
                 if (scopeContext.scope is null)
                 {
-                    _logger.LogWarning("Null scope found for faction {RecordId}", dataCoreTypedRecord.RecordId);
+                    _logger.LogWarning("Null scope found for faction reputation {RecordId}", dataCoreTypedRecord.RecordId);
                     continue;
                 }
-                
-                var scope = new ReputationModel();
 
-                scope.Category = scopeContext.scope.scopeName;
-                scope.DisplayName = await _p4kService.GetLocaleValue(scopeContext.scope.scopeName);
+                var scope = new ReputationModel
+                {
+                    Category = scopeContext.scope.scopeName,
+                    DisplayName = await _p4kService.GetLocaleValue(scopeContext.scope.scopeName)
+                };
 
                 contractor.Reputations.Add(scope);
 
@@ -80,37 +77,28 @@ public class ReputationService : IReputationService
                 {
                     if (standing is null)
                     {
-                        _logger.LogWarning("Null standing found for faction {RecordId}", dataCoreTypedRecord.RecordId);
+                        _logger.LogWarning("Null standing found for faction reputation {RecordId}", dataCoreTypedRecord.RecordId);
                         continue;
                     }
-                    var standingModel = new StandingModel
+
+                    scope.StandingList.Add(new StandingModel
                     {
                         Name = standing.name,
                         DisplayName = await _p4kService.GetLocaleValue(standing.displayName),
                         Min = standing.minReputation
-                    };
-                    
-                    scope.StandingList.Add(standingModel);
+                    });
                 }
 
                 // On défini la valeur max comme le min - 1 du prochain standing
                 for (int i = scope.StandingList.Count - 2; i >= 0; --i)
                 {
-                    scope.StandingList[i].Max = scope.StandingList[i+1].Min - 1;
+                    scope.StandingList[i].Max = scope.StandingList[i + 1].Min - 1;
                 }
-                
+
                 scope.StandingList[^1].Max = scopeContext.scope.standingMap.reputationCeiling;
-                // Le Standing par défaut sera le premier standing du scope
                 scope.CurrentStanding = scope.StandingList.FirstOrDefault();
             }
-            
-            // On récupère le scope de status
-            if (faction.factionReputationRef.reputationContextPropertiesUI.primaryScopeContext is not null)
-            {
-                var scope = faction.factionReputationRef.reputationContextPropertiesUI.primaryScopeContext;
-                
-            }
-            
+
             contractorMap.Add(contractor.Geid, contractor);
         }
 

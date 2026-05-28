@@ -300,7 +300,7 @@ public class DesignP4kService : IP4kService
         return Task.FromResult<DataCoreTypedRecord?>(new DataCoreTypedRecord("toto", "toto", default, null));   
     }
 
-    public Task<List<DataCoreTypedRecord>> GetAllFactions()
+    public Task<List<DataCoreTypedRecord>> GetAllFactionReputations()
     {
         return Task.FromResult(new List<DataCoreTypedRecord>());  
     }

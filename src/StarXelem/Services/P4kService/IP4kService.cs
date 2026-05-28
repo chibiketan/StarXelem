@@ -63,5 +63,5 @@ public interface IP4kService : INotifyPropertyChanged
     /// <returns>L'enregistrement demandé</returns>
     Task<DataCoreTypedRecord?> GetRecordWithSpecificDepth(CigGuid recordId, int depth);
 
-    Task<List<DataCoreTypedRecord>> GetAllFactions();
+    Task<List<DataCoreTypedRecord>> GetAllFactionReputations();
 }
