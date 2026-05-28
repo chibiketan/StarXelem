@@ -119,19 +119,19 @@ internal sealed class BlueprintMappingService : IBlueprintMappingService
 
                             // Ressource brute (ex : Fer 0,2 SCU) — quantité exprimée en SCU
                             case CraftingCost_Resource resourceCost:
-                                materialList.Add(new BlueprintMaterialModel
+                                materialList.Add(new BlueprintResourceModel
                                 {
                                     Name = await _p4kService.GetLocaleValue(resourceCost.resource?.displayName) ?? UnknownLabel,
                                     QuantityInScu = (resourceCost.quantity as SStandardCargoUnit)?.standardCargoUnits ?? -1.0f
                                 });
                                 break;
 
-                            // Objet spécifique (ex : minerai Sadaryx x4) — quantité entière via GetEntityClassName
+                            // Objet spécifique (ex : minerai Sadaryx x4) — quantité physique d'objets
                             case CraftingCost_Item itemCost:
-                                materialList.Add(new BlueprintMaterialModel
+                                materialList.Add(new BlueprintItemModel
                                 {
                                     Name = await _p4kService.GetEntityClassName(itemCost.entityClass) ?? UnknownLabel,
-                                    QuantityInScu = itemCost.quantity
+                                    Quantity = itemCost.quantity
                                 });
                                 break;
 

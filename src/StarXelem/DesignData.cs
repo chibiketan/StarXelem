@@ -158,10 +158,15 @@ public static class DesignData
                     {
                         Name = "Categorie 1",
                         MaterialList = [
-                            new BlueprintMaterialModel
+                            new BlueprintResourceModel
                             {
                                 Name = "Aslarite",
                                 QuantityInScu = 0.015f
+                            },
+                            new BlueprintItemModel
+                            {
+                                Name = "Minerai Sadaryx",
+                                Quantity = 4
                             }
                         ],
                         StatModifierList = [
@@ -189,12 +194,12 @@ public static class DesignData
                     {
                         Name = "Categorie 2",
                         MaterialList = [
-                            new BlueprintMaterialModel
+                            new BlueprintResourceModel
                             {
                                 Name = "Hadanite",
                                 QuantityInScu = 0.01f
                             },
-                            new BlueprintMaterialModel
+                            new BlueprintResourceModel
                             {
                                 Name = "Titanium",
                                 QuantityInScu = 0.06f
