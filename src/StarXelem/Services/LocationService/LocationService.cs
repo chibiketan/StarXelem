@@ -62,7 +62,7 @@ public class LocationService : ILocationService
 
         var id = ulong.Parse(split[2]);
 
-        if (type == ELocationType.Location || type == ELocationType.Hangar)
+        if (type == ELocationType.Location || type == ELocationType.Hangar || type == ELocationType.Mission)
         {
             return await ResolveLocationId((uint)id, type);
         }
@@ -289,6 +289,7 @@ public class LocationService : ILocationService
         Container,
         PersonalEntityInventory,
         PlayerInventory,
-        Hangar
+        Hangar,
+        Mission
     }
 }
