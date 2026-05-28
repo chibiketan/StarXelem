@@ -126,7 +126,16 @@
                                             <Grid ColumnDefinitions="Auto,*,Auto">
                                                 <Border Grid.Column="0" Classes="bulletpoint" />
                                                 <TextBlock Grid.Column="1" Classes="demi-dimming" Text="{Binding Name}" />
-                                                <TextBlock Grid.Column="2" Classes="demi-bold" Text="{Binding Quantity, StringFormat='\{0} unités'}" />
+                                                <TextBlock Grid.Column="2" Classes="demi-bold" Text="{Binding QuantityCount, StringFormat='\{0} unités'}" />
+                                            </Grid>
+                                        </DataTemplate>
+
+                                        <!-- Repli pour tout sous-type inconnu : affiche le nom sans quantité -->
+                                        <DataTemplate DataType="{x:Type vm:BlueprintMaterialModel}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <Border Grid.Column="0" Classes="bulletpoint" />
+                                                <TextBlock Grid.Column="1" Classes="demi-dimming" Text="{Binding Name}" />
+                                                <TextBlock Grid.Column="2" Classes="demi-bold" Text="(type inconnu)" />
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.DataTemplates>

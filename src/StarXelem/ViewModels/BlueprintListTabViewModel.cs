@@ -161,7 +161,8 @@ public class BlueprintResourceModel : BlueprintMaterialModel
 /// <summary>Objet spécifique mesuré en quantité physique (ex : minerai Sadaryx x4).</summary>
 public class BlueprintItemModel : BlueprintMaterialModel
 {
-    public required int Quantity { get; set; }
+    /// <summary>Nombre d'objets physiques requis (pas de SCU).</summary>
+    public required int QuantityCount { get; set; }
 }
 
 public abstract class BlueprintStatModelBase

@@ -166,7 +166,7 @@ public static class DesignData
                             new BlueprintItemModel
                             {
                                 Name = "Minerai Sadaryx",
-                                Quantity = 4
+                                QuantityCount = 4
                             }
                         ],
                         StatModifierList = [

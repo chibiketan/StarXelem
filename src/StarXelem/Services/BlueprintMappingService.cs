@@ -131,7 +131,7 @@ internal sealed class BlueprintMappingService : IBlueprintMappingService
                                 materialList.Add(new BlueprintItemModel
                                 {
                                     Name = await _p4kService.GetEntityClassName(itemCost.entityClass) ?? UnknownLabel,
-                                    Quantity = itemCost.quantity
+                                    QuantityCount = itemCost.quantity
                                 });
                                 break;
 
