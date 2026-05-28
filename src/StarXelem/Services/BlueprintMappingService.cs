@@ -109,15 +109,36 @@ internal sealed class BlueprintMappingService : IBlueprintMappingService
                     var categoryName = await _p4kService.GetLocaleValue(craftingCostSelect.nameInfo.displayName);
                     var materialList = new List<BlueprintMaterialModel>();
 
-                    var ressources = craftingCostSelect.options.OfType<CraftingCost_Resource>().ToList();
-
-                    foreach (var craftingCostResource in ressources)
+                    // Parcours de chaque option de coût : ressources brutes (Resource) et objets finis (Item)
+                    foreach (var costOption in craftingCostSelect.options)
                     {
-                        materialList.Add(new BlueprintMaterialModel
+                        switch (costOption)
                         {
-                            Name = await _p4kService.GetLocaleValue(craftingCostResource.resource?.displayName) ?? UnknownLabel,
-                            QuantityInScu = (craftingCostResource.quantity as SStandardCargoUnit)?.standardCargoUnits ?? -1.0f
-                        });
+                            case null:
+                                break;
+
+                            // Ressource brute (ex : Fer 0,2 SCU) — quantité exprimée en SCU
+                            case CraftingCost_Resource resourceCost:
+                                materialList.Add(new BlueprintResourceModel
+                                {
+                                    Name = await _p4kService.GetLocaleValue(resourceCost.resource?.displayName) ?? UnknownLabel,
+                                    QuantityInScu = (resourceCost.quantity as SStandardCargoUnit)?.standardCargoUnits ?? -1.0f
+                                });
+                                break;
+
+                            // Objet spécifique (ex : minerai Sadaryx x4) — quantité physique d'objets
+                            case CraftingCost_Item itemCost:
+                                materialList.Add(new BlueprintItemModel
+                                {
+                                    Name = await _p4kService.GetEntityClassName(itemCost.entityClass) ?? UnknownLabel,
+                                    QuantityCount = itemCost.quantity
+                                });
+                                break;
+
+                            default:
+                                _logger.LogWarning("Type de coût non reconnu dans une catégorie : {type}", costOption.GetType().FullName);
+                                break;
+                        }
                     }
 
                     var statModifierList = new List<BlueprintStatModelBase>();

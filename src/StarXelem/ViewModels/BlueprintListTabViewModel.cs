@@ -146,10 +146,23 @@ public class BlueprintCategoryModel
     public required List<BlueprintStatModelBase> StatModifierList { get; set; }
 }
 
-public class BlueprintMaterialModel
+/// <summary>Classe de base abstraite pour un matériau de blueprint (ressource ou objet).</summary>
+public abstract class BlueprintMaterialModel
 {
     public required string Name { get; set; }
+}
+
+/// <summary>Ressource brute mesurée en SCU (ex : Fer, Cuivre).</summary>
+public class BlueprintResourceModel : BlueprintMaterialModel
+{
     public required float QuantityInScu { get; set; }
+}
+
+/// <summary>Objet spécifique mesuré en quantité physique (ex : minerai Sadaryx x4).</summary>
+public class BlueprintItemModel : BlueprintMaterialModel
+{
+    /// <summary>Nombre d'objets physiques requis (pas de SCU).</summary>
+    public required int QuantityCount { get; set; }
 }
 
 public abstract class BlueprintStatModelBase

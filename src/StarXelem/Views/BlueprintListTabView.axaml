@@ -112,11 +112,30 @@
                                 <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 dimming bold">Ressources</TextBlock>
                                 <ItemsControl Grid.Row="1" Grid.Column="0" ItemsSource="{Binding MaterialList}">
                                     <ItemsControl.DataTemplates>
-                                        <DataTemplate DataType="{x:Type vm:BlueprintMaterialModel}">
+                                        <!-- Ressource brute en SCU (ex : Fer 0,2 SCU) -->
+                                        <DataTemplate DataType="{x:Type vm:BlueprintResourceModel}">
                                             <Grid ColumnDefinitions="Auto,*,Auto">
                                                 <Border Grid.Column="0" Classes="bulletpoint" />
                                                 <TextBlock Grid.Column="1" Classes="demi-dimming" Text="{Binding Name}" />
                                                 <TextBlock Grid.Column="2" Classes="demi-bold" Text="{Binding QuantityInScu, Converter={StaticResource ScuConverter}}" />
+                                            </Grid>
+                                        </DataTemplate>
+
+                                        <!-- Objet en quantité physique (ex : minerai Sadaryx 4 unités) -->
+                                        <DataTemplate DataType="{x:Type vm:BlueprintItemModel}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <Border Grid.Column="0" Classes="bulletpoint" />
+                                                <TextBlock Grid.Column="1" Classes="demi-dimming" Text="{Binding Name}" />
+                                                <TextBlock Grid.Column="2" Classes="demi-bold" Text="{Binding QuantityCount, StringFormat='\{0} unités'}" />
+                                            </Grid>
+                                        </DataTemplate>
+
+                                        <!-- Repli pour tout sous-type inconnu : affiche le nom sans quantité -->
+                                        <DataTemplate DataType="{x:Type vm:BlueprintMaterialModel}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <Border Grid.Column="0" Classes="bulletpoint" />
+                                                <TextBlock Grid.Column="1" Classes="demi-dimming" Text="{Binding Name}" />
+                                                <TextBlock Grid.Column="2" Classes="demi-bold" Text="(type inconnu)" />
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.DataTemplates>

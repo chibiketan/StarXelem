@@ -68,6 +68,4 @@ Each service has a `Design*` implementation (e.g. `DesignP4kService`) registered
 - New tab pages: create `XyzTabViewModel : PageViewModelBase` + `XyzTabView.axaml`, then register the view in `ViewLocator` and add the tab to `MainWindowViewModel`
 - Line length limit: 200 characters (see `.editorconfig`)
 
-### UI
 
-Toutes les conventions, couleurs et règles pour l'interface graphique sont présentes dans le fichier @CLAUDE_design_convention.md
