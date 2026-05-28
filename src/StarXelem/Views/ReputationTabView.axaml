@@ -24,7 +24,6 @@
                     <Setter Property="Opacity" Value="0.55"></Setter>
                 </Style>
 
-                
                 <Style Selector="^ TextBlock.relationship-color">
                     <Setter Property="Foreground" Value="#FF777777" />
                     <Setter Property="FontWeight" Value="ExtraBold" />
@@ -50,12 +49,56 @@
                 </Style>
             </Style>
         </Style>
+
+        <!-- Chevron rotation for ToggleButton (§17.7) -->
+        <Style Selector="ToggleButton.scope-toggle">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="2" />
+            <Style Selector="PathIcon">
+                <Setter Property="Data" Value="M15 18l6-6-6-6" />
+                <Setter Property="Width" Value="8" />
+                <Setter Property="Height" Value="8" />
+                <Setter Property="Foreground" Value="#4DFFFFFF" />
+            </Style>
+            <Style Selector=":checked PathIcon">
+                <Setter Property="Data" Value="M15 18l6-6-6-6" />
+                <Setter Property="RenderTransform">
+                    <Setter.Value>
+                        <RotateTransform Angle="90" CenterX="4" CenterY="4" />
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </Style>
+
+        <!-- Standing list item styles (§17.7) -->
+        <Style Selector="Border.standing-item">
+            <Setter Property="Padding" Value="4,6" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Margin" Value="0,2" />
+
+            <Style Selector="^.current-standing">
+                <Setter Property="Background" Value="#1A1D9E75" />
+                <Style Selector="^ TextBlock.standing-name">
+                    <Setter Property="Foreground" Value="#FF5DCAA5" />
+                </Style>
+                <Style Selector="^ TextBlock.standing-threshold">
+                    <Setter Property="Foreground" Value="#80FFFFFF" />
+                </Style>
+            </Style>
+
+            <Style Selector="^.locked-standing">
+                <Setter Property="Opacity" Value="0.45" />
+            </Style>
+        </Style>
     </UserControl.Styles>
+
     <UserControl.Resources>
         <ResourceDictionary>
             <conv:EnumToTextConverter x:Key="EnumToTextConverter" />
         </ResourceDictionary>
     </UserControl.Resources>
+
     <DockPanel LastChildFill="True" Classes="main">
         <!-- Toolbar Section -->
         <StackPanel DockPanel.Dock="Top"
@@ -113,13 +156,25 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <StackPanel Margin="0,0,0,10">
+                                                <!-- Scope label with chevron toggle (§17.7) -->
                                                 <DockPanel LastChildFill="False">
-                                                    <TextBlock Classes="demi-bold" Text="{Binding DisplayName}"
-                                                               DockPanel.Dock="Left" />
-                                                    <TextBlock Classes="dimming" Text="{Binding CurrentStanding.DisplayName}"
-                                                               DockPanel.Dock="Right" />
+                                                    <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                                                  Classes="scope-toggle"
+                                                                  DockPanel.Dock="Left">
+                                                    </ToggleButton>
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               DockPanel.Dock="Left"
+                                                               FontSize="10"
+                                                               FontWeight="500"
+                                                               Foreground="#33FFFFFF" />
+                                                    <TextBlock Text="{Binding CurrentValue}"
+                                                               DockPanel.Dock="Right"
+                                                               FontSize="10"
+                                                               FontFamily="Cascadia Mono, Consolas, monospace"
+                                                               Foreground="#47FFFFFF" />
                                                 </DockPanel>
 
+                                                <!-- Progress Bar -->
                                                 <ProgressBar Value="{Binding CurrentValue}"
                                                              Minimum="{Binding CurrentStanding.Min}"
                                                              Maximum="{Binding CurrentStanding.Max}"
@@ -128,13 +183,57 @@
                                                              Margin="0,6,0,6"
                                                              Foreground="{DynamicResource AccentBrush}"
                                                              Background="{DynamicResource BackgroundGrade4Brush}" />
+
+                                                <!-- Min/Max values -->
                                                 <DockPanel LastChildFill="False">
-                                                    <TextBlock Classes="demi-bold" Text="{Binding CurrentValue}"
+                                                    <TextBlock Classes="demi-bold"
+                                                               Text="{Binding CurrentValue}"
                                                                DockPanel.Dock="Left" />
-                                                    <TextBlock Classes="dimming" Text="{Binding CurrentStanding.Max}"
+                                                    <TextBlock Classes="dimming"
+                                                               Text="{Binding CurrentStanding.Max}"
                                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                                DockPanel.Dock="Right" />
                                                 </DockPanel>
+
+                                                <!-- Separator before standings list (§17.7) -->
+                                                <Rectangle Height="0.5"
+                                                           Fill="#0FFFFFFF"
+                                                           Margin="0,6,0,4" />
+
+                                                <!-- Standings list — visible only when IsExpanded == true (§17.7) -->
+                                                <ItemsControl ItemsSource="{Binding StandingList}"
+                                                              IsVisible="{Binding IsExpanded}"
+                                                              Loaded="OnStandingsListLoaded">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Classes="standing-item">
+                                                                <DockPanel LastChildFill="False"
+                                                                           Margin="0,1">
+                                                                    <!-- Standing dot (§17.4) -->
+                                                                    <Ellipse Width="7" Height="7"
+                                                                             Fill="#FF5DCAA5"
+                                                                             DockPanel.Dock="Left"
+                                                                             VerticalAlignment="Center"
+                                                                             Margin="0,0,8,0" />
+                                                                    <!-- Standing name -->
+                                                                    <TextBlock Text="{Binding DisplayName}"
+                                                                               Classes="standing-name"
+                                                                               DockPanel.Dock="Left"
+                                                                               FontSize="10"
+                                                                               FontWeight="500"
+                                                                               Foreground="#B3FFFFFF" />
+                                                                    <!-- Standing threshold (§17.8) -->
+                                                                    <TextBlock Text="{Binding Min}"
+                                                                               Classes="standing-threshold"
+                                                                               DockPanel.Dock="Right"
+                                                                               FontSize="10"
+                                                                               FontFamily="Cascadia Mono, Consolas, monospace"
+                                                                               Foreground="#47FFFFFF" />
+                                                                </DockPanel>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
                                             </StackPanel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
