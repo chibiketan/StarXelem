@@ -11,4 +11,5 @@ public class ReputationModel
     public string DisplayName { get; set; }
     public List<StandingModel> StandingList { get; set; } = new();
     public StandingModel? CurrentStanding { get; set; }
+    public bool IsExpanded { get; set; }
 }
