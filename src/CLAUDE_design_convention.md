@@ -528,6 +528,93 @@ Carte à `opacity: 0.55`, sans barres de progression. Un texte d'aide remplace l
 - **Bordure gauche 2 px** : seule exception à la règle générale des `0.5 px`. Justifiée car elle encode une information de premier niveau (état relationnel) et doit être perçue immédiatement dans la grille.
 - **Nombre de colonnes** : 3 colonnes fixes. Si le nombre de factions est important, la grille défile verticalement.
 
+### 17.7 Liste des ranks (scope déplié)
+
+Modélise la relation `1 faction → m scope → n rank`. Chaque scope est cliquable et déplie la liste verticale de tous ses ranks.
+
+**Interaction**
+
+- **Clic sur le scope** → déplie / replie la liste des ranks. Un chevron `›` à gauche du label pivote de 90° (`transition: transform .15s`).
+- Plusieurs scopes peuvent être dépliés simultanément.
+- Le menu contextuel (clic droit) est réservé aux actions (copier / exporter une valeur), jamais à l'affichage de cette liste.
+
+**Sélection du rang courant**
+
+Le rang courant est le dernier rank dont le `threshold ≤ valeur du scope`. Si aucune valeur de réputation n'est disponible, on retombe sur le premier rank (valeur initiale définie dans le scope). Le calcul ne doit jamais être codé en dur côté vue.
+
+```
+rangCourant = dernier rank tel que rank.threshold <= scope.value
+fill (%)    = (value - seuilCourant) / (seuilSuivant - seuilCourant), borné [4 %, 100 %]
+```
+
+> Le fill de la barre représente la progression **à l'intérieur du palier courant**, et non une position absolue sur l'ensemble des paliers.
+
+**Structure d'une ligne de rank**
+
+Grille à 4 colonnes : `[ point 14 px ] [ nom (flex) ] [ seuil (auto) ] [ bonus (auto) ]`, gap `8 px`, padding `4 px 6 px`, border-radius `5 px`, taille de police `10 px`.
+
+| Colonne | Contenu | Police |
+|---|---|---|
+| Point palier | pastille `7×7 px`, couleur du palier (§17.4) | — |
+| Nom du rank | nom complet | 500 |
+| Seuil | valeur numérique du seuil | monospace |
+| Bonus | bonus associé, `—` si aucun | monospace, min-width 34 px, aligné droite |
+
+**Couleurs de la liste**
+
+| Élément | Dark | Light |
+|---|---|---|
+| Séparateur haut de liste | `#0FFFFFFF` (0.5 px) | `#FFECECEC` (0.5 px) |
+| Nom (rank verrouillé) | `#80FFFFFF` | `#FF666666` |
+| Seuil (verrouillé) | `#47FFFFFF` | `#FF999999` |
+| Bonus (verrouillé) | `#40FFFFFF` | `#FFAAAAAA` |
+| Ranks non atteints | `opacity: 0.45` | `opacity: 0.45` |
+
+**Ligne du rang courant (surlignée)**
+
+| Élément | Dark | Light |
+|---|---|---|
+| Fond de ligne | `#1A1D9E75` | `#FFE1F5EE` |
+| Nom | `#FF5DCAA5` | `#FF0F6E56` |
+| Seuil | `#80FFFFFF` | `#FF444444` |
+| Bonus | `#FF5DCAA5` | `#FF0F6E56` |
+
+**Cas P7 Master** : la pastille reçoit un `outline: 1.5 px` de la couleur P7, `outline-offset: 1 px` (cohérent avec §17.4).
+
+### 17.8 Valeur brute et mode Debug
+
+**Valeur brute (toujours visible)**
+
+La valeur numérique du scope est affichée en permanence à droite du label, en monospace atténué — jamais masquée derrière un survol, afin de permettre la comparaison visuelle entre plusieurs scopes.
+
+| Élément | Dark | Light |
+|---|---|---|
+| Valeur brute | `#47FFFFFF` — monospace 10 px | `#FF888888` — monospace 10 px |
+
+**Mode Debug / Expérimentation (toggle global)**
+
+Un interrupteur unique dans la top-bar de l'écran affecte tous les scopes simultanément. Destiné au suivi fin de progression et à l'estimation du split d'XP (partage de missions).
+
+Quand il est actif :
+- La valeur passe de `1240` à `1240 / 2000 (+760)` : valeur courante / seuil du prochain rank / distance restante.
+- Le texte de rang est complété : `Senior Tracker · +15% · reste 760 → Master`.
+- L'état déplié des scopes est préservé lors du basculement du toggle.
+
+| Élément | Dark | Light |
+|---|---|---|
+| Valeur (mode debug) | `#80FFFFFF` | `#FF444444` |
+| Mention « (+reste) » | `#FF5DCAA5` | `#FF0F6E56` |
+
+**Toggle (interrupteur)**
+
+| Élément | Dark | Light |
+|---|---|---|
+| Piste OFF | `#0FFFFFFF` / bordure `#1AFFFFFF` | `#FFEBEBEB` / bordure `#FFD0D0D0` |
+| Curseur OFF | `#35FFFFFF` | `#FFAAAAAA` |
+| Piste ON | `#24A78BFA` / bordure `#52A78BFA` | `#FFEEEDFE` / bordure `#FFAFA9EC` |
+| Curseur ON | `#FFA78BFA` | `#FF534AB7` |
+| Dimensions | 32×18 px, curseur 13 px, course 14 px | idem |
+
 ---
 
 *Dernière mise à jour : mai 2026*

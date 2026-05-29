@@ -308,45 +308,8 @@ public static class DesignData
 
     private static void PopupateReputationTabViewModel()
     {
-        ReputationTabViewModel.FilteredContractors.Add(new ContractorModel
-        {
-           Id = default,
-           Name = "Contractor 1",
-           FactionStatus = FactionStatus.NotLoaded,
-           Reputations = new List<ReputationModel>
-           {
-               new()
-               {
-                   DisplayName = "Reputation 1 Display",
-                   MaxValue = 2000,
-                   Category = "Reputation 1",
-                   CurrentValue = null,
-                   TierName = "Tier 1",
-                   CurrentStanding = new StandingModel
-                   {
-                   Name = "Covalex_standing1",
-                   DisplayName = "Manager",
-                   Min = 100,
-                   Max = 500
-               }
-               },
-               new()
-               {
-                   DisplayName = "Reputation 2 Display",
-                   MaxValue = 500,
-                   Category = "Reputation 2",
-                   CurrentValue = null,
-                   TierName = "Tier 2",
-                   CurrentStanding = new StandingModel
-                   {
-                   Name = "Covalex_standing1",
-                   DisplayName = "recrue",
-                   Min = 0,
-                   Max = 99
-               }
-               }
-           }
-        });
+        // --- Covalex (Allié) ---
+        // Faction lawfull avec plusieurs scopes actifs et des progrès avancés
         ReputationTabViewModel.FilteredContractors.Add(new ContractorModel
         {
             Id = default,
@@ -356,67 +319,316 @@ public static class DesignData
             {
                 new()
                 {
-                    DisplayName = "Reputation 1 Display",
-                    MaxValue = 2000,
-                    Category = "Reputation 1",
-                    CurrentValue = 240,
+                    DisplayName = "Ship Combat",
+                    Category = "ShipCombat",
+                    MaxValue = 1001,
+                    CurrentValue = 850,
                     TierName = "Tier 1",
                     CurrentStanding = new StandingModel
                     {
-                        Name = "Covalex_standing1",
-                        DisplayName = "Manager",
-                        Min = 100,
-                        Max = 500
+                        Name = "ShipCombat_Rank5",
+                        DisplayName = "Veteran",
+                        Min = 500,
+                        Max = 999
+                    },
+                    StandingList = new List<StandingModel>
+                    {
+                        new() { Name = "ShipCombat_NotEligible",    DisplayName = "Not Eligible",      Min = -1000, Max = -1 },
+                        new() { Name = "ShipCombat_Rank0",          DisplayName = "Recruit",           Min = 0,     Max = 99 },
+                        new() { Name = "ShipCombat_Rank1",          DisplayName = "Novice",            Min = 100,   Max = 499 },
+                        new() { Name = "ShipCombat_Rank2",          DisplayName = "Apprentice",        Min = 500,   Max = 999 },
+                        new() { Name = "ShipCombat_Rank3",          DisplayName = "Adept",             Min = 1000,  Max = 4999 },
+                        new() { Name = "ShipCombat_Rank4",          DisplayName = "Proficient",        Min = 5000,  Max = 119999 },
+                        new() { Name = "ShipCombat_Rank5",          DisplayName = "Veteran",           Min = 120000, Max = 479999 },
+                        new() { Name = "ShipCombat_Rank6",          DisplayName = "Master",            Min = 480000, Max = 1000 },
                     }
-                }
+                },
+                new()
+                {
+                    DisplayName = "Security",
+                    Category = "Security",
+                    MaxValue = 5200000,
+                    CurrentValue = 240000,
+                    TierName = "Tier 1",
+                    CurrentStanding = new StandingModel
+                    {
+                        Name = "Security_Rank4",
+                        DisplayName = "Agent",
+                        Min = 120000,
+                        Max = 299999
+                    },
+                    StandingList = new List<StandingModel>
+                    {
+                        new() { Name = "Security_NotEligible",  DisplayName = "Not Eligible",   Min = -1000, Max = -1 },
+                        new() { Name = "Security_Rank0",        DisplayName = "Applicant",      Min = 0,     Max = 4999 },
+                        new() { Name = "Security_Rank1",        DisplayName = "Probation",      Min = 5000,  Max = 9999 },
+                        new() { Name = "Security_Rank2",        DisplayName = "Junior",         Min = 10000, Max = 29999 },
+                        new() { Name = "Security_Rank3",        DisplayName = "Officer",        Min = 30000, Max = 119999 },
+                        new() { Name = "Security_Rank4",        DisplayName = "Agent",          Min = 120000, Max = 299999 },
+                        new() { Name = "Security_Rank5",        DisplayName = "Senior Agent",   Min = 300000, Max = 1599999 },
+                        new() { Name = "Security_Rank6",        DisplayName = "Master Agent",   Min = 1600000, Max = 5199999 },
+                    }
+                },
+                new()
+                {
+                    DisplayName = "Hauling",
+                    Category = "Hauling",
+                    MaxValue = 367601,
+                    CurrentValue = 5250,
+                    TierName = "Tier 1",
+                    CurrentStanding = new StandingModel
+                    {
+                        Name = "Hauling_Rank1",
+                        DisplayName = "Freelancer",
+                        Min = 5250,
+                        Max = 19999
+                    },
+                    StandingList = new List<StandingModel>
+                    {
+                        new() { Name = "Hauling_NotEligible", DisplayName = "Not Eligible",    Min = -1000, Max = -1 },
+                        new() { Name = "Hauling_Rank0",       DisplayName = "Novice",          Min = 0,     Max = 5249 },
+                        new() { Name = "Hauling_Rank1",       DisplayName = "Freelancer",      Min = 5250,  Max = 19999 },
+                        new() { Name = "Hauling_Rank2",       DisplayName = "Hauler",          Min = 20000, Max = 49999 },
+                        new() { Name = "Hauling_Rank3",       DisplayName = "Contractor",      Min = 50000, Max = 99999 },
+                        new() { Name = "Hauling_Rank4",       DisplayName = "Professional",    Min = 100000, Max = 199999 },
+                        new() { Name = "Hauling_Rank5",       DisplayName = "Captain",         Min = 200000, Max = 367600 },
+                        new() { Name = "Hauling_Rank6",       DisplayName = "Legend",          Min = 367601, Max = 367601 },
+                    }
+                },
             }
         });
+
+        // --- Citizens for Prosperity (Neutre) ---
+        // Faction lawfull avec des scopes en début de progression et un scope bloqué
         ReputationTabViewModel.FilteredContractors.Add(new ContractorModel
         {
             Id = default,
-            Name = "Citizen for prosperity",
+            Name = "Citizens for Prosperity",
             FactionStatus = FactionStatus.Neutral,
             Reputations = new List<ReputationModel>
             {
                 new()
                 {
-                    DisplayName = "Reputation 1 Display",
-                    MaxValue = 2000,
-                    Category = "Reputation 1",
-                    CurrentValue = 150,
+                    DisplayName = "Bounty",
+                    Category = "Bounty",
+                    MaxValue = 5200000,
+                    CurrentValue = 1200,
                     TierName = "Tier 1",
                     CurrentStanding = new StandingModel
                     {
-                        Name = "Covalex_standing1",
-                        DisplayName = "Manager",
-                        Min = 100,
-                        Max = 500
+                        Name = "Bounty_Rank0",
+                        DisplayName = "Applicant",
+                        Min = 0,
+                        Max = 4999
+                    },
+                    StandingList = new List<StandingModel>
+                    {
+                        new() { Name = "Bounty_NotEligible",    DisplayName = "Not Eligible",     Min = -1000, Max = -1 },
+                        new() { Name = "Bounty_Rank0",          DisplayName = "Applicant",        Min = 0,     Max = 4999 },
+                        new() { Name = "Bounty_Rank1",          DisplayName = "Probation",        Min = 5000,  Max = 9999 },
+                        new() { Name = "Bounty_Rank2",          DisplayName = "Junior",           Min = 10000, Max = 29999 },
+                        new() { Name = "Bounty_Rank3",          DisplayName = "Agent",            Min = 30000, Max = 119999 },
+                        new() { Name = "Bounty_Rank4",          DisplayName = "Senior",           Min = 120000, Max = 299999 },
+                        new() { Name = "Bounty_Rank5",          DisplayName = "Veteran Agent",    Min = 300000, Max = 1599999 },
+                        new() { Name = "Bounty_Rank6",          DisplayName = "Master Agent",     Min = 1600000, Max = 5199999 },
                     }
-                }
+                },
+                new()
+                {
+                    DisplayName = "Affinity",
+                    Category = "Affinity",
+                    MaxValue = 10000,
+                    CurrentValue = -3500,
+                    TierName = "Tier 1",
+                    CurrentStanding = new StandingModel
+                    {
+                        Name = "Affinity_Enemy_-040",
+                        DisplayName = "Hostile",
+                        Min = -4000,
+                        Max = -3001
+                    },
+                    StandingList = new List<StandingModel>
+                    {
+                        new() { Name = "Affinity_Enemy_-100",  DisplayName = "Worst Enemy",     Min = -10000, Max = -9001 },
+                        new() { Name = "Affinity_Enemy_-090",  DisplayName = "Fierce Enemy",    Min = -9000,  Max = -8001 },
+                        new() { Name = "Affinity_Enemy_-080",  DisplayName = "Severe Enemy",    Min = -8000,  Max = -7001 },
+                        new() { Name = "Affinity_Enemy_-070",  DisplayName = "Enemy",           Min = -7000,  Max = -6001 },
+                        new() { Name = "Affinity_Enemy_-060",  DisplayName = "Strong Enemy",    Min = -6000,  Max = -5001 },
+                        new() { Name = "Affinity_Enemy_-050",  DisplayName = "Hostile Enemy",   Min = -5000,  Max = -4001 },
+                        new() { Name = "Affinity_Enemy_-040",  DisplayName = "Hostile",         Min = -4000,  Max = -3001 },
+                        new() { Name = "Affinity_Enemy_-030",  DisplayName = "Unfriendly",      Min = -3000,  Max = -2001 },
+                        new() { Name = "Affinity_Neutral_000", DisplayName = "Neutral",         Min = -2000,  Max = 1999 },
+                        new() { Name = "Affinity_Acquaint_030",DisplayName = "Acquaintance",    Min = 2000,   Max = 2999 },
+                        new() { Name = "Affinity_Acquaint_050",DisplayName = "Friendly",        Min = 3000,   Max = 3999 },
+                        new() { Name = "Affinity_Acquaint_075",DisplayName = "Friend",          Min = 4000,   Max = 4999 },
+                        new() { Name = "Affinity_Acquaint_100",DisplayName = "Ally",            Min = 5000,   Max = 10000 },
+                    }
+                },
+                new()
+                {
+                    DisplayName = "Ship Combat",
+                    Category = "ShipCombat",
+                    MaxValue = 1001,
+                    CurrentValue = -500,
+                    TierName = "Tier 1",
+                    CurrentStanding = new StandingModel
+                    {
+                        Name = "ShipCombat_NotEligible",
+                        DisplayName = "Not Eligible",
+                        Min = -1000,
+                        Max = -1
+                    },
+                    StandingList = new List<StandingModel>
+                    {
+                        new() { Name = "ShipCombat_NotEligible", DisplayName = "Not Eligible",   Min = -1000, Max = -1 },
+                        new() { Name = "ShipCombat_Rank0",       DisplayName = "Recruit",        Min = 0,     Max = 99 },
+                        new() { Name = "ShipCombat_Rank1",       DisplayName = "Novice",         Min = 100,   Max = 499 },
+                        new() { Name = "ShipCombat_Rank2",       DisplayName = "Apprentice",     Min = 500,   Max = 999 },
+                        new() { Name = "ShipCombat_Rank3",       DisplayName = "Adept",          Min = 1000,  Max = 4999 },
+                        new() { Name = "ShipCombat_Rank4",       DisplayName = "Proficient",     Min = 5000,  Max = 119999 },
+                        new() { Name = "ShipCombat_Rank5",       DisplayName = "Veteran",        Min = 120000, Max = 479999 },
+                        new() { Name = "ShipCombat_Rank6",       DisplayName = "Master",         Min = 480000, Max = 1000 },
+                    }
+                },
             }
         });
+
+        // --- Head Hunters (Hostile) ---
+        // Faction outlaw avec réputation négative et plusieurs scopes bloqués
         ReputationTabViewModel.FilteredContractors.Add(new ContractorModel
         {
             Id = default,
-            Name = "Head Hunter",
+            Name = "Head Hunters",
             FactionStatus = FactionStatus.Hostile,
             Reputations = new List<ReputationModel>
             {
                 new()
                 {
-                    DisplayName = "Reputation 0 Display",
-                    MaxValue = 2000,
-                    Category = "Reputation 1",
-                    CurrentValue = -1,
+                    DisplayName = "Bounty",
+                    Category = "Bounty",
+                    MaxValue = 5200000,
+                    CurrentValue = -800,
                     TierName = "Tier 1",
                     CurrentStanding = new StandingModel
                     {
-                        Name = "HH_standing0",
-                        DisplayName = "Hostile",
-                        Min = -10,
-                        Max = 0
+                        Name = "Bounty_NotEligible",
+                        DisplayName = "Not Eligible",
+                        Min = -1000,
+                        Max = -1
+                    },
+                    StandingList = new List<StandingModel>
+                    {
+                        new() { Name = "Bounty_NotEligible",    DisplayName = "Not Eligible",     Min = -1000, Max = -1 },
+                        new() { Name = "Bounty_Rank0",          DisplayName = "Applicant",        Min = 0,     Max = 4999 },
+                        new() { Name = "Bounty_Rank1",          DisplayName = "Probation",        Min = 5000,  Max = 9999 },
+                        new() { Name = "Bounty_Rank2",          DisplayName = "Junior",           Min = 10000, Max = 29999 },
+                        new() { Name = "Bounty_Rank3",          DisplayName = "Agent",            Min = 30000, Max = 119999 },
+                        new() { Name = "Bounty_Rank4",          DisplayName = "Senior",           Min = 120000, Max = 299999 },
+                        new() { Name = "Bounty_Rank5",          DisplayName = "Veteran Agent",    Min = 300000, Max = 1599999 },
+                        new() { Name = "Bounty_Rank6",          DisplayName = "Master Agent",     Min = 1600000, Max = 5199999 },
                     }
-                }
+                },
+                new()
+                {
+                    DisplayName = "Affinity",
+                    Category = "Affinity",
+                    MaxValue = 10000,
+                    CurrentValue = -7500,
+                    TierName = "Tier 1",
+                    CurrentStanding = new StandingModel
+                    {
+                        Name = "Affinity_Enemy_-080",
+                        DisplayName = "Enemy",
+                        Min = -8000,
+                        Max = -7001
+                    },
+                    StandingList = new List<StandingModel>
+                    {
+                        new() { Name = "Affinity_Enemy_-100",  DisplayName = "Worst Enemy",     Min = -10000, Max = -9001 },
+                        new() { Name = "Affinity_Enemy_-090",  DisplayName = "Fierce Enemy",    Min = -9000,  Max = -8001 },
+                        new() { Name = "Affinity_Enemy_-080",  DisplayName = "Severe Enemy",    Min = -8000,  Max = -7001 },
+                        new() { Name = "Affinity_Enemy_-070",  DisplayName = "Enemy",           Min = -7000,  Max = -6001 },
+                        new() { Name = "Affinity_Enemy_-060",  DisplayName = "Strong Enemy",    Min = -6000,  Max = -5001 },
+                        new() { Name = "Affinity_Enemy_-050",  DisplayName = "Hostile Enemy",   Min = -5000,  Max = -4001 },
+                        new() { Name = "Affinity_Enemy_-040",  DisplayName = "Hostile",         Min = -4000,  Max = -3001 },
+                        new() { Name = "Affinity_Enemy_-030",  DisplayName = "Unfriendly",      Min = -3000,  Max = -2001 },
+                        new() { Name = "Affinity_Neutral_000", DisplayName = "Neutral",         Min = -2000,  Max = 1999 },
+                        new() { Name = "Affinity_Acquaint_030",DisplayName = "Acquaintance",    Min = 2000,   Max = 2999 },
+                        new() { Name = "Affinity_Acquaint_050",DisplayName = "Friendly",        Min = 3000,   Max = 3999 },
+                        new() { Name = "Affinity_Acquaint_075",DisplayName = "Friend",          Min = 4000,   Max = 4999 },
+                        new() { Name = "Affinity_Acquaint_100",DisplayName = "Ally",            Min = 5000,   Max = 10000 },
+                    }
+                },
+            }
+        });
+
+        // --- Mercenary Guild (Neutre) ---
+        // Un contrat avec un seul scope mais une progression très avancée
+        ReputationTabViewModel.FilteredContractors.Add(new ContractorModel
+        {
+            Id = default,
+            Name = "Mercenary Guild",
+            FactionStatus = FactionStatus.Neutral,
+            Reputations = new List<ReputationModel>
+            {
+                new()
+                {
+                    DisplayName = "Security",
+                    Category = "Security",
+                    MaxValue = 5200000,
+                    CurrentValue = 1800000,
+                    TierName = "Tier 1",
+                    CurrentStanding = new StandingModel
+                    {
+                        Name = "Security_Rank6",
+                        DisplayName = "Master Agent",
+                        Min = 1600000,
+                        Max = 5199999
+                    },
+                    StandingList = new List<StandingModel>
+                    {
+                        new() { Name = "Security_NotEligible",  DisplayName = "Not Eligible",   Min = -1000, Max = -1 },
+                        new() { Name = "Security_Rank0",        DisplayName = "Applicant",      Min = 0,     Max = 4999 },
+                        new() { Name = "Security_Rank1",        DisplayName = "Probation",      Min = 5000,  Max = 9999 },
+                        new() { Name = "Security_Rank2",        DisplayName = "Junior",         Min = 10000, Max = 29999 },
+                        new() { Name = "Security_Rank3",        DisplayName = "Officer",        Min = 30000, Max = 119999 },
+                        new() { Name = "Security_Rank4",        DisplayName = "Agent",          Min = 120000, Max = 299999 },
+                        new() { Name = "Security_Rank5",        DisplayName = "Senior Agent",   Min = 300000, Max = 1599999 },
+                        new() { Name = "Security_Rank6",        DisplayName = "Master Agent",   Min = 1600000, Max = 5199999 },
+                    }
+                },
+            }
+        });
+
+        // --- Rough & Ready (Non chargé) ---
+        // Pour couvrir le cas NotLoaded avec CurrentValue à null
+        ReputationTabViewModel.FilteredContractors.Add(new ContractorModel
+        {
+            Id = default,
+            Name = "Rough & Ready",
+            FactionStatus = FactionStatus.NotLoaded,
+            Reputations = new List<ReputationModel>
+            {
+                new()
+                {
+                    DisplayName = "Ship Combat",
+                    Category = "ShipCombat",
+                    MaxValue = 1001,
+                    CurrentValue = null,
+                    TierName = "Tier 1",
+                    CurrentStanding = null,
+                    StandingList = new List<StandingModel>
+                    {
+                        new() { Name = "ShipCombat_NotEligible", DisplayName = "Not Eligible",   Min = -1000, Max = -1 },
+                        new() { Name = "ShipCombat_Rank0",       DisplayName = "Recruit",        Min = 0,     Max = 99 },
+                        new() { Name = "ShipCombat_Rank1",       DisplayName = "Novice",         Min = 100,   Max = 499 },
+                        new() { Name = "ShipCombat_Rank2",       DisplayName = "Apprentice",     Min = 500,   Max = 999 },
+                        new() { Name = "ShipCombat_Rank3",       DisplayName = "Adept",          Min = 1000,  Max = 4999 },
+                        new() { Name = "ShipCombat_Rank4",       DisplayName = "Proficient",     Min = 5000,  Max = 119999 },
+                        new() { Name = "ShipCombat_Rank5",       DisplayName = "Veteran",        Min = 120000, Max = 479999 },
+                        new() { Name = "ShipCombat_Rank6",       DisplayName = "Master",         Min = 480000, Max = 1000 },
+                    }
+                },
             }
         });
     }

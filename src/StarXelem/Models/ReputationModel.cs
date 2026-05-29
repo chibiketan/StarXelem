@@ -1,8 +1,10 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using StarXelem.Services;
+using StarXelem.ViewModels;
 
 namespace StarXelem.Models;
 
-public class ReputationModel
+public partial class ReputationModel : ViewModelBase
 {
     public string Category { get; set; } = string.Empty;
     public string TierName { get; set; } = string.Empty;
@@ -11,5 +13,5 @@ public class ReputationModel
     public string DisplayName { get; set; }
     public List<StandingModel> StandingList { get; set; } = new();
     public StandingModel? CurrentStanding { get; set; }
-    public bool IsExpanded { get; set; }
+    [ObservableProperty] public partial bool IsExpanded { get; set; }
 }

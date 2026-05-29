@@ -10,7 +10,6 @@
              d:DataContext="{x:Static local:DesignData.ReputationTabViewModel}"
              x:Class="StarXelem.Views.ReputationTabView"
              x:DataType="vm:ReputationTabViewModel">
-
     <UserControl.Styles>
         <Style Selector="Border.reputation-card">
             <Setter Property="Background" Value="{DynamicResource BackgroundGrade4Brush}" />
@@ -50,27 +49,7 @@
             </Style>
         </Style>
 
-        <!-- Chevron rotation for ToggleButton (§17.7) -->
-        <Style Selector="ToggleButton.scope-toggle">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="2" />
-            <Style Selector="PathIcon">
-                <Setter Property="Data" Value="M15 18l6-6-6-6" />
-                <Setter Property="Width" Value="8" />
-                <Setter Property="Height" Value="8" />
-                <Setter Property="Foreground" Value="#4DFFFFFF" />
-            </Style>
-            <Style Selector=":checked PathIcon">
-                <Setter Property="Data" Value="M15 18l6-6-6-6" />
-                <Setter Property="RenderTransform">
-                    <Setter.Value>
-                        <RotateTransform Angle="90" CenterX="4" CenterY="4" />
-                    </Setter.Value>
-                </Setter>
-            </Style>
-        </Style>
-
+ 
         <!-- Standing list item styles (§17.7) -->
         <Style Selector="Border.standing-item">
             <Setter Property="Padding" Value="4,6" />
@@ -78,12 +57,12 @@
             <Setter Property="Margin" Value="0,2" />
 
             <Style Selector="^.current-standing">
-                <Setter Property="Background" Value="#1A1D9E75" />
+                <Setter Property="Background" Value="{DynamicResource RepCurrentRankBgBrush}" />
                 <Style Selector="^ TextBlock.standing-name">
-                    <Setter Property="Foreground" Value="#FF5DCAA5" />
+                    <Setter Property="Foreground" Value="{DynamicResource RepCurrentRankNameBrush}" />
                 </Style>
                 <Style Selector="^ TextBlock.standing-threshold">
-                    <Setter Property="Foreground" Value="#80FFFFFF" />
+                    <Setter Property="Foreground" Value="{DynamicResource RepCurrentRankThresholdBrush}" />
                 </Style>
             </Style>
 
@@ -94,6 +73,75 @@
                 </Style>
             </Style>
         </Style>
+        
+        <!-- Modification du template par défaut de l'expander pour ce composant -->
+        <Style Selector="Expander /template/ ToggleButton">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <RelativePanel>
+                        <Border Name="Root" 
+                                RelativePanel.AlignLeftWithPanel="True"
+                                RelativePanel.AlignRightWithPanel="True"
+                                RelativePanel.AlignTopWithPanel="True"
+                                RelativePanel.AlignBottomWithPanel="True"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                MinHeight="{TemplateBinding MinHeight}"
+                                MinWidth="{TemplateBinding MinWidth}"
+                                MaxWidth="{TemplateBinding MaxWidth}"
+                                Width="{TemplateBinding Width}"
+                                HorizontalAlignment="{TemplateBinding HorizontalAlignment}"
+                                Padding="{TemplateBinding Padding}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                BackgroundSizing="{TemplateBinding BackgroundSizing}">
+                            <ContentPresenter Name="ContentPresenter"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <Border Name="ExpandCollapseChevronBorder"
+                                RelativePanel.AlignLeftWith="Root"
+                                RelativePanel.AlignTopWith="Root"
+                                Margin="16 9 0 0"
+                               >
+                            <TextBlock Name="ExpandCollapseChevron"
+                                       FontFamily="{DynamicResource SymbolThemeFontFamily}"
+                                       FontSize="15"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource ExpanderChevronForeground}"
+                                       RenderTransform="none">
+                                    <TextBlock.Transitions>
+                                        <Transitions>
+                                            <TransformOperationsTransition Duration="00:00:00.167" Property="RenderTransform" />
+                                        </Transitions>
+                                    </TextBlock.Transitions>
+                                </TextBlock>
+                            </Border>
+                    </RelativePanel>
+                </ControlTemplate>
+            </Setter>
+            
+            <!-- On définit la flèche comme à droite -->
+            <Style Selector="^ /template/ TextBlock#ExpandCollapseChevron">
+                <Setter Property="Text" Value="{StaticResource ExpanderChevronRightGlyph}"></Setter>
+            </Style>
+            <!-- On définit la rotation sur déploiement à 90° et non 180° -->
+            <Style Selector="^[Tag=expanded] /template/ TextBlock#ExpandCollapseChevron">
+                <Setter Property="RenderTransform" Value="rotate(90deg)" />
+            </Style>
+        </Style>
+
+        <!-- Dimming classes for standing text (§17.7) -->
+        <Style Selector="TextBlock.triple-dimming">
+            <Setter Property="Opacity" Value="0.12" />
+        </Style>
+        <Style Selector="TextBlock.double-dimming">
+            <Setter Property="Opacity" Value="0.20" />
+        </Style>
     </UserControl.Styles>
 
     <UserControl.Resources>
@@ -101,6 +149,7 @@
             <conv:EnumToTextConverter x:Key="EnumToTextConverter" />
             <conv:ToUpperConverter x:Key="ToUpperConverter" />
             <conv:StandingClassesConverter x:Key="StandingClassesConverter" />
+            
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -108,7 +157,7 @@
         <!-- Toolbar Section -->
         <StackPanel DockPanel.Dock="Top"
                     Orientation="Horizontal"
-                    Margin="16"
+                    Margin="16" 
                     Spacing="12">
 
             <!-- Search Box (Design System Section 9) -->
@@ -160,91 +209,91 @@
                                 <ItemsControl ItemsSource="{Binding Reputations}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <StackPanel Margin="0,0,0,10">
-                                                <!-- Scope label with chevron toggle (§17.7) -->
-                                                <DockPanel LastChildFill="False">
-                                                    <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}"
-                                                                  Classes="scope-toggle"
-                                                                  DockPanel.Dock="Left">
-                                                        <PathIcon />
-                                                    </ToggleButton>
-                                                    <TextBlock Text="{Binding DisplayName, Converter={StaticResource ToUpperConverter}}"
-                                                               DockPanel.Dock="Left"
-                                                               FontSize="10"
-                                                               FontWeight="500"
-                                                               Foreground="#33FFFFFF" />
-                                                    <TextBlock Text="{Binding CurrentValue}"
-                                                               DockPanel.Dock="Right"
-                                                               FontSize="10"
-                                                               FontFamily="Cascadia Mono, Consolas, monospace"
-                                                               Foreground="#47FFFFFF" />
-                                                </DockPanel>
+                                            <StackPanel >
+                                                <!-- Scope expander (§17.7) -->
+                                                <Expander IsExpanded="{Binding IsExpanded}" >
+                                                    <Expander.Header>
+                                                        <StackPanel Spacing="4" Margin="0 5 0 5">
+                                                            <DockPanel LastChildFill="False" Margin="20 0 0 0">
+                                                                <TextBlock Text="{Binding DisplayName, Converter={StaticResource ToUpperConverter}}"
+                                                                           DockPanel.Dock="Left"
+                                                                           FontWeight="DemiBold"
+                                                                           Classes="double-dimming" />
+                                                                <TextBlock
+                                                                           DockPanel.Dock="Right"
+                                                                           Classes="double-dimming">
+                                                                    <TextBlock.Text>
+                                                                        <MultiBinding StringFormat="{}{0} / {1}" >
+                                                                            <Binding Path="CurrentValue" />
+                                                                            <Binding Path="CurrentStanding.Max"  />
+                                                                        </MultiBinding>
+                                                                    </TextBlock.Text>
+                                                                </TextBlock>
+                                                            </DockPanel>
+                                                            
+                                                            <!-- Progress Bar -->
+                                                            <ProgressBar Value="{Binding CurrentValue}"
+                                                                         Minimum="{Binding CurrentStanding.Min}"
+                                                                         Maximum="{Binding CurrentStanding.Max}"
+                                                                         ToolTip.Tip="{Binding CurrentValue}"
+                                                                         Height="6"
+                                                                         Foreground="{DynamicResource AccentBrush}"
+                                                                         Background="{DynamicResource BackgroundGrade4Brush}" />
 
-                                                <!-- Progress Bar -->
-                                                <ProgressBar Value="{Binding CurrentValue}"
-                                                             Minimum="{Binding CurrentStanding.Min}"
-                                                             Maximum="{Binding CurrentStanding.Max}"
-                                                             ToolTip.Tip="{Binding CurrentValue}"
-                                                             Height="6"
-                                                             Margin="0,6,0,6"
-                                                             Foreground="{DynamicResource AccentBrush}"
-                                                             Background="{DynamicResource BackgroundGrade4Brush}" />
+                                                            <!-- Min/Max values -->
+                                                            <DockPanel LastChildFill="False">
+                                                                <TextBlock Classes="demi-bold dimming"
+                                                                           Text="{Binding CurrentStanding.DisplayName}"
+                                                                           Opacity="0.5"
+                                                                           DockPanel.Dock="Left" />
+                                                            </DockPanel>
+                                                        </StackPanel>
+                                                    </Expander.Header>
 
-                                                <!-- Min/Max values -->
-                                                <DockPanel LastChildFill="False">
-                                                    <TextBlock Classes="demi-bold"
-                                                               Text="{Binding CurrentValue}"
-                                                               DockPanel.Dock="Left" />
-                                                    <TextBlock Classes="dimming"
-                                                               Text="{Binding CurrentStanding.Max}"
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                                               DockPanel.Dock="Right" />
-                                                </DockPanel>
+                                                    <StackPanel Spacing="0">
 
-                                                <!-- Separator before standings list (§17.7) -->
-                                                <Rectangle Height="0.5"
-                                                           Fill="#0FFFFFFF"
-                                                           Margin="0,6,0,4" />
+                                                        <!-- Separator before standings list (§17.7) -->
+                                                        <Rectangle Height="0.5"
+                                                                   Fill="#0FFFFFFF"
+                                                                   Margin="0,0,0,0" />
 
-                                                <!-- Standings list — visible only when IsExpanded == true (§17.7) -->
-                                                <ItemsControl ItemsSource="{Binding StandingList}"
-                                                              IsVisible="{Binding IsExpanded}">
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <Border>
-                                                                <beh:DynamicClass.Names>
-                                                                    <MultiBinding Converter="{StaticResource StandingClassesConverter}">
-                                                                        <Binding />
-                                                                        <Binding Path="DataContext" RelativeSource="{RelativeSource FindAncestor, AncestorType=ItemsControl}" />
-                                                                    </MultiBinding>
-                                                                </beh:DynamicClass.Names>
-                                                                <DockPanel LastChildFill="False"
-                                                                           Margin="0,1">
-                                                                    <!-- Standing dot (§17.4) -->
-                                                                    <Ellipse Width="7" Height="7"
-                                                                             Fill="#FF5DCAA5"
-                                                                             DockPanel.Dock="Left"
-                                                                             VerticalAlignment="Center"
-                                                                             Margin="0,0,8,0" />
-                                                                    <!-- Standing name -->
-                                                                    <TextBlock Text="{Binding DisplayName}"
-                                                                               Classes="standing-name"
-                                                                               DockPanel.Dock="Left"
-                                                                               FontSize="10"
-                                                                               FontWeight="500"
-                                                                               Foreground="#B3FFFFFF" />
-                                                                    <!-- Standing threshold (§17.8) -->
-                                                                    <TextBlock Text="{Binding Min}"
-                                                                               Classes="standing-threshold"
-                                                                               DockPanel.Dock="Right"
-                                                                               FontSize="10"
-                                                                               FontFamily="Cascadia Mono, Consolas, monospace"
-                                                                               Foreground="#47FFFFFF" />
-                                                                </DockPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
+                                                        <!-- Standings list (§17.7) -->
+                                                        <ItemsControl ItemsSource="{Binding StandingList}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border>
+                                                                        <beh:DynamicClass.Names>
+                                                                            <MultiBinding Converter="{StaticResource StandingClassesConverter}">
+                                                                                <Binding />
+                                                                                <Binding Path="DataContext" RelativeSource="{RelativeSource FindAncestor, AncestorType=ItemsControl}" />
+                                                                            </MultiBinding>
+                                                                        </beh:DynamicClass.Names>
+                                                                        <DockPanel LastChildFill="False"
+                                                                                   Margin="0 1">
+                                                                            <!-- Standing dot (§17.4) -->
+                                                                            <Ellipse Width="7" Height="7"
+                                                                                     Fill="#FF5DCAA5"
+                                                                                     DockPanel.Dock="Left"
+                                                                                     VerticalAlignment="Center"
+                                                                                     Margin="0,0,8,0" />
+                                                                            <!-- Standing name -->
+                                                                            <TextBlock Text="{Binding DisplayName}"
+                                                                                       Classes="standing-name"
+                                                                                       DockPanel.Dock="Left"
+                                                                                       FontWeight="500"
+                                                                                       Foreground="#B3FFFFFF" />
+                                                                            <!-- Standing threshold (§17.8) -->
+                                                                            <TextBlock Text="{Binding Min}"
+                                                                                       Classes="standing-threshold"
+                                                                                       DockPanel.Dock="Right"
+                                                                                       Foreground="#47FFFFFF" />
+                                                                        </DockPanel>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </Expander>
                                             </StackPanel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
