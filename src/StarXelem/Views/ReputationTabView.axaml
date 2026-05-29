@@ -89,6 +89,9 @@
 
             <Style Selector="^.locked-standing">
                 <Setter Property="Opacity" Value="0.45" />
+                <Style Selector="^ TextBlock.standing-name">
+                    <Setter Property="Foreground" Value="#80FFFFFF" />
+                </Style>
             </Style>
         </Style>
     </UserControl.Styles>
@@ -96,6 +99,8 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <conv:EnumToTextConverter x:Key="EnumToTextConverter" />
+            <conv:ToUpperConverter x:Key="ToUpperConverter" />
+            <conv:StandingClassesConverter x:Key="StandingClassesConverter" />
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -163,7 +168,7 @@
                                                                   DockPanel.Dock="Left">
                                                         <PathIcon />
                                                     </ToggleButton>
-                                                    <TextBlock Text="{Binding DisplayName}"
+                                                    <TextBlock Text="{Binding DisplayName, Converter={StaticResource ToUpperConverter}}"
                                                                DockPanel.Dock="Left"
                                                                FontSize="10"
                                                                FontWeight="500"
@@ -203,11 +208,16 @@
 
                                                 <!-- Standings list — visible only when IsExpanded == true (§17.7) -->
                                                 <ItemsControl ItemsSource="{Binding StandingList}"
-                                                              IsVisible="{Binding IsExpanded}"
-                                                              Loaded="OnStandingsListLoaded">
+                                                              IsVisible="{Binding IsExpanded}">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <Border Classes="standing-item">
+                                                            <Border>
+                                                                <beh:DynamicClass.Names>
+                                                                    <MultiBinding Converter="{StaticResource StandingClassesConverter}">
+                                                                        <Binding />
+                                                                        <Binding Path="DataContext" RelativeSource="{RelativeSource FindAncestor, AncestorType=ItemsControl}" />
+                                                                    </MultiBinding>
+                                                                </beh:DynamicClass.Names>
                                                                 <DockPanel LastChildFill="False"
                                                                            Margin="0,1">
                                                                     <!-- Standing dot (§17.4) -->
