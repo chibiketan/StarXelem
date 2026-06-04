@@ -273,7 +273,7 @@
                                                                                    Margin="0 1">
                                                                             <!-- Standing dot (§17.4) -->
                                                                             <Ellipse Width="7" Height="7"
-                                                                                     Fill="#FF5DCAA5"
+                                                                                     Fill="{Binding Tier, Converter={StaticResource TierToFillBrushConverter}}"
                                                                                      DockPanel.Dock="Left"
                                                                                      VerticalAlignment="Center"
                                                                                      Margin="0,0,8,0" />
