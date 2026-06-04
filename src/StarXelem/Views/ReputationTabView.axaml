@@ -149,7 +149,8 @@
             <conv:EnumToTextConverter x:Key="EnumToTextConverter" />
             <conv:ToUpperConverter x:Key="ToUpperConverter" />
             <conv:StandingClassesConverter x:Key="StandingClassesConverter" />
-            
+            <conv:TierToFillBrushConverter x:Key="TierToFillBrushConverter" />
+
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -237,7 +238,7 @@
                                                                          Maximum="{Binding CurrentStanding.Max}"
                                                                          ToolTip.Tip="{Binding CurrentValue}"
                                                                          Height="6"
-                                                                         Foreground="{DynamicResource AccentBrush}"
+                                                                         Foreground="{Binding CurrentStanding.Tier, Converter={StaticResource TierToFillBrushConverter}}"
                                                                          Background="{DynamicResource BackgroundGrade4Brush}" />
 
                                                             <!-- Min/Max values -->
