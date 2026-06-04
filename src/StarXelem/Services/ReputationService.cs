@@ -73,8 +73,10 @@ public class ReputationService : IReputationService
 
                 contractor.Reputations.Add(scope);
 
-                foreach (var standing in scopeContext.scope.standingMap.standings)
+                for (int standingIndex = 0; standingIndex < scopeContext.scope.standingMap.standings.Count(); standingIndex++)
                 {
+                    var standing = scopeContext.scope.standingMap.standings[standingIndex];
+
                     if (standing is null)
                     {
                         _logger.LogWarning("Null standing found for faction reputation {RecordId}", dataCoreTypedRecord.RecordId);
@@ -85,7 +87,8 @@ public class ReputationService : IReputationService
                     {
                         Name = standing.name,
                         DisplayName = await _p4kService.GetLocaleValue(standing.displayName),
-                        Min = standing.minReputation
+                        Min = standing.minReputation,
+                        Tier = Math.Min(standingIndex + 1, 7)
                     });
                 }
 
@@ -155,4 +158,8 @@ public class StandingModel
     public required string DisplayName { get; set; }
     public long Min { get; set; }
     public long Max { get; set; }
+    /// <summary>
+    /// Palier (1-7) correspondant au design system §17.4. Index 0 → T1, ..., 6+ → T7.
+    /// </summary>
+    public int Tier { get; set; }
 }
