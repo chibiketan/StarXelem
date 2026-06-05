@@ -151,6 +151,7 @@
             <SolidColorBrush x:Key="RepTier5FillBrush" Color="{StaticResource ReputationSharedTeal}" />
             <SolidColorBrush x:Key="RepTier6FillBrush" Color="{StaticResource ReputationSharedViolet}" />
             <SolidColorBrush x:Key="RepTier7FillBrush" Color="#FFBA7517" />
+            <SolidColorBrush x:Key="RepTier7OutlineBrush" Color="#FFBA7517" />
 
             <!-- Réputation — Track (fond barre) -->
             <SolidColorBrush x:Key="RepBarTrackBrush" Color="{StaticResource ReputationSharedGray2}" />
@@ -325,6 +326,7 @@
             <SolidColorBrush x:Key="RepTier5FillBrush" Color="{StaticResource ReputationSharedGreen}" />
             <SolidColorBrush x:Key="RepTier6FillBrush" Color="{StaticResource ReputationSharedViolet}" />
             <SolidColorBrush x:Key="RepTier7FillBrush" Color="#FFEF9F27" />
+            <SolidColorBrush x:Key="RepTier7OutlineBrush" Color="#FFEF9F27" />
 
             <!-- Réputation — Track (fond barre) -->
             <SolidColorBrush x:Key="RepBarTrackBrush" Color="{StaticResource ReputationSharedGray2}" />

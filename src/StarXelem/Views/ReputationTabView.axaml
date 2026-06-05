@@ -150,6 +150,7 @@
             <conv:ToUpperConverter x:Key="ToUpperConverter" />
             <conv:StandingClassesConverter x:Key="StandingClassesConverter" />
             <conv:TierToFillBrushConverter x:Key="TierToFillBrushConverter" />
+            <conv:TierToOutlineBrushConverter x:Key="TierToOutlineBrushConverter" />
 
         </ResourceDictionary>
     </UserControl.Resources>
@@ -233,13 +234,17 @@
                                                             </DockPanel>
                                                             
                                                             <!-- Progress Bar -->
-                                                            <ProgressBar Value="{Binding CurrentValue}"
-                                                                         Minimum="{Binding CurrentStanding.Min}"
-                                                                         Maximum="{Binding CurrentStanding.Max}"
-                                                                         ToolTip.Tip="{Binding CurrentValue}"
-                                                                         Height="6"
-                                                                         Foreground="{Binding CurrentStanding.Tier, Converter={StaticResource TierToFillBrushConverter}}"
-                                                                         Background="{DynamicResource BackgroundGrade4Brush}" />
+                                                            <Border BorderBrush="{Binding CurrentStanding.Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
+                                                                    BorderThickness="1.5"
+                                                                    Padding="-1">
+                                                                <ProgressBar Value="{Binding CurrentValue}"
+                                                                             Minimum="{Binding CurrentStanding.Min}"
+                                                                             Maximum="{Binding CurrentStanding.Max}"
+                                                                             ToolTip.Tip="{Binding CurrentValue}"
+                                                                             Height="6"
+                                                                             Foreground="{Binding CurrentStanding.Tier, Converter={StaticResource TierToFillBrushConverter}}"
+                                                                             Background="{DynamicResource BackgroundGrade4Brush}" />
+                                                            </Border>
 
                                                             <!-- Min/Max values -->
                                                             <DockPanel LastChildFill="False">
@@ -274,6 +279,8 @@
                                                                             <!-- Standing dot (§17.4) -->
                                                                             <Ellipse Width="7" Height="7"
                                                                                      Fill="{Binding Tier, Converter={StaticResource TierToFillBrushConverter}}"
+                                                                                     Stroke="{Binding Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
+                                                                                     StrokeThickness="1.5"
                                                                                      DockPanel.Dock="Left"
                                                                                      VerticalAlignment="Center"
                                                                                      Margin="0,0,8,0" />
