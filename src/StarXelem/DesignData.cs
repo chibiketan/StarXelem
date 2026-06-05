@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using DocumentFormat.OpenXml.InkML;
 using Microsoft.Extensions.DependencyInjection;
 using Sc.External.Common.Shard.V1;
@@ -329,18 +329,27 @@ public static class DesignData
                         Name = "ShipCombat_Rank5",
                         DisplayName = "Veteran",
                         Min = 500,
-                        Max = 999
+                        Max = 999,
+                        Tier = 7
                     },
                     StandingList = new List<StandingModel>
                     {
-                        new() { Name = "ShipCombat_NotEligible",    DisplayName = "Not Eligible",      Min = -1000, Max = -1 },
-                        new() { Name = "ShipCombat_Rank0",          DisplayName = "Recruit",           Min = 0,     Max = 99 },
-                        new() { Name = "ShipCombat_Rank1",          DisplayName = "Novice",            Min = 100,   Max = 499 },
-                        new() { Name = "ShipCombat_Rank2",          DisplayName = "Apprentice",        Min = 500,   Max = 999 },
-                        new() { Name = "ShipCombat_Rank3",          DisplayName = "Adept",             Min = 1000,  Max = 4999 },
-                        new() { Name = "ShipCombat_Rank4",          DisplayName = "Proficient",        Min = 5000,  Max = 119999 },
-                        new() { Name = "ShipCombat_Rank5",          DisplayName = "Veteran",           Min = 120000, Max = 479999 },
-                        new() { Name = "ShipCombat_Rank6",          DisplayName = "Master",            Min = 480000, Max = 1000 },
+                        new() { Name = "ShipCombat_NotEligible",    DisplayName = "Not Eligible",      Min = -1000, Max = -1, Tier = 1},
+
+                        new() { Name = "ShipCombat_Rank0",          DisplayName = "Recruit",           Min = 0,     Max = 99, Tier = 2},
+
+                        new() { Name = "ShipCombat_Rank1",          DisplayName = "Novice",            Min = 100,   Max = 499, Tier = 3},
+
+                        new() { Name = "ShipCombat_Rank2",          DisplayName = "Apprentice",        Min = 500,   Max = 999, Tier = 4},
+
+                        new() { Name = "ShipCombat_Rank3",          DisplayName = "Adept",             Min = 1000,  Max = 4999, Tier = 5},
+
+                        new() { Name = "ShipCombat_Rank4",          DisplayName = "Proficient",        Min = 5000,  Max = 119999, Tier = 6},
+
+                        new() { Name = "ShipCombat_Rank5",          DisplayName = "Veteran",           Min = 120000, Max = 479999, Tier = 7},
+
+                        new() { Name = "ShipCombat_Rank6",          DisplayName = "Master",            Min = 480000, Max = 1000, Tier = 7},
+
                     }
                 },
                 new()
@@ -355,18 +364,27 @@ public static class DesignData
                         Name = "Security_Rank4",
                         DisplayName = "Agent",
                         Min = 120000,
-                        Max = 299999
+                        Max = 299999,
+                        Tier = 6
                     },
                     StandingList = new List<StandingModel>
                     {
-                        new() { Name = "Security_NotEligible",  DisplayName = "Not Eligible",   Min = -1000, Max = -1 },
-                        new() { Name = "Security_Rank0",        DisplayName = "Applicant",      Min = 0,     Max = 4999 },
-                        new() { Name = "Security_Rank1",        DisplayName = "Probation",      Min = 5000,  Max = 9999 },
-                        new() { Name = "Security_Rank2",        DisplayName = "Junior",         Min = 10000, Max = 29999 },
-                        new() { Name = "Security_Rank3",        DisplayName = "Officer",        Min = 30000, Max = 119999 },
-                        new() { Name = "Security_Rank4",        DisplayName = "Agent",          Min = 120000, Max = 299999 },
-                        new() { Name = "Security_Rank5",        DisplayName = "Senior Agent",   Min = 300000, Max = 1599999 },
-                        new() { Name = "Security_Rank6",        DisplayName = "Master Agent",   Min = 1600000, Max = 5199999 },
+                        new() { Name = "Security_NotEligible",  DisplayName = "Not Eligible",   Min = -1000, Max = -1, Tier = 1},
+
+                        new() { Name = "Security_Rank0",        DisplayName = "Applicant",      Min = 0,     Max = 4999, Tier = 2},
+
+                        new() { Name = "Security_Rank1",        DisplayName = "Probation",      Min = 5000,  Max = 9999, Tier = 3},
+
+                        new() { Name = "Security_Rank2",        DisplayName = "Junior",         Min = 10000, Max = 29999, Tier = 4},
+
+                        new() { Name = "Security_Rank3",        DisplayName = "Officer",        Min = 30000, Max = 119999, Tier = 5},
+
+                        new() { Name = "Security_Rank4",        DisplayName = "Agent",          Min = 120000, Max = 299999, Tier = 6},
+
+                        new() { Name = "Security_Rank5",        DisplayName = "Senior Agent",   Min = 300000, Max = 1599999, Tier = 7},
+
+                        new() { Name = "Security_Rank6",        DisplayName = "Master Agent",   Min = 1600000, Max = 5199999, Tier = 7},
+
                     }
                 },
                 new()
@@ -381,18 +399,27 @@ public static class DesignData
                         Name = "Hauling_Rank1",
                         DisplayName = "Freelancer",
                         Min = 5250,
-                        Max = 19999
+                        Max = 19999,
+                        Tier = 3
                     },
                     StandingList = new List<StandingModel>
                     {
-                        new() { Name = "Hauling_NotEligible", DisplayName = "Not Eligible",    Min = -1000, Max = -1 },
-                        new() { Name = "Hauling_Rank0",       DisplayName = "Novice",          Min = 0,     Max = 5249 },
-                        new() { Name = "Hauling_Rank1",       DisplayName = "Freelancer",      Min = 5250,  Max = 19999 },
-                        new() { Name = "Hauling_Rank2",       DisplayName = "Hauler",          Min = 20000, Max = 49999 },
-                        new() { Name = "Hauling_Rank3",       DisplayName = "Contractor",      Min = 50000, Max = 99999 },
-                        new() { Name = "Hauling_Rank4",       DisplayName = "Professional",    Min = 100000, Max = 199999 },
-                        new() { Name = "Hauling_Rank5",       DisplayName = "Captain",         Min = 200000, Max = 367600 },
-                        new() { Name = "Hauling_Rank6",       DisplayName = "Legend",          Min = 367601, Max = 367601 },
+                        new() { Name = "Hauling_NotEligible", DisplayName = "Not Eligible",    Min = -1000, Max = -1, Tier = 1},
+
+                        new() { Name = "Hauling_Rank0",       DisplayName = "Novice",          Min = 0,     Max = 5249, Tier = 2},
+
+                        new() { Name = "Hauling_Rank1",       DisplayName = "Freelancer",      Min = 5250,  Max = 19999, Tier = 3},
+
+                        new() { Name = "Hauling_Rank2",       DisplayName = "Hauler",          Min = 20000, Max = 49999, Tier = 4},
+
+                        new() { Name = "Hauling_Rank3",       DisplayName = "Contractor",      Min = 50000, Max = 99999, Tier = 5},
+
+                        new() { Name = "Hauling_Rank4",       DisplayName = "Professional",    Min = 100000, Max = 199999, Tier = 6},
+
+                        new() { Name = "Hauling_Rank5",       DisplayName = "Captain",         Min = 200000, Max = 367600, Tier = 7},
+
+                        new() { Name = "Hauling_Rank6",       DisplayName = "Legend",          Min = 367601, Max = 367601, Tier = 7},
+
                     }
                 },
             }
@@ -419,18 +446,27 @@ public static class DesignData
                         Name = "Bounty_Rank0",
                         DisplayName = "Applicant",
                         Min = 0,
-                        Max = 4999
+                        Max = 4999,
+                        Tier = 2
                     },
                     StandingList = new List<StandingModel>
                     {
-                        new() { Name = "Bounty_NotEligible",    DisplayName = "Not Eligible",     Min = -1000, Max = -1 },
-                        new() { Name = "Bounty_Rank0",          DisplayName = "Applicant",        Min = 0,     Max = 4999 },
-                        new() { Name = "Bounty_Rank1",          DisplayName = "Probation",        Min = 5000,  Max = 9999 },
-                        new() { Name = "Bounty_Rank2",          DisplayName = "Junior",           Min = 10000, Max = 29999 },
-                        new() { Name = "Bounty_Rank3",          DisplayName = "Agent",            Min = 30000, Max = 119999 },
-                        new() { Name = "Bounty_Rank4",          DisplayName = "Senior",           Min = 120000, Max = 299999 },
-                        new() { Name = "Bounty_Rank5",          DisplayName = "Veteran Agent",    Min = 300000, Max = 1599999 },
-                        new() { Name = "Bounty_Rank6",          DisplayName = "Master Agent",     Min = 1600000, Max = 5199999 },
+                        new() { Name = "Bounty_NotEligible",    DisplayName = "Not Eligible",     Min = -1000, Max = -1, Tier = 1},
+
+                        new() { Name = "Bounty_Rank0",          DisplayName = "Applicant",        Min = 0,     Max = 4999, Tier = 2},
+
+                        new() { Name = "Bounty_Rank1",          DisplayName = "Probation",        Min = 5000,  Max = 9999, Tier = 3},
+
+                        new() { Name = "Bounty_Rank2",          DisplayName = "Junior",           Min = 10000, Max = 29999, Tier = 4},
+
+                        new() { Name = "Bounty_Rank3",          DisplayName = "Agent",            Min = 30000, Max = 119999, Tier = 5},
+
+                        new() { Name = "Bounty_Rank4",          DisplayName = "Senior",           Min = 120000, Max = 299999, Tier = 6},
+
+                        new() { Name = "Bounty_Rank5",          DisplayName = "Veteran Agent",    Min = 300000, Max = 1599999, Tier = 7},
+
+                        new() { Name = "Bounty_Rank6",          DisplayName = "Master Agent",     Min = 1600000, Max = 5199999, Tier = 7},
+
                     }
                 },
                 new()
@@ -445,23 +481,37 @@ public static class DesignData
                         Name = "Affinity_Enemy_-040",
                         DisplayName = "Hostile",
                         Min = -4000,
-                        Max = -3001
+                        Max = -3001,
+                        Tier = 7
                     },
                     StandingList = new List<StandingModel>
                     {
-                        new() { Name = "Affinity_Enemy_-100",  DisplayName = "Worst Enemy",     Min = -10000, Max = -9001 },
-                        new() { Name = "Affinity_Enemy_-090",  DisplayName = "Fierce Enemy",    Min = -9000,  Max = -8001 },
-                        new() { Name = "Affinity_Enemy_-080",  DisplayName = "Severe Enemy",    Min = -8000,  Max = -7001 },
-                        new() { Name = "Affinity_Enemy_-070",  DisplayName = "Enemy",           Min = -7000,  Max = -6001 },
-                        new() { Name = "Affinity_Enemy_-060",  DisplayName = "Strong Enemy",    Min = -6000,  Max = -5001 },
-                        new() { Name = "Affinity_Enemy_-050",  DisplayName = "Hostile Enemy",   Min = -5000,  Max = -4001 },
-                        new() { Name = "Affinity_Enemy_-040",  DisplayName = "Hostile",         Min = -4000,  Max = -3001 },
-                        new() { Name = "Affinity_Enemy_-030",  DisplayName = "Unfriendly",      Min = -3000,  Max = -2001 },
-                        new() { Name = "Affinity_Neutral_000", DisplayName = "Neutral",         Min = -2000,  Max = 1999 },
-                        new() { Name = "Affinity_Acquaint_030",DisplayName = "Acquaintance",    Min = 2000,   Max = 2999 },
-                        new() { Name = "Affinity_Acquaint_050",DisplayName = "Friendly",        Min = 3000,   Max = 3999 },
-                        new() { Name = "Affinity_Acquaint_075",DisplayName = "Friend",          Min = 4000,   Max = 4999 },
-                        new() { Name = "Affinity_Acquaint_100",DisplayName = "Ally",            Min = 5000,   Max = 10000 },
+                        new() { Name = "Affinity_Enemy_-100",  DisplayName = "Worst Enemy",     Min = -10000, Max = -9001, Tier = 1},
+
+                        new() { Name = "Affinity_Enemy_-090",  DisplayName = "Fierce Enemy",    Min = -9000,  Max = -8001, Tier = 2},
+
+                        new() { Name = "Affinity_Enemy_-080",  DisplayName = "Severe Enemy",    Min = -8000,  Max = -7001, Tier = 3},
+
+                        new() { Name = "Affinity_Enemy_-070",  DisplayName = "Enemy",           Min = -7000,  Max = -6001, Tier = 4},
+
+                        new() { Name = "Affinity_Enemy_-060",  DisplayName = "Strong Enemy",    Min = -6000,  Max = -5001, Tier = 5},
+
+                        new() { Name = "Affinity_Enemy_-050",  DisplayName = "Hostile Enemy",   Min = -5000,  Max = -4001, Tier = 6},
+
+                        new() { Name = "Affinity_Enemy_-040",  DisplayName = "Hostile",         Min = -4000,  Max = -3001, Tier = 7},
+
+                        new() { Name = "Affinity_Enemy_-030",  DisplayName = "Unfriendly",      Min = -3000,  Max = -2001, Tier = 7},
+
+                        new() { Name = "Affinity_Neutral_000", DisplayName = "Neutral",         Min = -2000,  Max = 1999, Tier = 7},
+
+                        new() { Name = "Affinity_Acquaint_030",DisplayName = "Acquaintance",    Min = 2000,   Max = 2999, Tier = 7},
+
+                        new() { Name = "Affinity_Acquaint_050",DisplayName = "Friendly",        Min = 3000,   Max = 3999, Tier = 7},
+
+                        new() { Name = "Affinity_Acquaint_075",DisplayName = "Friend",          Min = 4000,   Max = 4999, Tier = 7},
+
+                        new() { Name = "Affinity_Acquaint_100",DisplayName = "Ally",            Min = 5000,   Max = 10000, Tier = 7},
+
                     }
                 },
                 new()
@@ -476,18 +526,27 @@ public static class DesignData
                         Name = "ShipCombat_NotEligible",
                         DisplayName = "Not Eligible",
                         Min = -1000,
-                        Max = -1
+                        Max = -1,
+                        Tier = 1
                     },
                     StandingList = new List<StandingModel>
                     {
-                        new() { Name = "ShipCombat_NotEligible", DisplayName = "Not Eligible",   Min = -1000, Max = -1 },
-                        new() { Name = "ShipCombat_Rank0",       DisplayName = "Recruit",        Min = 0,     Max = 99 },
-                        new() { Name = "ShipCombat_Rank1",       DisplayName = "Novice",         Min = 100,   Max = 499 },
-                        new() { Name = "ShipCombat_Rank2",       DisplayName = "Apprentice",     Min = 500,   Max = 999 },
-                        new() { Name = "ShipCombat_Rank3",       DisplayName = "Adept",          Min = 1000,  Max = 4999 },
-                        new() { Name = "ShipCombat_Rank4",       DisplayName = "Proficient",     Min = 5000,  Max = 119999 },
-                        new() { Name = "ShipCombat_Rank5",       DisplayName = "Veteran",        Min = 120000, Max = 479999 },
-                        new() { Name = "ShipCombat_Rank6",       DisplayName = "Master",         Min = 480000, Max = 1000 },
+                        new() { Name = "ShipCombat_NotEligible", DisplayName = "Not Eligible",   Min = -1000, Max = -1, Tier = 1},
+
+                        new() { Name = "ShipCombat_Rank0",       DisplayName = "Recruit",        Min = 0,     Max = 99, Tier = 2},
+
+                        new() { Name = "ShipCombat_Rank1",       DisplayName = "Novice",         Min = 100,   Max = 499, Tier = 3},
+
+                        new() { Name = "ShipCombat_Rank2",       DisplayName = "Apprentice",     Min = 500,   Max = 999, Tier = 4},
+
+                        new() { Name = "ShipCombat_Rank3",       DisplayName = "Adept",          Min = 1000,  Max = 4999, Tier = 5},
+
+                        new() { Name = "ShipCombat_Rank4",       DisplayName = "Proficient",     Min = 5000,  Max = 119999, Tier = 6},
+
+                        new() { Name = "ShipCombat_Rank5",       DisplayName = "Veteran",        Min = 120000, Max = 479999, Tier = 7},
+
+                        new() { Name = "ShipCombat_Rank6",       DisplayName = "Master",         Min = 480000, Max = 1000, Tier = 7},
+
                     }
                 },
             }
@@ -514,18 +573,27 @@ public static class DesignData
                         Name = "Bounty_NotEligible",
                         DisplayName = "Not Eligible",
                         Min = -1000,
-                        Max = -1
+                        Max = -1,
+                        Tier = 1
                     },
                     StandingList = new List<StandingModel>
                     {
-                        new() { Name = "Bounty_NotEligible",    DisplayName = "Not Eligible",     Min = -1000, Max = -1 },
-                        new() { Name = "Bounty_Rank0",          DisplayName = "Applicant",        Min = 0,     Max = 4999 },
-                        new() { Name = "Bounty_Rank1",          DisplayName = "Probation",        Min = 5000,  Max = 9999 },
-                        new() { Name = "Bounty_Rank2",          DisplayName = "Junior",           Min = 10000, Max = 29999 },
-                        new() { Name = "Bounty_Rank3",          DisplayName = "Agent",            Min = 30000, Max = 119999 },
-                        new() { Name = "Bounty_Rank4",          DisplayName = "Senior",           Min = 120000, Max = 299999 },
-                        new() { Name = "Bounty_Rank5",          DisplayName = "Veteran Agent",    Min = 300000, Max = 1599999 },
-                        new() { Name = "Bounty_Rank6",          DisplayName = "Master Agent",     Min = 1600000, Max = 5199999 },
+                        new() { Name = "Bounty_NotEligible",    DisplayName = "Not Eligible",     Min = -1000, Max = -1, Tier = 1},
+
+                        new() { Name = "Bounty_Rank0",          DisplayName = "Applicant",        Min = 0,     Max = 4999, Tier = 2},
+
+                        new() { Name = "Bounty_Rank1",          DisplayName = "Probation",        Min = 5000,  Max = 9999, Tier = 3},
+
+                        new() { Name = "Bounty_Rank2",          DisplayName = "Junior",           Min = 10000, Max = 29999, Tier = 4},
+
+                        new() { Name = "Bounty_Rank3",          DisplayName = "Agent",            Min = 30000, Max = 119999, Tier = 5},
+
+                        new() { Name = "Bounty_Rank4",          DisplayName = "Senior",           Min = 120000, Max = 299999, Tier = 6},
+
+                        new() { Name = "Bounty_Rank5",          DisplayName = "Veteran Agent",    Min = 300000, Max = 1599999, Tier = 7},
+
+                        new() { Name = "Bounty_Rank6",          DisplayName = "Master Agent",     Min = 1600000, Max = 5199999, Tier = 7},
+
                     }
                 },
                 new()
@@ -540,23 +608,37 @@ public static class DesignData
                         Name = "Affinity_Enemy_-080",
                         DisplayName = "Enemy",
                         Min = -8000,
-                        Max = -7001
+                        Max = -7001,
+                        Tier = 4
                     },
                     StandingList = new List<StandingModel>
                     {
-                        new() { Name = "Affinity_Enemy_-100",  DisplayName = "Worst Enemy",     Min = -10000, Max = -9001 },
-                        new() { Name = "Affinity_Enemy_-090",  DisplayName = "Fierce Enemy",    Min = -9000,  Max = -8001 },
-                        new() { Name = "Affinity_Enemy_-080",  DisplayName = "Severe Enemy",    Min = -8000,  Max = -7001 },
-                        new() { Name = "Affinity_Enemy_-070",  DisplayName = "Enemy",           Min = -7000,  Max = -6001 },
-                        new() { Name = "Affinity_Enemy_-060",  DisplayName = "Strong Enemy",    Min = -6000,  Max = -5001 },
-                        new() { Name = "Affinity_Enemy_-050",  DisplayName = "Hostile Enemy",   Min = -5000,  Max = -4001 },
-                        new() { Name = "Affinity_Enemy_-040",  DisplayName = "Hostile",         Min = -4000,  Max = -3001 },
-                        new() { Name = "Affinity_Enemy_-030",  DisplayName = "Unfriendly",      Min = -3000,  Max = -2001 },
-                        new() { Name = "Affinity_Neutral_000", DisplayName = "Neutral",         Min = -2000,  Max = 1999 },
-                        new() { Name = "Affinity_Acquaint_030",DisplayName = "Acquaintance",    Min = 2000,   Max = 2999 },
-                        new() { Name = "Affinity_Acquaint_050",DisplayName = "Friendly",        Min = 3000,   Max = 3999 },
-                        new() { Name = "Affinity_Acquaint_075",DisplayName = "Friend",          Min = 4000,   Max = 4999 },
-                        new() { Name = "Affinity_Acquaint_100",DisplayName = "Ally",            Min = 5000,   Max = 10000 },
+                        new() { Name = "Affinity_Enemy_-100",  DisplayName = "Worst Enemy",     Min = -10000, Max = -9001, Tier = 1},
+
+                        new() { Name = "Affinity_Enemy_-090",  DisplayName = "Fierce Enemy",    Min = -9000,  Max = -8001, Tier = 2},
+
+                        new() { Name = "Affinity_Enemy_-080",  DisplayName = "Severe Enemy",    Min = -8000,  Max = -7001, Tier = 3},
+
+                        new() { Name = "Affinity_Enemy_-070",  DisplayName = "Enemy",           Min = -7000,  Max = -6001, Tier = 4},
+
+                        new() { Name = "Affinity_Enemy_-060",  DisplayName = "Strong Enemy",    Min = -6000,  Max = -5001, Tier = 5},
+
+                        new() { Name = "Affinity_Enemy_-050",  DisplayName = "Hostile Enemy",   Min = -5000,  Max = -4001, Tier = 6},
+
+                        new() { Name = "Affinity_Enemy_-040",  DisplayName = "Hostile",         Min = -4000,  Max = -3001, Tier = 7},
+
+                        new() { Name = "Affinity_Enemy_-030",  DisplayName = "Unfriendly",      Min = -3000,  Max = -2001, Tier = 7},
+
+                        new() { Name = "Affinity_Neutral_000", DisplayName = "Neutral",         Min = -2000,  Max = 1999, Tier = 7},
+
+                        new() { Name = "Affinity_Acquaint_030",DisplayName = "Acquaintance",    Min = 2000,   Max = 2999, Tier = 7},
+
+                        new() { Name = "Affinity_Acquaint_050",DisplayName = "Friendly",        Min = 3000,   Max = 3999, Tier = 7},
+
+                        new() { Name = "Affinity_Acquaint_075",DisplayName = "Friend",          Min = 4000,   Max = 4999, Tier = 7},
+
+                        new() { Name = "Affinity_Acquaint_100",DisplayName = "Ally",            Min = 5000,   Max = 10000, Tier = 7},
+
                     }
                 },
             }
@@ -583,18 +665,27 @@ public static class DesignData
                         Name = "Security_Rank6",
                         DisplayName = "Master Agent",
                         Min = 1600000,
-                        Max = 5199999
+                        Max = 5199999,
+                        Tier = 7
                     },
                     StandingList = new List<StandingModel>
                     {
-                        new() { Name = "Security_NotEligible",  DisplayName = "Not Eligible",   Min = -1000, Max = -1 },
-                        new() { Name = "Security_Rank0",        DisplayName = "Applicant",      Min = 0,     Max = 4999 },
-                        new() { Name = "Security_Rank1",        DisplayName = "Probation",      Min = 5000,  Max = 9999 },
-                        new() { Name = "Security_Rank2",        DisplayName = "Junior",         Min = 10000, Max = 29999 },
-                        new() { Name = "Security_Rank3",        DisplayName = "Officer",        Min = 30000, Max = 119999 },
-                        new() { Name = "Security_Rank4",        DisplayName = "Agent",          Min = 120000, Max = 299999 },
-                        new() { Name = "Security_Rank5",        DisplayName = "Senior Agent",   Min = 300000, Max = 1599999 },
-                        new() { Name = "Security_Rank6",        DisplayName = "Master Agent",   Min = 1600000, Max = 5199999 },
+                        new() { Name = "Security_NotEligible",  DisplayName = "Not Eligible",   Min = -1000, Max = -1, Tier = 1},
+
+                        new() { Name = "Security_Rank0",        DisplayName = "Applicant",      Min = 0,     Max = 4999, Tier = 2},
+
+                        new() { Name = "Security_Rank1",        DisplayName = "Probation",      Min = 5000,  Max = 9999, Tier = 3},
+
+                        new() { Name = "Security_Rank2",        DisplayName = "Junior",         Min = 10000, Max = 29999, Tier = 4},
+
+                        new() { Name = "Security_Rank3",        DisplayName = "Officer",        Min = 30000, Max = 119999, Tier = 5},
+
+                        new() { Name = "Security_Rank4",        DisplayName = "Agent",          Min = 120000, Max = 299999, Tier = 6},
+
+                        new() { Name = "Security_Rank5",        DisplayName = "Senior Agent",   Min = 300000, Max = 1599999, Tier = 7},
+
+                        new() { Name = "Security_Rank6",        DisplayName = "Master Agent",   Min = 1600000, Max = 5199999, Tier = 7},
+
                     }
                 },
             }
@@ -619,14 +710,22 @@ public static class DesignData
                     CurrentStanding = null,
                     StandingList = new List<StandingModel>
                     {
-                        new() { Name = "ShipCombat_NotEligible", DisplayName = "Not Eligible",   Min = -1000, Max = -1 },
-                        new() { Name = "ShipCombat_Rank0",       DisplayName = "Recruit",        Min = 0,     Max = 99 },
-                        new() { Name = "ShipCombat_Rank1",       DisplayName = "Novice",         Min = 100,   Max = 499 },
-                        new() { Name = "ShipCombat_Rank2",       DisplayName = "Apprentice",     Min = 500,   Max = 999 },
-                        new() { Name = "ShipCombat_Rank3",       DisplayName = "Adept",          Min = 1000,  Max = 4999 },
-                        new() { Name = "ShipCombat_Rank4",       DisplayName = "Proficient",     Min = 5000,  Max = 119999 },
-                        new() { Name = "ShipCombat_Rank5",       DisplayName = "Veteran",        Min = 120000, Max = 479999 },
-                        new() { Name = "ShipCombat_Rank6",       DisplayName = "Master",         Min = 480000, Max = 1000 },
+                        new() { Name = "ShipCombat_NotEligible", DisplayName = "Not Eligible",   Min = -1000, Max = -1, Tier = 1},
+
+                        new() { Name = "ShipCombat_Rank0",       DisplayName = "Recruit",        Min = 0,     Max = 99, Tier = 2},
+
+                        new() { Name = "ShipCombat_Rank1",       DisplayName = "Novice",         Min = 100,   Max = 499, Tier = 3},
+
+                        new() { Name = "ShipCombat_Rank2",       DisplayName = "Apprentice",     Min = 500,   Max = 999, Tier = 4},
+
+                        new() { Name = "ShipCombat_Rank3",       DisplayName = "Adept",          Min = 1000,  Max = 4999, Tier = 5},
+
+                        new() { Name = "ShipCombat_Rank4",       DisplayName = "Proficient",     Min = 5000,  Max = 119999, Tier = 6},
+
+                        new() { Name = "ShipCombat_Rank5",       DisplayName = "Veteran",        Min = 120000, Max = 479999, Tier = 7},
+
+                        new() { Name = "ShipCombat_Rank6",       DisplayName = "Master",         Min = 480000, Max = 1000, Tier = 7},
+
                     }
                 },
             }
