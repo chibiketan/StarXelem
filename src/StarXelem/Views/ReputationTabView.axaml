@@ -17,34 +17,34 @@
             <Setter Property="CornerRadius" Value="8" />
 
             <Style Selector="^.notloaded" >
-                <Setter Property="BorderBrush" Value="#14FFFFFF" />
+                <Setter Property="BorderBrush" Value="{DynamicResource RepNotLoadedLeftBorderBrush}" />
 
                 <Style Selector="^ > StackPanel">
                     <Setter Property="Opacity" Value="0.55"></Setter>
                 </Style>
 
                 <Style Selector="^ TextBlock.relationship-color">
-                    <Setter Property="Foreground" Value="#FF777777" />
+                    <Setter Property="Foreground" Value="{DynamicResource RepNotLoadedStateTextBrush}" />
                     <Setter Property="FontWeight" Value="ExtraBold" />
                 </Style>
             </Style>
 
             <Style Selector="^.ally" >
-                <Setter Property="BorderBrush" Value="#FF1D9E75" />
+                <Setter Property="BorderBrush" Value="{DynamicResource RepAllyLeftBorderBrush}" />
                 <Style Selector="^ TextBlock.relationship-color">
-                    <Setter Property="Foreground" Value="#FF1D9E75" />
+                    <Setter Property="Foreground" Value="{DynamicResource RepAllyStateTextBrush}" />
                 </Style>
             </Style>
             <Style Selector="^.neutral">
-                <Setter Property="BorderBrush" Value="#30FFFFFF" />
+                <Setter Property="BorderBrush" Value="{DynamicResource RepNeutralLeftBorderBrush}" />
                 <Style Selector="^ TextBlock.relationship-color">
-                    <Setter Property="Foreground" Value="#30FFFFFF" />
+                    <Setter Property="Foreground" Value="{DynamicResource RepNeutralStateTextBrush}" />
                 </Style>
             </Style>
             <Style Selector="^.hostile">
-                <Setter Property="BorderBrush" Value="#FFE24B4A" />
+                <Setter Property="BorderBrush" Value="{DynamicResource RepHostileLeftBorderBrush}" />
                 <Style Selector="^ TextBlock.relationship-color">
-                    <Setter Property="Foreground" Value="#FFE24B4A" />
+                    <Setter Property="Foreground" Value="{DynamicResource RepHostileStateTextBrush}" />
                 </Style>
             </Style>
         </Style>
@@ -69,7 +69,7 @@
             <Style Selector="^.locked-standing">
                 <Setter Property="Opacity" Value="0.45" />
                 <Style Selector="^ TextBlock.standing-name">
-                    <Setter Property="Foreground" Value="#80FFFFFF" />
+                    <Setter Property="Foreground" Value="{DynamicResource RepStandingLockedNameBrush}" />
                 </Style>
             </Style>
         </Style>
@@ -151,6 +151,7 @@
             <conv:StandingClassesConverter x:Key="StandingClassesConverter" />
             <conv:TierToFillBrushConverter x:Key="TierToFillBrushConverter" />
             <conv:TierToOutlineBrushConverter x:Key="TierToOutlineBrushConverter" />
+            <conv:TierToOutlineThicknessConverter x:Key="TierToOutlineThicknessConverter" />
 
         </ResourceDictionary>
     </UserControl.Resources>
@@ -213,17 +214,19 @@
                                         <DataTemplate>
                                             <StackPanel >
                                                 <!-- Scope expander (§17.7) -->
-                                                <Expander IsExpanded="{Binding IsExpanded}" >
+                                                <Expander IsExpanded="{Binding IsExpanded}"   >
                                                     <Expander.Header>
-                                                        <StackPanel Spacing="4" Margin="0 5 0 5">
-                                                            <DockPanel LastChildFill="False" Margin="20 0 0 0">
+                                                        <StackPanel Spacing="4" Margin="0 5 20 5">
+                                                            <Grid  Margin="20 0 0 0" ColumnDefinitions="*,Auto" ColumnSpacing="5">
                                                                 <TextBlock Text="{Binding DisplayName, Converter={StaticResource ToUpperConverter}}"
-                                                                           DockPanel.Dock="Left"
+                                                                           Grid.Column="0"
+                                                                           TextTrimming="CharacterEllipsis"
                                                                            FontWeight="DemiBold"
-                                                                           Classes="double-dimming" />
+                                                                           ToolTip.Tip="{Binding DisplayName}"
+                                                                           Foreground="{DynamicResource RepScopeLabelBrush}" />
                                                                 <TextBlock
-                                                                           DockPanel.Dock="Right"
-                                                                           Classes="double-dimming">
+                                                                           Grid.Column="1"
+                                                                           Foreground="{DynamicResource RepRawValueBrush}">
                                                                     <TextBlock.Text>
                                                                         <MultiBinding StringFormat="{}{0} / {1}" >
                                                                             <Binding Path="CurrentValue" />
@@ -231,26 +234,30 @@
                                                                         </MultiBinding>
                                                                     </TextBlock.Text>
                                                                 </TextBlock>
-                                                            </DockPanel>
+                                                            </Grid>
                                                             
                                                             <!-- Progress Bar -->
                                                             <Border BorderBrush="{Binding CurrentStanding.Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
-                                                                    BorderThickness="1.5"
-                                                                    Padding="-1">
+                                                                    BorderThickness="{Binding CurrentStanding.Tier, Converter={StaticResource TierToOutlineThicknessConverter}}"
+                                                                    CornerRadius="10"
+                                                                    Margin="-1"
+                                                                    Padding="0 0.5 0 -0.5"
+                                                                    >
                                                                 <ProgressBar Value="{Binding CurrentValue}"
                                                                              Minimum="{Binding CurrentStanding.Min}"
                                                                              Maximum="{Binding CurrentStanding.Max}"
                                                                              ToolTip.Tip="{Binding CurrentValue}"
                                                                              Height="6"
                                                                              Foreground="{Binding CurrentStanding.Tier, Converter={StaticResource TierToFillBrushConverter}}"
-                                                                             Background="{DynamicResource BackgroundGrade4Brush}" />
+                                                                             Background="{DynamicResource BackgroundGrade4Brush}"
+                                                                             Margin="1" />
                                                             </Border>
 
                                                             <!-- Min/Max values -->
                                                             <DockPanel LastChildFill="False">
-                                                                <TextBlock Classes="demi-bold dimming"
+                                                                <TextBlock Classes="demi-bold"
                                                                            Text="{Binding CurrentStanding.DisplayName}"
-                                                                           Opacity="0.5"
+                                                                           Foreground="{DynamicResource RepRankTextBrush}"
                                                                            DockPanel.Dock="Left" />
                                                             </DockPanel>
                                                         </StackPanel>
@@ -260,7 +267,7 @@
 
                                                         <!-- Separator before standings list (§17.7) -->
                                                         <Rectangle Height="0.5"
-                                                                   Fill="#0FFFFFFF"
+                                                                   Fill="{DynamicResource RepSeparatorBrush}"
                                                                    Margin="0,0,0,0" />
 
                                                         <!-- Standings list (§17.7) -->
@@ -277,24 +284,31 @@
                                                                         <DockPanel LastChildFill="False"
                                                                                    Margin="0 1">
                                                                             <!-- Standing dot (§17.4) -->
-                                                                            <Ellipse Width="7" Height="7"
-                                                                                     Fill="{Binding Tier, Converter={StaticResource TierToFillBrushConverter}}"
-                                                                                     Stroke="{Binding Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
-                                                                                     StrokeThickness="1.5"
-                                                                                     DockPanel.Dock="Left"
-                                                                                     VerticalAlignment="Center"
-                                                                                     Margin="0,0,8,0" />
+                                                                            <Border Width="11" Height="11" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                                    DockPanel.Dock="Left"
+                                                                                    BorderBrush="{Binding Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
+                                                                                    BorderThickness="{Binding Tier, Converter={StaticResource TierToOutlineThicknessConverter}}"
+                                                                                    CornerRadius="10"
+                                                                                    Margin="0,0,8,0"
+                                                                                    Padding="0 0 0 0"
+                                                                            >
+                                                                                <Ellipse Width="7" Height="7"
+                                                                                         Fill="{Binding Tier, Converter={StaticResource TierToFillBrushConverter}}"
+                                                                                         Stroke="{Binding Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
+                                                                                         VerticalAlignment="Center"
+                                                                                          />
+                                                                            </Border>
                                                                             <!-- Standing name -->
                                                                             <TextBlock Text="{Binding DisplayName}"
                                                                                        Classes="standing-name"
                                                                                        DockPanel.Dock="Left"
                                                                                        FontWeight="500"
-                                                                                       Foreground="#B3FFFFFF" />
+                                                                                       Foreground="{DynamicResource RepStandingNameBrush}" />
                                                                             <!-- Standing threshold (§17.8) -->
-                                                                            <TextBlock Text="{Binding Min}"
+                                                                            <TextBlock Text="{Binding Max}"
                                                                                        Classes="standing-threshold"
                                                                                        DockPanel.Dock="Right"
-                                                                                       Foreground="#47FFFFFF" />
+                                                                                       Foreground="{DynamicResource RepStandingLockedThresholdBrush}" />
                                                                         </DockPanel>
                                                                     </Border>
                                                                 </DataTemplate>

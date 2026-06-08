@@ -436,7 +436,7 @@ public static class DesignData
             {
                 new()
                 {
-                    DisplayName = "Bounty",
+                    DisplayName = "BountyHunting_BountyHunterGuild",
                     Category = "Bounty",
                     MaxValue = 5200000,
                     CurrentValue = 1200,
