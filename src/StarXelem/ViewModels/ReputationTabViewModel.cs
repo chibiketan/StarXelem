@@ -21,6 +21,9 @@ public partial class ReputationTabViewModel : PageViewModelBase
     [ObservableProperty]
     private string _searchText = string.Empty;
 
+    [ObservableProperty]
+    private bool _isLoading;
+
     public ObservableCollection<ContractorModel> FilteredContractors { get; } = new();
 
     public ReputationTabViewModel(IReputationService reputationService)
@@ -41,6 +44,7 @@ public partial class ReputationTabViewModel : PageViewModelBase
     [RelayCommand]
     private async Task LoadData()
     {
+        IsLoading = true;
         try
         {
             var contractors = await _reputationService.GetSynchronizedReputationsAsync();
@@ -51,6 +55,10 @@ public partial class ReputationTabViewModel : PageViewModelBase
         {
             // In a real app, we would use the popup system to show an error
             Console.WriteLine($"Error loading reputations: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 
