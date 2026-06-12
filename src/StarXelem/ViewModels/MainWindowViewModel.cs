@@ -89,6 +89,8 @@ public partial class MainWindowViewModel : ViewModelBase
         app.RequestedThemeVariant = app.RequestedThemeVariant == ThemeVariant.Light
             ? ThemeVariant.Dark
             : ThemeVariant.Light;
+        
+        WeakReferenceMessenger.Default.Send(new ThemeChangedMessage());
     }
     
     public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IP4kService p4kService, IGrpcClientService grpcClientService, ISettingsService settingsService, PopupViewModel popupViewModel)

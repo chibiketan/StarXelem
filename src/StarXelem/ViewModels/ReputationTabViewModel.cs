@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StarXelem.Models;
@@ -16,8 +12,10 @@ public partial class ReputationTabViewModel : PageViewModelBase
     private List<ContractorModel> _allContractors = new();
 
     public override string Name => "Reputations";
-    public override string Icon => "ReputationIcon"; // This should be defined in the project's icon resources
+    public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Shield);
 
+    
+    
     [ObservableProperty]
     private string _searchText = string.Empty;
 
