@@ -89,6 +89,8 @@ public partial class MainWindowViewModel : ViewModelBase
         app.RequestedThemeVariant = app.RequestedThemeVariant == ThemeVariant.Light
             ? ThemeVariant.Dark
             : ThemeVariant.Light;
+        
+        WeakReferenceMessenger.Default.Send(new ThemeChangedMessage());
     }
     
     public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IP4kService p4kService, IGrpcClientService grpcClientService, ISettingsService settingsService, PopupViewModel popupViewModel)
@@ -145,6 +147,7 @@ public partial class MainWindowViewModel : ViewModelBase
             App.Current.Services.GetRequiredService<P4kShipTabViewModel>(),
             App.Current.Services.GetRequiredService<MissionsTabViewModel>(),
             App.Current.Services.GetRequiredService<ExtractionTabViewModel>(),
+            App.Current.Services.GetRequiredService<ReputationTabViewModel>(),
             App.Current.Services.GetRequiredService<SettingsTabViewModel>()
         ];
         

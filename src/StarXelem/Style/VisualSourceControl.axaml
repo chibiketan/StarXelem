@@ -1,0 +1,58 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:StarXelem.Style"
+        xmlns:vm="clr-namespace:StarXelem.ViewModels"
+        xmlns:ui="using:FluentAvalonia.UI.Controls"
+        xmlns:conv="clr-namespace:StarXelem.Converters">
+
+    <!-- ===================================================================
+         ControlTheme principal : VisualSourceControl
+         
+         Structure du template :
+           Border (clip + CornerRadius)
+             Grid
+               ├── ContentPresenter  → dispatch vers DataTemplate selon ResolvedSource
+               └── Border (loading)  → spinner, visible pendant IsLoading=True
+         =================================================================== -->
+
+    <Style Selector="controls|VisualSourceControl">
+        <Setter Property="Template">
+            <ControlTemplate TargetType="controls:VisualSourceControl">
+
+                <!-- Conteneur racine : applique le clipping pour le CornerRadius -->
+                <Border CornerRadius="{TemplateBinding CornerRadius}"
+                        ClipToBounds="True"
+                        Width="{TemplateBinding Width}"
+                        Height="{TemplateBinding Height}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+
+                    <Grid>
+
+                        <!-- Dispatch automatique vers le DataTemplate correspondant -->
+                        <ContentPresenter Content="{TemplateBinding ResolvedSource}"
+                                          HorizontalContentAlignment="Stretch"
+                                          VerticalContentAlignment="Stretch"
+                                          IsVisible="{TemplateBinding IsLoading,
+                                                      Converter={StaticResource InverseBoolConverter}}"/>
+
+                        <!-- Overlay de chargement (IsLoading = True) -->
+                        <Border IsVisible="{TemplateBinding IsLoading}"
+                                Background="{DynamicResource VisualSource.LoadingBackground}"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch">
+                            <ui:ProgressRing IsIndeterminate="True"
+                                             Width="16" Height="16"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center"
+                                             Foreground="{DynamicResource VisualSource.SpinnerForeground}"/>
+                        </Border>
+
+                    </Grid>
+                </Border>
+
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+</Styles>

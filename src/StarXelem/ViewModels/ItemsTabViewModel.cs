@@ -54,7 +54,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     private readonly IP4kService _p4KService;
     private readonly ILocationService _locationService;
     public override string Name => "Objets";
-    public override string Icon => nameof(Symbol.Account);
+    public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.PersonAccounts);
     [ObservableProperty] public Task<IList<ItemViewModel>>? _itemList;
     [ObservableProperty] public ItemViewModel? _selectedItem;
     [ObservableProperty] private bool _isLoading = false;

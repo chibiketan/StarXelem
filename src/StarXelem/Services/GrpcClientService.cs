@@ -8,6 +8,7 @@ using Sc.External.Services.Contacts.V1;
 using Sc.External.Services.Entitlement.V2;
 using Sc.External.Services.Entitygraph.V1;
 using Sc.External.Services.Identity.V1;
+using Sc.External.Services.Reputation.V1;
 using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Models;
@@ -833,6 +834,25 @@ public class GrpcClientService : IGrpcClientService
         
         Console.WriteLine("Coucou");
 
+    }
+
+    public async Task<List<VersionedReputation>> QueryReputationsAsync()
+    {
+        var service = new Sc.External.Services.Reputation.V1.ReputationService.ReputationServiceClient(_channel);
+        
+        var response = await service.QueryReputationsAsync(new QueryReputationsRequest
+        {
+            Query = new Query
+            {
+                Pagination = new PaginationArguments
+                {
+                    First = 100,
+                    After = ""
+                }
+            }
+            
+        }, _authHeaders, DateTime.UtcNow.AddSeconds(10));
+        return response.Results.ToList();
     }
 
     public async Task<List<BlueprintEntry>> GetBlueprintList()

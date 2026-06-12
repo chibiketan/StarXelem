@@ -20,7 +20,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     private readonly IGrpcClientService _clientService;
     private readonly IBlueprintMappingService _mappingService;
     public override string Name => "Blueprints";
-    public override string Icon => nameof(Symbol.Copy);
+    public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Copy);
     [ObservableProperty] public IList<BlueprintViewModel>? _blueprintList;
     [ObservableProperty] public BlueprintViewModel? _selectedBluePrint;
     [ObservableProperty] private bool _isLoading = false;

@@ -18,7 +18,7 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
     private readonly IP4kService _p4kService;
     private readonly IMissionMappingService _missionMappingService;
     public override string Name => "Missions";
-    public override string Icon => nameof(Symbol.Target);
+    public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Target);
 
     [ObservableProperty]
     private bool _isLoading;

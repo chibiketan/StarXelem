@@ -22,7 +22,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
     private readonly ILogger<ExtractionTabViewModel> _logger;
 
     public override string Name => "Extractions";
-    public override string Icon => nameof(Symbol.Download);
+    public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.ArrowDownload);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsExtracting))]

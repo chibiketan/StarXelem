@@ -23,7 +23,7 @@ public partial class P4kShipTabViewModel : PageViewModelBase
     private List<P4kShipModel> _allShips = new();
 
     public override string Name => "Loadout vaisseaux";
-    public override string Icon => nameof(Symbol.Target);
+    public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Target);
 
     [ObservableProperty] private ObservableCollection<P4kShipModel> _ships = new();
     [ObservableProperty] private P4kShipModel? _selectedShip;

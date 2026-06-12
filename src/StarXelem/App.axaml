@@ -3,17 +3,122 @@
              x:Class="StarXelem.App"
              xmlns:local="using:StarXelem"
              xmlns:sty="clr-namespace:FluentAvalonia.Styling;assembly=FluentAvalonia"
+             xmlns:icon="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
+             xmlns:conv="clr-namespace:StarXelem.Converters"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels"
+             xmlns:controls="clr-namespace:StarXelem.Style"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
     <Application.DataTemplates>
         <local:ViewLocator/>
+            <!-- =======================================================================
+                 DataTemplate : InitialsVisualViewModel
+                 Fond coloré (défini dans le VM) + texte initiales centré
+                 ======================================================================= -->
+            <DataTemplate DataType="vm:InitialsVisualViewModel">
+                <Border Background="{Binding .,
+                                      Converter={StaticResource VisualSourceBackgroundConverter}}"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch">
+                    <TextBlock Text="{Binding Initials}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="10"
+                               FontWeight="SemiBold"
+                               LetterSpacing="0.5"
+                               Foreground="{Binding .,
+                                            Converter={StaticResource VisualSourceBrushConverter}}"/>
+                </Border>
+            </DataTemplate>
+
+            <!-- =======================================================================
+                 DataTemplate : GeometryIconVisualViewModel
+                 Path Avalonia avec StreamGeometry chargée depuis une StaticResource
+                 ======================================================================= -->
+            <DataTemplate DataType="vm:GeometryIconVisualViewModel">
+                <!--
+                    Le converter ResourceKeyToGeometryConverter résout la clé de ressource
+                    en StreamGeometry depuis Application.Current.Resources.
+                -->
+                <Path Data="{Binding ResourceKey,
+                              Converter={StaticResource ResourceKeyToGeometryConverter}}"
+                      Fill="{Binding .,
+                              Converter={StaticResource VisualSourceBrushConverter}}"
+                      Stretch="Uniform"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      Margin="4"/>
+            </DataTemplate>
+
+            <!-- =======================================================================
+                 DataTemplate : FluentIconVisualViewModel
+                 SymbolIcon FluentAvalonia (glyphe Fluent System Icons)
+                 ======================================================================= -->
+            <DataTemplate DataType="vm:FluentIconVisualViewModel">
+                <icon:SymbolIcon Symbol="{Binding Symbol}"
+                                 Foreground="{Binding .,
+                                             Converter={StaticResource VisualSourceBrushConverter}}"
+                                 FontSize="{Binding FontSize}"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center" />
+                <!-- <ui:SymbolIcon Symbol="{Binding Symbol}" -->
+                <!--                Foreground="{Binding Foreground}" -->
+                <!--                FontSize="{Binding FontSize}" -->
+                <!--                HorizontalAlignment="Center" -->
+                <!--                VerticalAlignment="Center"/> -->
+            </DataTemplate>
+
+
+            <!-- =======================================================================
+                 DataTemplate : BitmapVisualViewModel (interne — résultat de chargement async)
+                 Image Avalonia avec la Bitmap déjà décodée
+                 ======================================================================= -->
+            <DataTemplate DataType="{x:Type controls:BitmapVisualViewModel}">
+                <!--
+                    Note : BitmapVisualViewModel est internal. Ce DataTemplate doit être
+                    dans le même assembly. Si tu veux l'exposer, passe-le en public.
+                -->
+                <Image Source="{Binding Bitmap}"
+                       Stretch="UniformToFill"
+                       HorizontalAlignment="Stretch"
+                       VerticalAlignment="Stretch"/>
+            </DataTemplate>
+
+            <!--
+                UriImageVisualViewModel et PathImageVisualViewModel n'ont PAS de DataTemplate.
+                Ces types sont résolus en amont par VisualSourceControl.OnSourceChanged()
+                qui les transforme en BitmapVisualViewModel (succès) ou InitialsVisualViewModel (fallback).
+                Un ContentPresenter nu ne peut pas gérer le chargement async — passer toujours
+                par VisualSourceControl pour ces deux types.
+            -->
+
     </Application.DataTemplates>
     <Application.Resources>
         <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="VisualSourceIconForeground">White</SolidColorBrush>
+                    <SolidColorBrush x:Key="VisualSourceInitialsForeground">White</SolidColorBrush>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="VisualSourceIconForeground">Black</SolidColorBrush>
+                    <SolidColorBrush x:Key="VisualSourceInitialsForeground">Black</SolidColorBrush>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="Style/DefaultResources.axaml" />
+                <!-- DataTemplates du VisualSource -->
+                <ResourceInclude Source="Style/VisualSourceDataTemplates.axaml"/>
             </ResourceDictionary.MergedDictionaries>
+            
+            <!-- Converters -->
+            <conv:ColorToBrushConverter         x:Key="ColorToBrushConverter"/>
+            <conv:ResourceKeyToGeometryConverter x:Key="ResourceKeyToGeometryConverter"/>
+            <conv:InverseBoolConverter           x:Key="InverseBoolConverter"/>
+            <conv:VisualSourceBrushConverter     x:Key="VisualSourceBrushConverter"/>
+            <conv:VisualSourceBackgroundConverter x:Key="VisualSourceBackgroundConverter"/>
         </ResourceDictionary>
     </Application.Resources>
  
@@ -25,5 +130,7 @@
         <!-- <StyleInclude Source="avares://AvaloniaHex/Themes/Simple/AvaloniaHex.axaml"/> -->
         <!-- <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" /> -->
         <StyleInclude Source="Style/BlueprintStyles.axaml" />
+                <StyleInclude Source="Style/VisualSourceControl.axaml"/>
+                <StyleInclude Source="Style/NavigationViewStyles.axaml"/>
     </Application.Styles>
 </Application>

@@ -1,0 +1,363 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:conv="using:StarXelem.Converters"
+             xmlns:beh="using:StarXelem.Behaviors"
+             xmlns:vm="using:StarXelem.ViewModels"
+             xmlns:local="clr-namespace:StarXelem"
+             xmlns:fluent="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
+             d:DataContext="{x:Static local:DesignData.ReputationTabViewModel}"
+             x:Class="StarXelem.Views.ReputationTabView"
+             x:DataType="vm:ReputationTabViewModel">
+    <UserControl.Styles>
+        <Style Selector="Border.reputation-card">
+            <Setter Property="Background" Value="{DynamicResource BackgroundGrade4Brush}" />
+            <Setter Property="BorderThickness" Value="3 0.5 0.5 0.5" />
+            <Setter Property="CornerRadius" Value="8" />
+
+            <Style Selector="^.notloaded" >
+                <Setter Property="BorderBrush" Value="{DynamicResource RepNotLoadedLeftBorderBrush}" />
+
+                <Style Selector="^ > StackPanel">
+                    <Setter Property="Opacity" Value="0.55"></Setter>
+                </Style>
+
+                <Style Selector="^ TextBlock.relationship-color">
+                    <Setter Property="Foreground" Value="{DynamicResource RepNotLoadedStateTextBrush}" />
+                    <Setter Property="FontWeight" Value="ExtraBold" />
+                </Style>
+            </Style>
+
+            <Style Selector="^.ally" >
+                <Setter Property="BorderBrush" Value="{DynamicResource RepAllyLeftBorderBrush}" />
+                <Style Selector="^ TextBlock.relationship-color">
+                    <Setter Property="Foreground" Value="{DynamicResource RepAllyStateTextBrush}" />
+                </Style>
+            </Style>
+            <Style Selector="^.neutral">
+                <Setter Property="BorderBrush" Value="{DynamicResource RepNeutralLeftBorderBrush}" />
+                <Style Selector="^ TextBlock.relationship-color">
+                    <Setter Property="Foreground" Value="{DynamicResource RepNeutralStateTextBrush}" />
+                </Style>
+            </Style>
+            <Style Selector="^.hostile">
+                <Setter Property="BorderBrush" Value="{DynamicResource RepHostileLeftBorderBrush}" />
+                <Style Selector="^ TextBlock.relationship-color">
+                    <Setter Property="Foreground" Value="{DynamicResource RepHostileStateTextBrush}" />
+                </Style>
+            </Style>
+        </Style>
+
+ 
+        <!-- Standing list item styles (§17.7) -->
+        <Style Selector="Border.standing-item">
+            <Setter Property="Padding" Value="4,6" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Margin" Value="0,2" />
+
+            <Style Selector="^.current-standing">
+                <Setter Property="Background" Value="{DynamicResource RepCurrentRankBgBrush}" />
+                <Style Selector="^ TextBlock.standing-name">
+                    <Setter Property="Foreground" Value="{DynamicResource RepCurrentRankNameBrush}" />
+                </Style>
+                <Style Selector="^ TextBlock.standing-threshold">
+                    <Setter Property="Foreground" Value="{DynamicResource RepCurrentRankThresholdBrush}" />
+                </Style>
+            </Style>
+
+            <Style Selector="^.locked-standing">
+                <Setter Property="Opacity" Value="0.45" />
+                <Style Selector="^ TextBlock.standing-name">
+                    <Setter Property="Foreground" Value="{DynamicResource RepStandingLockedNameBrush}" />
+                </Style>
+            </Style>
+        </Style>
+        
+        <!-- Modification du template par défaut de l'expander pour ce composant -->
+        <Style Selector="Expander /template/ ToggleButton">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <RelativePanel>
+                        <Border Name="Root" 
+                                RelativePanel.AlignLeftWithPanel="True"
+                                RelativePanel.AlignRightWithPanel="True"
+                                RelativePanel.AlignTopWithPanel="True"
+                                RelativePanel.AlignBottomWithPanel="True"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                MinHeight="{TemplateBinding MinHeight}"
+                                MinWidth="{TemplateBinding MinWidth}"
+                                MaxWidth="{TemplateBinding MaxWidth}"
+                                Width="{TemplateBinding Width}"
+                                HorizontalAlignment="{TemplateBinding HorizontalAlignment}"
+                                Padding="{TemplateBinding Padding}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                BackgroundSizing="{TemplateBinding BackgroundSizing}">
+                            <ContentPresenter Name="ContentPresenter"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <Border Name="ExpandCollapseChevronBorder"
+                                RelativePanel.AlignLeftWith="Root"
+                                RelativePanel.AlignTopWith="Root"
+                                Margin="16 9 0 0"
+                               >
+                            <TextBlock Name="ExpandCollapseChevron"
+                                       FontFamily="{DynamicResource SymbolThemeFontFamily}"
+                                       FontSize="15"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource ExpanderChevronForeground}"
+                                       RenderTransform="none">
+                                    <TextBlock.Transitions>
+                                        <Transitions>
+                                            <TransformOperationsTransition Duration="00:00:00.167" Property="RenderTransform" />
+                                        </Transitions>
+                                    </TextBlock.Transitions>
+                                </TextBlock>
+                            </Border>
+                    </RelativePanel>
+                </ControlTemplate>
+            </Setter>
+            
+            <!-- On définit la flèche comme à droite -->
+            <Style Selector="^ /template/ TextBlock#ExpandCollapseChevron">
+                <Setter Property="Text" Value="{StaticResource ExpanderChevronRightGlyph}"></Setter>
+            </Style>
+            <!-- On définit la rotation sur déploiement à 90° et non 180° -->
+            <Style Selector="^[Tag=expanded] /template/ TextBlock#ExpandCollapseChevron">
+                <Setter Property="RenderTransform" Value="rotate(90deg)" />
+            </Style>
+        </Style>
+
+        <!-- Dimming classes for standing text (§17.7) -->
+        <Style Selector="TextBlock.triple-dimming">
+            <Setter Property="Opacity" Value="0.12" />
+        </Style>
+        <Style Selector="TextBlock.double-dimming">
+            <Setter Property="Opacity" Value="0.20" />
+        </Style>
+        <Style Selector="fluent|SymbolIcon.loading">
+            <Style.Animations>
+                <Animation Duration="0:0:2" IterationCount="Infinite">
+                    <KeyFrame KeyTime="0:0:0" >
+                        <Setter Property="RotateTransform.Angle" Value="90" />
+                    </KeyFrame>
+                    <KeyFrame KeyTime="0:0:0.5" >
+                        <Setter Property="RotateTransform.Angle" Value="180" />
+                    </KeyFrame>
+                    <KeyFrame KeyTime="0:0:1" >
+                        <Setter Property="RotateTransform.Angle" Value="270" />
+                    </KeyFrame>
+                    <KeyFrame KeyTime="0:0:1.5" >
+                        <Setter Property="RotateTransform.Angle" Value="360" />
+                    </KeyFrame>
+                    <KeyFrame KeyTime="0:0:2" >
+                        <Setter Property="RotateTransform.Angle" Value="450" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+    </UserControl.Styles>
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <conv:EnumToTextConverter x:Key="EnumToTextConverter" />
+            <conv:ToUpperConverter x:Key="ToUpperConverter" />
+            <conv:StandingClassesConverter x:Key="StandingClassesConverter" />
+            <conv:TierToFillBrushConverter x:Key="TierToFillBrushConverter" />
+            <conv:TierToOutlineBrushConverter x:Key="TierToOutlineBrushConverter" />
+            <conv:TierToOutlineThicknessConverter x:Key="TierToOutlineThicknessConverter" />
+
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <DockPanel LastChildFill="True" Classes="main">
+        <!-- Toolbar Section -->
+        <StackPanel DockPanel.Dock="Top"
+                    Orientation="Horizontal"
+                    Margin="16" 
+                    Spacing="12">
+
+            <!-- Search Box (Design System Section 9) -->
+            <TextBox Text="{Binding SearchText, Mode=TwoWay}"
+                     Width="300"
+                     Watermark="Rechercher un contracteur..."
+                     VerticalAlignment="Center" />
+
+            <!-- Load Button (Design System Section 8) -->
+            <Button Classes="btn principal" Command="{Binding LoadDataCommand}"
+                    Padding="11,5"
+                    CornerRadius="7"
+                    VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                    <fluent:SymbolIcon Classes.loading="{Binding IsLoading}"  Symbol="ArrowSync">
+                        <fluent:SymbolIcon.RenderTransform>
+                            <RotateTransform Angle="90"/>
+                        </fluent:SymbolIcon.RenderTransform>
+                    </fluent:SymbolIcon>
+                    <!-- <PathIcon Classes.loading="{Binding IsLoading}" Data="{StaticResource Icon.Refresh}" -->
+                    <!--           Width="11" Height="11" /> -->
+                    <TextBlock Text="Charger les données"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               FontWeight="500" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
+
+        <!-- Main Content -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding FilteredContractors}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <!-- Contractor Card (Design System Section 15) -->
+                        <Border Classes="reputation-card" beh:DynamicClass.Names="{Binding StateClasses}" Width="300" Margin="10">
+                            <StackPanel Margin="16" Spacing="12">
+                                <!-- Header -->
+                                <TextBlock Classes="bold h1"  Text="{Binding Name}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,4"/>
+
+                                <!-- Status -->
+                                <TextBlock Classes="bold h2 relationship-color"  Text="{Binding FactionStatus, Converter={StaticResource EnumToTextConverter}}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,4"/>
+
+                                <!-- Reputations List -->
+                                <ItemsControl ItemsSource="{Binding Reputations}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel >
+                                                <!-- Scope expander (§17.7) -->
+                                                <Expander IsExpanded="{Binding IsExpanded}"   >
+                                                    <Expander.Header>
+                                                        <StackPanel Spacing="4" Margin="0 5 20 5">
+                                                            <Grid  Margin="20 0 0 0" ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                                                                <TextBlock Text="{Binding DisplayName, Converter={StaticResource ToUpperConverter}}"
+                                                                           Grid.Column="0"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           FontWeight="DemiBold"
+                                                                           ToolTip.Tip="{Binding DisplayName}"
+                                                                           Foreground="{DynamicResource RepScopeLabelBrush}" />
+                                                                <TextBlock
+                                                                           Grid.Column="1"
+                                                                           Foreground="{DynamicResource RepRawValueBrush}">
+                                                                    <TextBlock.Text>
+                                                                        <MultiBinding StringFormat="{}{0} / {1}" >
+                                                                            <Binding Path="CurrentValue" />
+                                                                            <Binding Path="CurrentStanding.Max"  />
+                                                                        </MultiBinding>
+                                                                    </TextBlock.Text>
+                                                                </TextBlock>
+                                                            </Grid>
+                                                            
+                                                            <!-- Progress Bar -->
+                                                            <Border BorderBrush="{Binding CurrentStanding.Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
+                                                                    BorderThickness="{Binding CurrentStanding.Tier, Converter={StaticResource TierToOutlineThicknessConverter}}"
+                                                                    CornerRadius="10"
+                                                                    Margin="-1"
+                                                                    Padding="0 0.5 0 -0.5"
+                                                                    >
+                                                                <ProgressBar Value="{Binding CurrentValue}"
+                                                                             Minimum="{Binding CurrentStanding.Min}"
+                                                                             Maximum="{Binding CurrentStanding.Max}"
+                                                                             ToolTip.Tip="{Binding CurrentValue}"
+                                                                             Height="6"
+                                                                             Foreground="{Binding CurrentStanding.Tier, Converter={StaticResource TierToFillBrushConverter}}"
+                                                                             Background="{DynamicResource BackgroundGrade4Brush}"
+                                                                             Margin="1" >
+                                                                    <ProgressBar.Resources>
+                                                                        <x:Double x:Key="ProgressBarTrackHeight">6</x:Double>
+                                                                        <CornerRadius x:Key="ProgressBarTrackCornerRadius">5</CornerRadius>
+                                                                    </ProgressBar.Resources>
+                                                                </ProgressBar>
+                                                            </Border>
+
+                                                            <!-- Min/Max values -->
+                                                            <DockPanel LastChildFill="False">
+                                                                <TextBlock Classes="demi-bold"
+                                                                           Text="{Binding CurrentStanding.DisplayName}"
+                                                                           Foreground="{DynamicResource RepRankTextBrush}"
+                                                                           DockPanel.Dock="Left" />
+                                                            </DockPanel>
+                                                        </StackPanel>
+                                                    </Expander.Header>
+
+                                                    <StackPanel Spacing="0">
+
+                                                        <!-- Separator before standings list (§17.7) -->
+                                                        <Rectangle Height="0.5"
+                                                                   Fill="{DynamicResource RepSeparatorBrush}"
+                                                                   Margin="0,0,0,0" />
+
+                                                        <!-- Standings list (§17.7) -->
+                                                        <ItemsControl ItemsSource="{Binding StandingList}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border>
+                                                                        <beh:DynamicClass.Names>
+                                                                            <MultiBinding Converter="{StaticResource StandingClassesConverter}">
+                                                                                <Binding />
+                                                                                <Binding Path="DataContext" RelativeSource="{RelativeSource FindAncestor, AncestorType=ItemsControl}" />
+                                                                            </MultiBinding>
+                                                                        </beh:DynamicClass.Names>
+                                                                        <DockPanel LastChildFill="False"
+                                                                                   Margin="0 1">
+                                                                            <!-- Standing dot (§17.4) -->
+                                                                            <Border Width="11" Height="11" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                                    DockPanel.Dock="Left"
+                                                                                    BorderBrush="{Binding Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
+                                                                                    BorderThickness="{Binding Tier, Converter={StaticResource TierToOutlineThicknessConverter}}"
+                                                                                    CornerRadius="10"
+                                                                                    Margin="0,0,8,0"
+                                                                                    Padding="0 0 0 0"
+                                                                            >
+                                                                                <Ellipse Width="7" Height="7"
+                                                                                         Fill="{Binding Tier, Converter={StaticResource TierToFillBrushConverter}}"
+                                                                                         Stroke="{Binding Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
+                                                                                         VerticalAlignment="Center"
+                                                                                          />
+                                                                            </Border>
+                                                                            <!-- Standing name -->
+                                                                            <TextBlock Text="{Binding DisplayName}"
+                                                                                       Classes="standing-name"
+                                                                                       DockPanel.Dock="Left"
+                                                                                       FontWeight="500"
+                                                                                       Foreground="{DynamicResource RepStandingNameBrush}" />
+                                                                            <!-- Standing threshold (§17.8) -->
+                                                                            <TextBlock Text="{Binding Max}"
+                                                                                       Classes="standing-threshold"
+                                                                                       DockPanel.Dock="Right"
+                                                                                       Foreground="{DynamicResource RepStandingLockedThresholdBrush}" />
+                                                                        </DockPanel>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </Expander>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

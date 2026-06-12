@@ -28,7 +28,7 @@ public partial class ShipTabViewModel : PageViewModelBase
     private readonly ILocationService _locationService;
     private readonly IAllianceOrbitalService _allianceOrbitalService;
     public override string Name => "Mon hangar";
-    public override string Icon => nameof(Symbol.Home);
+    public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Home);
     
     [ObservableProperty]
     private Task<IList<SpaceshipModel>>? _spaceships;

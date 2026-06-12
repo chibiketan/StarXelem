@@ -8,6 +8,8 @@
         xmlns:popup="clr-namespace:StarXelem.Views.Popup"
         xmlns:local="clr-namespace:StarXelem"
         xmlns:conv="clr-namespace:StarXelem.Converters"
+        xmlns:primitives="clr-namespace:FluentAvalonia.UI.Controls.Primitives;assembly=FluentAvalonia"
+        xmlns:style="clr-namespace:StarXelem.Style"
         MinWidth="1024"
         MinHeight="768"
         mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
@@ -89,13 +91,7 @@
             IsPaneToggleButtonVisible="True"
             IsBackButtonVisible="False"
             OpenPaneLength="190">
-            <ui:NavigationView.MenuItemTemplate>
-                <DataTemplate DataType="vm:PageViewModelBase">
-                    <ui:NavigationViewItem
-                        Content="{Binding Name}"
-                        IconSource="{Binding Icon}" />
-                </DataTemplate>
-            </ui:NavigationView.MenuItemTemplate>
+
             <ContentControl Content="{Binding CurrentPage}" />
         </ui:NavigationView>
         <popup:MainPopup Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" DataContext="{Binding PopupViewModel}" />

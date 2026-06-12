@@ -4,6 +4,7 @@ using Sc.External.Services.Contacts.V1;
 using Sc.External.Services.Entitlement.V2;
 using Sc.External.Services.Entitygraph.V1;
 using Sc.External.Services.Friends.V1;
+using Sc.External.Services.Reputation.V1;
 using StarXelem.Models;
 using StarXelem.Services;
 
@@ -113,6 +114,11 @@ public class DesignGrpcClientService : IGrpcClientService
     public Task<IList<EntityStowContext>> GetEntityStowContextByParentUrnList(IList<string> urnList, List<uint> list)
     {
         return Task.FromResult<IList<EntityStowContext>>(new List<EntityStowContext>());
+    }
+
+    public Task<List<VersionedReputation>> QueryReputationsAsync()
+    {
+        return Task.FromResult(new List<VersionedReputation>());
     }
 
     public Task<List<BlueprintEntry>> GetBlueprintList()

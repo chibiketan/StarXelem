@@ -24,7 +24,7 @@ public partial class SettingsTabViewModel : PageViewModelBase
     private bool _saved = false;
 
     public override string Name => "Paramètres";
-    public override string Icon => nameof(Symbol.Settings);
+    public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Settings);
 
     public SettingsTabViewModel(ISettingsService settingsService, ILogger<SettingsTabViewModel> logger)
     {

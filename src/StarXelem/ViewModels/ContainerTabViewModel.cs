@@ -13,7 +13,7 @@ public partial class ContainerTabViewModel : PageViewModelBase
     private readonly IGrpcClientService  _clientService;
     private readonly IP4kService _p4KService;
     public override string Name => "Conteneurs";
-    public override string Icon => nameof(Symbol.Folder);
+    public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Folder);
     [ObservableProperty] public Task<IList<InventoryViewModel>>? _inventoryList;
     [ObservableProperty] private bool _isLoading = false;
     [ObservableProperty] private string _treatmentStatus = "";

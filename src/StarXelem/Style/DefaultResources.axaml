@@ -100,6 +100,90 @@
             <SolidColorBrush x:Key="ConnInGameShardTextBrush" Color="#FF534AB7" />
             <SolidColorBrush x:Key="ConnErrorTextBrush" Color="#FFA32D2D" />
 
+            <!-- ═══════════════════════════════════════════════════
+                 Réputation — Couleurs partagées (Color)
+                 ═══════════════════════════════════════════════════ -->
+            <Color x:Key="ReputationSharedViolet">#534AB7</Color>
+            <Color x:Key="ReputationSharedCardBg">#fafafa</Color>
+            <Color x:Key="ReputationSharedBorderLight">#e4e4e4</Color>
+            <Color x:Key="ReputationSharedTeal">#5DCAA5</Color>
+            <Color x:Key="ReputationSharedGreen">#1D9E75</Color>
+            <Color x:Key="ReputationSharedGreenBorder">#401D9E75</Color>
+            <Color x:Key="ReputationSharedGreenBg">#FFE1F5EE</Color>
+            <Color x:Key="ReputationSharedRed">#E24B4A</Color>
+            <Color x:Key="ReputationSharedRedBorder">#33E24B4A</Color>
+            <Color x:Key="ReputationSharedGray2">#FFEBEBEB</Color>
+            <Color x:Key="ReputationSharedGray3">#CCCCCC</Color>
+            <Color x:Key="ReputationSharedGray4">#E4E4E4</Color>
+            <Color x:Key="ReputationSharedGray6">#FFFAFAFA</Color>
+
+            <!-- ═══════════════════════════════════════════════════
+                 Réputation — Paliers (fill barre de progression)
+                 ═══════════════════════════════════════════════════ -->
+            <SolidColorBrush x:Key="RepTier1FillBrush" Color="#FF888888" />
+            <SolidColorBrush x:Key="RepTier2FillBrush" Color="#FF378ADD" />
+            <SolidColorBrush x:Key="RepTier3FillBrush" Color="#FFBA7517" />
+            <SolidColorBrush x:Key="RepTier4FillBrush" Color="{StaticResource ReputationSharedTeal}" />
+            <SolidColorBrush x:Key="RepTier5FillBrush" Color="{StaticResource ReputationSharedTeal}" />
+            <SolidColorBrush x:Key="RepTier6FillBrush" Color="{StaticResource ReputationSharedViolet}" />
+            <SolidColorBrush x:Key="RepTier7FillBrush" Color="#FFBA7517" />
+            <SolidColorBrush x:Key="RepTier7OutlineBrush" Color="#FFBA7517" />
+
+            <!-- Réputation — Track (fond barre) -->
+            <SolidColorBrush x:Key="RepBarTrackBrush" Color="{StaticResource ReputationSharedGray2}" />
+
+            <!-- Réputation — Valeur brute scope (monospace atténué) -->
+            <SolidColorBrush x:Key="RepRawValueBrush" Color="#FF888888" />
+
+            <!-- Réputation — Mode Debug -->
+            <SolidColorBrush x:Key="RepDebugValueBrush" Color="#FF444444" />
+            <SolidColorBrush x:Key="RepDebugRemainingBrush" Color="{StaticResource ReputationSharedTeal}" />
+
+            <!-- Réputation — Ligne rang courant (surlignée) -->
+            <SolidColorBrush x:Key="RepCurrentRankBgBrush" Color="{StaticResource ReputationSharedGreenBg}" />
+            <SolidColorBrush x:Key="RepCurrentRankNameBrush" Color="{StaticResource ReputationSharedTeal}" />
+            <SolidColorBrush x:Key="RepCurrentRankThresholdBrush" Color="#FF444444" />
+            <SolidColorBrush x:Key="RepCurrentRankBonusBrush" Color="{StaticResource ReputationSharedTeal}" />
+
+            <!-- Réputation — Textes des standings (§17.4, §17.7) -->
+            <SolidColorBrush x:Key="RepStandingNameBrush" Color="#FF999999" />
+            <SolidColorBrush x:Key="RepStandingLockedNameBrush" Color="#FF666666" />
+            <SolidColorBrush x:Key="RepStandingLockedThresholdBrush" Color="#FF999999" />
+            <SolidColorBrush x:Key="RepScopeLabelBrush" Color="#FFBBBBBB" />
+            <SolidColorBrush x:Key="RepRankTextBrush" Color="#FF999999" />
+            <SolidColorBrush x:Key="RepRankTextP7Brush" Color="#FF555555" />
+            <SolidColorBrush x:Key="RepSeparatorBrush" Color="#FFECECEC" />
+
+            <!-- Réputation — Texte état relationnel (§17.3) -->
+            <SolidColorBrush x:Key="RepAllyStateTextBrush" Color="#FF0F6E56" />
+            <SolidColorBrush x:Key="RepNeutralStateTextBrush" Color="#FFAAAAAA" />
+            <SolidColorBrush x:Key="RepHostileStateTextBrush" Color="#FFA32D2D" />
+            <SolidColorBrush x:Key="RepNotLoadedStateTextBrush" Color="#FFCCCCCC" />
+
+            <!-- Réputation — Bordure gauche carte par état (§17.3) -->
+            <SolidColorBrush x:Key="RepAllyLeftBorderBrush" Color="#FF1D9E75" />
+            <SolidColorBrush x:Key="RepNeutralLeftBorderBrush" Color="#FFCCCCCC" />
+            <SolidColorBrush x:Key="RepHostileLeftBorderBrush" Color="#FFE24B4A" />
+            <SolidColorBrush x:Key="RepNotLoadedLeftBorderBrush" Color="#FFE0E0E0" />
+
+            <!-- Réputation — Bordure carte par état (§17.3) -->
+            <SolidColorBrush x:Key="RepAllyCardBorderBrush" Color="#401D9E75" />
+            <SolidColorBrush x:Key="RepNeutralCardBorderBrush" Color="#FFE4E4E4" />
+            <SolidColorBrush x:Key="RepHostileCardBorderBrush" Color="#33E24B4A" />
+            <SolidColorBrush x:Key="RepNotLoadedCardBorderBrush" Color="#FFEEEEEE" />
+
+            <!-- Réputation — Fond carte par état (§17.3) -->
+            <SolidColorBrush x:Key="RepAlliedNeutralCardBgBrush" Color="#FFFAFAFA" />
+            <SolidColorBrush x:Key="RepHostileCardBgBrush" Color="#FFF9F3F3" />
+
+            <!-- ═══════════════════════════════════════════════════
+                 Réputation — Toggle Debug
+                 ═══════════════════════════════════════════════════ -->
+            <SolidColorBrush x:Key="RepDebugToggleTrackOffBrush" Color="{StaticResource ReputationSharedGray2}" />
+            <SolidColorBrush x:Key="RepDebugToggleThumbOffBrush" Color="#FFAAAAAA" />
+            <SolidColorBrush x:Key="RepDebugToggleTrackOnBrush" Color="#EEEDFE" />
+            <SolidColorBrush x:Key="RepDebugToggleThumbOnBrush" Color="{StaticResource ReputationSharedViolet}" />
+
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <!-- Pour le thème sombre -->
@@ -117,29 +201,29 @@
             
             <!-- Icon -->
             <SolidColorBrush x:Key="IconBackgroundBrush" Color="#1f8b5cf6" />
-            <SolidColorBrush x:Key="IconStrokeBrush" Color="#a78bfa" />
+            <SolidColorBrush x:Key="IconStrokeBrush" Color="{StaticResource ReputationSharedViolet}" />
             <SolidColorBrush x:Key="IconBorderBrush" Color="#4d8b5cf6" />
-            
+
             <!-- card -->
-            <SolidColorBrush x:Key="CardBackgroundBrush" Color="#08ffffff" />
-            <SolidColorBrush x:Key="CardBorderBrush" Color="#14ffffff" />
-            
+            <SolidColorBrush x:Key="CardBackgroundBrush" Color="{StaticResource ReputationSharedCardBg}" />
+            <SolidColorBrush x:Key="CardBorderBrush" Color="{StaticResource ReputationSharedBorderLight}" />
+
             <!-- boutons -->
             <SolidColorBrush x:Key="ButtonPrimaryHoverBackgroundBrush" Color="#408b5cf6" />
             <SolidColorBrush x:Key="ButtonPrimaryBackgroundBrush" Color="#268b5cf6" />
-            <SolidColorBrush x:Key="ButtonPrimaryForegroundBrush" Color="#a78bfa" />
+            <SolidColorBrush x:Key="ButtonPrimaryForegroundBrush" Color="{StaticResource ReputationSharedViolet}" />
             <SolidColorBrush x:Key="ButtonPrimaryBorderBrush" Color="#598b5cf6" />
             <SolidColorBrush x:Key="ButtonLangHoverBackgroundBrush" Color="#331D9E75" />
-            
+
             <!-- badges -->
-            <SolidColorBrush x:Key="BadgeTiers1ForegroundColor" Color="#a78bfa" />
+            <SolidColorBrush x:Key="BadgeTiers1ForegroundColor" Color="{StaticResource ReputationSharedViolet}" />
             <SolidColorBrush x:Key="BadgeTiers1BackgroundColor" Color="#338b5cf6" />
             <SolidColorBrush x:Key="BadgeTiers1BorderColor" Color="#4d8b5cf6" />
-            <SolidColorBrush x:Key="BadgeUsageForegroundColor" Color="#FF5DCAA5" />
+            <SolidColorBrush x:Key="BadgeUsageForegroundColor" Color="{StaticResource ReputationSharedTeal}" />
             <SolidColorBrush x:Key="BadgeUsageBackgroundColor" Color="#261D9E75" />
             <SolidColorBrush x:Key="BadgeUsageBorderColor" Color="#4d1d9e75" />
             <SolidColorBrush x:Key="BadgeTimerForegroundColor" Color="#73FFFFFF" />
-            <SolidColorBrush x:Key="BadgeTimerBackgroundColor" Color="#0FFFFFFF" />
+            <SolidColorBrush x:Key="BadgeTimerBackgroundColor" Color="{StaticResource ReputationSharedGray2}" />
             <SolidColorBrush x:Key="BadgeTimerBorderColor" Color="#1affffff" />
             <SolidColorBrush x:Key="BadgeArenaCommanderForegroundColor" Color="#FFEF9F27" />
             <SolidColorBrush x:Key="BadgeArenaCommanderBackgroundColor" Color="#1EEF9F27" />
@@ -178,7 +262,7 @@
             <!-- connexion gRPC —Connected -->
             <SolidColorBrush x:Key="ConnConnectedBackgroundBrush" Color="#1A5DCAA5" />
             <SolidColorBrush x:Key="ConnConnectedBorderBrush" Color="#4D5DCAA5" />
-            <SolidColorBrush x:Key="ConnConnectedDotBrush" Color="#FF5DCAA5" />
+            <SolidColorBrush x:Key="ConnConnectedDotBrush" Color="{StaticResource ReputationSharedTeal}" />
 
             <!-- connexion gRPC —InGame -->
             <SolidColorBrush x:Key="ConnInGameBackgroundBrush" Color="#178B5CF6" />
@@ -197,6 +281,96 @@
             <SolidColorBrush x:Key="ConnInGameTextBrush" Color="#FFA78BFA" />
             <SolidColorBrush x:Key="ConnInGameShardTextBrush" Color="#A6A78BFA" />
             <SolidColorBrush x:Key="ConnErrorTextBrush" Color="#FFF09595" />
+
+            <!-- ═══════════════════════════════════════════════════
+                 Réputation — Couleurs partagées (Color)
+                 ═══════════════════════════════════════════════════ -->
+            <Color x:Key="ReputationSharedViolet">#a78bfa</Color>
+            <Color x:Key="ReputationSharedCardBg">#15171D</Color>
+            <Color x:Key="ReputationSharedBorderLight">#14FFFFFF</Color>
+            <Color x:Key="ReputationSharedTeal">#5DCAA5</Color>
+            <Color x:Key="ReputationSharedGreen">#1D9E75</Color>
+            <Color x:Key="ReputationSharedGreenBorder">#591D9E75</Color>
+            <Color x:Key="ReputationSharedGreenBg">#261D9E75</Color>
+            <Color x:Key="ReputationSharedRed">#E24B4A</Color>
+            <Color x:Key="ReputationSharedRedBorder">#4DE24B4A</Color>
+            <Color x:Key="ReputationSharedGray2">#0FFFFFFF</Color>
+            <Color x:Key="ReputationSharedGray3">#30FFFFFF</Color>
+            <Color x:Key="ReputationSharedGray4">#17FFFFFF</Color>
+            <Color x:Key="ReputationSharedGray6">#05FFFFFF</Color>
+
+            <!-- ═══════════════════════════════════════════════════
+                 Réputation — État relationnel (bordure gauche carte)
+                 ═══════════════════════════════════════════════════ -->
+            <SolidColorBrush x:Key="RepAllyLeftBorderBrush" Color="{StaticResource ReputationSharedGreen}" />
+            <SolidColorBrush x:Key="RepNeutralLeftBorderBrush" Color="{StaticResource ReputationSharedGray3}" />
+            <SolidColorBrush x:Key="RepHostileLeftBorderBrush" Color="{StaticResource ReputationSharedRed}" />
+            <SolidColorBrush x:Key="RepNotLoadedLeftBorderBrush" Color="{StaticResource ReputationSharedBorderLight}" />
+
+            <!-- Réputation — Bordure carte par état -->
+            <SolidColorBrush x:Key="RepAllyCardBorderBrush" Color="{StaticResource ReputationSharedGreenBorder}" />
+            <SolidColorBrush x:Key="RepNeutralCardBorderBrush" Color="{StaticResource ReputationSharedGray4}" />
+            <SolidColorBrush x:Key="RepHostileCardBorderBrush" Color="{StaticResource ReputationSharedRedBorder}" />
+            <!-- Non chargé = Neutre même valeurs -->
+            <SolidColorBrush x:Key="RepNotLoadedCardBorderBrush" Color="{StaticResource ReputationSharedGray4}" />
+
+            <!-- Réputation — Fond carte par état -->
+            <SolidColorBrush x:Key="RepAlliedNeutralCardBgBrush" Color="{StaticResource ReputationSharedGray6}" />
+            <SolidColorBrush x:Key="RepHostileCardBgBrush" Color="#08E24B4A" />
+            <!-- Non chargé = même fond que Allié/Neutre, avec opacity 0.55 appliquée en XAML -->
+
+            <!-- Réputation — Badge texte état -->
+            <SolidColorBrush x:Key="RepNeutralStateTextBrush" Color="#40FFFFFF" />
+            <SolidColorBrush x:Key="RepNotLoadedStateTextBrush" Color="#1FFFFFFF" />
+
+            <!-- ═══════════════════════════════════════════════════
+                 Réputation — Paliers (fill barre de progression)
+                 ═══════════════════════════════════════════════════ -->
+            <SolidColorBrush x:Key="RepTier1FillBrush" Color="#FF555555" />
+            <SolidColorBrush x:Key="RepTier2FillBrush" Color="#FF85B7EB" />
+            <SolidColorBrush x:Key="RepTier3FillBrush" Color="#FFEF9F27" />
+            <SolidColorBrush x:Key="RepTier4FillBrush" Color="{StaticResource ReputationSharedTeal}" />
+            <SolidColorBrush x:Key="RepTier5FillBrush" Color="{StaticResource ReputationSharedGreen}" />
+            <SolidColorBrush x:Key="RepTier6FillBrush" Color="{StaticResource ReputationSharedViolet}" />
+            <SolidColorBrush x:Key="RepTier7FillBrush" Color="#FFEF9F27" />
+            <SolidColorBrush x:Key="RepTier7OutlineBrush" Color="#FFEF9F27" />
+
+            <!-- Réputation — Track (fond barre) -->
+            <SolidColorBrush x:Key="RepBarTrackBrush" Color="{StaticResource ReputationSharedGray2}" />
+
+            <!-- Réputation — Valeur brute scope (monospace atténué) -->
+            <SolidColorBrush x:Key="RepRawValueBrush" Color="#47FFFFFF" />
+
+            <!-- Réputation — Mode Debug -->
+            <SolidColorBrush x:Key="RepDebugValueBrush" Color="#80FFFFFF" />
+            <SolidColorBrush x:Key="RepDebugRemainingBrush" Color="{StaticResource ReputationSharedTeal}" />
+
+            <!-- Réputation — Ligne rang courant (surlignée) -->
+            <SolidColorBrush x:Key="RepCurrentRankBgBrush" Color="{StaticResource ReputationSharedGreenBg}" />
+            <SolidColorBrush x:Key="RepCurrentRankNameBrush" Color="{StaticResource ReputationSharedTeal}" />
+            <SolidColorBrush x:Key="RepCurrentRankThresholdBrush" Color="#80FFFFFF" />
+            <SolidColorBrush x:Key="RepCurrentRankBonusBrush" Color="{StaticResource ReputationSharedTeal}" />
+
+            <!-- Réputation — Textes des standings (§17.4, §17.7) -->
+            <SolidColorBrush x:Key="RepStandingNameBrush" Color="#B3FFFFFF" />
+            <SolidColorBrush x:Key="RepStandingLockedNameBrush" Color="#80FFFFFF" />
+            <SolidColorBrush x:Key="RepStandingLockedThresholdBrush" Color="#47FFFFFF" />
+            <SolidColorBrush x:Key="RepScopeLabelBrush" Color="#33FFFFFF" />
+            <SolidColorBrush x:Key="RepRankTextBrush" Color="#59FFFFFF" />
+            <SolidColorBrush x:Key="RepRankTextP7Brush" Color="#B3FFFFFF" />
+            <SolidColorBrush x:Key="RepSeparatorBrush" Color="#0FFFFFFF" />
+
+            <!-- Réputation — Texte état relationnel (§17.3) -->
+            <SolidColorBrush x:Key="RepAllyStateTextBrush" Color="#FF5DCAA5" />
+            <SolidColorBrush x:Key="RepHostileStateTextBrush" Color="#FFF09595" />
+
+            <!-- ═══════════════════════════════════════════════════
+                 Réputation — Toggle Debug
+                 ═══════════════════════════════════════════════════ -->
+            <SolidColorBrush x:Key="RepDebugToggleTrackOffBrush" Color="{StaticResource ReputationSharedGray2}" />
+            <SolidColorBrush x:Key="RepDebugToggleThumbOffBrush" Color="#35FFFFFF" />
+            <SolidColorBrush x:Key="RepDebugToggleTrackOnBrush" Color="#24A78BFA" />
+            <SolidColorBrush x:Key="RepDebugToggleThumbOnBrush" Color="{StaticResource ReputationSharedViolet}" />
 
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>

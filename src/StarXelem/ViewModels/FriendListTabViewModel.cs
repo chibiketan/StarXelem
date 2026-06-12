@@ -19,7 +19,7 @@ public partial class FriendListTabViewModel : PageViewModelBase
 {
     private readonly IGrpcClientService  _clientService;
     public override string Name => "Amis";
-    public override string Icon => nameof(Symbol.People);
+    public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.People);
     
     [ObservableProperty] private Task<List<FriendViewModel>?>? _friendList;
     [ObservableProperty] private bool _isLoading = false;

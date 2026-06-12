@@ -36,6 +36,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<SendToOrbitalAlliancePopupContentViewModel>();
         services.AddTransient<FleetSyncPopupContentViewModel>();
         services.AddTransient<ItemsSyncPopupContentViewModel>();
+        services.AddTransient<ReputationTabViewModel>();
 
         if (isDesignMode)
         {
@@ -58,6 +59,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IBlueprintMappingService, BlueprintMappingService>();
         services.AddSingleton<IMissionMappingService, MissionMappingService>();
         services.AddSingleton<ISettingsService, RegistrySettingsService>();
+        services.AddSingleton<IReputationService, ReputationService>();
 
         // Service API externe pour la communication avec Alliance Orbital (profil utilisateur)
         services.AddSingleton<IAllianceOrbitalService, AllianceOrbitalService>();

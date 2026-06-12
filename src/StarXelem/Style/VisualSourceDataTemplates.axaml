@@ -1,0 +1,67 @@
+<!--
+    VisualSourceDataTemplates.axaml
+    ================================
+    DataTemplates globales pour le dispatch automatique du ContentPresenter
+    vers le bon rendu selon le type de IVisualSourceViewModel.
+
+    À inclure dans App.axaml :
+        <Application.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceInclude Source="avares://StarXelem/Controls/VisualSource/VisualSourceDataTemplates.axaml"/>
+                </ResourceDictionary.MergedDictionaries>
+            </ResourceDictionary>
+        </Application.Resources>
+
+    IMPORTANT : Les DataTemplates avec DataType sont scopées à leur ResourceDictionary.
+    Pour qu'elles soient applicables globalement (ContentPresenter hors VisualSourceControl),
+    elles DOIVENT être dans Application.Resources ou dans une fenêtre parente.
+-->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:conv="clr-namespace:StarXelem.Converters">
+
+    <!-- =======================================================================
+         DESIGN TOKENS — Ressources de thème pour le VisualSourceControl
+         Définis ici en tant que DynamicResource pour réagir au changement de thème.
+         ======================================================================= -->
+
+    <!-- Background du fond avatar (semi-transparent, neutre) -->
+    <!-- Dark : #14FFFFFF / Light : #FFF0F0F0 — voir design system §17.2 -->
+    <SolidColorBrush x:Key="VisualSource.DefaultBackground"
+                     Color="{DynamicResource VisualSource.DefaultBackgroundColor}"/>
+
+    <!-- Bordure de l'avatar -->
+    <SolidColorBrush x:Key="VisualSource.DefaultBorder"
+                     Color="{DynamicResource VisualSource.DefaultBorderColor}"/>
+
+    <!-- Texte des initiales quand aucune couleur n'est forcée -->
+    <SolidColorBrush x:Key="VisualSource.DefaultInitialsForeground"
+                     Color="{DynamicResource VisualSource.DefaultInitialsForegroundColor}"/>
+
+    <!-- Loading overlay -->
+    <SolidColorBrush x:Key="VisualSource.LoadingBackground"  Color="#1AFFFFFF"/>
+    <SolidColorBrush x:Key="VisualSource.SpinnerForeground"  Color="#FFA78BFA"/>
+
+    <!-- Thème Dark -->
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Dark">
+            <!-- Avatar §17.2 -->
+            <Color x:Key="VisualSource.DefaultBackgroundColor">#14FFFFFF</Color>
+            <Color x:Key="VisualSource.DefaultBorderColor">#1AFFFFFF</Color>
+            <Color x:Key="VisualSource.DefaultInitialsForegroundColor">#66FFFFFF</Color>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+            <Color x:Key="VisualSource.DefaultBackgroundColor">#FFF0F0F0</Color>
+            <Color x:Key="VisualSource.DefaultBorderColor">#FFE0E0E0</Color>
+            <Color x:Key="VisualSource.DefaultInitialsForegroundColor">#FFAAAAAA</Color>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Default">
+            <!-- Fallback = Dark -->
+            <Color x:Key="VisualSource.DefaultBackgroundColor">#14FFFFFF</Color>
+            <Color x:Key="VisualSource.DefaultBorderColor">#1AFFFFFF</Color>
+            <Color x:Key="VisualSource.DefaultInitialsForegroundColor">#66FFFFFF</Color>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+</ResourceDictionary>
