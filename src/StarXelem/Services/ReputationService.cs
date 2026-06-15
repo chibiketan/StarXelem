@@ -128,6 +128,11 @@ public class ReputationService : IReputationService
                 reputation.CurrentValue = playerRep.Reputation.Score;
                 reputation.CurrentStanding = reputation.StandingList.FirstOrDefault(s => s.Min <= playerRep.Reputation.Score && playerRep.Reputation.Score <= s.Max);
             }
+            else
+            {
+                // Pas de standing qui march, ça ne sans pas bon
+                _logger.LogWarning("No scope found for scope {scope} with id {standingId}", playerRep.Reputation.Scope, playerRep.Reputation.StandingsId);
+            }
         }
 
         foreach (var contractor in contractorMap.Values)
