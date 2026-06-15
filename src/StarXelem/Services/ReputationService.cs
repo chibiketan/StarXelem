@@ -68,7 +68,7 @@ public class ReputationService : IReputationService
                 var scope = new ReputationModel
                 {
                     Category = scopeContext.scope.scopeName,
-                    DisplayName = await _p4kService.GetLocaleValue(scopeContext.scope.scopeName)
+                    DisplayName = await _p4kService.GetLocaleValue(scopeContext.scope.displayName)
                 };
 
                 contractor.Reputations.Add(scope);
@@ -114,7 +114,7 @@ public class ReputationService : IReputationService
                 var scope = new ReputationModel
                 {
                     Category = p.scope.scopeName,
-                    DisplayName = await _p4kService.GetLocaleValue(p.scope.scopeName)
+                    DisplayName = await _p4kService.GetLocaleValue(p.scope.displayName)
                 };
 
                 if (p.scope.standingMap != null)
