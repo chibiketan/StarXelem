@@ -383,7 +383,7 @@ public static class DesignData
 
                         new() { Name = "Security_Rank5",        DisplayName = "Senior Agent",   Min = 300000, Max = 1599999, Tier = 7},
 
-                        new() { Name = "Security_Rank6",        DisplayName = "Master Agent",   Min = 1600000, Max = 5199999, Tier = 7},
+                        new() { Name = "Security_Rank6",        DisplayName = "Master Agent et un texte beaucoup trop long à afficher",   Min = 1600000, Max = 5199999, Tier = 7},
 
                     }
                 },

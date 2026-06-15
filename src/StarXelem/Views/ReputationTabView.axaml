@@ -305,15 +305,13 @@
                                                                                 <Binding Path="DataContext" RelativeSource="{RelativeSource FindAncestor, AncestorType=ItemsControl}" />
                                                                             </MultiBinding>
                                                                         </beh:DynamicClass.Names>
-                                                                        <DockPanel LastChildFill="False"
-                                                                                   Margin="0 1">
+                                                                        <Grid Margin="0 1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                                                                             <!-- Standing dot (§17.4) -->
                                                                             <Border Width="11" Height="11" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                                    DockPanel.Dock="Left"
+                                                                                    Grid.Column="0"
                                                                                     BorderBrush="{Binding Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
                                                                                     BorderThickness="{Binding Tier, Converter={StaticResource TierToOutlineThicknessConverter}}"
                                                                                     CornerRadius="10"
-                                                                                    Margin="0,0,8,0"
                                                                                     Padding="0 0 0 0"
                                                                             >
                                                                                 <Ellipse Width="7" Height="7"
@@ -324,16 +322,19 @@
                                                                             </Border>
                                                                             <!-- Standing name -->
                                                                             <TextBlock Text="{Binding DisplayName}"
+                                                                                       Grid.Column="1"
                                                                                        Classes="standing-name"
-                                                                                       DockPanel.Dock="Left"
+                                                                                       ToolTip.Tip="{Binding DisplayName}"
+                                                                                       HorizontalAlignment="Stretch"
+                                                                                       TextTrimming="CharacterEllipsis"
                                                                                        FontWeight="500"
                                                                                        Foreground="{DynamicResource RepStandingNameBrush}" />
                                                                             <!-- Standing threshold (§17.8) -->
                                                                             <TextBlock Text="{Binding Max}"
                                                                                        Classes="standing-threshold"
-                                                                                       DockPanel.Dock="Right"
+                                                                                       Grid.Column="2"
                                                                                        Foreground="{DynamicResource RepStandingLockedThresholdBrush}" />
-                                                                        </DockPanel>
+                                                                        </Grid>
                                                                     </Border>
                                                                 </DataTemplate>
                                                             </ItemsControl.ItemTemplate>
