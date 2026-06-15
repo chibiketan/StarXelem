@@ -69,6 +69,7 @@ public static class DesignData
         P4kShipTabViewModel.Ships.Add(new P4kShipModel
         {
             EntityClass = null,
+            Guid = "test_guid",
             Name = "Test ship",
             TechnicalName = "test_ship",
             Manufacturer = "Test Manufacturer"

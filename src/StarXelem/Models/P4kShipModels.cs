@@ -6,6 +6,7 @@ public class P4kShipModel
 {
     public required string Name { get; set; }
     public required string TechnicalName { get; set; }
+    public required string Guid { get; set; }
     public required EntityClassDefinition EntityClass { get; init; }
     public string? Manufacturer { get; set; }
     public string Tags { get; set; }

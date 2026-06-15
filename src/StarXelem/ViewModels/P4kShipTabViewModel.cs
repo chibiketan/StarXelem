@@ -9,6 +9,7 @@ using FluentAvalonia.UI.Controls;
 using StarBreaker.Common;
 using StarBreaker.DataCore;
 using StarBreaker.DataCoreGenerated;
+using StarXelem.Data;
 using StarXelem.Models;
 using StarXelem.Services;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,7 @@ namespace StarXelem.ViewModels;
 public partial class P4kShipTabViewModel : PageViewModelBase
 {
     private readonly IP4kService _p4kService;
+    private readonly ILocalDatabaseService _localDatabaseService;
     private readonly ILogger<P4kShipTabViewModel> _logger;
     private bool _isLoaded = false;
     private List<P4kShipModel> _allShips = new();
@@ -27,6 +29,7 @@ public partial class P4kShipTabViewModel : PageViewModelBase
 
     [ObservableProperty] private ObservableCollection<P4kShipModel> _ships = new();
     [ObservableProperty] private P4kShipModel? _selectedShip;
+    [ObservableProperty] private ObservableCollection<MissionEntity> _missionsForSelectedShip = new();
     [ObservableProperty] private ObservableCollection<P4kShipComponentModel> _components = new();
     [ObservableProperty] private bool _isLoading = false;
     [ObservableProperty] private bool _showOnlyVisible = true;
@@ -41,9 +44,10 @@ public partial class P4kShipTabViewModel : PageViewModelBase
     [ObservableProperty] private String _tagList = "";
     private Dictionary<String, CigGuid> _componentGuidMap = new(); 
 
-    public P4kShipTabViewModel(IP4kService p4kService, ILogger<P4kShipTabViewModel> logger)
+    public P4kShipTabViewModel(IP4kService p4kService, ILocalDatabaseService localDatabaseService, ILogger<P4kShipTabViewModel> logger)
     {
         _p4kService = p4kService;
+        _localDatabaseService = localDatabaseService;
         _logger = logger;
     }
 
@@ -94,17 +98,18 @@ public partial class P4kShipTabViewModel : PageViewModelBase
                                     && !technicalName.EndsWith("_indestructible", StringComparison.InvariantCultureIgnoreCase)
                                     && !technicalName.EndsWith("_pu", StringComparison.InvariantCultureIgnoreCase);
                 
-                    shipList.Add(new P4kShipModel
-                    {
-                        Name = displayName,
-                        TechnicalName = technicalName,
-                        EntityClass = entityDef,
-                        Manufacturer = manufacturer,
-                        Tags = tags,
-                        // Pour être visible il doit être "inclus" et avoir un entitlement
-                        // IsVisible = null != entitlementEntityParams && eaEntityDataParams?.inclusionMode == EAEntityInclusionMode.ReadyToInclude
-                        IsVisible = isVisible
-                    });
+                        shipList.Add(new P4kShipModel
+                        {
+                            Name = displayName,
+                            TechnicalName = technicalName,
+                            Guid = record.RecordId.ToString(),
+                            EntityClass = entityDef,
+                            Manufacturer = manufacturer,
+                            Tags = tags,
+                            // Pour être visible il doit être "inclus" et avoir un entitlement
+                            // IsVisible = null != entitlementEntityParams && eaEntityDataParams?.inclusionMode == EAEntityInclusionMode.ReadyToInclude
+                            IsVisible = isVisible
+                        });
                 }
                 
                 // Traitement des composants
@@ -190,6 +195,7 @@ public partial class P4kShipTabViewModel : PageViewModelBase
 
     partial void OnSelectedShipChanged(P4kShipModel? value)
     {
+        MissionsForSelectedShip.Clear();
         var prefix = new Dictionary<string, string>()
         {
             { "hardpoint_cooler", "cooler" },
@@ -204,9 +210,23 @@ public partial class P4kShipTabViewModel : PageViewModelBase
             { "missile", "missile" },
         };
 
-        Components.Clear();
         if (value == null) return;
 
+        // Update missions for selected ship
+        _ = Task.Run(async () =>
+        {
+            var missions = await _localDatabaseService.GetMissionsForShipAsync(value.Guid).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                MissionsForSelectedShip.Clear();
+                foreach (var mission in missions)
+                {
+                    MissionsForSelectedShip.Add(mission);
+                }
+            });
+        });
+
+        Components.Clear();
         // Utiliser le displayIcon présent dans (EntityUIDisplayParams)StaticEntityClassData[0].displayIcon ?
         var defaultLoadout = value.EntityClass.Components.OfType<SEntityComponentDefaultLoadoutParams>().FirstOrDefault();
         var quantumdriveList = new List<P4kShipComponentModel>(); 

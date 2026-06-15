@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.Logging;
 using StarBreaker.DataCoreGenerated;
+using StarXelem.Data;
 using StarXelem.Services;
 
 namespace StarXelem.ViewModels;
@@ -17,6 +18,7 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
     private readonly ILogger<MissionsTabViewModel> _logger;
     private readonly IP4kService _p4kService;
     private readonly IMissionMappingService _missionMappingService;
+    private readonly ILocalDatabaseService _localDatabaseService;
     public override string Name => "Missions";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Target);
 
@@ -27,22 +29,43 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
     [ObservableProperty] private List<MissionContractorItemViewModel> _contractorList = [];
     [ObservableProperty] private MissionContractorItemViewModel selectedContractor;
     [ObservableProperty] private MissionItemViewModel selectedMission;
+    [ObservableProperty] private ObservableCollection<ShipEntity> _shipsForSelectedMission = new();
     [ObservableProperty] private List<MissionCategoryItemViewModel> _categoryList = [];
     [ObservableProperty] private MissionCategoryItemViewModel selectedCategory;
 
 
-    public MissionsTabViewModel(IP4kService p4KService, ILogger<MissionsTabViewModel> logger, IMissionMappingService missionMappingService)
+    public MissionsTabViewModel(IP4kService p4KService, ILogger<MissionsTabViewModel> logger, IMissionMappingService missionMappingService, ILocalDatabaseService localDatabaseService)
     {
         _p4kService = p4KService;
         _logger = logger;
         // Service responsable de la transformation des données Contrat -> ViewModel (injecté)
         _missionMappingService = missionMappingService;
+        _localDatabaseService = localDatabaseService;
     }
 
     protected override Task OnFirstShowAsync()
     {
         // Précharger si nécessaire plus tard
         return Task.CompletedTask;
+    }
+
+    partial void OnSelectedMissionChanged(MissionItemViewModel? value)
+    {
+        ShipsForSelectedMission.Clear();
+        if (value == null) return;
+
+        _ = Task.Run(async () =>
+        {
+            var ships = await _localDatabaseService.GetShipsForMissionAsync(value.DebugName).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                ShipsForSelectedMission.Clear();
+                foreach (var ship in ships)
+                {
+                    ShipsForSelectedMission.Add(ship);
+                }
+            });
+        });
     }
 
     [RelayCommand]
