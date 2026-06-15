@@ -145,20 +145,11 @@
         </Style>
         <Style Selector="fluent|SymbolIcon.loading">
             <Style.Animations>
-                <Animation Duration="0:0:2" IterationCount="Infinite">
-                    <KeyFrame KeyTime="0:0:0" >
+                <Animation Duration="0:0:1" IterationCount="Infinite">
+                    <KeyFrame Cue="0%">
                         <Setter Property="RotateTransform.Angle" Value="90" />
                     </KeyFrame>
-                    <KeyFrame KeyTime="0:0:0.5" >
-                        <Setter Property="RotateTransform.Angle" Value="180" />
-                    </KeyFrame>
-                    <KeyFrame KeyTime="0:0:1" >
-                        <Setter Property="RotateTransform.Angle" Value="270" />
-                    </KeyFrame>
-                    <KeyFrame KeyTime="0:0:1.5" >
-                        <Setter Property="RotateTransform.Angle" Value="360" />
-                    </KeyFrame>
-                    <KeyFrame KeyTime="0:0:2" >
+                    <KeyFrame Cue="100%" >
                         <Setter Property="RotateTransform.Angle" Value="450" />
                     </KeyFrame>
                 </Animation>

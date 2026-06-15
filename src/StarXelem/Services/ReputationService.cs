@@ -102,6 +102,51 @@ public class ReputationService : IReputationService
                 scope.CurrentStanding = scope.StandingList.FirstOrDefault();
             }
 
+            // Assurer que les scopes d'hostilité et d'alliance sont chargés même s'ils ne sont pas dans scopeContextList
+            var additionalParams = new List<RelationStandingParams>();
+            if (factionReputation.hostilityParams != null) additionalParams.Add(factionReputation.hostilityParams);
+            if (factionReputation.alliedParams != null) additionalParams.Add(factionReputation.alliedParams);
+
+            foreach (var p in additionalParams)
+            {
+                if (p.scope == null || contractor.Reputations.Any(r => r.Category == p.scope.scopeName)) continue;
+
+                var scope = new ReputationModel
+                {
+                    Category = p.scope.scopeName,
+                    DisplayName = await _p4kService.GetLocaleValue(p.scope.scopeName)
+                };
+
+                if (p.scope.standingMap != null)
+                {
+                    for (int standingIndex = 0; standingIndex < p.scope.standingMap.standings.Count(); standingIndex++)
+                    {
+                        var standing = p.scope.standingMap.standings[standingIndex];
+                        if (standing == null) continue;
+
+                        scope.StandingList.Add(new StandingModel
+                        {
+                            Name = standing.name,
+                            DisplayName = await _p4kService.GetLocaleValue(standing.displayName),
+                            Min = standing.minReputation,
+                            Tier = Math.Min(standingIndex + 1, 7)
+                        });
+                    }
+
+                    for (int i = scope.StandingList.Count - 2; i >= 0; --i)
+                    {
+                        scope.StandingList[i].Max = scope.StandingList[i + 1].Min - 1;
+                    }
+                    if (scope.StandingList.Count > 0)
+                    {
+                        scope.StandingList[^1].Max = p.scope.standingMap.reputationCeiling;
+                    }
+                    
+                    scope.CurrentStanding = scope.StandingList.FirstOrDefault();
+                }
+                contractor.Reputations.Add(scope);
+            }
+
             contractorMap.Add(contractor.Geid, contractor);
         }
 
