@@ -117,255 +117,43 @@ public class DesignP4kService : IP4kService
 
     public Task<List<DataCoreTypedRecord>> GetAllContractGenerator()
     {
-        return Task.FromResult(new List<DataCoreTypedRecord>
-        {
-            new DataCoreTypedRecord("TEST", "TEST", new CigGuid(), new ContractGenerator
-            {
-                generators =
-                [
-                    new ContractGeneratorHandler_List
-                    {
-                        debugName = "my_test",
-                        contractParams = new ContractParamOverrides
-                        {
-                            stringParamOverrides =
-                            [
-                                new ContractStringParam
-                                {
-                                    param = ContractStringParamType.Contractor,
-                                    value = "TestContractor",
-                                    selfId = default
-                                }
-                            ],
-                            boolParamOverrides =
-                            [
-                            ],
-                            intParamOverrides =
-                            [
-                            ],
-                            propertyTagReplacement =
-                            [
-                            ],
-                            propertyOverrides =
-                            [
-                            ],
-                            modifierOverrides =
-                            [
-                            ],
-                            missionTypeOverride = null,
-                            overridePhaseMissionDetailsDisplayInfo =
-                            [
-                            ],
-                            selfId = default
-                        },
-                        required_active_scenarios =
-                        [
-                        ],
-                        notForRelease = false,
-                        workInProgress = false,
-                        contracts =
-                        [
-                            new Contract
-                            {
-                                id = default,
-                                notForRelease = false,
-                                workInProgress = false,
-                                debugName = "debug_contract_name",
-                                template = null,
-                                paramOverrides = new ContractParamOverrides
-                                {
-                                    stringParamOverrides =
-                                    [
-                                        new ContractStringParam
-                                        {
-                                            param = ContractStringParamType.Title,
-                                            value = "TestContractTitle",
-                                            selfId = default
-                                        },
-                                        new ContractStringParam
-                                        {
-                                            param = ContractStringParamType.Description,
-                                            value = "TestContractDescription",
-                                            selfId = default
-                                        }
-                                    ],
-                                    boolParamOverrides =
-                                    [
-                                    ],
-                                    intParamOverrides =
-                                    [
-                                    ],
-                                    propertyTagReplacement =
-                                    [
-                                    ],
-                                    propertyOverrides =
-                                    [
-                                    ],
-                                    modifierOverrides =
-                                    [
-                                    ],
-                                    missionTypeOverride = null,
-                                    overridePhaseMissionDetailsDisplayInfo =
-                                    [
-                                    ],
-                                    selfId = default
-                                },
-                                subContracts =
-                                [
-                                ],
-                                additionalPrerequisites =
-                                [
-                                ],
-                                generationParams = null,
-                                contractLifeTime = null,
-                                contractPlugins =
-                                [
-                                ],
-                                contractResults = new ContractResults
-                                {
-                                    contractResults =
-                                    [
-                                        new ContractResult_Item
-                                        {
-                                            entityClass = null,
-                                            amount = 2,
-                                            sendToPlayerHomeLocation = false,
-                                            awardOnlyToMissionOwner = false,
-                                            targetLocation = default,
-                                            notification = null,
-                                            missionResults =
-                                            [
-                                            ],
-                                            selfId = default
-                                        },
-                                        new ContractResult_Item
-                                        {
-                                            entityClass = null,
-                                            amount = 1,
-                                            sendToPlayerHomeLocation = false,
-                                            awardOnlyToMissionOwner = true,
-                                            targetLocation = default,
-                                            notification = null,
-                                            missionResults =
-                                            [
-                                            ],
-                                            selfId = default
-                                        },
-                                        new ContractResult_Item
-                                        {
-                                            entityClass = null,
-                                            amount = 9999,
-                                            sendToPlayerHomeLocation = true,
-                                            awardOnlyToMissionOwner = true,
-                                            targetLocation = default,
-                                            notification = null,
-                                            missionResults =
-                                            [
-                                            ],
-                                            selfId = default
-                                        },
-                                        new ContractResult_Item
-                                        {
-                                            entityClass = null,
-                                            amount = 42,
-                                            sendToPlayerHomeLocation = true,
-                                            awardOnlyToMissionOwner = false,
-                                            targetLocation = default,
-                                            notification = null,
-                                            missionResults =
-                                            [
-                                            ],
-                                            selfId = default
-                                        },
-                                        new ContractResult_ItemsWeighting
-                                        {
-                                            awardOnlyToMissionOwner = true,
-                                            targetLocation = default,
-                                            notification = null,
-                                            missionResults =
-                                            [
-                                            ],
-                                            itemAwardStructure =
-                                            [
-                                                new ItemAwardWeightings
-                                                {
-                                                    weighting = 0,
-                                                    awards =
-                                                    [
-                                                        new ItemAwardEntityClass
-                                                        {
-                                                            amountToAward = 33,
-                                                            entityClass = null,
-                                                            selfId = default
-                                                        }
-                                                    ],
-                                                    selfId = default
-                                                }
-                                            ],
-                                            selfId = default
-                                        }
-                                    ],
-                                    contractBuyInAmount = 0,
-                                    timeToComplete = 0,
-                                    difficulty = null,
-                                    selfId = default
-                                },
-                                required_active_scenarios =
-                                [
-                                ],
-                                selfId = default
-                            }
-                        ],
-                        defaultAvailability = new ContractAvailability
-                        {
-                            prerequisites =
-                            [
-                            ],
-                            notifyOnAvailable = false,
-                            maxPlayersPerInstance = 0,
-                            onceOnly = false,
-                            availableInPrison = false,
-                            canReacceptAfterAbandoning = false,
-                            abandonedCooldownTime = 0,
-                            abandonedCooldownTimeVariation = 0,
-                            canReacceptAfterFailing = false,
-                            hasPersonalCooldown = false,
-                            personalCooldownTime = 0,
-                            personalCooldownTimeVariation = 0,
-                            hideInMobiGlas = false,
-                            selfId = default
-                        },
-                        selfId = default
-                    }
-                ],
-                required_active_scenarios =
-                [
-                ],
-                selfId = default
-            })
-        });
+        return Task.FromResult(new List<DataCoreTypedRecord>());
     }
-
+    
     public Task<string?> GetEntityClassName(EntityClassDefinition? entityClass)
     {
         return Task.FromResult("GetEntityClassName")!;
     }
-
+    
     public Task<DataCoreTypedRecord> GetRecordWithFullHistory(CigGuid recordId)
     {
         return Task.FromResult(new DataCoreTypedRecord("toto", "toto", default, null));
     }
-
+    
+    public Task<TagDatabase> GetTagDatabase()
+    {
+        return Task.FromResult(new TagDatabase
+        {
+            selfId = default,
+            tags = []
+        });
+    }
+    
     public Task<DataCoreTypedRecord?> GetRecordWithSpecificDepth(CigGuid recordId, int depth)
     {
-        return Task.FromResult<DataCoreTypedRecord?>(new DataCoreTypedRecord("toto", "toto", default, null));   
+        return Task.FromResult(new DataCoreTypedRecord("toto", "toto", default, null));   
     }
-
+    
+    public Task<List<DataCoreTypedRecord>> EnsureRecordsDepthAsync(IEnumerable<DataCoreTypedRecord> records, int depth)
+    {
+        return Task.FromResult(new List<DataCoreTypedRecord>());
+    }
+    
     public Task<List<DataCoreTypedRecord>> GetAllFactionReputations()
     {
         return Task.FromResult(new List<DataCoreTypedRecord>());  
     }
-
+    
     private static P4kEntry[] GetFakeEntries() =>
     [
         new(@"Data\entry1", 69, 69, 0, false, 123, 0xffff, 0xdeadbeef),

@@ -552,6 +552,17 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<TagDatabase> GetTagDatabase()
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+        var cacheEntry = _EntityClassDict.Values.First(r => r.Record.Data is TagDatabase);
+        
+        // TODO Crash à 10, comment augmenter cette limite ???
+        await UpdateCacheRecordWithDepth(cacheEntry, 15).ConfigureAwait(false);
+        return (TagDatabase)cacheEntry.Record.Data;
+    }
+
     public async Task<DataCoreTypedRecord?> GetRecordWithSpecificDepth(CigGuid recordId, int depth)
     {
         await LoadDatabaseIfNeeded().ConfigureAwait(false);
@@ -633,6 +644,25 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         {
             UpdateState(P4kFileLoadState.CacheLoaded);
         }
+    }
+
+    public async Task<List<DataCoreTypedRecord>> EnsureRecordsDepthAsync(IEnumerable<DataCoreTypedRecord> records, int depth)
+    {
+        var tasks = records.AsParallel().Select(async record =>
+        {
+            if (_entityClassGuidDict.TryGetValue(record.RecordId, out var cacheEntry))
+            {
+                await UpdateCacheRecordWithDepth(cacheEntry, depth).ConfigureAwait(false);
+
+                return cacheEntry.Record;
+            }
+
+            return record;
+        })
+        .ToList();
+
+        await Task.WhenAll(tasks).ConfigureAwait(false);
+        return tasks.Select(t => t.Result).ToList();
     }
 
     private async Task UpdateCacheRecordWithDepth(CacheEntry cacheEntry, int newDepth)

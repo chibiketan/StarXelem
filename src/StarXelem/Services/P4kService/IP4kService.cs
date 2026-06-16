@@ -56,6 +56,12 @@ public interface IP4kService : INotifyPropertyChanged
     Task<DataCoreTypedRecord> GetRecordWithFullHistory(CigGuid recordId);
     
     /// <summary>
+    /// Retourne la base de données des tags
+    /// </summary>
+    /// <returns></returns>
+    Task<TagDatabase> GetTagDatabase();
+    
+    /// <summary>
     /// Récupère un enregistrement avec un minimum une profondeur de données spécifique
     /// </summary>
     /// <param name="recordId">ID de l'enregistrement à récupérer</param>
@@ -64,4 +70,6 @@ public interface IP4kService : INotifyPropertyChanged
     Task<DataCoreTypedRecord?> GetRecordWithSpecificDepth(CigGuid recordId, int depth);
 
     Task<List<DataCoreTypedRecord>> GetAllFactionReputations();
+    Task<List<DataCoreTypedRecord>> EnsureRecordsDepthAsync(IEnumerable<DataCoreTypedRecord> records, int depth);
 }
+
