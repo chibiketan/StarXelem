@@ -284,7 +284,7 @@ public class BlueprintRecipeCostEntity
     public string CostName { get; set; } = string.Empty;
 
     public string? ResourceRef { get; set; }
-    public float? ResourceAmount { get; set; }
+    public decimal? ResourceAmount { get; set; }
     public string? ItemEntityClassRef { get; set; }
     public int? ItemCount { get; set; }
     public int? MinQuality { get; set; }

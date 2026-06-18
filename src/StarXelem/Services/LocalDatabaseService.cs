@@ -20,6 +20,8 @@ public class LocalDatabaseService : ILocalDatabaseService
     private readonly IP4kService _p4kService;
     private readonly ILogger<LocalDatabaseService> _logger;
     private readonly string _dbPath;
+    private CancellationTokenSource _rebuildCts = new();
+    private Task? _rebuildTask;
 
     public LocalDatabaseService(IP4kService p4kService, ILogger<LocalDatabaseService> logger)
     {
@@ -52,14 +54,46 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     public async Task RebuildDbAsync()
     {
+        // Annule la reconstruction en cours si elle existe
+        if (_rebuildTask != null && !_rebuildTask.IsCompleted)
+        {
+            _logger.LogWarning("Reconstruction déjà en cours, annulation...");
+            _rebuildCts.Cancel();
+            try
+            {
+                await _rebuildTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("Reconstruction précédente annulée");
+            }
+        }
+
+        // Nouveau token de cancellation
+        _rebuildCts = new CancellationTokenSource();
+        var cancellationToken = _rebuildCts.Token;
+
+        _rebuildTask = RebuildDbCoreAsync(cancellationToken);
+        try
+        {
+            await _rebuildTask.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Reconstruction de la BDD annulée");
+        }
+    }
+
+    private async Task RebuildDbCoreAsync(CancellationToken cancellationToken)
+    {
         _logger.LogInformation("Rebuilding local database at {Path}", _dbPath);
         _entityClassToGuid.Clear();
 
         using var db = new StarXelemDbContext(GetOptions());
         
         // 1. Wipe existing data
-        await db.Database.EnsureDeletedAsync().ConfigureAwait(false);
-        await db.Database.EnsureCreatedAsync().ConfigureAwait(false);
+        await db.Database.EnsureDeletedAsync(cancellationToken).ConfigureAwait(false);
+        await db.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
         
         // 2. Populate Manufacturers & Ships
         var ships = new List<ShipEntity>();
@@ -74,6 +108,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         
         start.Stop();
         _logger.LogInformation("Tag hierarchy populated in {Elapsed}ms.", start.ElapsedMilliseconds);
+        cancellationToken.ThrowIfCancellationRequested();
         
         start = Stopwatch.StartNew();
         await foreach (var record in _p4kService.GetAllEntityClassDefinition(1).ConfigureAwait(false))
@@ -172,11 +207,13 @@ public class LocalDatabaseService : ILocalDatabaseService
         _logger.LogInformation("Ships and manufacturers processed in {Elapsed}ms.", start.ElapsedMilliseconds);
         db.Manufacturers.AddRange(manufacturers);
         db.Ships.AddRange(ships);
-        await db.SaveChangesAsync().ConfigureAwait(false);
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         _logger.LogInformation("Inserted {Count} manufacturer into the database.", manufacturers.Count);
         _logger.LogInformation("Inserted {Count} ship into the database.", ships.Count);
         db.ShipTags.AddRange(shipTags);
-        await db.SaveChangesAsync().ConfigureAwait(false);
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         _logger.LogInformation("Inserted {Count} liaison ship <=> tag into the database.", shipTags.Count);
         
         // 3. Populate Contract Generators
@@ -227,7 +264,8 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
 
         db.ContractGenerators.AddRange(contractGenerators);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         start.Stop();
         _logger.LogInformation("Inserted {Count} contract generators into the database.", contractGenerators.Count);
 
@@ -236,22 +274,24 @@ public class LocalDatabaseService : ILocalDatabaseService
         int missionCount = 0;
         foreach (var record in contracts)
         {
-            missionCount += await ProcessContractForDb(record, db, record.RecordName);
+            cancellationToken.ThrowIfCancellationRequested();
+            missionCount += await ProcessContractForDb(record, db, record.RecordName, cancellationToken);
         }
         start.Stop();
         _logger.LogInformation("Missions and requirements processed in {Elapsed}ms.", start.ElapsedMilliseconds);
         _logger.LogInformation("Inserted {Count} missions into the database.", missionCount);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
+        cancellationToken.ThrowIfCancellationRequested();
         start = Stopwatch.StartNew();
-        await ProcessMissionShipSpawnShipsAsync(db);
+        await ProcessMissionShipSpawnShipsAsync(db, cancellationToken);
         start.Stop();
         _logger.LogInformation("Mission spawn rules processed in {Elapsed}ms.", start.ElapsedMilliseconds);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Database rebuild completed.");
     }
 
-    private async Task<int> ProcessContractForDb(DataCoreTypedRecord record, StarXelemDbContext db, string generatorName)
+    private async Task<int> ProcessContractForDb(DataCoreTypedRecord record, StarXelemDbContext db, string generatorName, CancellationToken cancellationToken)
     {
         if (record.Data is not ContractGenerator generator || generator.generators == null) return 0;
         int missionsAdded = 0;
@@ -259,6 +299,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         
         foreach (var handler in generator.generators)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (handler == null) continue;
 
             var contractsToProcess = new List<ContractBase>();
@@ -444,7 +485,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
     }
 
-    private async Task ProcessMissionShipSpawnShipsAsync(StarXelemDbContext db)
+    private async Task ProcessMissionShipSpawnShipsAsync(StarXelemDbContext db, CancellationToken cancellationToken)
     {
         long toto = 0;
         string[] excludedPath = ["/Spawning/", "/SkillDefinitions/", "/CargoManifest/", "/CrewManifest/"];
@@ -456,6 +497,7 @@ public class LocalDatabaseService : ILocalDatabaseService
 
         await foreach (var spawnRule in shipSpawnRules.ConfigureAwait(false))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             List<String> posTags = spawnRule.Tags.Where(t => t.IsIncluded).Select(t => t.Tag!).Where(t => !excludedPath.Any(ep => t.Path.Contains(ep))).Select(t => t.SelfId).ToList();
             List<String> negTags = spawnRule.Tags.Where(t => !t.IsIncluded).Select(t => t.Tag!.SelfId).ToList();;
             // Filtrer les tags à filtrer
@@ -762,7 +804,7 @@ public class LocalDatabaseService : ILocalDatabaseService
 
                 case ContractResult_Item item:
                     {
-                        var entityName = item.entityClass?.selfId.ToString();
+                        var entityName = await _p4kService.GetEntityClassName(item.entityClass) ?? "Inconnu";
                         db.MissionRewards.Add(new MissionRewardEntity
                         {
                             MissionId = missionId,
@@ -818,8 +860,40 @@ public class LocalDatabaseService : ILocalDatabaseService
                     }
                     break;
 
-                case ContractResult_CalculatedReputation _:
-                case ContractResult_CompletionTags _:
+                case ContractResult_CalculatedReputation reputation:
+                    {
+                        var scopeName = await _p4kService.GetLocaleValue(reputation.reputationScope?.displayName);
+                        var factionName = await _p4kService.GetLocaleValue(reputation.factionReputation?.displayName);
+                        db.MissionRewards.Add(new MissionRewardEntity
+                        {
+                            MissionId = missionId,
+                            RewardType = "ContractResult_CalculatedReputation",
+                            DisplayValue = $"Réputation: {scopeName} → {factionName}",
+                            IsCalculated = false
+                        });
+                        count++;
+                    }
+                    break;
+
+                case ContractResult_CompletionTags completionTags:
+                    {
+                        var tagNames = new List<string>();
+                        foreach (var ct in completionTags.completionTags)
+                        {
+                            var tag = await _p4kService.GetLocaleValue(ct.tag?.tagName);
+                            tagNames.Add($"'{ct.tag?.tagName}'");
+                        }
+                        db.MissionRewards.Add(new MissionRewardEntity
+                        {
+                            MissionId = missionId,
+                            RewardType = "ContractResult_CompletionTags",
+                            DisplayValue = $"Tags: {string.Join(", ", tagNames)}",
+                            IsCalculated = false
+                        });
+                        count++;
+                    }
+                    break;
+
                 case ContractResult_JournalEntry _:
                 case ContractResult_RefundBuyIn _:
                     {
@@ -1060,7 +1134,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         {
             case CraftingCost_Resource resourceCost:
                 {
-                    var quantity = (resourceCost.quantity as SStandardCargoUnit)?.standardCargoUnits ?? 0f;
+                    float rawQuantity = (resourceCost.quantity as SStandardCargoUnit)?.standardCargoUnits ?? 0f;
 
                     db.BlueprintRecipeCosts.Add(new BlueprintRecipeCostEntity
                     {
@@ -1068,7 +1142,7 @@ public class LocalDatabaseService : ILocalDatabaseService
                         CostType = "Resource",
                         CostName = costName,
                         ResourceRef = resourceCost.resource?.selfId.ToString() ?? "unknown",
-                        ResourceAmount = quantity
+                        ResourceAmount = (decimal)rawQuantity
                     });
                 }
                 break;
