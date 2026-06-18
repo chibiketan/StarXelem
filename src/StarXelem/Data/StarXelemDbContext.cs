@@ -17,6 +17,13 @@ public class StarXelemDbContext : DbContext
     public DbSet<TagEntity> Tags => Set<TagEntity>();
     public DbSet<ShipTagEntity> ShipTags => Set<ShipTagEntity>();
     public DbSet<ContractGeneratorEntity> ContractGenerators => Set<ContractGeneratorEntity>();
+    public DbSet<MissionRewardEntity> MissionRewards => Set<MissionRewardEntity>();
+    public DbSet<MissionBlueprintPoolEntity> MissionBlueprintPools => Set<MissionBlueprintPoolEntity>();
+    public DbSet<MissionBlueprintEntryEntity> MissionBlueprintEntries => Set<MissionBlueprintEntryEntity>();
+    public DbSet<BlueprintEntity> Blueprints => Set<BlueprintEntity>();
+    public DbSet<BlueprintRecipeCostEntity> BlueprintRecipeCosts => Set<BlueprintRecipeCostEntity>();
+
+    public DbSet<BlueprintModifierEntity> BlueprintModifiers => Set<BlueprintModifierEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -89,6 +96,40 @@ public class StarXelemDbContext : DbContext
             .HasOne(m => m.Generator)
             .WithMany(cg => cg.Missions)
             .HasForeignKey(m => m.GeneratorId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Rewards
+        modelBuilder.Entity<MissionRewardEntity>()
+            .HasOne(r => r.Mission)
+            .WithMany()
+            .HasForeignKey(r => r.MissionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Blueprint pools
+        modelBuilder.Entity<MissionBlueprintPoolEntity>()
+            .HasOne(p => p.Mission)
+            .WithMany()
+            .HasForeignKey(p => p.MissionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MissionBlueprintEntryEntity>()
+            .HasOne(e => e.Pool)
+            .WithMany(p => p.Entries)
+            .HasForeignKey(e => e.PoolId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Blueprint costs
+        modelBuilder.Entity<BlueprintRecipeCostEntity>()
+            .HasOne(c => c.Blueprint)
+            .WithMany(b => b.Costs)
+            .HasForeignKey(c => c.BlueprintId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Blueprint modifiers
+        modelBuilder.Entity<BlueprintModifierEntity>()
+            .HasOne(m => m.Blueprint)
+            .WithMany(b => b.Modifiers)
+            .HasForeignKey(m => m.BlueprintId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

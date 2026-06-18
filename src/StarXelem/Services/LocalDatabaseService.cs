@@ -311,6 +311,7 @@ public class LocalDatabaseService : ILocalDatabaseService
                 }
 
                 await ProcessSpawnableShipsAsync(c, db, mission.Id);
+                await ProcessMissionRewards(mission.Id, c, db);
             }
             
             handlerIndex++;
@@ -672,5 +673,487 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
         
         return null;
+    }
+
+    /// <summary>
+    /// Extracts and stores mission rewards into the local database.
+    /// For aUEC rewards, computes the actual value using the difficulty curve formula.
+    /// For blueprint rewards, recursively processes pools and blueprint details.
+    /// </summary>
+    private async Task<int> ProcessMissionRewards(string missionId, dynamic contract, StarXelemDbContext db)
+    {
+                var count = 0;
+
+                if (contract.contractResults?.contractResults == null)
+                    return 0;
+
+                var resultArray = contract.contractResults.contractResults as ContractResultBase[];
+                foreach (var resultBase in resultArray ?? Array.Empty<ContractResultBase>())
+        {
+            if (resultBase == null)
+                continue;
+
+            switch (resultBase)
+            {
+                case ContractResult_CalculatedReward calculatedReward:
+                    {
+                         var computed = await ComputeAUECReward(contract, calculatedReward);
+                        if (computed > 0)
+                        {
+                            db.MissionRewards.Add(new MissionRewardEntity
+                            {
+                                MissionId = missionId,
+                                RewardType = "ContractResult_CalculatedReward",
+                                DisplayValue = string.Format("{0:N0} aUEC", computed),
+                                IsCalculated = true
+                            });
+                            count++;
+                        }
+                    }
+                    break;
+
+                case BlueprintRewards blueprintRewards:
+                    {
+                        var poolRef = blueprintRewards.blueprintPool?.selfId.ToString();
+                        if (!string.IsNullOrEmpty(poolRef))
+                        {
+                            var poolEntity = new MissionBlueprintPoolEntity
+                            {
+                                MissionId = missionId,
+                                BlueprintPoolRef = poolRef
+                            };
+                            db.MissionBlueprintPools.Add(poolEntity);
+
+                            db.MissionRewards.Add(new MissionRewardEntity
+                            {
+                                MissionId = missionId,
+                                RewardType = "BlueprintRewards",
+                                DisplayValue = $"Blueprint pool (chance: {blueprintRewards.chance * 100}%)",
+                                IsCalculated = false
+                            });
+                            count++;
+
+                            // Ingest blueprints from the pool
+                            if (blueprintRewards.blueprintPool?.blueprintRewards != null)
+                            {
+                                await ProcessBlueprintPoolsAsync(blueprintRewards.blueprintPool, db, poolEntity);
+                            }
+                        }
+                    }
+                    break;
+
+                case ContractResult_Reward reward:
+                    {
+                        var contractReward = reward.contractReward;
+                        if (contractReward != null)
+                        {
+                            var currencyName = Enum.GetName(typeof(CurrencyType), contractReward.currencyType);
+                            db.MissionRewards.Add(new MissionRewardEntity
+                            {
+                                MissionId = missionId,
+                                RewardType = "ContractResult_Reward",
+                                DisplayValue = string.Format("{0:N0} {1}", contractReward.reward, currencyName),
+                                IsCalculated = false
+                            });
+                            count++;
+                        }
+                    }
+                    break;
+
+                case ContractResult_Item item:
+                    {
+                        var entityName = item.entityClass?.selfId.ToString();
+                        db.MissionRewards.Add(new MissionRewardEntity
+                        {
+                            MissionId = missionId,
+                            RewardType = "ContractResult_Item",
+                            DisplayValue = string.Format("{0} x {1}", entityName, item.amount),
+                            IsCalculated = false
+                        });
+                        count++;
+                    }
+                    break;
+
+                case ContractResult_BadgeAward badgeAward:
+                    {
+                        db.MissionRewards.Add(new MissionRewardEntity
+                        {
+                            MissionId = missionId,
+                            RewardType = "ContractResult_BadgeAward",
+                            DisplayValue = badgeAward.badgeToAward.ToString(),
+                            IsCalculated = false
+                        });
+                        count++;
+                    }
+                    break;
+
+                case ContractResult_ScenarioProgress scenarioProgress:
+                    {
+                        db.MissionRewards.Add(new MissionRewardEntity
+                        {
+                            MissionId = missionId,
+                            RewardType = "ContractResult_ScenarioProgress",
+                            DisplayValue = string.Format("{0:N0} points", scenarioProgress.PointsToAward),
+                            IsCalculated = false
+                        });
+                        count++;
+                    }
+                    break;
+
+                case ContractResult_LegacyReputation legacyRep:
+                    {
+                        var amounts = legacyRep.contractResultReputationAmounts;
+                        var rewardValue = amounts?.reward?.reputationAmount ?? 0;
+                        var scopeName = await _p4kService.GetLocaleValue(amounts?.reputationScope?.displayName);
+                        var factionName = await _p4kService.GetLocaleValue(amounts?.factionReputation?.displayName);
+
+                        db.MissionRewards.Add(new MissionRewardEntity
+                        {
+                            MissionId = missionId,
+                            RewardType = "ContractResult_LegacyReputation",
+                            DisplayValue = string.Format("{0:N0} points de réputation {1} pour {2}", rewardValue, scopeName, factionName),
+                            IsCalculated = false
+                        });
+                        count++;
+                    }
+                    break;
+
+                case ContractResult_CalculatedReputation _:
+                case ContractResult_CompletionTags _:
+                case ContractResult_JournalEntry _:
+                case ContractResult_RefundBuyIn _:
+                    {
+                        var type = resultBase.GetType().Name;
+                        db.MissionRewards.Add(new MissionRewardEntity
+                        {
+                            MissionId = missionId,
+                            RewardType = type,
+                            DisplayValue = type,
+                            IsCalculated = false
+                        });
+                        count++;
+                    }
+                    break;
+            }
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Computes the aUEC reward using the difficulty curve formula.
+    /// Formula: Math.Exp((score - midpoint) * steepness) * i * (time / 60), then rounded to nearest 250.
+    /// </summary>
+     private async Task<float> ComputeAUECReward(ContractBase contract, ContractResult_CalculatedReward _cr)
+    {
+        try
+        {
+            if (contract.contractResults.difficulty is null)
+                return 0f;
+
+            // Load sc_default.xml to get uecCurve parameters
+            var scDefaultRecord = await _p4kService.GetRecordWithSpecificDepth(new CigGuid("330ce5d3-fb01-4f82-8708-3154a3a4b78a"), 1).ConfigureAwait(false);
+            var uecCurve = ((scDefaultRecord?.Data as GameMode)?.subsumptionMissionModule as SSubsumptionMission)?.uecCurve;
+            if (uecCurve == null)
+                return 0f;
+
+            double i = uecCurve.i;
+            double steepness = uecCurve.k;
+            double midpoint = uecCurve.m;
+
+            int mechanicalSkill = (int)contract.contractResults.difficulty.mechanicalSkill;
+            int mentalLoad = (int)contract.contractResults.difficulty.mentalLoad;
+            int riskOfLoss = (int)contract.contractResults.difficulty.riskOfLoss;
+            int gameKnowledge = (int)contract.contractResults.difficulty.gameKnowledge;
+
+            double mechWeight = contract.contractResults.difficulty.difficultyProfile?.mechanicalSkillWeight ?? 1.0;
+            double mentalWeight = contract.contractResults.difficulty.difficultyProfile?.mentalLoadWeight ?? 1.0;
+            double riskWeight = contract.contractResults.difficulty.difficultyProfile?.riskOfLossWeight ?? 1.0;
+            double gameWeight = contract.contractResults.difficulty.difficultyProfile?.gameKnowledgeWeight ?? 1.0;
+
+            double difficultyScore =
+                (mechanicalSkill + 1.0) * mechWeight +
+                (mentalLoad + 1.0) * mentalWeight +
+                (riskOfLoss + 1.0) * riskWeight +
+                (gameKnowledge + 1.0) * gameWeight;
+
+            var timeToComplete = contract.contractResults.timeToComplete;
+
+            double rewardRaw = Math.Exp((difficultyScore - midpoint) * steepness) * i * (timeToComplete / 60.0);
+            double aUEC = Math.Round((rewardRaw / 250.0)) * 250;
+
+            int rounded = Math.Max(0, (int)Math.Round(aUEC));
+            return rounded;
+        }
+        catch
+        {
+            return 0f;
+        }
+    }
+
+    /// <summary>
+    /// Cached blueprint records to avoid redundant P4K lookups.
+    /// Key: blueprint selfId, Value: BlueprintEntity (or null if failed).
+    /// </summary>
+    private readonly Dictionary<string, BlueprintEntity> _blueprintCache = new();
+
+    /// <summary>
+    /// Processes blueprint pools recursively: creates pool entries, blueprint details, costs, results, and modifiers.
+    /// </summary>
+    private async Task ProcessBlueprintPoolsAsync(dynamic blueprintPool, StarXelemDbContext db, MissionBlueprintPoolEntity poolEntity)
+    {
+        if (blueprintPool?.blueprintRewards == null)
+            return;
+
+        foreach (var blueprintReward in (blueprintPool.blueprintRewards as dynamic[]) ?? Array.Empty<dynamic>())
+        {
+            if (blueprintReward == null) continue;
+
+            var bpRecord = blueprintReward.blueprintRecord;
+            if (bpRecord?.selfId == null) continue;
+
+            var bpId = bpRecord.selfId.ToString();
+            var entry = new MissionBlueprintEntryEntity
+            {
+                Pool = poolEntity,
+                BlueprintRef = bpId,
+                Weight = blueprintReward.weight
+            };
+            db.MissionBlueprintEntries.Add(entry);
+
+            // Already ingested?
+            if (_blueprintCache.ContainsKey(bpId))
+                continue;
+
+            var blueprintEntity = await IngestBlueprintAsync(bpId, db);
+            if (blueprintEntity != null)
+            {
+                _blueprintCache[bpId] = blueprintEntity;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Ingests blueprint details from P4K: category, rarity, name.
+    /// </summary>
+    private async Task<BlueprintEntity?> IngestBlueprintAsync(string blueprintId, StarXelemDbContext db)
+    {
+        var bpRecord = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(blueprintId), 4);
+        var b = bpRecord?.Data as CraftingBlueprintRecord;
+
+        if (b?.blueprint is not CraftingBlueprint craftingBlueprint)
+        {
+            _logger.LogWarning("Failed to get blueprint record for {BlueprintId}", blueprintId);
+            return null;
+        }
+
+        var blueprintName = string.IsNullOrEmpty(craftingBlueprint.blueprintName)
+            ? "Unknown"
+            : await _p4kService.GetLocaleValue(craftingBlueprint.blueprintName) ?? "Unknown";
+
+        // Determine process type and output entity
+        var processType = string.Empty;
+        var outputEntityClassRef = (string?)null;
+        if (craftingBlueprint.processSpecificData is CraftingProcess_Creation creation)
+        {
+            processType = "Creation";
+            outputEntityClassRef = creation.entityClass?.selfId.ToString();
+        }
+
+        var blueprintEntity = new BlueprintEntity
+        {
+            SelfId = blueprintId,
+            BlueprintName = blueprintName,
+            CategoryRef = craftingBlueprint.category?.selfId.ToString() ?? "",
+            CategoryName = "Unknown",
+            ProcessType = processType,
+            OutputEntityClassRef = outputEntityClassRef
+        };
+
+        // TODO: Resolve category name from BlueprintCategoryDatabase record
+
+        // Extract craft duration from costs
+        var craftingRecipe = craftingBlueprint.tiers.OfType<CraftingBlueprintTier>().FirstOrDefault()?.recipe as CraftingRecipe;
+
+        if (craftingRecipe?.costs is CraftingRecipeCosts costs)
+        {
+            db.Blueprints.Add(blueprintEntity);
+            await db.SaveChangesAsync();
+
+            await IngestRecipeCostsAsync(blueprintEntity, costs, db);
+        }
+        else
+        {
+            db.Blueprints.Add(blueprintEntity);
+            await db.SaveChangesAsync();
+        }
+
+        return blueprintEntity;
+    }
+
+    /// <summary>
+    /// Ingests mandatory and optional costs from a recipe.
+    /// </summary>
+    private async Task IngestRecipeCostsAsync(BlueprintEntity blueprintEntity, CraftingRecipeCosts costs, StarXelemDbContext db)
+    {
+        var mandatoryCost = costs.mandatoryCost as CraftingCost_Select;
+        if (mandatoryCost == null)
+        {
+            _logger.LogWarning("Mandatory cost is not CraftingCost_Select for blueprint {BlueprintId}", blueprintEntity.SelfId);
+            return;
+        }
+
+        // Process optional costs separately
+        if (costs.optionalCosts != null)
+        {
+            ProcessOptionalCosts(blueprintEntity, costs.optionalCosts, db);
+        }
+
+        foreach (var craftingCostOption in mandatoryCost.options)
+        {
+            if (craftingCostOption is not CraftingCost_Select costSelect)
+                continue;
+
+            var categoryName = await _p4kService.GetLocaleValue(costSelect.nameInfo.displayName) ?? "Unknown";
+
+            // Process materials within this cost category
+            foreach (var costOption in costSelect.options)
+            {
+                ProcessCostOption(blueprintEntity, costOption, categoryName, db);
+            }
+
+            // Process stat modifiers
+            var modifiers = new List<BlueprintModifierEntity>();
+            foreach (var modifierContext in costSelect.context.OfType<CraftingCostContext_ResultGameplayPropertyModifiers>())
+            {
+                modifiers.AddRange(await ExtractModifierEntitiesAsync(blueprintEntity, modifierContext));
+            }
+
+            db.BlueprintModifiers.AddRange(modifiers);
+        }
+    }
+
+    /// <summary>
+    /// Processes optional cost entries.
+    /// </summary>
+    private void ProcessOptionalCosts(BlueprintEntity blueprintEntity, dynamic[] optionalEntries, StarXelemDbContext db)
+    {
+        foreach (var opt in optionalEntries)
+        {
+            if (opt is not CraftingOptionalEntry optionalEntry)
+                continue;
+
+            var cost = optionalEntry.optionalCost;
+            ProcessCostOption(blueprintEntity, cost, "Optional", db);
+        }
+    }
+
+    /// <summary>
+    /// Processes a single cost option (resource or item) and creates corresponding DB entities.
+    /// </summary>
+    private void ProcessCostOption(BlueprintEntity blueprintEntity, dynamic? costOption, string costName, StarXelemDbContext db)
+    {
+        if (costOption == null)
+            return;
+
+        switch (costOption)
+        {
+            case CraftingCost_Resource resourceCost:
+                {
+                    var quantity = (resourceCost.quantity as SStandardCargoUnit)?.standardCargoUnits ?? 0f;
+
+                    db.BlueprintRecipeCosts.Add(new BlueprintRecipeCostEntity
+                    {
+                        BlueprintId = blueprintEntity.SelfId,
+                        CostType = "Resource",
+                        CostName = costName,
+                        ResourceRef = resourceCost.resource?.selfId.ToString() ?? "unknown",
+                        ResourceAmount = quantity
+                    });
+                }
+                break;
+
+            case CraftingCost_Item itemCost:
+                {
+                    db.BlueprintRecipeCosts.Add(new BlueprintRecipeCostEntity
+                    {
+                        BlueprintId = blueprintEntity.SelfId,
+                        CostType = "Item",
+                        CostName = costName,
+                        ItemEntityClassRef = itemCost.entityClass?.selfId.ToString() ?? "unknown",
+                        ItemCount = itemCost.quantity,
+                        MinQuality = itemCost.minQuality
+                    });
+                }
+                break;
+
+            default:
+                _logger.Log(LogLevel.Warning, 0, "Unknown cost option type for blueprint {BlueprintId}: {Type}", new object?[] { blueprintEntity.SelfId, costOption.GetType().FullName }, null, default);
+                break;
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Ingests recipe results from a recipe.
+    /// </summary>
+
+
+    /// <summary>
+    /// Extracts modifier entities from a modifier context.
+    /// </summary>
+    private async Task<List<BlueprintModifierEntity>> ExtractModifierEntitiesAsync(
+        BlueprintEntity blueprintEntity, 
+        CraftingCostContext_ResultGameplayPropertyModifiers modifierContext)
+    {
+        var modifiers = new List<BlueprintModifierEntity>();
+
+        var modifierList = modifierContext.gameplayPropertyModifiers as CraftingGameplayPropertyModifiers_List;
+        if (modifierList?.gameplayPropertyModifiers == null)
+            return modifiers;
+
+        foreach (var rawModifier in modifierList.gameplayPropertyModifiers)
+        {
+            var modifier = rawModifier as CraftingGameplayPropertyModifierCommon;
+            if (modifier == null)
+            {
+                _logger.LogWarning("Modifier not castable for blueprint {BlueprintId}: {Type}", (object)blueprintEntity.SelfId, rawModifier?.GetType().FullName);
+                continue;
+            }
+
+            var propertyName = await _p4kService.GetLocaleValue(modifier.gameplayPropertyRecord?.propertyName);
+
+            var linearRanges = modifier.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_Linear>().ToList();
+            if (linearRanges is { Count: > 0 })
+            {
+                modifiers.Add(new BlueprintModifierEntity
+                {
+                    BlueprintId = blueprintEntity.SelfId,
+                    ContextType = "ResultGameplayPropertyModifiers",
+                    ParameterValue = $"Linear:{propertyName}:[{linearRanges[0].modifierAtStart}-{linearRanges[^1].modifierAtEnd}]"
+                });
+            }
+            else
+            {
+                var additiveRanges = modifier.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_LinearIntegerAdditive>().ToList();
+                if (additiveRanges is { Count: > 0 })
+                {
+                    modifiers.Add(new BlueprintModifierEntity
+                    {
+                        BlueprintId = blueprintEntity.SelfId,
+                        ContextType = "ResultGameplayPropertyModifiers",
+                        ParameterValue = $"Additive:{propertyName}:[{additiveRanges[0].startQuality}-{additiveRanges[^1].endQuality}]:{additiveRanges[0].additiveModifierAtStart}"
+                    });
+                }
+                else
+                {
+                    _logger.LogWarning("No recognized modifier range for property {Name} on blueprint {BlueprintId}", 
+                        propertyName, blueprintEntity.SelfId);
+                    continue;
+                }
+            }
+        }
+
+        return modifiers;
     }
 }

@@ -177,3 +177,133 @@ public class MissionShipSpawnShipEntity
     [ForeignKey("ShipGuid")]
     public virtual ShipEntity? Ship { get; set; }
 }
+
+/* ---- Reward entities ---- */
+
+/// <summary>
+/// Polymorphic reward entry for a mission. <c>RewardType</c> is a simple string discriminator
+/// (e.g. "CalculatedReward", "LegacyReputation", "BaseReward", "BadgeAward", "CompletionTags", "Item").
+/// <c>DisplayValue</c> holds the human-readable value extracted from the game data.
+/// </summary>
+public class MissionRewardEntity
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Required]
+    public string MissionId { get; set; } = string.Empty;
+    [ForeignKey("MissionId")]
+    public virtual MissionEntity? Mission { get; set; }
+
+    /// <summary>Type discriminator – ContractResult subclass name (e.g. "CalculatedReward", "LegacyReputation").</summary>
+    public string RewardType { get; set; } = string.Empty;
+
+    /// <summary>Human-readable display string (e.g. "2500 aUEC", "150 réputation Foxwell").</summary>
+    public string DisplayValue { get; set; } = string.Empty;
+
+    /// <summary>True for aUEC (CalculatedReward) where the value is computed, not fixed.</summary>
+    public bool IsCalculated { get; set; }
+}
+
+/* ---- Blueprint pool linkage — mission → pool → entries ---- */
+
+/// <summary>Represents a BlueprintPoolRecord referenced by a mission contract.</summary>
+public class MissionBlueprintPoolEntity
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Required]
+    public string MissionId { get; set; } = string.Empty;
+    [ForeignKey("MissionId")]
+    public virtual MissionEntity? Mission { get; set; }
+
+    /// <summary>BlueprintPoolRecord selfId.</summary>
+    public string BlueprintPoolRef { get; set; } = string.Empty;
+
+    public virtual ICollection<MissionBlueprintEntryEntity> Entries { get; set; } = new List<MissionBlueprintEntryEntity>();
+}
+
+/// <summary>One BlueprintReward entry inside a BlueprintPoolRecord.</summary>
+public class MissionBlueprintEntryEntity
+{
+    [Key]
+    public int Id { get; set; }
+
+    [ForeignKey("Pool")]
+    public int PoolId { get; set; }
+    public virtual MissionBlueprintPoolEntity Pool { get; set; } = new MissionBlueprintPoolEntity();
+    public string BlueprintRef { get; set; } = string.Empty;
+
+    public float Weight { get; set; }
+
+    public float ChanceToAppear { get; set; }
+}
+
+/* ---- Blueprint detail storage ---- */
+
+/// <summary>Full blueprint definition: recipe, costs, results, and modifiers.</summary>
+public class BlueprintEntity
+{
+    [Key]
+    public string SelfId { get; set; } = string.Empty;
+
+    public string BlueprintName { get; set; } = string.Empty;
+
+    /// <summary>BlueprintCategoryRecord selfId.</summary>
+    public string CategoryRef { get; set; } = string.Empty;
+
+    /// <summary>Denormalized category name from blueprintcategorydatabase.xml.</summary>
+    public string CategoryName { get; set; } = string.Empty;
+
+    /// <summary>Process type: "Creation", "Dismantle", "Upgrade", "Refining", "Repair".</summary>
+    public string ProcessType { get; set; } = string.Empty;
+
+    /// <summary>entityClass selfId from CraftingProcess_Creation / _Upgrade (nullable for Dismantle/Refining).</summary>
+    public string? OutputEntityClassRef { get; set; }
+
+    public virtual ICollection<BlueprintRecipeCostEntity> Costs { get; set; } = new List<BlueprintRecipeCostEntity>();
+    public virtual ICollection<BlueprintModifierEntity> Modifiers { get; set; } = new List<BlueprintModifierEntity>();
+}
+
+/// <summary>One cost (resource or item) or a Select-option inside a blueprint recipe.</summary>
+public class BlueprintRecipeCostEntity
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Required]
+    public string BlueprintId { get; set; } = string.Empty;
+    [ForeignKey("BlueprintId")]
+    public virtual BlueprintEntity? Blueprint { get; set; }
+
+    /// <summary>"Resource", "Item", or "Select".</summary>
+    public string CostType { get; set; } = string.Empty;
+
+    /// <summary>For Select costs: nameInfo (e.g. "FRAME", "ELECTRONICS").</summary>
+    public string CostName { get; set; } = string.Empty;
+
+    public string? ResourceRef { get; set; }
+    public float? ResourceAmount { get; set; }
+    public string? ItemEntityClassRef { get; set; }
+    public int? ItemCount { get; set; }
+    public int? MinQuality { get; set; }
+}
+
+/// <summary>Modifier context applied to a cost (quantity multipliers, composition inclusion, gameplay property modifiers).</summary>
+public class BlueprintModifierEntity
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Required]
+    public string BlueprintId { get; set; } = string.Empty;
+    [ForeignKey("BlueprintId")]
+    public virtual BlueprintEntity? Blueprint { get; set; }
+
+    /// <summary>Context type: "QuantityMultiplier", "ResultCompositionInclusion", "ResultGameplayPropertyModifiers".</summary>
+    public string ContextType { get; set; } = string.Empty;
+
+    /// <summary>Serialized parameter value (e.g. multiplier float, modifier name).</summary>
+    public string ParameterValue { get; set; } = string.Empty;
+}
