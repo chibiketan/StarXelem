@@ -16,6 +16,8 @@ public class StarXelemDbContext : DbContext
     public DbSet<MissionShipSpawnTagEntity> MissionShipSpawnTags => Set<MissionShipSpawnTagEntity>();
     public DbSet<TagEntity> Tags => Set<TagEntity>();
     public DbSet<ShipTagEntity> ShipTags => Set<ShipTagEntity>();
+    public DbSet<ActorEntity> Actors => Set<ActorEntity>();
+    public DbSet<MissionCategoryEntity> MissionCategories => Set<MissionCategoryEntity>();
     public DbSet<ContractGeneratorEntity> ContractGenerators => Set<ContractGeneratorEntity>();
     public DbSet<MissionRewardEntity> MissionRewards => Set<MissionRewardEntity>();
     public DbSet<MissionBlueprintPoolEntity> MissionBlueprintPools => Set<MissionBlueprintPoolEntity>();
@@ -131,5 +133,19 @@ public class StarXelemDbContext : DbContext
             .WithMany(b => b.Modifiers)
             .HasForeignKey(m => m.BlueprintId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Mission <-> Contractor
+        modelBuilder.Entity<MissionEntity>()
+            .HasOne(m => m.Contractor)
+            .WithMany(a => a.Missions)
+            .HasForeignKey(m => m.ContractorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Mission <-> Category
+        modelBuilder.Entity<MissionEntity>()
+            .HasOne(m => m.Category)
+            .WithMany(c => c.Missions)
+            .HasForeignKey(m => m.CategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

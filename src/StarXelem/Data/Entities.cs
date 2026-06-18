@@ -63,6 +63,33 @@ public class ShipEntity
     public virtual ICollection<MissionShipRequirementEntity> MissionRequirements { get; set; } = new List<MissionShipRequirementEntity>();
 }
 
+public class ActorEntity
+{
+    // PK = selfId (CigGuid string)
+    [Key]
+    public string Id { get; set; } = string.Empty;
+
+    // Resolved from contractParams.stringParamOverrides (ContractStringParamType.Contractor)
+    public string NameKey { get; set; } = string.Empty;
+
+    // DisplayName resolved from P4K
+    public string Name { get; set; } = string.Empty;
+
+    public virtual ICollection<MissionEntity> Missions { get; set; } = new List<MissionEntity>();
+}
+
+public class MissionCategoryEntity
+{
+    // PK = locale key (ex: "ContractCategory_Eliminate")
+    [Key]
+    public string Id { get; set; } = string.Empty;
+
+    // Resolved via GetLocaleValue(localeKey) ou "Inconnue" si null
+    public string Name { get; set; } = string.Empty;
+
+    public virtual ICollection<MissionEntity> Missions { get; set; } = new List<MissionEntity>();
+}
+
 public class ContractGeneratorEntity
 {
     [Key]
@@ -90,12 +117,10 @@ public class MissionEntity
 {
     [Key]
     public string Id { get; set; } = string.Empty;
-    public string DebugName { get; set; } = string.Empty;
-    public string GeneratorName { get; set; } = string.Empty;
+    public string DebugName { get;set; } = string.Empty;
+    public string GeneratorName { get;set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Description { get;set; } = string.Empty;
-    public string ContractorName { get; set; } = string.Empty;
-    public string CategoryName { get; set; } = string.Empty;
     public bool NotForRelease { get; set; }
     public bool WorkInProgress { get; set; }
 
@@ -104,8 +129,19 @@ public class MissionEntity
     [ForeignKey("GeneratorId")]
     public virtual ContractGeneratorEntity? Generator { get; set; }
 
+    public string? CategoryId { get; set; }
+    [ForeignKey("CategoryId")]
+    public virtual MissionCategoryEntity? Category { get; set; }
+
+    public string? ContractorId { get; set; }
+    [ForeignKey("ContractorId")]
+    public virtual ActorEntity? Contractor { get; set; }
+
+    public decimal AUECReward { get; set; }
+    public decimal AUECCost { get; set; }
+
     public virtual ICollection<MissionShipRequirementEntity> ShipRequirements { get; set; } = new List<MissionShipRequirementEntity>();
-    public virtual ICollection<MissionShipSpawnEntity> ShipSpawns { get;set; } = new List<MissionShipSpawnEntity>();
+    public virtual ICollection<MissionShipSpawnEntity> ShipSpawns { get; set; } = new List<MissionShipSpawnEntity>();
 }
 
 public class MissionShipRequirementEntity

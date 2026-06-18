@@ -22,11 +22,15 @@ public class LocalDatabaseService : ILocalDatabaseService
     private readonly string _dbPath;
     private CancellationTokenSource _rebuildCts = new();
     private Task? _rebuildTask;
+    private readonly Dictionary<string, ActorEntity> _contractorCache;
+    private readonly Dictionary<string, MissionCategoryEntity> _categoryCache;
 
     public LocalDatabaseService(IP4kService p4kService, ILogger<LocalDatabaseService> logger)
     {
         _p4kService = p4kService;
         _logger = logger;
+        _contractorCache = new Dictionary<string, ActorEntity>(StringComparer.Ordinal);
+        _categoryCache = new Dictionary<string, MissionCategoryEntity>(StringComparer.Ordinal);
         
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var folder = Path.Combine(appData, "StarXelem");
@@ -88,6 +92,8 @@ public class LocalDatabaseService : ILocalDatabaseService
     {
         _logger.LogInformation("Rebuilding local database at {Path}", _dbPath);
         _entityClassToGuid.Clear();
+        _contractorCache.Clear();
+        _categoryCache.Clear();
 
         using var db = new StarXelemDbContext(GetOptions());
         
@@ -219,7 +225,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         // 3. Populate Contract Generators
         start = Stopwatch.StartNew();
         var contracts = await _p4kService.GetAllContractGenerator();
-        _logger.LogInformation("Found {Count} contract generators. Ensuring depth 3...", contracts.Count);
+         _logger.LogInformation("Found {Count} contract generators. Ensuring depth 5 (factionReputation in org at depth 4-5)...", contracts.Count);
         contracts = await _p4kService.EnsureRecordsDepthAsync(contracts, 3);
 
         var contractGenerators = new List<ContractGeneratorEntity>();
@@ -296,7 +302,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         if (record.Data is not ContractGenerator generator || generator.generators == null) return 0;
         int missionsAdded = 0;
         int handlerIndex = 0;
-        
+
         foreach (var handler in generator.generators)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -315,12 +321,121 @@ public class LocalDatabaseService : ILocalDatabaseService
             }
             else continue;
 
+            // Resolve contractor from handler contractParams stringParamOverrides
+            string? handlerContractorKey = handler.contractParams?.stringParamOverrides
+                ?.FirstOrDefault(p => p.param == ContractStringParamType.Contractor)?.value;
+            // Also try handler propertyOverrides for "Contractor" MissionProperty with MissionPropertyValue_Organization
+            var handlerContractorProp = handler.contractParams?.propertyOverrides
+                ?.FirstOrDefault(p => p.extendedTextToken == "Contractor");
+            string? handlerContractorOrgKey = null;
+            if (handlerContractorProp?.value is MissionPropertyValue_Organization orgValue)
+            {
+                foreach (var mc in orgValue.matchConditions)
+                {
+                    if (mc is DataSetMatchCondition_SpecificOrganizationsDef specOrg)
+                    {
+                        handlerContractorOrgKey = specOrg.organizations.FirstOrDefault()?
+                            .factionReputation?.name;
+
+                        if (string.IsNullOrEmpty(handlerContractorKey))
+                        {
+                            handlerContractorKey = specOrg.organizations.FirstOrDefault()?.stringVariants.variants.FirstOrDefault(s => s.tag?.tagName == "Name")?.@string;
+                        }
+                        break;
+                    }
+                }
+            }
+            string? handlerContractorKeyResolved = handlerContractorKey ?? handlerContractorOrgKey;
+
             foreach (var c in contractsToProcess)
             {
                 if (c == null) continue;
 
                 bool notForRelease = (bool)c.notForRelease;
                 bool workInProgress = (bool)c.workInProgress;
+
+                // Resolve contractor: contract-level wins, then handler-level, fallback to stringParamOverrides
+                ActorEntity? contractorEntity = null;
+                string? contractorKey = null;
+
+                // 1st: contract propertyOverrides "Contractor" MissionProperty with MissionPropertyValue_Organization
+                var contractContractorProp = c.paramOverrides?.propertyOverrides
+                    ?.FirstOrDefault(p => p.extendedTextToken == "Contractor");
+                if (contractContractorProp?.value is MissionPropertyValue_Organization cOrgValue)
+                {
+                    foreach (var mc2 in cOrgValue.matchConditions)
+                    {
+                        if (mc2 is DataSetMatchCondition_SpecificOrganizationsDef cSpecOrg)
+                        {
+                            contractorKey = cSpecOrg.organizations.FirstOrDefault()?
+                                .factionReputation?.name;
+                            break;
+                        }
+                    }
+                }
+
+                // 2nd: contract stringParamOverrides
+                if (string.IsNullOrEmpty(contractorKey))
+                {
+                    contractorKey = c.paramOverrides?.stringParamOverrides
+                        ?.FirstOrDefault(p => p.param == ContractStringParamType.Contractor)?.value;
+                }
+
+                // 3rd: handler resolved key (either propertyOverrides org or stringParamOverrides)
+                if (string.IsNullOrEmpty(contractorKey))
+                {
+                    contractorKey = handlerContractorKeyResolved;
+                }
+
+                if (!string.IsNullOrEmpty(contractorKey))
+                {
+                    if (!_contractorCache.ContainsKey(contractorKey))
+                    {
+                        var name = await _p4kService.GetLocaleValue(contractorKey) ?? "Inconnu";
+                        contractorEntity = new ActorEntity
+                        {
+                            Id = contractorKey,
+                            NameKey = contractorKey,
+                            Name = name
+                        };
+                        db.Actors.Add(contractorEntity);
+                        _contractorCache[contractorKey] = contractorEntity;
+                    }
+                    else
+                    {
+                        contractorEntity = _contractorCache[contractorKey];
+                    }
+                }
+
+                // Resolve category from contract
+                MissionCategoryEntity? categoryEntity = null;
+                string? categoryKey = null;
+                if (c.paramOverrides?.missionTypeOverride != null)
+                {
+                    categoryKey = c.paramOverrides.missionTypeOverride.LocalisedTypeName;
+                }
+                else
+                {
+                    categoryKey = c.template?.contractDisplayInfo?.type?.LocalisedTypeName;
+                }
+                if (!string.IsNullOrEmpty(categoryKey))
+                {
+                    if (!_categoryCache.ContainsKey(categoryKey))
+                    {
+                        var categoryName = await _p4kService.GetLocaleValue(categoryKey) ?? "Inconnue";
+                        categoryEntity = new MissionCategoryEntity
+                        {
+                            Id = categoryKey,
+                            Name = categoryName
+                        };
+                        db.MissionCategories.Add(categoryEntity);
+                        _categoryCache[categoryKey] = categoryEntity;
+                    }
+                    else
+                    {
+                        categoryEntity = _categoryCache[categoryKey];
+                    }
+                }
 
                 var mission = new MissionEntity
                 {
@@ -332,7 +447,9 @@ public class LocalDatabaseService : ILocalDatabaseService
                         ?? c.template?.contractDisplayInfo?.displayString[0]) ?? "Unknown",
                     NotForRelease = notForRelease,
                     WorkInProgress = workInProgress,
-                    GeneratorId = $"{generator.selfId}-{handlerIndex}"
+                    GeneratorId = $"{generator.selfId}-{handlerIndex}",
+                    Contractor = contractorEntity,
+                    Category = categoryEntity
                 };
 
                 db.Missions.Add(mission);
@@ -354,11 +471,12 @@ public class LocalDatabaseService : ILocalDatabaseService
                 await ProcessSpawnableShipsAsync(c, db, mission.Id);
                 await ProcessMissionRewards(mission.Id, c, db);
             }
-            
+
             handlerIndex++;
         }
         return missionsAdded;
     }
+
 
     private async Task ProcessSpawnableShipsAsync(ContractBase contract, StarXelemDbContext db, string missionId)
     {
@@ -729,6 +847,14 @@ public class LocalDatabaseService : ILocalDatabaseService
                 if (contract.contractResults?.contractResults == null)
                     return 0;
 
+                // Store aUEC cost (buy-in) on mission
+                if (contract.contractResults.contractBuyInAmount > 0)
+                {
+                    var mission = db.Missions.Find(missionId);
+                    if (mission != null)
+                        mission.AUECCost = (decimal)contract.contractResults.contractBuyInAmount;
+                }
+
                 var resultArray = contract.contractResults.contractResults as ContractResultBase[];
                 foreach (var resultBase in resultArray ?? Array.Empty<ContractResultBase>())
         {
@@ -740,17 +866,9 @@ public class LocalDatabaseService : ILocalDatabaseService
                 case ContractResult_CalculatedReward calculatedReward:
                     {
                          var computed = await ComputeAUECReward(contract, calculatedReward);
-                        if (computed > 0)
-                        {
-                            db.MissionRewards.Add(new MissionRewardEntity
-                            {
-                                MissionId = missionId,
-                                RewardType = "ContractResult_CalculatedReward",
-                                DisplayValue = string.Format("{0:N0} aUEC", computed),
-                                IsCalculated = true
-                            });
-                            count++;
-                        }
+                        var mission = db.Missions.Find(missionId);
+                        if (mission != null)
+                            mission.AUECReward = (decimal)computed;
                     }
                     break;
 
