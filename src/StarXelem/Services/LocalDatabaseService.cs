@@ -11,6 +11,7 @@ namespace StarXelem.Services;
 public interface ILocalDatabaseService
 {
     Task RebuildDbAsync();
+    Task EnsureDbAsync();
     Task<List<MissionEntity>> GetMissionsForShipAsync(string shipGuid);
     Task<List<ShipEntity>> GetShipsForMissionAsync(string missionDebugName);
 }
@@ -25,7 +26,7 @@ public class LocalDatabaseService : ILocalDatabaseService
     private readonly Dictionary<string, ActorEntity> _contractorCache;
     private readonly Dictionary<string, MissionCategoryEntity> _categoryCache;
 
-    public LocalDatabaseService(IP4kService p4kService, ILogger<LocalDatabaseService> logger)
+    public LocalDatabaseService(IP4kService p4kService, ILogger<LocalDatabaseService> logger, bool autoRebuild = false)
     {
         _p4kService = p4kService;
         _logger = logger;
@@ -37,10 +38,22 @@ public class LocalDatabaseService : ILocalDatabaseService
         if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
         _dbPath = Path.Combine(folder, "database.db");
 
-        if (_p4kService is P4kService p4k)
+        if (autoRebuild && _p4kService is P4kService p4k)
         {
             p4k.SelectedP4KFileChanged += async (s, e) => await RebuildDbAsync();
         }
+    }
+
+    public async Task EnsureDbAsync()
+    {
+        if (File.Exists(_dbPath))
+        {
+            _logger.LogInformation("Database already exists at {Path}", _dbPath);
+            return;
+        }
+
+        _logger.LogInformation("Database not found, rebuilding at {Path}", _dbPath);
+        await RebuildDbAsync();
     }
 
     private DbContextOptions<StarXelemDbContext> GetOptions()

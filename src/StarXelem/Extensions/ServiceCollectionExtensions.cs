@@ -58,7 +58,11 @@ public static class ServiceCollectionExtensions
         // Les services indépendants du mode design
         services.AddSingleton<IBlueprintMappingService, BlueprintMappingService>();
         services.AddSingleton<IMissionMappingService, MissionMappingService>();
-        services.AddSingleton<ILocalDatabaseService, LocalDatabaseService>();
+        services.AddSingleton<ILocalDatabaseService>(sp =>
+            new LocalDatabaseService(
+                sp.GetRequiredService<IP4kService>(),
+                sp.GetRequiredService<ILogger<LocalDatabaseService>>(),
+                autoRebuild: false));
         services.AddSingleton<ISettingsService, RegistrySettingsService>();
         services.AddSingleton<IReputationService, ReputationService>();
 

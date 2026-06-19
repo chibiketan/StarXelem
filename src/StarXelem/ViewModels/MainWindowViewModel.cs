@@ -26,6 +26,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IP4kService _p4kService;
     private readonly IGrpcClientService _grpcClientService;
     private readonly ISettingsService _settingsService;
+    private readonly ILocalDatabaseService _localDatabaseService;
     private const string P4kFolderSettingName = "P4KFolder";
 
     [ObservableProperty]
@@ -93,12 +94,13 @@ public partial class MainWindowViewModel : ViewModelBase
         WeakReferenceMessenger.Default.Send(new ThemeChangedMessage());
     }
     
-    public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IP4kService p4kService, IGrpcClientService grpcClientService, ISettingsService settingsService, PopupViewModel popupViewModel)
+    public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IP4kService p4kService, IGrpcClientService grpcClientService, ISettingsService settingsService, PopupViewModel popupViewModel, ILocalDatabaseService localDatabaseService)
     {
         _logger = logger;
         _p4kService = p4kService;
         _grpcClientService = grpcClientService;
         _settingsService = settingsService;
+        _localDatabaseService = localDatabaseService;
         PopupViewModel = popupViewModel;
         _installedEnvs = p4kService.FindInstalledFiles();
         InstalledEnvs.ContinueWith(async x =>
@@ -300,6 +302,7 @@ public partial class MainWindowViewModel : ViewModelBase
             UpdateP4kStatus("Chargement terminé");
             // On termine par attendre l'initialisation du client gRPC
             await initClientTask;
+            await _localDatabaseService.EnsureDbAsync().ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
