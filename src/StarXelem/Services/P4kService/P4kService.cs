@@ -599,6 +599,23 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         return results.Select(r => r.Record).ToList();
     }
 
+    public async Task<List<DataCoreTypedRecord>> GetAllCraftingBlueprintRecord()
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+
+        var result = new List<DataCoreTypedRecord>(500);
+
+        foreach (var record in _EntityClassDict.Values)
+        {
+            if (record.Record.Data is CraftingBlueprintRecord)
+            {
+                result.Add(record.Record);
+            }
+        }
+
+        return result;
+    }
+
     private void ResetSelectedFile()
     {
         // stop previous loading if any

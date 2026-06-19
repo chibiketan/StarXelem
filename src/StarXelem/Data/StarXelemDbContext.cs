@@ -129,9 +129,9 @@ public class StarXelemDbContext : DbContext
 
         // Blueprint modifiers
         modelBuilder.Entity<BlueprintModifierEntity>()
-            .HasOne(m => m.Blueprint)
-            .WithMany(b => b.Modifiers)
-            .HasForeignKey(m => m.BlueprintId)
+            .HasOne(m => m.Cost)
+            .WithMany(c => c.Modifiers)
+            .HasForeignKey(m => m.CostId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Mission <-> Contractor

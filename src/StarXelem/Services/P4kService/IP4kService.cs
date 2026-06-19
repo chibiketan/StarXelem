@@ -70,6 +70,7 @@ public interface IP4kService : INotifyPropertyChanged
     Task<DataCoreTypedRecord?> GetRecordWithSpecificDepth(CigGuid recordId, int depth);
 
     Task<List<DataCoreTypedRecord>> GetAllFactionReputations();
+    Task<List<DataCoreTypedRecord>> GetAllCraftingBlueprintRecord();
     Task<List<DataCoreTypedRecord>> EnsureRecordsDepthAsync(IEnumerable<DataCoreTypedRecord> records, int depth);
 }
 

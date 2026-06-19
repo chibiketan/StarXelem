@@ -56,9 +56,12 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     private readonly Dictionary<EntityClassDefinition, string> _entityClassToGuid = new();
 
+    /* ========================================================================
+     * REBUILD ORCHESTRATION
+     * ======================================================================== */
+
     public async Task RebuildDbAsync()
     {
-        // Annule la reconstruction en cours si elle existe
         if (_rebuildTask != null && !_rebuildTask.IsCompleted)
         {
             _logger.LogWarning("Reconstruction déjà en cours, annulation...");
@@ -73,7 +76,6 @@ public class LocalDatabaseService : ILocalDatabaseService
             }
         }
 
-        // Nouveau token de cancellation
         _rebuildCts = new CancellationTokenSource();
         var cancellationToken = _rebuildCts.Token;
 
@@ -97,365 +99,378 @@ public class LocalDatabaseService : ILocalDatabaseService
 
         using var db = new StarXelemDbContext(GetOptions());
         
-        // 1. Wipe existing data
         await db.Database.EnsureDeletedAsync(cancellationToken).ConfigureAwait(false);
         await db.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
+
+        // Phase 1: Tag hierarchy
+        var tagResolutionMap = new Dictionary<string, string>();
+        await PopulateTagHierarchyAsync(db, tagResolutionMap).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 2: Ships, manufacturers, and ship-tag associations
+        await PopulateShipsAndManufacturersAsync(db, tagResolutionMap, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 3: Contract generators
+        await PopulateContractGeneratorsAsync(db, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 4: Missions and their requirements/rewards/spawn rules
+        await PopulateMissionsAsync(db, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 5: Resolve spawn rules to actual ships
+        await ProcessMissionShipSpawnShipsAsync(db, cancellationToken).ConfigureAwait(false);
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 6: Blueprints
+        await ProcessAllBlueprintsAsync(db, cancellationToken).ConfigureAwait(false);
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        _logger.LogInformation("Database rebuild completed.");
+    }
+
+    /* ========================================================================
+     * PHASE 1: TAG HIERARCHY
+     * ======================================================================== */
+
+    private async Task PopulateTagHierarchyAsync(StarXelemDbContext db, Dictionary<string, string> map)
+    {
+        var database = await _p4kService.GetTagDatabase();
         
-        // 2. Populate Manufacturers & Ships
+        try
+        {
+            var tagEntities = new List<TagEntity>();
+            var start = Stopwatch.StartNew();
+
+            void ParseTagsRecursive(Tag tagElement, string? parentName, string currentPath)
+            {
+                var id = tagElement.selfId.ToString();
+                var name = tagElement.tagName;
+
+                if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(name))
+                {
+                    var newPath = string.IsNullOrEmpty(currentPath) ? name : $"{currentPath}/{name}";
+
+                    tagEntities.Add(new TagEntity
+                    {
+                        Name = name,
+                        SelfId = id,
+                        ParentName = parentName,
+                        Path = newPath
+                    });
+
+                    map[id] = name;
+
+                    if (tagElement.children != null)
+                    {
+                        foreach (var child in tagElement.children)
+                        {
+                            ParseTagsRecursive(child, name, newPath);
+                        }
+                    }
+                }
+            }
+
+            if (database.tags != null)
+            {
+                foreach (var tag in database.tags)
+                {
+                    ParseTagsRecursive(tag, null, "");
+                }
+            }
+            
+            db.Tags.AddRange(tagEntities);
+            await db.SaveChangesAsync();
+            start.Stop();
+            _logger.LogInformation("Tag hierarchy populated in {Elapsed}ms.", start.ElapsedMilliseconds);
+            _logger.LogInformation("Populated {Count} tags into database and resolution map.", tagEntities.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to populate tag hierarchy from P4K");
+        }
+    }
+
+    /* ========================================================================
+     * PHASE 2: SHIPS, MANUFACTURERS, SHIP-TAGS
+     * ======================================================================== */
+
+    private async Task PopulateShipsAndManufacturersAsync(
+        StarXelemDbContext db, 
+        Dictionary<string, string> tagResolutionMap, 
+        CancellationToken cancellationToken)
+    {
         var ships = new List<ShipEntity>();
         var manufacturers = new List<ManufacturerEntity>();
         var manufacturerCache = new Dictionary<string, ManufacturerEntity>();
         var shipTags = new List<ShipTagEntity>();
-        var tagResolutionMap = new Dictionary<string, string>();
-        
         var start = Stopwatch.StartNew();
-        
-        await PopulateTagHierarchyAsync(db, tagResolutionMap).ConfigureAwait(false);
-        
-        start.Stop();
-        _logger.LogInformation("Tag hierarchy populated in {Elapsed}ms.", start.ElapsedMilliseconds);
-        cancellationToken.ThrowIfCancellationRequested();
-        
-        start = Stopwatch.StartNew();
+
         await foreach (var record in _p4kService.GetAllEntityClassDefinition(1).ConfigureAwait(false))
         {
-            if (record.Data is EntityClassDefinition entityClass)
+            if (record.Data is not EntityClassDefinition entityClass)
+                continue;
+
+            var vehicleParams = entityClass.Components.OfType<VehicleComponentParams>().FirstOrDefault();
+            if (vehicleParams == null)
+                continue;
+
+            var guid = record.RecordId.ToString();
+            _entityClassToGuid[entityClass] = guid;
+
+            // Extract and add ship tags
+            var extractedTags = ExtractShipTags(entityClass, tagResolutionMap);
+            foreach (var tagId in extractedTags)
             {
-                var vehicleParams = entityClass.Components.OfType<VehicleComponentParams>().FirstOrDefault();
-                if (vehicleParams == null) continue;
-                
-                var guid = record.RecordId.ToString();
-                _entityClassToGuid[entityClass] = guid;
-                
-                // Handle Tags
-                var eaEntityDataParams = entityClass.StaticEntityClassData.OfType<EAEntityDataParams>().FirstOrDefault();
-                var extractedTags = (entityClass.tags?
-                    .Select(t => ResolveTag(t, tagResolutionMap))
-                    .Where(name => !string.IsNullOrEmpty(name)) ?? Enumerable.Empty<string>())
-                    .Concat(eaEntityDataParams?.inclusionParams.tags.tags?
-                    .Select(t => ResolveTag(t, tagResolutionMap))
-                    .Where(name => !string.IsNullOrEmpty(name)) ?? Enumerable.Empty<string>())
-                    .Distinct();
-                
-                        foreach (var id in extractedTags)
-                        {
-                            if (tagResolutionMap.TryGetValue(id, out var name))
-                            {
-                                shipTags.Add(new ShipTagEntity { ShipGuid = guid, TagSelfId = id });
-                            }
-                        }
-                
-                // Handle Manufacturer
-                var manufacturerId = "Unknown";
-                if (vehicleParams.manufacturer != null)
-                {
-                    var manufacturer = vehicleParams.manufacturer;
-                    // Use Code as the unique identifier if available, otherwise fallback to Localization Name
-                    manufacturerId = !string.IsNullOrEmpty(manufacturer.Code) 
-                                        ? manufacturer.Code 
-                                        : (!string.IsNullOrEmpty(manufacturer.Localization.Name) ? manufacturer.Localization.Name : "Unknown");
-        
-                    if (manufacturerId != "Unknown")
-                    {
-                        if (!manufacturerCache.TryGetValue(manufacturerId, out var manufacturerEntity))
-                        {
-                            var nameKey = !string.IsNullOrEmpty(manufacturer.Localization.Name) 
-                                            ? manufacturer.Localization.Name 
-                                            : manufacturerId;
-                            var descKey = !string.IsNullOrEmpty(manufacturer.Localization.Description) 
-                                            ? manufacturer.Localization.Description 
-                                            : string.Empty;
-        
-                            manufacturerEntity = new ManufacturerEntity
-                            {
-                                Id = manufacturerId,
-                                Name = await _p4kService.GetLocaleValue(nameKey) ?? manufacturerId,
-                                NameKey = nameKey,
-                                Description = await _p4kService.GetLocaleValue(descKey) ?? string.Empty,
-                                DescriptionKey = descKey,
-                                Logo = manufacturer.Logo ?? string.Empty
-                            };
-                            manufacturerCache[manufacturerId] = manufacturerEntity;
-                            manufacturers.Add(manufacturerEntity);
-                        }
-                    }
-                    else
-                    {
-                        if (!manufacturerCache.TryGetValue("Unknown", out var unknownManufacturer))
-                        {
-                            unknownManufacturer = new ManufacturerEntity { Id = "Unknown", Name = "Unknown" };
-                            manufacturerCache["Unknown"] = unknownManufacturer;
-                            manufacturers.Add(unknownManufacturer);
-                        }
-                    }
-                }
-                else
-                {
-                    if (!manufacturerCache.TryGetValue("Unknown", out var unknownManufacturer))
-                    {
-                        unknownManufacturer = new ManufacturerEntity { Id = "Unknown", Name = "Unknown" };
-                        manufacturerCache["Unknown"] = unknownManufacturer;
-                        manufacturers.Add(unknownManufacturer);
-                    }
-                    manufacturerId = "Unknown";
-                }
-        
-                ships.Add(new ShipEntity
-                {
-                    EntityClassGuid = guid,
-                    TechnicalName = record.RecordName,
-                    LocalizedName = await _p4kService.GetEntityClassName(entityClass) ?? "Unknown",
-                    ManufacturerId = manufacturerId
-                });
+                shipTags.Add(new ShipTagEntity { ShipGuid = guid, TagSelfId = tagId });
             }
+
+            // Resolve manufacturer
+            var manufacturerId = ResolveManufacturerId(vehicleParams.manufacturer, manufacturerCache, manufacturers);
+
+            ships.Add(new ShipEntity
+            {
+                EntityClassGuid = guid,
+                TechnicalName = record.RecordName,
+                LocalizedName = await _p4kService.GetEntityClassName(entityClass) ?? "Unknown",
+                ManufacturerId = manufacturerId
+            });
         }
+
         start.Stop();
         _logger.LogInformation("Ships and manufacturers processed in {Elapsed}ms.", start.ElapsedMilliseconds);
+
         db.Manufacturers.AddRange(manufacturers);
         db.Ships.AddRange(ships);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
         _logger.LogInformation("Inserted {Count} manufacturer into the database.", manufacturers.Count);
         _logger.LogInformation("Inserted {Count} ship into the database.", ships.Count);
+
         db.ShipTags.AddRange(shipTags);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
         _logger.LogInformation("Inserted {Count} liaison ship <=> tag into the database.", shipTags.Count);
-        
-        // 3. Populate Contract Generators
-        start = Stopwatch.StartNew();
+    }
+
+    private IEnumerable<string> ExtractShipTags(EntityClassDefinition entityClass, Dictionary<string, string> tagResolutionMap)
+    {
+        var tagSources = new List<IEnumerable<object?>>();
+
+        if (entityClass.tags != null)
+            tagSources.Add(entityClass.tags);
+
+        var eaEntityDataParams = entityClass.StaticEntityClassData.OfType<EAEntityDataParams>().FirstOrDefault();
+        if (eaEntityDataParams?.inclusionParams?.tags?.tags != null)
+            tagSources.Add(eaEntityDataParams.inclusionParams.tags.tags);
+
+        var extractedTags = tagSources
+            .SelectMany(source => source)
+            .Select(t => ResolveTag(t, tagResolutionMap))
+            .Where(name => !string.IsNullOrEmpty(name))
+            .Distinct();
+
+        foreach (var id in extractedTags)
+        {
+            if (tagResolutionMap.TryGetValue(id, out _))
+            {
+                yield return id;
+            }
+        }
+    }
+
+    private string ResolveManufacturerId(
+        dynamic? manufacturer, 
+        Dictionary<string, ManufacturerEntity> manufacturerCache, 
+        List<ManufacturerEntity> manufacturers)
+    {
+        if (manufacturer == null)
+            return GetOrCreateUnknownManufacturer(manufacturerCache, manufacturers).Id;
+
+        var manufacturerId = !string.IsNullOrEmpty(manufacturer.Code) 
+            ? manufacturer.Code 
+            : (!string.IsNullOrEmpty(manufacturer.Localization.Name) ? manufacturer.Localization.Name : "Unknown");
+
+        if (manufacturerId == "Unknown")
+            return GetOrCreateUnknownManufacturer(manufacturerCache, manufacturers).Id;
+
+        ManufacturerEntity? existingEntity;
+        if (!manufacturerCache.TryGetValue(manufacturerId, out existingEntity))
+        {
+            var nameKey = !string.IsNullOrEmpty(manufacturer.Localization.Name) 
+                ? manufacturer.Localization.Name 
+                : manufacturerId;
+            var descKey = !string.IsNullOrEmpty(manufacturer.Localization.Description) 
+                ? manufacturer.Localization.Description 
+                : string.Empty;
+
+            var entity = new ManufacturerEntity
+            {
+                Id = manufacturerId,
+                Name = _p4kService.GetLocaleValue(nameKey).GetAwaiter().GetResult() ?? manufacturerId,
+                NameKey = nameKey,
+                Description = _p4kService.GetLocaleValue(descKey).GetAwaiter().GetResult() ?? string.Empty,
+                DescriptionKey = descKey,
+                Logo = manufacturer.Logo ?? string.Empty
+            };
+            manufacturerCache[manufacturerId] = entity;
+            manufacturers.Add(entity);
+        }
+
+        return manufacturerId;
+    }
+
+    private ManufacturerEntity GetOrCreateUnknownManufacturer(
+        Dictionary<string, ManufacturerEntity> manufacturerCache, 
+        List<ManufacturerEntity> manufacturers)
+    {
+        if (!manufacturerCache.TryGetValue("Unknown", out var entity))
+        {
+            entity = new ManufacturerEntity { Id = "Unknown", Name = "Unknown" };
+            manufacturerCache["Unknown"] = entity;
+            manufacturers.Add(entity);
+        }
+        return entity;
+    }
+
+    /* ========================================================================
+     * PHASE 3: CONTRACT GENERATORS
+     * ======================================================================== */
+
+    private async Task PopulateContractGeneratorsAsync(StarXelemDbContext db, CancellationToken cancellationToken)
+    {
+        var start = Stopwatch.StartNew();
         var contracts = await _p4kService.GetAllContractGenerator();
-         _logger.LogInformation("Found {Count} contract generators. Ensuring depth 5 (factionReputation in org at depth 4-5)...", contracts.Count);
+        _logger.LogInformation("Found {Count} contract generators. Ensuring depth 5 (factionReputation in org at depth 4-5)...", contracts.Count);
         contracts = await _p4kService.EnsureRecordsDepthAsync(contracts, 3);
 
-        var contractGenerators = new List<ContractGeneratorEntity>();
+        var contractGenerators = ExtractContractGeneratorEntities(contracts);
+
+        db.ContractGenerators.AddRange(contractGenerators);
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        start.Stop();
+        _logger.LogInformation("Inserted {Count} contract generators into the database.", contractGenerators.Count);
+    }
+
+    private List<ContractGeneratorEntity> ExtractContractGeneratorEntities(IEnumerable<DataCoreTypedRecord> contracts)
+    {
+        var result = new List<ContractGeneratorEntity>();
+
         foreach (var record in contracts)
         {
-            if (record.Data is not ContractGenerator generator) continue;
-            if (generator.generators == null) continue;
+            if (record.Data is not ContractGenerator generator)
+                continue;
+            if (generator.generators == null)
+                continue;
 
             int handlerIndex = 0;
             foreach (var handler in generator.generators)
             {
-                if (handler == null) continue;
+                if (handler == null)
+                    continue;
+
                 var avail = handler.defaultAvailability;
-
-                bool ToBool(dynamic? v, bool @default = false)
-                {
-                    if (v == null) return @default;
-                    return (bool)v;
-                }
-
-                contractGenerators.Add(new ContractGeneratorEntity
-                {
-                    Id = $"{generator.selfId}-{handlerIndex}",
-                    DebugName = handler.debugName,
-                    NotForRelease = ToBool(handler.notForRelease),
-                    WorkInProgress = ToBool(handler.workInProgress),
-                    MaxPlayersPerInstance = avail?.maxPlayersPerInstance ?? 1,
-                    OnceOnly = ToBool(avail?.onceOnly),
-                    AvailableInPrison = ToBool(avail?.availableInPrison),
-                    HideInMobiGlas = ToBool(avail?.hideInMobiGlas),
-                    CanReacceptAfterAbandoning = ToBool(avail?.canReacceptAfterAbandoning),
-                    AbandonedCooldownTime = avail?.abandonedCooldownTime ?? 1f,
-                    AbandonedCooldownTimeVariation = avail?.abandonedCooldownTimeVariation ?? 1f,
-                    CanReacceptAfterFailing = ToBool(avail?.canReacceptAfterFailing),
-                    HasPersonalCooldown = ToBool(avail?.hasPersonalCooldown),
-                    PersonalCooldownTime = avail?.personalCooldownTime ?? 1f,
-                    PersonalCooldownTimeVariation = avail?.personalCooldownTimeVariation ?? 1f,
-                    NotifyOnAvailable = ToBool(avail?.notifyOnAvailable),
-                });
+                result.Add(CreateContractGeneratorEntity(generator, handler, handlerIndex, avail));
                 handlerIndex++;
             }
         }
 
-        db.ContractGenerators.AddRange(contractGenerators);
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        start.Stop();
-        _logger.LogInformation("Inserted {Count} contract generators into the database.", contractGenerators.Count);
+        return result;
+    }
 
-        // 4. Populate Missions & Requirements
-        start = Stopwatch.StartNew();
+    private ContractGeneratorEntity CreateContractGeneratorEntity(
+        ContractGenerator generator, 
+        dynamic handler, 
+        int handlerIndex, 
+        dynamic? avail)
+    {
+        return new ContractGeneratorEntity
+        {
+            Id = $"{generator.selfId}-{handlerIndex}",
+            DebugName = handler.debugName,
+            NotForRelease = ToBool(handler.notForRelease),
+            WorkInProgress = ToBool(handler.workInProgress),
+            MaxPlayersPerInstance = avail?.maxPlayersPerInstance ?? 1,
+            OnceOnly = ToBool(avail?.onceOnly),
+            AvailableInPrison = ToBool(avail?.availableInPrison),
+            HideInMobiGlas = ToBool(avail?.hideInMobiGlas),
+            CanReacceptAfterAbandoning = ToBool(avail?.canReacceptAfterAbandoning),
+            AbandonedCooldownTime = avail?.abandonedCooldownTime ?? 1f,
+            AbandonedCooldownTimeVariation = avail?.abandonedCooldownTimeVariation ?? 1f,
+            CanReacceptAfterFailing = ToBool(avail?.canReacceptAfterFailing),
+            HasPersonalCooldown = ToBool(avail?.hasPersonalCooldown),
+            PersonalCooldownTime = avail?.personalCooldownTime ?? 1f,
+            PersonalCooldownTimeVariation = avail?.personalCooldownTimeVariation ?? 1f,
+            NotifyOnAvailable = ToBool(avail?.notifyOnAvailable),
+        };
+    }
+
+    private static bool ToBool(dynamic? v, bool @default = false)
+    {
+        if (v == null) return @default;
+        return (bool)v;
+    }
+
+    /* ========================================================================
+     * PHASE 4: MISSIONS
+     * ======================================================================== */
+
+    private async Task PopulateMissionsAsync(StarXelemDbContext db, CancellationToken cancellationToken)
+    {
+        var start = Stopwatch.StartNew();
+        var contracts = await _p4kService.GetAllContractGenerator();
+        contracts = await _p4kService.EnsureRecordsDepthAsync(contracts, 3);
+
         int missionCount = 0;
         foreach (var record in contracts)
         {
             cancellationToken.ThrowIfCancellationRequested();
             missionCount += await ProcessContractForDb(record, db, record.RecordName, cancellationToken);
         }
+
         start.Stop();
         _logger.LogInformation("Missions and requirements processed in {Elapsed}ms.", start.ElapsedMilliseconds);
         _logger.LogInformation("Inserted {Count} missions into the database.", missionCount);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-        cancellationToken.ThrowIfCancellationRequested();
-        start = Stopwatch.StartNew();
-        await ProcessMissionShipSpawnShipsAsync(db, cancellationToken);
-        start.Stop();
-        _logger.LogInformation("Mission spawn rules processed in {Elapsed}ms.", start.ElapsedMilliseconds);
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        _logger.LogInformation("Database rebuild completed.");
     }
 
     private async Task<int> ProcessContractForDb(DataCoreTypedRecord record, StarXelemDbContext db, string generatorName, CancellationToken cancellationToken)
     {
-        if (record.Data is not ContractGenerator generator || generator.generators == null) return 0;
+        if (record.Data is not ContractGenerator generator || generator.generators == null)
+            return 0;
+
         int missionsAdded = 0;
         int handlerIndex = 0;
 
         foreach (var handler in generator.generators)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (handler == null) continue;
+            if (handler == null)
+                continue;
 
-            var contractsToProcess = new List<ContractBase>();
-
-            if (handler is ContractGeneratorHandler_Career career)
+            var contractsToProcess = ExtractContractsFromHandler(handler);
+            if (contractsToProcess == null)
             {
-                contractsToProcess.AddRange(career.introContracts.Cast<ContractBase>());
-                contractsToProcess.AddRange(career.contracts.Cast<ContractBase>());
+                handlerIndex++;
+                continue;
             }
-            else if (handler is ContractGeneratorHandler_List list)
+
+            // Resolve contractor from handler level
+            var handlerContractorKey = ResolveHandlerContractorKey(handler);
+
+            foreach (var contract in contractsToProcess)
             {
-                contractsToProcess.AddRange(list.contracts.Cast<ContractBase>());
-            }
-            else continue;
+                if (contract == null)
+                    continue;
 
-            // Resolve contractor from handler contractParams stringParamOverrides
-            string? handlerContractorKey = handler.contractParams?.stringParamOverrides
-                ?.FirstOrDefault(p => p.param == ContractStringParamType.Contractor)?.value;
-            // Also try handler propertyOverrides for "Contractor" MissionProperty with MissionPropertyValue_Organization
-            var handlerContractorProp = handler.contractParams?.propertyOverrides
-                ?.FirstOrDefault(p => p.extendedTextToken == "Contractor");
-            string? handlerContractorOrgKey = null;
-            if (handlerContractorProp?.value is MissionPropertyValue_Organization orgValue)
-            {
-                foreach (var mc in orgValue.matchConditions)
-                {
-                    if (mc is DataSetMatchCondition_SpecificOrganizationsDef specOrg)
-                    {
-                        handlerContractorOrgKey = specOrg.organizations.FirstOrDefault()?
-                            .factionReputation?.name;
-
-                        if (string.IsNullOrEmpty(handlerContractorKey))
-                        {
-                            handlerContractorKey = specOrg.organizations.FirstOrDefault()?.stringVariants.variants.FirstOrDefault(s => s.tag?.tagName == "Name")?.@string;
-                        }
-                        break;
-                    }
-                }
-            }
-            string? handlerContractorKeyResolved = handlerContractorKey ?? handlerContractorOrgKey;
-
-            foreach (var c in contractsToProcess)
-            {
-                if (c == null) continue;
-
-                bool notForRelease = (bool)c.notForRelease;
-                bool workInProgress = (bool)c.workInProgress;
-
-                // Resolve contractor: contract-level wins, then handler-level, fallback to stringParamOverrides
-                ActorEntity? contractorEntity = null;
-                string? contractorKey = null;
-
-                // 1st: contract propertyOverrides "Contractor" MissionProperty with MissionPropertyValue_Organization
-                var contractContractorProp = c.paramOverrides?.propertyOverrides
-                    ?.FirstOrDefault(p => p.extendedTextToken == "Contractor");
-                if (contractContractorProp?.value is MissionPropertyValue_Organization cOrgValue)
-                {
-                    foreach (var mc2 in cOrgValue.matchConditions)
-                    {
-                        if (mc2 is DataSetMatchCondition_SpecificOrganizationsDef cSpecOrg)
-                        {
-                            contractorKey = cSpecOrg.organizations.FirstOrDefault()?
-                                .factionReputation?.name;
-                            break;
-                        }
-                    }
-                }
-
-                // 2nd: contract stringParamOverrides
-                if (string.IsNullOrEmpty(contractorKey))
-                {
-                    contractorKey = c.paramOverrides?.stringParamOverrides
-                        ?.FirstOrDefault(p => p.param == ContractStringParamType.Contractor)?.value;
-                }
-
-                // 3rd: handler resolved key (either propertyOverrides org or stringParamOverrides)
-                if (string.IsNullOrEmpty(contractorKey))
-                {
-                    contractorKey = handlerContractorKeyResolved;
-                }
-
-                if (!string.IsNullOrEmpty(contractorKey))
-                {
-                    if (!_contractorCache.ContainsKey(contractorKey))
-                    {
-                        var name = await _p4kService.GetLocaleValue(contractorKey) ?? "Inconnu";
-                        contractorEntity = new ActorEntity
-                        {
-                            Id = contractorKey,
-                            NameKey = contractorKey,
-                            Name = name
-                        };
-                        db.Actors.Add(contractorEntity);
-                        _contractorCache[contractorKey] = contractorEntity;
-                    }
-                    else
-                    {
-                        contractorEntity = _contractorCache[contractorKey];
-                    }
-                }
-
-                // Resolve category from contract
-                MissionCategoryEntity? categoryEntity = null;
-                string? categoryKey = null;
-                if (c.paramOverrides?.missionTypeOverride != null)
-                {
-                    categoryKey = c.paramOverrides.missionTypeOverride.LocalisedTypeName;
-                }
-                else
-                {
-                    categoryKey = c.template?.contractDisplayInfo?.type?.LocalisedTypeName;
-                }
-                if (!string.IsNullOrEmpty(categoryKey))
-                {
-                    if (!_categoryCache.ContainsKey(categoryKey))
-                    {
-                        var categoryName = await _p4kService.GetLocaleValue(categoryKey) ?? "Inconnue";
-                        categoryEntity = new MissionCategoryEntity
-                        {
-                            Id = categoryKey,
-                            Name = categoryName
-                        };
-                        db.MissionCategories.Add(categoryEntity);
-                        _categoryCache[categoryKey] = categoryEntity;
-                    }
-                    else
-                    {
-                        categoryEntity = _categoryCache[categoryKey];
-                    }
-                }
-
-                var mission = new MissionEntity
-                {
-                    Id = c.id.ToString(),
-                    DebugName = c.debugName,
-                    GeneratorName = generatorName,
-                    Title = await _p4kService.GetLocaleValue(
-                        c.paramOverrides?.stringParamOverrides?.FirstOrDefault(p => p.param == ContractStringParamType.Title)?.value 
-                        ?? c.template?.contractDisplayInfo?.displayString[0]) ?? "Unknown",
-                    NotForRelease = notForRelease,
-                    WorkInProgress = workInProgress,
-                    GeneratorId = $"{generator.selfId}-{handlerIndex}",
-                    Contractor = contractorEntity,
-                    Category = categoryEntity
-                };
+                var contractorEntity = ResolveContractor(contract, handlerContractorKey, db);
+                var categoryEntity = ResolveCategory(contract, db);
+                var mission = CreateMissionEntity(contract, generator, handlerIndex, generatorName, contractorEntity, categoryEntity);
 
                 db.Missions.Add(mission);
                 missionsAdded++;
 
-                var shipDefs = ExtractShipDefs(c);
+                var shipDefs = ExtractShipDefs(contract);
                 foreach (var def in shipDefs)
                 {
                     if (_entityClassToGuid.TryGetValue(def, out var guid))
@@ -468,143 +483,220 @@ public class LocalDatabaseService : ILocalDatabaseService
                     }
                 }
 
-                await ProcessSpawnableShipsAsync(c, db, mission.Id);
-                await ProcessMissionRewards(mission.Id, c, db);
+                await ProcessSpawnableShipsAsync(contract, db, mission.Id);
+                await ProcessMissionRewards(mission.Id, contract, db);
             }
 
             handlerIndex++;
         }
+
         return missionsAdded;
     }
 
+    /* ---- Handler and contract extraction ---- */
 
-    private async Task ProcessSpawnableShipsAsync(ContractBase contract, StarXelemDbContext db, string missionId)
+    private List<ContractBase>? ExtractContractsFromHandler(dynamic handler)
     {
-        var tempRules = new List<(MissionShipSpawnEntity Rule, List<string> PosTags, List<string> NegTags)>();
-        
-        var allProperties = new Dictionary<string, MissionProperty>();
+        var contractsToProcess = new List<ContractBase>();
 
-        // Collect properties from template
-        if (contract.template?.contractProperties != null)
+        if (handler is ContractGeneratorHandler_Career career)
         {
-            foreach (var prop in contract.template.contractProperties)
-            {
-                allProperties[prop.missionVariableName] = prop;
-            }
+            contractsToProcess.AddRange(career.introContracts.Cast<ContractBase>());
+            contractsToProcess.AddRange(career.contracts.Cast<ContractBase>());
+        }
+        else if (handler is ContractGeneratorHandler_List list)
+        {
+            contractsToProcess.AddRange(list.contracts.Cast<ContractBase>());
+        }
+        else
+        {
+            return null;
         }
 
-        // Overwrite with property overrides if they exist
-        foreach (var overrideProp in contract.paramOverrides.propertyOverrides)
-        {
-            allProperties[overrideProp.missionVariableName] = overrideProp;
-        }
+        return contractsToProcess;
+    }
 
-        foreach (var prop in allProperties.Values)
+    /* ---- Contractor resolution ---- */
+
+    private string? ResolveHandlerContractorKey(dynamic handler)
+    {
+        var stringParamKey = FindContractorFromParams(handler.contractParams?.stringParamOverrides);
+        var propOverride = FindContractorPropOverride(handler.contractParams?.propertyOverrides);
+
+        string? orgKey = null;
+        if (propOverride?.value is MissionPropertyValue_Organization orgValue)
         {
-            var value = prop.value as MissionPropertyValue_ShipSpawnDescriptions;
-            
-            if (value?.spawnDescriptions != null)
+            foreach (var mc in orgValue.matchConditions)
             {
-                foreach (var group in value.spawnDescriptions)
+                if (mc is DataSetMatchCondition_SpecificOrganizationsDef specOrg)
                 {
-                    if (group.ships != null)
+                    orgKey = specOrg.organizations.FirstOrDefault()?
+                        .factionReputation?.name;
+
+                    if (string.IsNullOrEmpty(stringParamKey))
                     {
-                        foreach (var shipOption in group.ships)
-                        {
-                            if (shipOption.options != null)
-                            {
-                                foreach (dynamic ship in shipOption.options)
-                                {
-                                    var posIds = new List<string>();
-                                    var tagsProp = ship.GetType().GetProperty("tags");
-                                    if (tagsProp != null)
-                                    {
-                                        var tags = tagsProp.GetValue(ship);
-                                        if (tags is StarBreaker.DataCoreGenerated.TagList tagList)
-                                        {
-                                            foreach (var t in tagList.@tags)
-                                            {
-                                                if (t != null) posIds.Add(t.selfId.ToString());
-                                            }
-                                        }
-                                        else if (tags != null)
-                                        {
-                                            foreach (dynamic t in tags)
-                                            {
-                                                if (t != null) posIds.Add(t.selfId.ToString());
-                                            }
-                                        }
-                                    }
-                                    
-                                    var negIds = new List<string>();
-                                    var negTagsProp = ship.GetType().GetProperty("negativeTags");
-                                    if (negTagsProp != null)
-                                    {
-                                        var negTagsObj = negTagsProp.GetValue(ship);
-                                        if (negTagsObj is StarBreaker.DataCoreGenerated.TagList negTagList)
-                                        {
-                                            foreach (var t in negTagList.@tags)
-                                            {
-                                                if (t != null) negIds.Add(t.selfId.ToString());
-                                            }
-                                        }
-                                        else if (negTagsObj != null)
-                                        {
-                                            foreach (dynamic t in negTagsObj)
-                                            {
-                                                if (t != null) negIds.Add(t.selfId.ToString());
-                                            }
-                                        }
-                                    }
-                                    
-                                    var groupName = !string.IsNullOrWhiteSpace(group?.Name) ? group.Name : prop.missionVariableName;
-                                    var spawnRule = new MissionShipSpawnEntity
-                                    {
-                                        MissionId = missionId,
-                                        GroupName = groupName,
-                                        Weight = (int)ship.weight
-                                    };
-                                    
-                                    db.MissionShipSpawns.Add(spawnRule);
-                                    tempRules.Add((spawnRule, posIds, negIds));
-                                }
-                            }
-                        }
+                        stringParamKey = specOrg.organizations.FirstOrDefault()?
+                            .stringVariants?.variants?.FirstOrDefault(s => s.tag?.tagName == "Name")?.@string;
                     }
+                    break;
                 }
             }
         }
-        
-        foreach (var item in tempRules)
+
+        return stringParamKey ?? orgKey;
+    }
+
+    private static string? FindContractorFromParams(object? overrides)
+    {
+        if (overrides == null)
+            return null;
+        foreach (dynamic p in (overrides as dynamic[] ?? Array.Empty<dynamic>()))
         {
-            foreach (var tagStr in item.PosTags)
+            if (p.param == ContractStringParamType.Contractor)
+                return p.value;
+        }
+        return null;
+    }
+
+    private static dynamic? FindContractorPropOverride(object? overrides)
+    {
+        if (overrides == null)
+            return null;
+        foreach (dynamic p in (overrides as dynamic[] ?? Array.Empty<dynamic>()))
+        {
+            if (p.extendedTextToken == "Contractor")
+                return p;
+        }
+        return null;
+    }
+
+    private ActorEntity? ResolveContractor(ContractBase contract, string? handlerContractorKey, StarXelemDbContext db)
+    {
+        string? contractorKey = null;
+
+        // 1st: contract propertyOverrides "Contractor" MissionProperty
+        var contractContractorProp = contract.paramOverrides?.propertyOverrides
+            ?.FirstOrDefault(p => p.extendedTextToken == "Contractor");
+        if (contractContractorProp?.value is MissionPropertyValue_Organization cOrgValue)
+        {
+            foreach (var mc in cOrgValue.matchConditions)
             {
-                if (string.IsNullOrEmpty(tagStr)) continue;
-                
-                db.MissionShipSpawnTags.Add(new MissionShipSpawnTagEntity
+                if (mc is DataSetMatchCondition_SpecificOrganizationsDef cSpecOrg)
                 {
-                    SpawnRule = item.Rule,
-                    TagSelfId = tagStr,
-                    IsIncluded = true
-                });
-            }
-            
-            foreach (var tagStr in item.NegTags)
-            {
-                if (string.IsNullOrEmpty(tagStr)) continue;
-                
-                db.MissionShipSpawnTags.Add(new MissionShipSpawnTagEntity
-                {
-                    SpawnRule = item.Rule,
-                    TagSelfId = tagStr,
-                    IsIncluded = false
-                });
+                    contractorKey = cSpecOrg.organizations.FirstOrDefault()?
+                        .factionReputation?.name;
+                    break;
+                }
             }
         }
+
+        // 2nd: contract stringParamOverrides
+        if (string.IsNullOrEmpty(contractorKey))
+        {
+            contractorKey = contract.paramOverrides?.stringParamOverrides
+                ?.FirstOrDefault(p => p.param == ContractStringParamType.Contractor)?.value;
+        }
+
+        // 3rd: handler resolved key
+        if (string.IsNullOrEmpty(contractorKey))
+        {
+            contractorKey = handlerContractorKey;
+        }
+
+        if (string.IsNullOrEmpty(contractorKey))
+            return null;
+
+        if (!_contractorCache.TryGetValue(contractorKey, out var entity))
+        {
+            var name = Task.Run(async () => await _p4kService.GetLocaleValue(contractorKey)).Result ?? "Inconnu";
+            entity = new ActorEntity
+            {
+                Id = contractorKey,
+                NameKey = contractorKey,
+                Name = name
+            };
+            db.Actors.Add(entity);
+            _contractorCache[contractorKey] = entity;
+        }
+
+        return entity;
     }
+
+    /* ---- Category resolution ---- */
+
+    private MissionCategoryEntity? ResolveCategory(ContractBase contract, StarXelemDbContext db)
+    {
+        string? categoryKey = null;
+
+        if (contract.paramOverrides?.missionTypeOverride != null)
+        {
+            categoryKey = contract.paramOverrides.missionTypeOverride.LocalisedTypeName;
+        }
+        else
+        {
+            categoryKey = contract.template?.contractDisplayInfo?.type?.LocalisedTypeName;
+        }
+
+        if (string.IsNullOrEmpty(categoryKey))
+            return null;
+
+        if (!_categoryCache.TryGetValue(categoryKey, out var entity))
+        {
+            var categoryName = Task.Run(async () => await _p4kService.GetLocaleValue(categoryKey)).Result ?? "Inconnue";
+            entity = new MissionCategoryEntity
+            {
+                Id = categoryKey,
+                Name = categoryName
+            };
+            db.MissionCategories.Add(entity);
+            _categoryCache[categoryKey] = entity;
+        }
+
+        return entity;
+    }
+
+    /* ---- Mission entity construction ---- */
+
+    private MissionEntity CreateMissionEntity(
+        ContractBase contract,
+        ContractGenerator generator,
+        int handlerIndex,
+        string generatorName,
+        ActorEntity? contractorEntity,
+        MissionCategoryEntity? categoryEntity)
+    {
+        var titleKey = contract.paramOverrides?.stringParamOverrides
+            ?.FirstOrDefault(p => p.param == ContractStringParamType.Title)?.value 
+            ?? contract.template?.contractDisplayInfo?.displayString[0];
+
+        var descKey = contract.paramOverrides?.stringParamOverrides
+            ?.FirstOrDefault(p => p.param == ContractStringParamType.Description)?.value 
+            ?? contract.template?.contractDisplayInfo?.displayString[2];
+
+        return new MissionEntity
+        {
+            Id = contract.id.ToString(),
+            DebugName = contract.debugName,
+            GeneratorName = generatorName,
+            TitleKey = titleKey,
+            Title = Task.Run(async () => await _p4kService.GetLocaleValue(titleKey)).Result ?? "Unknown",
+            DescriptionKey = descKey,
+            Description = Task.Run(async () => await _p4kService.GetLocaleValue(descKey)).Result ?? "",
+            NotForRelease = (bool)contract.notForRelease,
+            WorkInProgress = (bool)contract.workInProgress,
+            GeneratorId = $"{generator.selfId}-{handlerIndex}",
+            Contractor = contractorEntity,
+            Category = categoryEntity
+        };
+    }
+
+    /* ========================================================================
+     * PHASE 5: SPAWN RULES -> SHIPS RESOLUTION
+     * ======================================================================== */
 
     private async Task ProcessMissionShipSpawnShipsAsync(StarXelemDbContext db, CancellationToken cancellationToken)
     {
+        var start = Stopwatch.StartNew();
         long toto = 0;
         string[] excludedPath = ["/Spawning/", "/SkillDefinitions/", "/CargoManifest/", "/CrewManifest/"];
         
@@ -616,22 +708,28 @@ public class LocalDatabaseService : ILocalDatabaseService
         await foreach (var spawnRule in shipSpawnRules.ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            List<String> posTags = spawnRule.Tags.Where(t => t.IsIncluded).Select(t => t.Tag!).Where(t => !excludedPath.Any(ep => t.Path.Contains(ep))).Select(t => t.SelfId).ToList();
-            List<String> negTags = spawnRule.Tags.Where(t => !t.IsIncluded).Select(t => t.Tag!.SelfId).ToList();;
-            // Filtrer les tags à filtrer
-            // Récupérer les vaisseaux
-            // Par défaut les vaisseaux qui ne possèdent pas les tags negatifs
-            var shipsQuery = db.Ships.Where(s => !negTags.Any(t => s.ShipTags.Any(st => st.Tag!.SelfId == t)));
+            var posTags = spawnRule.Tags
+                .Where(t => t.IsIncluded)
+                .Select(t => t.Tag!)
+                .Where(t => !excludedPath.Any(ep => t.Path.Contains(ep)))
+                .Select(t => t.SelfId)
+                .ToList();
+
+            var negTags = spawnRule.Tags
+                .Where(t => !t.IsIncluded)
+                .Select(t => t.Tag!.SelfId)
+                .ToList();
+
+            var shipsQuery = db.Ships
+                .Where(s => !negTags.Any(t => s.ShipTags.Any(st => st.Tag!.SelfId == t)));
 
             if (posTags.Any())
             {
-                // Si au moins un tag positif, tous les tags doivent être présents
                 shipsQuery = shipsQuery.Where(s => posTags.All(t => s.ShipTags.Any(st => st.Tag!.SelfId == t)));
             }
 
             await foreach (var ship in shipsQuery.ToAsyncEnumerable().ConfigureAwait(false))
             {
-                // On a la liste des vaisseaux elligibles, on y va !
                 db.MissionShipSpawnShips.Add(new MissionShipSpawnShipEntity
                 {
                     SpawnRule = spawnRule,
@@ -641,13 +739,130 @@ public class LocalDatabaseService : ILocalDatabaseService
             }
         }
         
+        start.Stop();
         _logger.LogInformation("Processed {Count} spawn rules.", toto);
+        _logger.LogInformation("Mission spawn rules processed in {Elapsed}ms.", start.ElapsedMilliseconds);
     }
-    
+
+    /* ========================================================================
+     * SPAWNABLE SHIPS (per mission)
+     * ======================================================================== */
+
+    private async Task ProcessSpawnableShipsAsync(ContractBase contract, StarXelemDbContext db, string missionId)
+    {
+        var tempRules = new List<(MissionShipSpawnEntity Rule, List<string> PosTags, List<string> NegTags)>();
+        var allProperties = new Dictionary<string, MissionProperty>();
+
+        if (contract.template?.contractProperties != null)
+        {
+            foreach (var prop in contract.template.contractProperties)
+            {
+                allProperties[prop.missionVariableName] = prop;
+            }
+        }
+
+        foreach (var overrideProp in contract.paramOverrides.propertyOverrides)
+        {
+            allProperties[overrideProp.missionVariableName] = overrideProp;
+        }
+
+        foreach (var prop in allProperties.Values)
+        {
+            var value = prop.value as MissionPropertyValue_ShipSpawnDescriptions;
+            if (value?.spawnDescriptions == null)
+                continue;
+
+            foreach (var group in value.spawnDescriptions)
+            {
+                if (group.ships == null)
+                    continue;
+
+                foreach (var shipOption in group.ships)
+                {
+                    if (shipOption.options == null)
+                        continue;
+
+                    foreach (dynamic ship in shipOption.options)
+                    {
+                        var posIds = ExtractTagIds(ship, "tags");
+                        var negIds = ExtractTagIds(ship, "negativeTags");
+                        var groupName = !string.IsNullOrWhiteSpace(group?.Name) ? group.Name : prop.missionVariableName;
+
+                        var spawnRule = new MissionShipSpawnEntity
+                        {
+                            MissionId = missionId,
+                            GroupName = groupName,
+                            Weight = (int)ship.weight
+                        };
+
+                        db.MissionShipSpawns.Add(spawnRule);
+                        tempRules.Add((spawnRule, posIds, negIds));
+                    }
+                }
+            }
+        }
+        
+        foreach (var item in tempRules)
+        {
+            foreach (var tagStr in item.PosTags)
+            {
+                if (string.IsNullOrEmpty(tagStr)) continue;
+                db.MissionShipSpawnTags.Add(new MissionShipSpawnTagEntity
+                {
+                    SpawnRule = item.Rule,
+                    TagSelfId = tagStr,
+                    IsIncluded = true
+                });
+            }
+            
+            foreach (var tagStr in item.NegTags)
+            {
+                if (string.IsNullOrEmpty(tagStr)) continue;
+                db.MissionShipSpawnTags.Add(new MissionShipSpawnTagEntity
+                {
+                    SpawnRule = item.Rule,
+                    TagSelfId = tagStr,
+                    IsIncluded = false
+                });
+            }
+        }
+    }
+
+    private List<string> ExtractTagIds(dynamic ship, string propertyName)
+    {
+        var ids = new List<string>();
+        var prop = ship.GetType().GetProperty(propertyName);
+        if (prop == null)
+            return ids;
+
+        var tagsObj = prop.GetValue(ship);
+        if (tagsObj is StarBreaker.DataCoreGenerated.TagList tagList)
+        {
+            foreach (var t in tagList.@tags)
+            {
+                if (t != null) ids.Add(t.selfId.ToString());
+            }
+        }
+        else if (tagsObj != null)
+        {
+            foreach (dynamic t in tagsObj)
+            {
+                if (t != null) ids.Add(t.selfId.ToString());
+            }
+        }
+
+        return ids;
+    }
+
+    /* ========================================================================
+     * SHIP DEFINITIONS EXTRACTION
+     * ======================================================================== */
+
     private List<EntityClassDefinition> ExtractShipDefs(ContractBase contract)
     {
         var defs = new HashSet<EntityClassDefinition>();
-        if (contract.template?.objectiveTokens == null) return defs.ToList();
+        if (contract.template?.objectiveTokens == null)
+            return defs.ToList();
 
         foreach (var token in contract.template.objectiveTokens)
         {
@@ -679,11 +894,13 @@ public class LocalDatabaseService : ILocalDatabaseService
                 }
                 break;
             case HaulingOrder_Property prop:
-                var haulingProperty = contract.template?.contractProperties.FirstOrDefault(p => p.value is MissionPropertyValue_HaulingOrders);
-                if (haulingProperty == null) break;
+                var haulingProperty = contract.template?.contractProperties
+                    .FirstOrDefault(p => p.value is MissionPropertyValue_HaulingOrders);
+                if (haulingProperty == null) return;
 
                 var propertyKey = haulingProperty.missionVariableName;
-                var overrideProp = contract.paramOverrides.propertyOverrides.FirstOrDefault(p => p.missionVariableName == propertyKey);
+                var overrideProp = contract.paramOverrides.propertyOverrides
+                    .FirstOrDefault(p => p.missionVariableName == propertyKey);
 
                 var haulingOrders = (overrideProp?.value as MissionPropertyValue_HaulingOrders) 
                                    ?? (haulingProperty.value as MissionPropertyValue_HaulingOrders);
@@ -731,81 +948,581 @@ public class LocalDatabaseService : ILocalDatabaseService
         return Enumerable.Empty<EntityClassDefinition>();
     }
 
-    public async Task<List<MissionEntity>> GetMissionsForShipAsync(string shipGuid)
-    {
-        using var db = new StarXelemDbContext(GetOptions());
-        return await db.Missions
-            .Where(m => m.ShipRequirements.Any(sr => sr.ShipGuid == shipGuid))
-            .ToListAsync();
-    }
+    /* ========================================================================
+     * MISSION REWARDS
+     * ======================================================================== */
 
-    public async Task<List<ShipEntity>> GetShipsForMissionAsync(string missionId)
+    private async Task<int> ProcessMissionRewards(string missionId, dynamic contract, StarXelemDbContext db)
     {
-        using var db = new StarXelemDbContext(GetOptions());
-        return await db.Ships
-            .Where(s => s.MissionRequirements.Any(mr => mr.MissionId == missionId))
-            .ToListAsync();
-    }
+        var count = 0;
 
-    private async Task PopulateTagHierarchyAsync(StarXelemDbContext db, Dictionary<string, string> map)
-    {
-        var database = await _p4kService.GetTagDatabase();
-        
-        try
+        if (contract.contractResults?.contractResults == null)
+            return 0;
+
+        if (contract.contractResults.contractBuyInAmount > 0)
         {
-            var tagEntities = new List<TagEntity>();
+            var mission = db.Missions.Find(missionId);
+            if (mission != null)
+                mission.AUECCost = (decimal)contract.contractResults.contractBuyInAmount;
+        }
 
-            // We need to process tags in a way that we can resolve parents.
-            // Since the XML is nested, we can use a recursive function to build the hierarchy.
-            
-            void ParseTagsRecursive(Tag tagElement, string? parentName, string currentPath)
-            {
-                var id = tagElement.selfId.ToString();
-                var name = tagElement.tagName;
+        var resultArray = contract.contractResults.contractResults as ContractResultBase[];
+        foreach (var resultBase in resultArray ?? Array.Empty<ContractResultBase>())
+        {
+            if (resultBase == null)
+                continue;
 
-                if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(name))
+            count += await ProcessSingleReward(missionId, resultBase, contract, db);
+        }
+
+        return count;
+    }
+
+    private async Task<int> ProcessSingleReward(
+        string missionId, 
+        ContractResultBase resultBase, 
+        dynamic contract, 
+        StarXelemDbContext db)
+    {
+        switch (resultBase)
+        {
+            case ContractResult_CalculatedReward calculatedReward:
                 {
-                    var newPath = string.IsNullOrEmpty(currentPath) ? name : $"{currentPath}/{name}";
+                    var computed = await ComputeAUECReward(contract, calculatedReward);
+                    var mission = db.Missions.Find(missionId);
+                    if (mission != null)
+                        mission.AUECReward = (decimal)computed;
+                }
+                return 0;
 
-                    tagEntities.Add(new TagEntity
+            case BlueprintRewards blueprintRewards:
+                {
+                    var poolRef = blueprintRewards.blueprintPool?.selfId.ToString();
+                    if (!string.IsNullOrEmpty(poolRef))
                     {
-                        Name = name,
-                        SelfId = id,
-                        ParentName = parentName,
-                        Path = newPath
-                    });
-
-                    map[id] = name;
-
-                    if (tagElement.children != null)
-                    {
-                        foreach (var child in tagElement.children)
+                        var poolEntity = new MissionBlueprintPoolEntity
                         {
-                            ParseTagsRecursive(child, name, newPath);
+                            MissionId = missionId,
+                            BlueprintPoolRef = poolRef
+                        };
+                        db.MissionBlueprintPools.Add(poolEntity);
+
+                        db.MissionRewards.Add(new MissionRewardEntity
+                        {
+                            MissionId = missionId,
+                            RewardType = "BlueprintRewards",
+                            DisplayValue = $"Blueprint pool (chance: {blueprintRewards.chance * 100}%)",
+                            IsCalculated = false
+                        });
+
+                        if (blueprintRewards.blueprintPool?.blueprintRewards != null)
+                        {
+                            await ProcessBlueprintPoolsAsync(blueprintRewards.blueprintPool, db, poolEntity);
                         }
                     }
                 }
-            }
+                return 1;
 
-            if (database.tags != null)
-            {
-                foreach (var tag in database.tags)
+            case ContractResult_Reward reward:
                 {
-                    ParseTagsRecursive(tag, null, "");
+                    var contractReward = reward.contractReward;
+                    if (contractReward != null)
+                    {
+                        var currencyName = Enum.GetName(typeof(CurrencyType), contractReward.currencyType);
+                        db.MissionRewards.Add(new MissionRewardEntity
+                        {
+                            MissionId = missionId,
+                            RewardType = "ContractResult_Reward",
+                            DisplayValue = string.Format("{0:N0} {1}", contractReward.reward, currencyName),
+                            IsCalculated = false
+                        });
+                        return 1;
+                    }
                 }
-            }
-            
-            db.Tags.AddRange(tagEntities);
-            await db.SaveChangesAsync();
-            
-            _logger.LogInformation("Populated {Count} tags into database and resolution map.", tagEntities.Count);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to populate tag hierarchy from P4K");
+                return 0;
+
+            case ContractResult_Item item:
+                {
+                    var entityName = await _p4kService.GetEntityClassName(item.entityClass) ?? "Inconnu";
+                    db.MissionRewards.Add(new MissionRewardEntity
+                    {
+                        MissionId = missionId,
+                        RewardType = "ContractResult_Item",
+                        DisplayValue = string.Format("{0} x {1}", entityName, item.amount),
+                        IsCalculated = false
+                    });
+                }
+                return 1;
+
+            case ContractResult_BadgeAward badgeAward:
+                {
+                    db.MissionRewards.Add(new MissionRewardEntity
+                    {
+                        MissionId = missionId,
+                        RewardType = "ContractResult_BadgeAward",
+                        DisplayValue = badgeAward.badgeToAward.ToString(),
+                        IsCalculated = false
+                    });
+                }
+                return 1;
+
+            case ContractResult_ScenarioProgress scenarioProgress:
+                {
+                    db.MissionRewards.Add(new MissionRewardEntity
+                    {
+                        MissionId = missionId,
+                        RewardType = "ContractResult_ScenarioProgress",
+                        DisplayValue = string.Format("{0:N0} points", scenarioProgress.PointsToAward),
+                        IsCalculated = false
+                    });
+                }
+                return 1;
+
+            case ContractResult_LegacyReputation legacyRep:
+                {
+                    var amounts = legacyRep.contractResultReputationAmounts;
+                    var rewardValue = amounts?.reward?.reputationAmount ?? 0;
+                    var scopeName = await _p4kService.GetLocaleValue(amounts?.reputationScope?.displayName);
+                    var factionName = await _p4kService.GetLocaleValue(amounts?.factionReputation?.displayName);
+
+                    db.MissionRewards.Add(new MissionRewardEntity
+                    {
+                        MissionId = missionId,
+                        RewardType = "ContractResult_LegacyReputation",
+                        DisplayValue = string.Format("{0:N0} points de réputation {1} pour {2}", rewardValue, scopeName, factionName),
+                        IsCalculated = false
+                    });
+                }
+                return 1;
+
+            case ContractResult_CalculatedReputation reputation:
+                {
+                    var scopeName = await _p4kService.GetLocaleValue(reputation.reputationScope?.displayName);
+                    var factionName = await _p4kService.GetLocaleValue(reputation.factionReputation?.displayName);
+                    db.MissionRewards.Add(new MissionRewardEntity
+                    {
+                        MissionId = missionId,
+                        RewardType = "ContractResult_CalculatedReputation",
+                        DisplayValue = $"Réputation: {scopeName} → {factionName}",
+                        IsCalculated = false
+                    });
+                }
+                return 1;
+
+            case ContractResult_CompletionTags completionTags:
+                {
+                    var tagNames = new List<string>();
+                    foreach (var ct in completionTags.completionTags)
+                    {
+                        tagNames.Add($"'{ct.tag?.tagName}'");
+                    }
+                    db.MissionRewards.Add(new MissionRewardEntity
+                    {
+                        MissionId = missionId,
+                        RewardType = "ContractResult_CompletionTags",
+                        DisplayValue = $"Tags: {string.Join(", ", tagNames)}",
+                        IsCalculated = false
+                    });
+                }
+                return 1;
+
+            default:
+                {
+                    var type = resultBase.GetType().Name;
+                    db.MissionRewards.Add(new MissionRewardEntity
+                    {
+                        MissionId = missionId,
+                        RewardType = type,
+                        DisplayValue = type,
+                        IsCalculated = false
+                    });
+                }
+                return 1;
         }
     }
-    
+
+    /* ========================================================================
+     * AUEC REWARD COMPUTATION
+     * ======================================================================== */
+
+    private async Task<float> ComputeAUECReward(ContractBase contract, ContractResult_CalculatedReward _cr)
+    {
+        try
+        {
+            if (contract.contractResults.difficulty is null)
+                return 0f;
+
+            var scDefaultRecord = await _p4kService.GetRecordWithSpecificDepth(
+                new CigGuid("330ce5d3-fb01-4f82-8708-3154a3a4b78a"), 1).ConfigureAwait(false);
+            var uecCurve = ((scDefaultRecord?.Data as GameMode)?.subsumptionMissionModule as SSubsumptionMission)?.uecCurve;
+            if (uecCurve == null)
+                return 0f;
+
+            double i = uecCurve.i;
+            double steepness = uecCurve.k;
+            double midpoint = uecCurve.m;
+
+            int mechanicalSkill = (int)contract.contractResults.difficulty.mechanicalSkill;
+            int mentalLoad = (int)contract.contractResults.difficulty.mentalLoad;
+            int riskOfLoss = (int)contract.contractResults.difficulty.riskOfLoss;
+            int gameKnowledge = (int)contract.contractResults.difficulty.gameKnowledge;
+
+            double mechWeight = contract.contractResults.difficulty.difficultyProfile?.mechanicalSkillWeight ?? 1.0;
+            double mentalWeight = contract.contractResults.difficulty.difficultyProfile?.mentalLoadWeight ?? 1.0;
+            double riskWeight = contract.contractResults.difficulty.difficultyProfile?.riskOfLossWeight ?? 1.0;
+            double gameWeight = contract.contractResults.difficulty.difficultyProfile?.gameKnowledgeWeight ?? 1.0;
+
+            double difficultyScore =
+                (mechanicalSkill + 1.0) * mechWeight +
+                (mentalLoad + 1.0) * mentalWeight +
+                (riskOfLoss + 1.0) * riskWeight +
+                (gameKnowledge + 1.0) * gameWeight;
+
+            var timeToComplete = contract.contractResults.timeToComplete;
+            double rewardRaw = Math.Exp((difficultyScore - midpoint) * steepness) * i * (timeToComplete / 60.0);
+            double aUEC = Math.Round((rewardRaw / 250.0)) * 250;
+            int rounded = Math.Max(0, (int)Math.Round(aUEC));
+            return rounded;
+        }
+        catch
+        {
+            return 0f;
+        }
+    }
+
+    /* ========================================================================
+     * BLUEPRINTS
+     * ======================================================================== */
+
+    private readonly Dictionary<string, BlueprintEntity> _blueprintCache = new();
+
+    private async Task ProcessAllBlueprintsAsync(StarXelemDbContext db, CancellationToken cancellationToken)
+    {
+        var allBlueprints = await _p4kService.GetAllCraftingBlueprintRecord();
+        _logger.LogInformation("Found {Count} blueprint records in P4K.", allBlueprints.Count);
+
+        var start = Stopwatch.StartNew();
+        int count = 0;
+
+        foreach (var record in allBlueprints)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (record.Data is not CraftingBlueprintRecord)
+                continue;
+
+            var bpId = record.RecordId.ToString();
+            if (_blueprintCache.ContainsKey(bpId))
+                continue;
+
+            var blueprintEntity = await IngestBlueprintAsync(bpId, db);
+            if (blueprintEntity != null)
+            {
+                _blueprintCache[bpId] = blueprintEntity;
+                count++;
+            }
+
+            if (count % 50 == 0)
+            {
+                await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        start.Stop();
+        _logger.LogInformation("Ingested {Count} new blueprints (total in cache: {CacheCount}).", count, _blueprintCache.Count);
+        _logger.LogInformation("All blueprints processed in {Elapsed}ms.", start.ElapsedMilliseconds);
+    }
+
+    private async Task ProcessBlueprintPoolsAsync(dynamic blueprintPool, StarXelemDbContext db, MissionBlueprintPoolEntity poolEntity)
+    {
+        if (blueprintPool?.blueprintRewards == null)
+            return;
+
+        foreach (var blueprintReward in (blueprintPool.blueprintRewards as dynamic[]) ?? Array.Empty<dynamic>())
+        {
+            if (blueprintReward == null)
+                continue;
+
+            var bpRecord = blueprintReward.blueprintRecord;
+            if (bpRecord?.selfId == null)
+                continue;
+
+            var bpId = bpRecord.selfId.ToString();
+            var entry = new MissionBlueprintEntryEntity
+            {
+                Pool = poolEntity,
+                BlueprintRef = bpId,
+                Weight = blueprintReward.weight
+            };
+            db.MissionBlueprintEntries.Add(entry);
+
+            if (_blueprintCache.ContainsKey(bpId))
+                continue;
+
+            var blueprintEntity = await IngestBlueprintAsync(bpId, db);
+            if (blueprintEntity != null)
+            {
+                _blueprintCache[bpId] = blueprintEntity;
+            }
+        }
+    }
+
+    private async Task<BlueprintEntity?> IngestBlueprintAsync(string blueprintId, StarXelemDbContext db)
+    {
+        var bpRecord = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(blueprintId), 4);
+        var b = bpRecord?.Data as CraftingBlueprintRecord;
+
+        if (b?.blueprint is not CraftingBlueprint craftingBlueprint)
+        {
+            _logger.LogWarning("Failed to get blueprint record for {BlueprintId}", blueprintId);
+            return null;
+        }
+
+        var (processType, outputEntityClassRef) = ResolveProcessType(craftingBlueprint.processSpecificData);
+        
+        var blueprintName = await ResolveBlueprintName(craftingBlueprint, craftingBlueprint.processSpecificData);
+
+        var blueprintEntity = new BlueprintEntity
+        {
+            SelfId = blueprintId,
+            BlueprintName = blueprintName,
+            CategoryRef = craftingBlueprint.category?.selfId.ToString() ?? "",
+            CategoryName = "Unknown",
+            ProcessType = processType,
+            OutputEntityClassRef = outputEntityClassRef
+        };
+
+        var craftingRecipe = craftingBlueprint.tiers.OfType<CraftingBlueprintTier>().FirstOrDefault()?.recipe as CraftingRecipe;
+
+        if (craftingRecipe?.costs is CraftingRecipeCosts costs)
+        {
+            db.Blueprints.Add(blueprintEntity);
+            await db.SaveChangesAsync();
+            await IngestRecipeCostsAsync(blueprintEntity, costs, db);
+        }
+        else
+        {
+            db.Blueprints.Add(blueprintEntity);
+            await db.SaveChangesAsync();
+        }
+
+        return blueprintEntity;
+    }
+
+    private (string ProcessType, string? OutputEntityClassRef) ResolveProcessType(object? processSpecificData)
+    {
+        return processSpecificData switch
+        {
+            CraftingProcess_Creation creation => ("Creation", creation.entityClass?.selfId.ToString()),
+            CraftingProcess_Dismantle dismantle => ("Dismantle", dismantle.entityClass?.selfId.ToString()),
+            CraftingProcess_Upgrade upgrade => ("Upgrade", upgrade.entityClass?.selfId.ToString()),
+            CraftingProcess_Refining _ => ("Refining", null),
+            CraftingProcess_Repair repair => ("Repair", repair.entityClass?.selfId.ToString()),
+            _ => (string.Empty, null)
+        };
+    }
+
+    private async Task<string> ResolveBlueprintName(CraftingBlueprint blueprint, object? processSpecificData)
+    {
+        EntityClassDefinition? entityClass = null;
+
+        if (processSpecificData is CraftingProcess_Creation creation)
+            entityClass = creation.entityClass;
+        else if (processSpecificData is CraftingProcess_Dismantle dismantle)
+            entityClass = dismantle.entityClass;
+        else if (processSpecificData is CraftingProcess_Upgrade upgrade)
+            entityClass = upgrade.entityClass;
+        else if (processSpecificData is CraftingProcess_Repair repair)
+            entityClass = repair.entityClass;
+
+        if (entityClass != null)
+        {
+            var name = await _p4kService.GetEntityClassName(entityClass);
+            if (!string.IsNullOrEmpty(name))
+                return name;
+        }
+
+        if (!string.IsNullOrEmpty(blueprint.blueprintName))
+        {
+            var resolved = await _p4kService.GetLocaleValue(blueprint.blueprintName);
+            if (!string.IsNullOrEmpty(resolved))
+                return resolved;
+        }
+
+        return "Unknown";
+    }
+
+    private async Task IngestRecipeCostsAsync(BlueprintEntity blueprintEntity, CraftingRecipeCosts costs, StarXelemDbContext db)
+    {
+        var mandatoryCost = costs.mandatoryCost as CraftingCost_Select;
+        if (mandatoryCost == null)
+        {
+            _logger.LogWarning("Mandatory cost is not CraftingCost_Select for blueprint {BlueprintId}", blueprintEntity.SelfId);
+            return;
+        }
+
+        if (costs.optionalCosts != null)
+        {
+            ProcessOptionalCosts(blueprintEntity, costs.optionalCosts, db);
+        }
+
+        foreach (var craftingCostOption in mandatoryCost.options)
+        {
+            if (craftingCostOption is not CraftingCost_Select costSelect)
+                continue;
+
+            var categoryName = await _p4kService.GetLocaleValue(costSelect.nameInfo.displayName) ?? "Unknown";
+
+            var costEntities = new List<BlueprintRecipeCostEntity>();
+            foreach (var costOption in costSelect.options)
+            {
+                var costEntity = ProcessCostOption(blueprintEntity, costOption, categoryName, db);
+                if (costEntity != null)
+                    costEntities.Add(costEntity);
+            }
+
+            await db.SaveChangesAsync();
+
+            foreach (var modifierContext in costSelect.context.OfType<CraftingCostContext_ResultGameplayPropertyModifiers>())
+            {
+                var modifiers = await ExtractModifierEntitiesAsync(modifierContext);
+                foreach (var costEntity in costEntities)
+                {
+                    foreach (var modifier in modifiers)
+                    {
+                        modifier.CostId = costEntity.Id;
+                        db.BlueprintModifiers.Add(modifier);
+                    }
+                }
+            }
+        }
+    }
+
+    private void ProcessOptionalCosts(BlueprintEntity blueprintEntity, dynamic[] optionalEntries, StarXelemDbContext db)
+    {
+        foreach (var opt in optionalEntries)
+        {
+            if (opt is not CraftingOptionalEntry optionalEntry)
+                continue;
+
+            var cost = optionalEntry.optionalCost;
+            ProcessCostOption(blueprintEntity, cost, "Optional", db);
+        }
+    }
+
+    private BlueprintRecipeCostEntity? ProcessCostOption(BlueprintEntity blueprintEntity, dynamic? costOption, string costName, StarXelemDbContext db)
+    {
+        if (costOption == null)
+            return null;
+
+        switch (costOption)
+        {
+            case CraftingCost_Resource resourceCost:
+                {
+                    float rawQuantity = (resourceCost.quantity as SStandardCargoUnit)?.standardCargoUnits ?? 0f;
+                    var entity = new BlueprintRecipeCostEntity
+                    {
+                        BlueprintId = blueprintEntity.SelfId,
+                        CostType = "Resource",
+                        CostName = costName,
+                        ResourceRef = resourceCost.resource?.selfId.ToString() ?? "unknown",
+                        ResourceAmount = (decimal)rawQuantity
+                    };
+                    db.BlueprintRecipeCosts.Add(entity);
+                    return entity;
+                }
+
+            case CraftingCost_Item itemCost:
+                {
+                    var entity = new BlueprintRecipeCostEntity
+                    {
+                        BlueprintId = blueprintEntity.SelfId,
+                        CostType = "Item",
+                        CostName = costName,
+                        ItemEntityClassRef = itemCost.entityClass?.selfId.ToString() ?? "unknown",
+                        ItemCount = itemCost.quantity,
+                        MinQuality = itemCost.minQuality
+                    };
+                    db.BlueprintRecipeCosts.Add(entity);
+                    return entity;
+                }
+
+            default:
+                _logger.Log(LogLevel.Warning, 0, "Unknown cost option type for blueprint {BlueprintId}: {Type}", 
+                    new object?[] { blueprintEntity.SelfId, costOption.GetType().FullName }, null, default);
+                return null;
+        }
+    }
+
+    private async Task<List<BlueprintModifierEntity>> ExtractModifierEntitiesAsync(
+        CraftingCostContext_ResultGameplayPropertyModifiers modifierContext)
+    {
+        var modifiers = new List<BlueprintModifierEntity>();
+
+        var modifierList = modifierContext.gameplayPropertyModifiers as CraftingGameplayPropertyModifiers_List;
+        if (modifierList?.gameplayPropertyModifiers == null)
+            return modifiers;
+
+        foreach (var rawModifier in modifierList.gameplayPropertyModifiers)
+        {
+            var modifier = rawModifier as CraftingGameplayPropertyModifierCommon;
+            if (modifier == null)
+            {
+                _logger.LogWarning("Modifier not castable: {Type}", rawModifier?.GetType().FullName);
+                continue;
+            }
+
+            var propertyName = await _p4kService.GetLocaleValue(modifier.gameplayPropertyRecord?.propertyName);
+
+            var linearRanges = modifier.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_Linear>().ToList();
+            if (linearRanges is { Count: > 0 })
+            {
+                foreach (var range in linearRanges)
+                {
+                    modifiers.Add(new BlueprintModifierEntity
+                    {
+                        RangeType = "Linear",
+                        PropertyName = propertyName ?? string.Empty,
+                        StartQuality = range.startQuality,
+                        EndQuality = range.endQuality,
+                        ModifierStart = (decimal)range.modifierAtStart,
+                        ModifierEnd = (decimal)range.modifierAtEnd
+                    });
+                }
+            }
+            else
+            {
+                var additiveRanges = modifier.valueRanges
+                    .OfType<CraftingGameplayPropertyModifierValueRange_LinearIntegerAdditive>().ToList();
+                if (additiveRanges is { Count: > 0 })
+                {
+                    foreach (var range in additiveRanges)
+                    {
+                        modifiers.Add(new BlueprintModifierEntity
+                        {
+                            RangeType = "Additive",
+                            PropertyName = propertyName ?? string.Empty,
+                            StartQuality = range.startQuality,
+                            EndQuality = range.endQuality,
+                            ModifierStart = (decimal)range.additiveModifierAtStart,
+                            ModifierEnd = (decimal)range.additiveModifierAtEnd
+                        });
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("No recognized modifier range for property {Name}", propertyName);
+                    continue;
+                }
+            }
+        }
+
+        return modifiers;
+    }
+
+    /* ========================================================================
+     * TAG RESOLUTION
+     * ======================================================================== */
+
     private string? ResolveTag(object? tag, Dictionary<string, string> map)
     {
         if (tag == null) return null;
@@ -835,517 +1552,23 @@ public class LocalDatabaseService : ILocalDatabaseService
         return null;
     }
 
-    /// <summary>
-    /// Extracts and stores mission rewards into the local database.
-    /// For aUEC rewards, computes the actual value using the difficulty curve formula.
-    /// For blueprint rewards, recursively processes pools and blueprint details.
-    /// </summary>
-    private async Task<int> ProcessMissionRewards(string missionId, dynamic contract, StarXelemDbContext db)
+    /* ========================================================================
+     * QUERY METHODS
+     * ======================================================================== */
+
+    public async Task<List<MissionEntity>> GetMissionsForShipAsync(string shipGuid)
     {
-                var count = 0;
-
-                if (contract.contractResults?.contractResults == null)
-                    return 0;
-
-                // Store aUEC cost (buy-in) on mission
-                if (contract.contractResults.contractBuyInAmount > 0)
-                {
-                    var mission = db.Missions.Find(missionId);
-                    if (mission != null)
-                        mission.AUECCost = (decimal)contract.contractResults.contractBuyInAmount;
-                }
-
-                var resultArray = contract.contractResults.contractResults as ContractResultBase[];
-                foreach (var resultBase in resultArray ?? Array.Empty<ContractResultBase>())
-        {
-            if (resultBase == null)
-                continue;
-
-            switch (resultBase)
-            {
-                case ContractResult_CalculatedReward calculatedReward:
-                    {
-                         var computed = await ComputeAUECReward(contract, calculatedReward);
-                        var mission = db.Missions.Find(missionId);
-                        if (mission != null)
-                            mission.AUECReward = (decimal)computed;
-                    }
-                    break;
-
-                case BlueprintRewards blueprintRewards:
-                    {
-                        var poolRef = blueprintRewards.blueprintPool?.selfId.ToString();
-                        if (!string.IsNullOrEmpty(poolRef))
-                        {
-                            var poolEntity = new MissionBlueprintPoolEntity
-                            {
-                                MissionId = missionId,
-                                BlueprintPoolRef = poolRef
-                            };
-                            db.MissionBlueprintPools.Add(poolEntity);
-
-                            db.MissionRewards.Add(new MissionRewardEntity
-                            {
-                                MissionId = missionId,
-                                RewardType = "BlueprintRewards",
-                                DisplayValue = $"Blueprint pool (chance: {blueprintRewards.chance * 100}%)",
-                                IsCalculated = false
-                            });
-                            count++;
-
-                            // Ingest blueprints from the pool
-                            if (blueprintRewards.blueprintPool?.blueprintRewards != null)
-                            {
-                                await ProcessBlueprintPoolsAsync(blueprintRewards.blueprintPool, db, poolEntity);
-                            }
-                        }
-                    }
-                    break;
-
-                case ContractResult_Reward reward:
-                    {
-                        var contractReward = reward.contractReward;
-                        if (contractReward != null)
-                        {
-                            var currencyName = Enum.GetName(typeof(CurrencyType), contractReward.currencyType);
-                            db.MissionRewards.Add(new MissionRewardEntity
-                            {
-                                MissionId = missionId,
-                                RewardType = "ContractResult_Reward",
-                                DisplayValue = string.Format("{0:N0} {1}", contractReward.reward, currencyName),
-                                IsCalculated = false
-                            });
-                            count++;
-                        }
-                    }
-                    break;
-
-                case ContractResult_Item item:
-                    {
-                        var entityName = await _p4kService.GetEntityClassName(item.entityClass) ?? "Inconnu";
-                        db.MissionRewards.Add(new MissionRewardEntity
-                        {
-                            MissionId = missionId,
-                            RewardType = "ContractResult_Item",
-                            DisplayValue = string.Format("{0} x {1}", entityName, item.amount),
-                            IsCalculated = false
-                        });
-                        count++;
-                    }
-                    break;
-
-                case ContractResult_BadgeAward badgeAward:
-                    {
-                        db.MissionRewards.Add(new MissionRewardEntity
-                        {
-                            MissionId = missionId,
-                            RewardType = "ContractResult_BadgeAward",
-                            DisplayValue = badgeAward.badgeToAward.ToString(),
-                            IsCalculated = false
-                        });
-                        count++;
-                    }
-                    break;
-
-                case ContractResult_ScenarioProgress scenarioProgress:
-                    {
-                        db.MissionRewards.Add(new MissionRewardEntity
-                        {
-                            MissionId = missionId,
-                            RewardType = "ContractResult_ScenarioProgress",
-                            DisplayValue = string.Format("{0:N0} points", scenarioProgress.PointsToAward),
-                            IsCalculated = false
-                        });
-                        count++;
-                    }
-                    break;
-
-                case ContractResult_LegacyReputation legacyRep:
-                    {
-                        var amounts = legacyRep.contractResultReputationAmounts;
-                        var rewardValue = amounts?.reward?.reputationAmount ?? 0;
-                        var scopeName = await _p4kService.GetLocaleValue(amounts?.reputationScope?.displayName);
-                        var factionName = await _p4kService.GetLocaleValue(amounts?.factionReputation?.displayName);
-
-                        db.MissionRewards.Add(new MissionRewardEntity
-                        {
-                            MissionId = missionId,
-                            RewardType = "ContractResult_LegacyReputation",
-                            DisplayValue = string.Format("{0:N0} points de réputation {1} pour {2}", rewardValue, scopeName, factionName),
-                            IsCalculated = false
-                        });
-                        count++;
-                    }
-                    break;
-
-                case ContractResult_CalculatedReputation reputation:
-                    {
-                        var scopeName = await _p4kService.GetLocaleValue(reputation.reputationScope?.displayName);
-                        var factionName = await _p4kService.GetLocaleValue(reputation.factionReputation?.displayName);
-                        db.MissionRewards.Add(new MissionRewardEntity
-                        {
-                            MissionId = missionId,
-                            RewardType = "ContractResult_CalculatedReputation",
-                            DisplayValue = $"Réputation: {scopeName} → {factionName}",
-                            IsCalculated = false
-                        });
-                        count++;
-                    }
-                    break;
-
-                case ContractResult_CompletionTags completionTags:
-                    {
-                        var tagNames = new List<string>();
-                        foreach (var ct in completionTags.completionTags)
-                        {
-                            var tag = await _p4kService.GetLocaleValue(ct.tag?.tagName);
-                            tagNames.Add($"'{ct.tag?.tagName}'");
-                        }
-                        db.MissionRewards.Add(new MissionRewardEntity
-                        {
-                            MissionId = missionId,
-                            RewardType = "ContractResult_CompletionTags",
-                            DisplayValue = $"Tags: {string.Join(", ", tagNames)}",
-                            IsCalculated = false
-                        });
-                        count++;
-                    }
-                    break;
-
-                case ContractResult_JournalEntry _:
-                case ContractResult_RefundBuyIn _:
-                    {
-                        var type = resultBase.GetType().Name;
-                        db.MissionRewards.Add(new MissionRewardEntity
-                        {
-                            MissionId = missionId,
-                            RewardType = type,
-                            DisplayValue = type,
-                            IsCalculated = false
-                        });
-                        count++;
-                    }
-                    break;
-            }
-        }
-
-        return count;
+        using var db = new StarXelemDbContext(GetOptions());
+        return await db.Missions
+            .Where(m => m.ShipRequirements.Any(sr => sr.ShipGuid == shipGuid))
+            .ToListAsync();
     }
 
-    /// <summary>
-    /// Computes the aUEC reward using the difficulty curve formula.
-    /// Formula: Math.Exp((score - midpoint) * steepness) * i * (time / 60), then rounded to nearest 250.
-    /// </summary>
-     private async Task<float> ComputeAUECReward(ContractBase contract, ContractResult_CalculatedReward _cr)
+    public async Task<List<ShipEntity>> GetShipsForMissionAsync(string missionId)
     {
-        try
-        {
-            if (contract.contractResults.difficulty is null)
-                return 0f;
-
-            // Load sc_default.xml to get uecCurve parameters
-            var scDefaultRecord = await _p4kService.GetRecordWithSpecificDepth(new CigGuid("330ce5d3-fb01-4f82-8708-3154a3a4b78a"), 1).ConfigureAwait(false);
-            var uecCurve = ((scDefaultRecord?.Data as GameMode)?.subsumptionMissionModule as SSubsumptionMission)?.uecCurve;
-            if (uecCurve == null)
-                return 0f;
-
-            double i = uecCurve.i;
-            double steepness = uecCurve.k;
-            double midpoint = uecCurve.m;
-
-            int mechanicalSkill = (int)contract.contractResults.difficulty.mechanicalSkill;
-            int mentalLoad = (int)contract.contractResults.difficulty.mentalLoad;
-            int riskOfLoss = (int)contract.contractResults.difficulty.riskOfLoss;
-            int gameKnowledge = (int)contract.contractResults.difficulty.gameKnowledge;
-
-            double mechWeight = contract.contractResults.difficulty.difficultyProfile?.mechanicalSkillWeight ?? 1.0;
-            double mentalWeight = contract.contractResults.difficulty.difficultyProfile?.mentalLoadWeight ?? 1.0;
-            double riskWeight = contract.contractResults.difficulty.difficultyProfile?.riskOfLossWeight ?? 1.0;
-            double gameWeight = contract.contractResults.difficulty.difficultyProfile?.gameKnowledgeWeight ?? 1.0;
-
-            double difficultyScore =
-                (mechanicalSkill + 1.0) * mechWeight +
-                (mentalLoad + 1.0) * mentalWeight +
-                (riskOfLoss + 1.0) * riskWeight +
-                (gameKnowledge + 1.0) * gameWeight;
-
-            var timeToComplete = contract.contractResults.timeToComplete;
-
-            double rewardRaw = Math.Exp((difficultyScore - midpoint) * steepness) * i * (timeToComplete / 60.0);
-            double aUEC = Math.Round((rewardRaw / 250.0)) * 250;
-
-            int rounded = Math.Max(0, (int)Math.Round(aUEC));
-            return rounded;
-        }
-        catch
-        {
-            return 0f;
-        }
-    }
-
-    /// <summary>
-    /// Cached blueprint records to avoid redundant P4K lookups.
-    /// Key: blueprint selfId, Value: BlueprintEntity (or null if failed).
-    /// </summary>
-    private readonly Dictionary<string, BlueprintEntity> _blueprintCache = new();
-
-    /// <summary>
-    /// Processes blueprint pools recursively: creates pool entries, blueprint details, costs, results, and modifiers.
-    /// </summary>
-    private async Task ProcessBlueprintPoolsAsync(dynamic blueprintPool, StarXelemDbContext db, MissionBlueprintPoolEntity poolEntity)
-    {
-        if (blueprintPool?.blueprintRewards == null)
-            return;
-
-        foreach (var blueprintReward in (blueprintPool.blueprintRewards as dynamic[]) ?? Array.Empty<dynamic>())
-        {
-            if (blueprintReward == null) continue;
-
-            var bpRecord = blueprintReward.blueprintRecord;
-            if (bpRecord?.selfId == null) continue;
-
-            var bpId = bpRecord.selfId.ToString();
-            var entry = new MissionBlueprintEntryEntity
-            {
-                Pool = poolEntity,
-                BlueprintRef = bpId,
-                Weight = blueprintReward.weight
-            };
-            db.MissionBlueprintEntries.Add(entry);
-
-            // Already ingested?
-            if (_blueprintCache.ContainsKey(bpId))
-                continue;
-
-            var blueprintEntity = await IngestBlueprintAsync(bpId, db);
-            if (blueprintEntity != null)
-            {
-                _blueprintCache[bpId] = blueprintEntity;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Ingests blueprint details from P4K: category, rarity, name.
-    /// </summary>
-    private async Task<BlueprintEntity?> IngestBlueprintAsync(string blueprintId, StarXelemDbContext db)
-    {
-        var bpRecord = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(blueprintId), 4);
-        var b = bpRecord?.Data as CraftingBlueprintRecord;
-
-        if (b?.blueprint is not CraftingBlueprint craftingBlueprint)
-        {
-            _logger.LogWarning("Failed to get blueprint record for {BlueprintId}", blueprintId);
-            return null;
-        }
-
-        var blueprintName = string.IsNullOrEmpty(craftingBlueprint.blueprintName)
-            ? "Unknown"
-            : await _p4kService.GetLocaleValue(craftingBlueprint.blueprintName) ?? "Unknown";
-
-        // Determine process type and output entity
-        var processType = string.Empty;
-        var outputEntityClassRef = (string?)null;
-        if (craftingBlueprint.processSpecificData is CraftingProcess_Creation creation)
-        {
-            processType = "Creation";
-            outputEntityClassRef = creation.entityClass?.selfId.ToString();
-        }
-
-        var blueprintEntity = new BlueprintEntity
-        {
-            SelfId = blueprintId,
-            BlueprintName = blueprintName,
-            CategoryRef = craftingBlueprint.category?.selfId.ToString() ?? "",
-            CategoryName = "Unknown",
-            ProcessType = processType,
-            OutputEntityClassRef = outputEntityClassRef
-        };
-
-        // TODO: Resolve category name from BlueprintCategoryDatabase record
-
-        // Extract craft duration from costs
-        var craftingRecipe = craftingBlueprint.tiers.OfType<CraftingBlueprintTier>().FirstOrDefault()?.recipe as CraftingRecipe;
-
-        if (craftingRecipe?.costs is CraftingRecipeCosts costs)
-        {
-            db.Blueprints.Add(blueprintEntity);
-            await db.SaveChangesAsync();
-
-            await IngestRecipeCostsAsync(blueprintEntity, costs, db);
-        }
-        else
-        {
-            db.Blueprints.Add(blueprintEntity);
-            await db.SaveChangesAsync();
-        }
-
-        return blueprintEntity;
-    }
-
-    /// <summary>
-    /// Ingests mandatory and optional costs from a recipe.
-    /// </summary>
-    private async Task IngestRecipeCostsAsync(BlueprintEntity blueprintEntity, CraftingRecipeCosts costs, StarXelemDbContext db)
-    {
-        var mandatoryCost = costs.mandatoryCost as CraftingCost_Select;
-        if (mandatoryCost == null)
-        {
-            _logger.LogWarning("Mandatory cost is not CraftingCost_Select for blueprint {BlueprintId}", blueprintEntity.SelfId);
-            return;
-        }
-
-        // Process optional costs separately
-        if (costs.optionalCosts != null)
-        {
-            ProcessOptionalCosts(blueprintEntity, costs.optionalCosts, db);
-        }
-
-        foreach (var craftingCostOption in mandatoryCost.options)
-        {
-            if (craftingCostOption is not CraftingCost_Select costSelect)
-                continue;
-
-            var categoryName = await _p4kService.GetLocaleValue(costSelect.nameInfo.displayName) ?? "Unknown";
-
-            // Process materials within this cost category
-            foreach (var costOption in costSelect.options)
-            {
-                ProcessCostOption(blueprintEntity, costOption, categoryName, db);
-            }
-
-            // Process stat modifiers
-            var modifiers = new List<BlueprintModifierEntity>();
-            foreach (var modifierContext in costSelect.context.OfType<CraftingCostContext_ResultGameplayPropertyModifiers>())
-            {
-                modifiers.AddRange(await ExtractModifierEntitiesAsync(blueprintEntity, modifierContext));
-            }
-
-            db.BlueprintModifiers.AddRange(modifiers);
-        }
-    }
-
-    /// <summary>
-    /// Processes optional cost entries.
-    /// </summary>
-    private void ProcessOptionalCosts(BlueprintEntity blueprintEntity, dynamic[] optionalEntries, StarXelemDbContext db)
-    {
-        foreach (var opt in optionalEntries)
-        {
-            if (opt is not CraftingOptionalEntry optionalEntry)
-                continue;
-
-            var cost = optionalEntry.optionalCost;
-            ProcessCostOption(blueprintEntity, cost, "Optional", db);
-        }
-    }
-
-    /// <summary>
-    /// Processes a single cost option (resource or item) and creates corresponding DB entities.
-    /// </summary>
-    private void ProcessCostOption(BlueprintEntity blueprintEntity, dynamic? costOption, string costName, StarXelemDbContext db)
-    {
-        if (costOption == null)
-            return;
-
-        switch (costOption)
-        {
-            case CraftingCost_Resource resourceCost:
-                {
-                    float rawQuantity = (resourceCost.quantity as SStandardCargoUnit)?.standardCargoUnits ?? 0f;
-
-                    db.BlueprintRecipeCosts.Add(new BlueprintRecipeCostEntity
-                    {
-                        BlueprintId = blueprintEntity.SelfId,
-                        CostType = "Resource",
-                        CostName = costName,
-                        ResourceRef = resourceCost.resource?.selfId.ToString() ?? "unknown",
-                        ResourceAmount = (decimal)rawQuantity
-                    });
-                }
-                break;
-
-            case CraftingCost_Item itemCost:
-                {
-                    db.BlueprintRecipeCosts.Add(new BlueprintRecipeCostEntity
-                    {
-                        BlueprintId = blueprintEntity.SelfId,
-                        CostType = "Item",
-                        CostName = costName,
-                        ItemEntityClassRef = itemCost.entityClass?.selfId.ToString() ?? "unknown",
-                        ItemCount = itemCost.quantity,
-                        MinQuality = itemCost.minQuality
-                    });
-                }
-                break;
-
-            default:
-                _logger.Log(LogLevel.Warning, 0, "Unknown cost option type for blueprint {BlueprintId}: {Type}", new object?[] { blueprintEntity.SelfId, costOption.GetType().FullName }, null, default);
-                break;
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Ingests recipe results from a recipe.
-    /// </summary>
-
-
-    /// <summary>
-    /// Extracts modifier entities from a modifier context.
-    /// </summary>
-    private async Task<List<BlueprintModifierEntity>> ExtractModifierEntitiesAsync(
-        BlueprintEntity blueprintEntity, 
-        CraftingCostContext_ResultGameplayPropertyModifiers modifierContext)
-    {
-        var modifiers = new List<BlueprintModifierEntity>();
-
-        var modifierList = modifierContext.gameplayPropertyModifiers as CraftingGameplayPropertyModifiers_List;
-        if (modifierList?.gameplayPropertyModifiers == null)
-            return modifiers;
-
-        foreach (var rawModifier in modifierList.gameplayPropertyModifiers)
-        {
-            var modifier = rawModifier as CraftingGameplayPropertyModifierCommon;
-            if (modifier == null)
-            {
-                _logger.LogWarning("Modifier not castable for blueprint {BlueprintId}: {Type}", (object)blueprintEntity.SelfId, rawModifier?.GetType().FullName);
-                continue;
-            }
-
-            var propertyName = await _p4kService.GetLocaleValue(modifier.gameplayPropertyRecord?.propertyName);
-
-            var linearRanges = modifier.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_Linear>().ToList();
-            if (linearRanges is { Count: > 0 })
-            {
-                modifiers.Add(new BlueprintModifierEntity
-                {
-                    BlueprintId = blueprintEntity.SelfId,
-                    ContextType = "ResultGameplayPropertyModifiers",
-                    ParameterValue = $"Linear:{propertyName}:[{linearRanges[0].modifierAtStart}-{linearRanges[^1].modifierAtEnd}]"
-                });
-            }
-            else
-            {
-                var additiveRanges = modifier.valueRanges.OfType<CraftingGameplayPropertyModifierValueRange_LinearIntegerAdditive>().ToList();
-                if (additiveRanges is { Count: > 0 })
-                {
-                    modifiers.Add(new BlueprintModifierEntity
-                    {
-                        BlueprintId = blueprintEntity.SelfId,
-                        ContextType = "ResultGameplayPropertyModifiers",
-                        ParameterValue = $"Additive:{propertyName}:[{additiveRanges[0].startQuality}-{additiveRanges[^1].endQuality}]:{additiveRanges[0].additiveModifierAtStart}"
-                    });
-                }
-                else
-                {
-                    _logger.LogWarning("No recognized modifier range for property {Name} on blueprint {BlueprintId}", 
-                        propertyName, blueprintEntity.SelfId);
-                    continue;
-                }
-            }
-        }
-
-        return modifiers;
+        using var db = new StarXelemDbContext(GetOptions());
+        return await db.Ships
+            .Where(s => s.MissionRequirements.Any(mr => mr.MissionId == missionId))
+            .ToListAsync();
     }
 }

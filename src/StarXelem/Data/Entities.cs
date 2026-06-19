@@ -120,7 +120,9 @@ public class MissionEntity
     public string DebugName { get;set; } = string.Empty;
     public string GeneratorName { get;set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
+    public string? TitleKey { get; set; }
     public string Description { get;set; } = string.Empty;
+    public string? DescriptionKey { get; set; }
     public bool NotForRelease { get; set; }
     public bool WorkInProgress { get; set; }
 
@@ -299,7 +301,6 @@ public class BlueprintEntity
     public string? OutputEntityClassRef { get; set; }
 
     public virtual ICollection<BlueprintRecipeCostEntity> Costs { get; set; } = new List<BlueprintRecipeCostEntity>();
-    public virtual ICollection<BlueprintModifierEntity> Modifiers { get; set; } = new List<BlueprintModifierEntity>();
 }
 
 /// <summary>One cost (resource or item) or a Select-option inside a blueprint recipe.</summary>
@@ -324,22 +325,37 @@ public class BlueprintRecipeCostEntity
     public string? ItemEntityClassRef { get; set; }
     public int? ItemCount { get; set; }
     public int? MinQuality { get; set; }
+
+    public virtual ICollection<BlueprintModifierEntity> Modifiers { get; set; } = new List<BlueprintModifierEntity>();
 }
 
-/// <summary>Modifier context applied to a cost (quantity multipliers, composition inclusion, gameplay property modifiers).</summary>
+/// <summary>Modifier context applied to a cost slot (gameplay property modifiers).</summary>
 public class BlueprintModifierEntity
 {
     [Key]
     public int Id { get; set; }
 
+    /// <summary>FK to the recipe cost this modifier applies to.</summary>
     [Required]
-    public string BlueprintId { get; set; } = string.Empty;
-    [ForeignKey("BlueprintId")]
-    public virtual BlueprintEntity? Blueprint { get; set; }
+    public int CostId { get; set; }
+    [ForeignKey("CostId")]
+    public virtual BlueprintRecipeCostEntity? Cost { get; set; }
 
-    /// <summary>Context type: "QuantityMultiplier", "ResultCompositionInclusion", "ResultGameplayPropertyModifiers".</summary>
-    public string ContextType { get; set; } = string.Empty;
+    /// <summary>Range calculation: "Linear" (multiplicative) or "Additive".</summary>
+    public string RangeType { get; set; } = string.Empty;
 
-    /// <summary>Serialized parameter value (e.g. multiplier float, modifier name).</summary>
-    public string ParameterValue { get; set; } = string.Empty;
+    /// <summary>Gameplay property name (e.g. "Integrity", "Impact Force", "Power Pips").</summary>
+    public string PropertyName { get; set; } = string.Empty;
+
+    /// <summary>Start of quality range (0 = min quality).</summary>
+    public int StartQuality { get; set; }
+
+    /// <summary>End of quality range.</summary>
+    public int EndQuality { get; set; }
+
+    /// <summary>Modifier value at start quality.</summary>
+    public decimal ModifierStart { get; set; }
+
+    /// <summary>Modifier value at end quality (Linear only, 0 for Additive).</summary>
+    public decimal ModifierEnd { get; set; }
 }
