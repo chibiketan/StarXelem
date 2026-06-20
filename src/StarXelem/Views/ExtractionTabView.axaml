@@ -170,6 +170,13 @@
                             <TextBlock Classes="action-title" Text="Mise à jour du fichier de langue" />
                             <TextBlock Classes="action-desc"
                                        Text="Extrait les libellés des fichiers du jeu, identifie les composants, ajoute le type, la taille et le rang, puis dépose le fichier au bon endroit pour être utilisé par le jeu." />
+                            <CheckBox Content="Inclure les récompenses Blueprint"
+                                      IsChecked="{Binding IncludeBlueprints}"
+                                      FontSize="11" />
+                            <CheckBox Content="Marquer les BP déjà obtenus"
+                                      IsChecked="{Binding IncludeObtainedBlueprints}"
+                                      IsEnabled="{Binding IsGrpcConnected}"
+                                      FontSize="11" />
                         </StackPanel>
 
                         <Button Grid.Column="2"

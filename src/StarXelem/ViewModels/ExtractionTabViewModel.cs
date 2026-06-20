@@ -19,6 +19,8 @@ public partial class ExtractionTabViewModel : PageViewModelBase
 {
     private const string DataCorePath = @"Data\Game2.dcb";
     private readonly IP4kService _p4kService;
+    private readonly ILocalDatabaseService _localDatabaseService;
+    private readonly IGrpcClientService _grpcClientService;
     private readonly ILogger<ExtractionTabViewModel> _logger;
 
     public override string Name => "Extractions";
@@ -41,13 +43,38 @@ public partial class ExtractionTabViewModel : PageViewModelBase
     [ObservableProperty] private string _statusMessage = "";
     [ObservableProperty] private double _csvProgress = 0;
     [ObservableProperty] private double _langProgress = 0;
+    [ObservableProperty] private bool _includeBlueprints = true;
+    [ObservableProperty] private bool _includeObtainedBlueprints = false;
+    [ObservableProperty] private bool _isGrpcConnected = false;
 
-    public ExtractionTabViewModel(IP4kService p4kService, ILogger<ExtractionTabViewModel> logger)
+    public ExtractionTabViewModel(IP4kService p4kService, ILocalDatabaseService localDatabaseService, IGrpcClientService grpcClientService, ILogger<ExtractionTabViewModel> logger)
     {
         _p4kService = p4kService;
+        _localDatabaseService = localDatabaseService;
+        _grpcClientService = grpcClientService;
         _logger = logger;
         
         _p4kService.SelectedP4KFileChanged += (sender, model) => OnSelectedP4KFileChanged();
+        _grpcClientService.OnStatusChanged += OnGrpcStatusChanged;
+        UpdateGrpcConnectedState();
+    }
+
+    private void OnGrpcStatusChanged(object? sender, GrpcConnectionStatus status)
+    {
+        UpdateGrpcConnectedState();
+    }
+
+    private void UpdateGrpcConnectedState()
+    {
+        var connected = _grpcClientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame;
+        if (IsGrpcConnected != connected)
+        {
+            IsGrpcConnected = connected;
+            if (!connected)
+            {
+                IncludeObtainedBlueprints = false;
+            }
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanExtract))]
@@ -194,6 +221,25 @@ public partial class ExtractionTabViewModel : PageViewModelBase
             
             await Dispatcher.UIThread.InvokeAsync(() => LangProgress = 60);
 
+            // Query DB for missions with blueprint pools to build BP suffix maps
+            Dictionary<string, string> titleSuffixMap = new();
+            Dictionary<string, Dictionary<string, HashSet<string>>> descAppendMap = new();
+
+            if (IncludeBlueprints)
+            {
+                UpdateStatusMessage("Chargement des récompenses BP depuis la base de données...");
+                HashSet<string>? obtainedIds = null;
+
+                if (IncludeObtainedBlueprints && IsGrpcConnected)
+                {
+                    UpdateStatusMessage("Chargement des BP obtenus depuis le jeu...");
+                    var grpcBps = await _grpcClientService.GetBlueprintList().ConfigureAwait(false);
+                    obtainedIds = grpcBps.Select(e => e.BlueprintId).ToHashSet();
+                }
+
+                (titleSuffixMap, descAppendMap) = await _localDatabaseService.GetBlueprintRewardMapsAsync(obtainedIds);
+            }
+
             // extract localisation file, check each line then write the final file
             UpdateStatusMessage("Ecriture du fichier de localisation en cours...");
             await using var rawStream = _p4kService.P4KFileSystem.OpenRead(@"Data\Localization\english\global.ini");
@@ -204,8 +250,6 @@ public partial class ExtractionTabViewModel : PageViewModelBase
 
             if (!file.Exists)
             {
-                // Le fichier n'existe pas déjà
-                // Ensure directory exists
                 file.Directory!.Create();
             }
 
@@ -216,13 +260,42 @@ public partial class ExtractionTabViewModel : PageViewModelBase
             while (null != (line = await textReader.ReadLineAsync()))
             {
                 var split = line.Split('=', 2);
+                var key = split[0];
 
-                if (replacementMap.TryGetValue(split[0], out var prefix))
+                if (replacementMap.TryGetValue(key, out var prefix))
                 {
                     split[1] = $"{prefix} {split[1]}";
                 }
+
+                if (titleSuffixMap.TryGetValue(key, out var suffix))
+                {
+                    split[1] = $"{split[1]} {suffix}";
+                }
+
+                if (descAppendMap.TryGetValue(key, out var poolMap))
+                {
+                    var sb = new StringBuilder(split[1]);
+                    foreach (var (poolName, bpSet) in poolMap.OrderBy(p => p.Key))
+                    {
+                        sb.Append($"\\n\\n<EM3>**{poolName}**</EM3>");
+                        foreach (var bpName in bpSet.OrderBy(n => n))
+                        {
+                            sb.Append($"\\n- {bpName}");
+                        }
+                    }
+                    split[1] = sb.ToString();
+                }
+
+                if (key == "Journal_General_Mining_Compendium_Content")
+                {
+                    var val = "";
+                    for (var i = 0; i <= 20; ++i)
+                    {
+                        val += $"<EM{i}>Un texte d'essai avec la balise EM{i}</EM{i}>\\n";
+                    }
+                    split[1] = $"Test des couleurs EM\\n\\n{val}\\n\\n\\n\\n{split[1]}";
+                }
                 
-                // On écrit dans le fichier final
                 fileWriter.WriteLine(string.Join('=', split));
             }
 

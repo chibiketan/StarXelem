@@ -110,7 +110,7 @@ public class StarXelemDbContext : DbContext
         // Blueprint pools
         modelBuilder.Entity<MissionBlueprintPoolEntity>()
             .HasOne(p => p.Mission)
-            .WithMany()
+            .WithMany(m => m.BlueprintPools)
             .HasForeignKey(p => p.MissionId)
             .OnDelete(DeleteBehavior.Cascade);
 
@@ -119,6 +119,12 @@ public class StarXelemDbContext : DbContext
             .WithMany(p => p.Entries)
             .HasForeignKey(e => e.PoolId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MissionBlueprintEntryEntity>()
+            .HasOne(e => e.Blueprint)
+            .WithMany()
+            .HasForeignKey(e => e.BlueprintId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Blueprint costs
         modelBuilder.Entity<BlueprintRecipeCostEntity>()

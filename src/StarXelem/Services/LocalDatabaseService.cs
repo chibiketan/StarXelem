@@ -14,6 +14,7 @@ public interface ILocalDatabaseService
     Task EnsureDbAsync();
     Task<List<MissionEntity>> GetMissionsForShipAsync(string shipGuid);
     Task<List<ShipEntity>> GetShipsForMissionAsync(string missionDebugName);
+    Task<(Dictionary<string, string> TitleSuffixMap, Dictionary<string, Dictionary<string, HashSet<string>>> DescriptionAppendMap)> GetBlueprintRewardMapsAsync(HashSet<string>? obtainedBlueprintIds = null);
 }
 
 public class LocalDatabaseService : ILocalDatabaseService
@@ -1013,10 +1014,12 @@ public class LocalDatabaseService : ILocalDatabaseService
                     var poolRef = blueprintRewards.blueprintPool?.selfId.ToString();
                     if (!string.IsNullOrEmpty(poolRef))
                     {
+                        var poolRecord = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(poolRef), 0);
                         var poolEntity = new MissionBlueprintPoolEntity
                         {
                             MissionId = missionId,
-                            BlueprintPoolRef = poolRef
+                            BlueprintPoolRef = poolRef,
+                             PoolName = StripRecordPrefix(poolRecord?.RecordName) ?? "Unknown"
                         };
                         db.MissionBlueprintPools.Add(poolEntity);
 
@@ -1263,7 +1266,7 @@ public class LocalDatabaseService : ILocalDatabaseService
             var entry = new MissionBlueprintEntryEntity
             {
                 Pool = poolEntity,
-                BlueprintRef = bpId,
+                BlueprintId = bpId,
                 Weight = blueprintReward.weight
             };
             db.MissionBlueprintEntries.Add(entry);
@@ -1583,5 +1586,140 @@ public class LocalDatabaseService : ILocalDatabaseService
         return await db.Ships
             .Where(s => s.MissionRequirements.Any(mr => mr.MissionId == missionId))
             .ToListAsync();
+    }
+
+    private static string? StripRecordPrefix(string? recordName)
+    {
+        if (string.IsNullOrEmpty(recordName)) return null;
+        var dotIndex = recordName.IndexOf('.');
+        return dotIndex >= 0 ? recordName.Substring(dotIndex + 1) : recordName;
+    }
+
+    /// <summary>
+    /// Construit les cartes de suffixe de titre et d'appendice de description pour les missions comportant des récompenses Blueprint.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// La méthode interroge la base de données pour récupérer l'ensemble des missions possédant au moins un pool Blueprint,
+    /// puis génère deux dictionnaires destinés à l'export du fichier de localisation <c>global.ini</c>.
+    /// </para>
+    /// <para>
+    /// <b>TitleSuffixMap</b> — clé INI du titre (sans préfixe <c>@</c>) → suffixe à apposer au titre.
+    /// <list type="bullet">
+    /// <item><term>Sans suivi d'obtention :</term><description><c>[N BP]</c> (N = nombre total d'entrées BP du contrat)</description></item>
+    /// <item><term>Avec suivi d'obtention :</term><description><c>[non_obtenus/total BP]</c></description></item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <b>DescriptionAppendMap</b> — clé INI de description (sans préfixe <c>@</c>) → dictionnaire pool → ensemble de noms BP.
+    /// Chaque pool produit un bloc <c>\n\n&lt;EM3&gt;**PoolName**&lt;/EM3&gt;</c> suivi d'une liste <c>\n- BPName</c> pour chaque Blueprint.
+    /// Lorsqu'un BP n'a pas encore été obtenu par le joueur, son nom est entouré de <c>&lt;EM4&gt;...&lt;/EM4&gt;</c> pour le mettre en évidence visuellement.
+    /// </para>
+    /// <para>
+    /// Le paramètre <c>obtainedBlueprintIds</c> permet de fournir l'ensemble des identifiants Blueprint déjà détenus par le joueur
+    /// (issus de l'API gRPC <c>BlueprintLibrary</c>). Chaque identifiant correspond au <c>SelfId</c> d'un enregistrement
+    /// <c>CraftingBlueprintRecord</c> dans le P4K. Lorsqu'il est <c>null</c>, le mode de suivi d'obtention est désactivé :
+    /// les titres affichent simplement le total et aucun BP n'est entouré de balises <c>&lt;EM4&gt;</c>.
+    /// </para>
+    /// <para>
+    /// <b>Exemple de sortie dans le fichier INI :</b>
+    /// </para>
+    /// <code>
+    /// Mission_Title_X = Assaut sur la base pirate [2/5 BP]
+    /// Mission_Desc_X = Éliminez les cibles...\n\n&lt;EM3&gt;**Récompenses**&lt;/EM3&gt;\n- &lt;EM4&gt;Plasma Rifle&lt;/EM4&gt;\n- Fusioncutter MK2
+    /// </code>
+    /// <para>
+    /// Dans cet exemple, le joueur possède déjà 3 des 5 Blueprint récompensés par ce contrat.
+    /// Le Plasma Rifle n'a pas encore été obtenu et apparaît entouré de <c>&lt;EM4&gt;</c>.
+    /// </para>
+    /// </remarks>
+    /// <param name="obtainedBlueprintIds">
+    /// Ensemble des identifiants Blueprint déjà obtenus par le joueur (gRPC <c>BlueprintEntry.BlueprintId</c>).
+    /// <c>null</c> pour désactiver le suivi d'obtention.
+    /// </param>
+    /// <returns>
+    /// Un tuple contenant :
+    /// <list type="table">
+    /// <item><term><c>TitleSuffixMap</c></term><description>Mappage clé titre → suffixe <c>[x/y BP]</c> ou <c>[y BP]</c></description></item>
+    /// <item><term><c>DescriptionAppendMap</c></term><description>Mappage clé description → pool → ensemble de noms BP (avec ou sans balises <c>&lt;EM4&gt;</c>)</description></item>
+    /// </list>
+    /// </returns>
+    public async Task<(Dictionary<string, string> TitleSuffixMap, Dictionary<string, Dictionary<string, HashSet<string>>> DescriptionAppendMap)> GetBlueprintRewardMapsAsync(HashSet<string>? obtainedBlueprintIds = null)
+    {
+        await using var db = new StarXelemDbContext(GetOptions());
+        var titleSuffixMap = new Dictionary<string, string>();
+        var descAppendMap = new Dictionary<string, Dictionary<string, HashSet<string>>>();
+
+        var missions = await db.Missions
+            .Where(m => m.NotForRelease == false && m.WorkInProgress == false && m.Generator!.NotForRelease == false && m.Generator.WorkInProgress == false)
+            .Include(m => m.BlueprintPools)
+            .ThenInclude(bp => bp.Entries)
+            .ThenInclude(bp => bp.Blueprint)
+            .Where(m => m.BlueprintPools.Any())
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        foreach (var missionEntity in missions)
+        {
+            var titleKey = missionEntity.TitleKey!.Substring(1);
+            var descKey = missionEntity.DescriptionKey!.Substring(1);
+
+            if (titleSuffixMap.ContainsKey(titleKey))
+            {
+                _logger.LogWarning("Duplicate title key for BP: {Key}", titleKey);
+            }
+            else
+            {
+                var totalBp = missionEntity.BlueprintPools.Sum(bp => bp.Entries.Count);
+                if (obtainedBlueprintIds != null)
+                {
+                    var obtainedCount = 0;
+                    foreach (var bpPool in missionEntity.BlueprintPools)
+                    {
+                        foreach (var bpEntry in bpPool.Entries)
+                        {
+                            var bpId = bpEntry.Blueprint?.SelfId;
+                            if (bpId != null && obtainedBlueprintIds.Contains(bpId))
+                            {
+                                obtainedCount++;
+                            }
+                        }
+                    }
+                    var unobtained = totalBp - obtainedCount;
+                    titleSuffixMap[titleKey] = $"[{unobtained}/{totalBp} BP]";
+                }
+                else
+                {
+                    titleSuffixMap[titleKey] = $"[{totalBp} BP]";
+                }
+            }
+
+            if (descAppendMap.ContainsKey(descKey))
+            {
+                _logger.LogWarning("Duplicate description key for BP: {Key}", descKey);
+            }
+            else
+            {
+                var poolDic = new Dictionary<string, HashSet<string>>();
+                descAppendMap.Add(descKey, poolDic);
+                foreach (var bpPool in missionEntity.BlueprintPools)
+                {
+                    var pool = new HashSet<string>();
+                    foreach (var bpEntry in bpPool.Entries)
+                    {
+                        var bpName = bpEntry.Blueprint!.BlueprintName;
+                        var bpId = bpEntry.Blueprint.SelfId;
+                        if (obtainedBlueprintIds != null && !obtainedBlueprintIds.Contains(bpId))
+                        {
+                            bpName = $"<EM4>{bpName}</EM4>";
+                        }
+                        pool.Add(bpName);
+                    }
+                    poolDic.Add(bpPool.PoolName, pool);
+                }
+            }
+        }
+
+        return (titleSuffixMap, descAppendMap);
     }
 }

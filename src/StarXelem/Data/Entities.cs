@@ -144,6 +144,7 @@ public class MissionEntity
 
     public virtual ICollection<MissionShipRequirementEntity> ShipRequirements { get; set; } = new List<MissionShipRequirementEntity>();
     public virtual ICollection<MissionShipSpawnEntity> ShipSpawns { get; set; } = new List<MissionShipSpawnEntity>();
+    public virtual ICollection<MissionBlueprintPoolEntity> BlueprintPools { get; set; } = new List<MissionBlueprintPoolEntity>();
 }
 
 public class MissionShipRequirementEntity
@@ -259,6 +260,9 @@ public class MissionBlueprintPoolEntity
     /// <summary>BlueprintPoolRecord selfId.</summary>
     public string BlueprintPoolRef { get; set; } = string.Empty;
 
+    /// <summary>Denormalized pool name from DataCoreTypedRecord.RecordName.</summary>
+    public string PoolName { get; set; } = string.Empty;
+
     public virtual ICollection<MissionBlueprintEntryEntity> Entries { get; set; } = new List<MissionBlueprintEntryEntity>();
 }
 
@@ -271,7 +275,11 @@ public class MissionBlueprintEntryEntity
     [ForeignKey("Pool")]
     public int PoolId { get; set; }
     public virtual MissionBlueprintPoolEntity Pool { get; set; } = new MissionBlueprintPoolEntity();
-    public string BlueprintRef { get; set; } = string.Empty;
+
+    [Required]
+    public string BlueprintId { get; set; } = string.Empty;
+    [ForeignKey("BlueprintId")]
+    public virtual BlueprintEntity? Blueprint { get; set; }
 
     public float Weight { get; set; }
 
