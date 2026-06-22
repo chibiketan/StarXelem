@@ -8,6 +8,39 @@ using System.Xml.Linq;
 
 namespace StarXelem.Services;
 
+public record DbBlueprintRow(
+    string SelfId,
+    string BlueprintName,
+    string CategoryName,
+    string ProcessType,
+    string? OutputEntityClassRef,
+    TimeSpan? CraftDuration,
+    DbBlueprintCostRow[] Costs,
+    DbMissionPoolRow[] MissionPools);
+
+public record DbBlueprintCostRow(
+    string CostType,
+    string CostName,
+    string? ResourceRef,
+    decimal? ResourceAmount,
+    string? ItemEntityClassRef,
+    int? ItemCount,
+    int? MinQuality,
+    DbBlueprintModifierRow[] Modifiers);
+
+public record DbBlueprintModifierRow(
+    string RangeType,
+    string PropertyName,
+    int StartQuality,
+    int EndQuality,
+    decimal ModifierStart,
+    decimal ModifierEnd);
+
+public record DbMissionPoolRow(
+    string PoolName,
+    string MissionTitle,
+    string MissionDebugName);
+
 public interface ILocalDatabaseService
 {
     Task RebuildDbAsync();
@@ -15,6 +48,7 @@ public interface ILocalDatabaseService
     Task<List<MissionEntity>> GetMissionsForShipAsync(string shipGuid);
     Task<List<ShipEntity>> GetShipsForMissionAsync(string missionDebugName);
     Task<(Dictionary<string, string> TitleSuffixMap, Dictionary<string, Dictionary<string, HashSet<string>>> DescriptionAppendMap)> GetBlueprintRewardMapsAsync(HashSet<string>? obtainedBlueprintIds = null);
+    Task<List<DbBlueprintRow>> GetBlueprintsAsync(HashSet<string>? obtainedBlueprintIds = null);
 }
 
 public class LocalDatabaseService : ILocalDatabaseService
@@ -1308,9 +1342,11 @@ public class LocalDatabaseService : ILocalDatabaseService
         };
 
         var craftingRecipe = craftingBlueprint.tiers.OfType<CraftingBlueprintTier>().FirstOrDefault()?.recipe as CraftingRecipe;
+        var costs = craftingRecipe?.costs as CraftingRecipeCosts;
 
-        if (craftingRecipe?.costs is CraftingRecipeCosts costs)
+        if (costs != null)
         {
+            blueprintEntity.CraftDuration = ResolveCraftDuration(costs.craftTime);
             db.Blueprints.Add(blueprintEntity);
             await db.SaveChangesAsync();
             await IngestRecipeCostsAsync(blueprintEntity, costs, db);
@@ -1365,6 +1401,17 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
 
         return "Unknown";
+    }
+
+    private static TimeSpan? ResolveCraftDuration(object? craftTime)
+    {
+        return craftTime switch
+        {
+            null => null,
+            TimeValue_LongSeconds t => TimeSpan.FromSeconds(t.seconds),
+            TimeValue_Partitioned t => new TimeSpan(t.days, t.hours, t.minutes, (int)t.seconds),
+            _ => null
+        };
     }
 
     private async Task IngestRecipeCostsAsync(BlueprintEntity blueprintEntity, CraftingRecipeCosts costs, StarXelemDbContext db)
@@ -1586,6 +1633,75 @@ public class LocalDatabaseService : ILocalDatabaseService
         return await db.Ships
             .Where(s => s.MissionRequirements.Any(mr => mr.MissionId == missionId))
             .ToListAsync();
+    }
+
+    public async Task<List<DbBlueprintRow>> GetBlueprintsAsync(HashSet<string>? obtainedBlueprintIds = null)
+    {
+        await using var db = new StarXelemDbContext(GetOptions());
+
+        var blueprints = await db.Blueprints
+            .OrderBy(b => b.BlueprintName) 
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        var result = new List<DbBlueprintRow>();
+
+        foreach (var bp in blueprints)
+        {
+            var costs = await db.BlueprintRecipeCosts
+                .Where(c => c.BlueprintId == bp.SelfId)
+                .ToListAsync()
+                .ConfigureAwait(false);
+
+            var costRows = new List<DbBlueprintCostRow>();
+            foreach (var cost in costs)
+            {
+                var modifiers = await db.BlueprintModifiers
+                    .Where(m => m.CostId == cost.Id)
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+
+                costRows.Add(new DbBlueprintCostRow(
+                    cost.CostType,
+                    cost.CostName,
+                    cost.ResourceRef,
+                    cost.ResourceAmount,
+                    cost.ItemEntityClassRef,
+                    cost.ItemCount,
+                    cost.MinQuality,
+                    modifiers.Select(m => new DbBlueprintModifierRow(
+                        m.RangeType,
+                        m.PropertyName,
+                        m.StartQuality,
+                        m.EndQuality,
+                        m.ModifierStart,
+                        m.ModifierEnd
+                    )).ToArray()
+                ));
+            }
+
+            var missionPools = await db.MissionBlueprintPools
+                .Where(mp => mp.Entries.Any(e => e.BlueprintId == bp.SelfId))
+                .Join(db.Missions,
+                    mp => mp.MissionId,
+                    m => m.Id,
+                    (mp, m) => new DbMissionPoolRow(mp.PoolName, m.Title, m.DebugName))
+                .ToListAsync()
+                .ConfigureAwait(false);
+
+            result.Add(new DbBlueprintRow(
+                bp.SelfId,
+                bp.BlueprintName,
+                bp.CategoryName,
+                bp.ProcessType,
+                bp.OutputEntityClassRef,
+                bp.CraftDuration,
+                costRows.ToArray(),
+                missionPools.ToArray()
+            ));
+        }
+
+        return result;
     }
 
     private static string? StripRecordPrefix(string? recordName)

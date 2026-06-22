@@ -308,6 +308,9 @@ public class BlueprintEntity
     /// <summary>entityClass selfId from CraftingProcess_Creation / _Upgrade (nullable for Dismantle/Refining).</summary>
     public string? OutputEntityClassRef { get; set; }
 
+    /// <summary>Craft time from CraftingRecipeCosts.craftTime, stored as TimeSpan ticks.</summary>
+    public TimeSpan? CraftDuration { get; set; }
+
     public virtual ICollection<BlueprintRecipeCostEntity> Costs { get; set; } = new List<BlueprintRecipeCostEntity>();
 }
 
