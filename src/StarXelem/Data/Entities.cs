@@ -145,6 +145,8 @@ public class MissionEntity
     public virtual ICollection<MissionShipRequirementEntity> ShipRequirements { get; set; } = new List<MissionShipRequirementEntity>();
     public virtual ICollection<MissionShipSpawnEntity> ShipSpawns { get; set; } = new List<MissionShipSpawnEntity>();
     public virtual ICollection<MissionBlueprintPoolEntity> BlueprintPools { get; set; } = new List<MissionBlueprintPoolEntity>();
+    public virtual ICollection<MissionRequiredTagEntity> RequiredTags { get; set; } = new List<MissionRequiredTagEntity>();
+    public virtual ICollection<MissionCompletionTagEntity> CompletionTags { get; set; } = new List<MissionCompletionTagEntity>();
 }
 
 public class MissionShipRequirementEntity
@@ -369,4 +371,42 @@ public class BlueprintModifierEntity
 
     /// <summary>Modifier value at end quality (Linear only, 0 for Additive).</summary>
     public decimal ModifierEnd { get; set; }
+}
+
+public class MissionRequiredTagEntity
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Required]
+    public string MissionId { get; set; } = string.Empty;
+    [ForeignKey("MissionId")]
+    public virtual MissionEntity? Mission { get; set; }
+
+    [Required]
+    public string TagSelfId { get; set; } = string.Empty;
+    [ForeignKey("TagSelfId")]
+    public virtual TagEntity? Tag { get; set; }
+
+    /// <summary>true = tag requis (inclusion), false = tag exclu (exclusion)</summary>
+    public bool IsRequired { get; set; }
+
+    /// <summary>Nombre de tags requis pour satisfaire le prérequis (requiredCountValue ou excludedCountValue)</summary>
+    public int RequiredCount { get; set; }
+}
+
+public class MissionCompletionTagEntity
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Required]
+    public string MissionId { get; set; } = string.Empty;
+    [ForeignKey("MissionId")]
+    public virtual MissionEntity? Mission { get; set; }
+
+    [Required]
+    public string TagSelfId { get; set; } = string.Empty;
+    [ForeignKey("TagSelfId")]
+    public virtual TagEntity? Tag { get; set; }
 }
