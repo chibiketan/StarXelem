@@ -20,6 +20,8 @@ public class StarXelemDbContext : DbContext
     public DbSet<MissionCategoryEntity> MissionCategories => Set<MissionCategoryEntity>();
     public DbSet<ContractGeneratorEntity> ContractGenerators => Set<ContractGeneratorEntity>();
     public DbSet<MissionRewardEntity> MissionRewards => Set<MissionRewardEntity>();
+    public DbSet<MissionRequiredTagEntity> MissionRequiredTags => Set<MissionRequiredTagEntity>();
+    public DbSet<MissionCompletionTagEntity> MissionCompletionTags => Set<MissionCompletionTagEntity>();
     public DbSet<MissionBlueprintPoolEntity> MissionBlueprintPools => Set<MissionBlueprintPoolEntity>();
     public DbSet<MissionBlueprintEntryEntity> MissionBlueprintEntries => Set<MissionBlueprintEntryEntity>();
     public DbSet<BlueprintEntity> Blueprints => Set<BlueprintEntity>();
@@ -153,5 +155,31 @@ public class StarXelemDbContext : DbContext
             .WithMany(c => c.Missions)
             .HasForeignKey(m => m.CategoryId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Mission -> RequiredTags
+        modelBuilder.Entity<MissionRequiredTagEntity>()
+            .HasOne(rt => rt.Mission)
+            .WithMany(m => m.RequiredTags)
+            .HasForeignKey(rt => rt.MissionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MissionRequiredTagEntity>()
+            .HasOne(rt => rt.Tag)
+            .WithMany()
+            .HasForeignKey(rt => rt.TagSelfId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Mission -> CompletionTags
+        modelBuilder.Entity<MissionCompletionTagEntity>()
+            .HasOne(ct => ct.Mission)
+            .WithMany(m => m.CompletionTags)
+            .HasForeignKey(ct => ct.MissionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MissionCompletionTagEntity>()
+            .HasOne(ct => ct.Tag)
+            .WithMany()
+            .HasForeignKey(ct => ct.TagSelfId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
