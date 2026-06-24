@@ -1039,7 +1039,7 @@ public class LocalDatabaseService : ILocalDatabaseService
                 if (prerequisite is not ContractPrerequisite_CompletedContractTags completedTags)
                     continue;
 
-                foreach (var tag in completedTags.requiredCompletedContractTags?.tags ?? Enumerable.Empty<object>())
+                foreach (var tag in completedTags.requiredCompletedContractTags?.tags ?? [])
                 {
                     if (tag == null) continue;
                     dynamic t = tag;
@@ -1055,7 +1055,7 @@ public class LocalDatabaseService : ILocalDatabaseService
                     });
                 }
 
-                foreach (var tag in completedTags.excludedCompletedContractTags?.tags ?? Enumerable.Empty<object>())
+                foreach (var tag in completedTags.excludedCompletedContractTags?.tags ?? [])
                 {
                     if (tag == null) continue;
                     dynamic t = tag;
@@ -1216,7 +1216,18 @@ public class LocalDatabaseService : ILocalDatabaseService
                     var tagNames = new List<string>();
                     foreach (var ct in completionTags.completionTags)
                     {
-                        tagNames.Add($"'{ct.tag?.tagName}'");
+                        if (ct?.tag == null) continue;
+                        tagNames.Add($"'{ct.tag.tagName}'");
+
+                        var tagId = ct.tag.selfId.ToString();
+                        if (!string.IsNullOrEmpty(tagId))
+                        {
+                            db.MissionCompletionTags.Add(new MissionCompletionTagEntity
+                            {
+                                MissionId = missionId,
+                                TagSelfId = tagId
+                            });
+                        }
                     }
                     db.MissionRewards.Add(new MissionRewardEntity
                     {
