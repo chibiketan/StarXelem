@@ -1027,19 +1027,23 @@ public class LocalDatabaseService : ILocalDatabaseService
         return count;
     }
 
-    private Task ProcessMissionRequiredTagsAsync(string missionId, ContractBase contract, StarXelemDbContext db)
+    private async Task ProcessMissionRequiredTagsAsync(string missionId, ContractBase contract, StarXelemDbContext db)
     {
         try
         {
+            if (contract.additionalPrerequisites == null)
+                return;
+
             foreach (var prerequisite in contract.additionalPrerequisites)
             {
                 if (prerequisite is not ContractPrerequisite_CompletedContractTags completedTags)
                     continue;
 
-                foreach (var tag in completedTags.requiredCompletedContractTags.tags)
+                foreach (var tag in completedTags.requiredCompletedContractTags?.tags ?? Enumerable.Empty<object>())
                 {
                     if (tag == null) continue;
-                    var tagId = tag.selfId.ToString();
+                    dynamic t = tag;
+                    var tagId = t.selfId.ToString();
                     if (string.IsNullOrEmpty(tagId)) continue;
 
                     db.MissionRequiredTags.Add(new MissionRequiredTagEntity
@@ -1051,10 +1055,11 @@ public class LocalDatabaseService : ILocalDatabaseService
                     });
                 }
 
-                foreach (var tag in completedTags.excludedCompletedContractTags.tags)
+                foreach (var tag in completedTags.excludedCompletedContractTags?.tags ?? Enumerable.Empty<object>())
                 {
                     if (tag == null) continue;
-                    var tagId = tag.selfId.ToString();
+                    dynamic t = tag;
+                    var tagId = t.selfId.ToString();
                     if (string.IsNullOrEmpty(tagId)) continue;
 
                     db.MissionRequiredTags.Add(new MissionRequiredTagEntity
@@ -1071,8 +1076,6 @@ public class LocalDatabaseService : ILocalDatabaseService
         {
             _logger.LogWarning(ex, "Échec du parsing des prérequis de tags pour la mission {MissionId}", missionId);
         }
-
-        return Task.CompletedTask;
     }
 
     private async Task<int> ProcessSingleReward(
