@@ -533,6 +533,7 @@ public class LocalDatabaseService : ILocalDatabaseService
 
                 await ProcessSpawnableShipsAsync(contract, db, mission.Id);
                 await ProcessMissionRewards(mission.Id, contract, db);
+                await ProcessMissionRequiredTagsAsync(mission.Id, contract, db);
             }
 
             handlerIndex++;
@@ -1024,6 +1025,54 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
 
         return count;
+    }
+
+    private Task ProcessMissionRequiredTagsAsync(string missionId, ContractBase contract, StarXelemDbContext db)
+    {
+        try
+        {
+            foreach (var prerequisite in contract.additionalPrerequisites)
+            {
+                if (prerequisite is not ContractPrerequisite_CompletedContractTags completedTags)
+                    continue;
+
+                foreach (var tag in completedTags.requiredCompletedContractTags.tags)
+                {
+                    if (tag == null) continue;
+                    var tagId = tag.selfId.ToString();
+                    if (string.IsNullOrEmpty(tagId)) continue;
+
+                    db.MissionRequiredTags.Add(new MissionRequiredTagEntity
+                    {
+                        MissionId = missionId,
+                        TagSelfId = tagId,
+                        IsRequired = true,
+                        RequiredCount = completedTags.requiredCountValue
+                    });
+                }
+
+                foreach (var tag in completedTags.excludedCompletedContractTags.tags)
+                {
+                    if (tag == null) continue;
+                    var tagId = tag.selfId.ToString();
+                    if (string.IsNullOrEmpty(tagId)) continue;
+
+                    db.MissionRequiredTags.Add(new MissionRequiredTagEntity
+                    {
+                        MissionId = missionId,
+                        TagSelfId = tagId,
+                        IsRequired = false,
+                        RequiredCount = completedTags.excludedCountValue
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Échec du parsing des prérequis de tags pour la mission {MissionId}", missionId);
+        }
+
+        return Task.CompletedTask;
     }
 
     private async Task<int> ProcessSingleReward(
