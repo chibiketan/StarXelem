@@ -1027,12 +1027,12 @@ public class LocalDatabaseService : ILocalDatabaseService
         return count;
     }
 
-    private async Task ProcessMissionRequiredTagsAsync(string missionId, ContractBase contract, StarXelemDbContext db)
+    private Task ProcessMissionRequiredTagsAsync(string missionId, ContractBase contract, StarXelemDbContext db)
     {
         try
         {
             if (contract.additionalPrerequisites == null)
-                return;
+                return Task.CompletedTask;
 
             foreach (var prerequisite in contract.additionalPrerequisites)
             {
@@ -1076,6 +1076,8 @@ public class LocalDatabaseService : ILocalDatabaseService
         {
             _logger.LogWarning(ex, "Échec du parsing des prérequis de tags pour la mission {MissionId}", missionId);
         }
+
+        return Task.CompletedTask;
     }
 
     private async Task<int> ProcessSingleReward(
