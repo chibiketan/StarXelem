@@ -58,9 +58,14 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         LoadItemListCommand.NotifyCanExecuteChanged();
     }
 
+    protected override async Task OnFirstShowAsync()
+    {
+        await LoadItemList();
+    }
+
     public bool CanLoadItemList()
     {
-        return _clientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame && !IsLoading;
+        return !IsLoading;
     }
 
     [RelayCommand(CanExecute = nameof(CanLoadItemList))]
