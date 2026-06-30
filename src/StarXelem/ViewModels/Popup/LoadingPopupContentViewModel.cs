@@ -7,10 +7,11 @@ public partial class LoadingPopupContentViewModel : ViewModelBase, IPopupContent
 {
     [ObservableProperty] private string _message = "Chargement";
     [ObservableProperty] private bool _showLoading;
+    [ObservableProperty] private double? _progress;
+    [ObservableProperty] private string _phaseLabel = "";
 
     public Task OnPopupShownAsync()
     {
-        // Pas d'initialisation spécifique requise pour ce contenu
         return Task.CompletedTask;
     }
 }

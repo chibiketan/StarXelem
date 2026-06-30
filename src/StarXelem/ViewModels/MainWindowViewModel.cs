@@ -278,6 +278,7 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private CancellationTokenSource? _cts;
+    private LoadingPopupContentViewModel? _rebuildPopupContent;
     
     private async void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)
     {
@@ -302,7 +303,7 @@ public partial class MainWindowViewModel : ViewModelBase
             UpdateP4kStatus("Chargement terminé");
             // On termine par attendre l'initialisation du client gRPC
             await initClientTask;
-            await _localDatabaseService.EnsureDbAsync().ConfigureAwait(false);
+            await RunRebuildWithPopupAsync().ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -334,6 +335,67 @@ public partial class MainWindowViewModel : ViewModelBase
                 // En dernier recours si l'UI thread n'est pas disponible, ne rien faire de plus
             }
         }        
+    }
+
+    private async Task RunRebuildWithPopupAsync()
+    {
+        if (!await _localDatabaseService.NeedsRebuildCheckAsync().ConfigureAwait(false))
+        {
+            return;
+        }
+
+        _rebuildPopupContent = new LoadingPopupContentViewModel
+        {
+            PhaseLabel = "Préparation de la base de données…",
+            ShowLoading = true
+        };
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            WeakReferenceMessenger.Default.Send(new ShowPopupMessage(
+                showCloseButton: false,
+                onClose: null,
+                viewModel: _rebuildPopupContent
+            ));
+        });
+
+        try
+        {
+            var rebuildProgress = new Progress<RebuildProgress>(p =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (_rebuildPopupContent != null)
+                    {
+                        _rebuildPopupContent.PhaseLabel = p.PhaseName;
+                        _rebuildPopupContent.Progress = (double)p.CurrentPhase / p.TotalPhases * 100;
+                        _rebuildPopupContent.Message = $"Phase {p.CurrentPhase}/{p.TotalPhases}";
+                    }
+                });
+            });
+
+            await _localDatabaseService.EnsureDbAsync(rebuildProgress).ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (_rebuildPopupContent != null)
+                {
+                    _rebuildPopupContent.PhaseLabel = "Terminé !";
+                    _rebuildPopupContent.Progress = 100;
+                    _rebuildPopupContent.Message = "";
+                }
+            });
+
+            await Task.Delay(300).ConfigureAwait(false);
+        }
+        finally
+        {
+            _rebuildPopupContent = null;
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                WeakReferenceMessenger.Default.Send(new ClosePopupMessage());
+            });
+        }
     }
 
     private static string BuildExceptionMessage(Exception ex)

@@ -16,7 +16,8 @@ async Task RunAsync()
     var dbLogger = loggerFactory.CreateLogger<LocalDatabaseService>();
 
     var p4kService = new P4kService(p4kLogger);
-    var dbService = new LocalDatabaseService(p4kService, dbLogger, autoRebuild: false);
+    var settingsLogger = loggerFactory.CreateLogger<RegistrySettingsService>();
+    var dbService = new LocalDatabaseService(p4kService, dbLogger, new RegistrySettingsService(settingsLogger), autoRebuild: false);
 
     string p4kPath;
 

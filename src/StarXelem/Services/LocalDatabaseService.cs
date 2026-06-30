@@ -41,10 +41,13 @@ public record DbMissionPoolRow(
     string MissionTitle,
     string MissionDebugName);
 
+public record RebuildProgress(int CurrentPhase, int TotalPhases, string PhaseName);
+
 public interface ILocalDatabaseService
 {
-    Task RebuildDbAsync();
-    Task EnsureDbAsync();
+    Task RebuildDbAsync(IProgress<RebuildProgress>? progress = null);
+    Task<bool> NeedsRebuildCheckAsync();
+    Task EnsureDbAsync(IProgress<RebuildProgress>? progress = null);
     Task<List<MissionEntity>> GetMissionsForShipAsync(string shipGuid);
     Task<List<ShipEntity>> GetShipsForMissionAsync(string missionDebugName);
     Task<(Dictionary<string, string> TitleSuffixMap, Dictionary<string, Dictionary<string, HashSet<string>>> DescriptionAppendMap)> GetBlueprintRewardMapsAsync(HashSet<string>? obtainedBlueprintIds = null);
@@ -55,19 +58,21 @@ public class LocalDatabaseService : ILocalDatabaseService
 {
     private readonly IP4kService _p4kService;
     private readonly ILogger<LocalDatabaseService> _logger;
+    private readonly ISettingsService _settingsService;
     private readonly string _dbPath;
     private CancellationTokenSource _rebuildCts = new();
     private Task? _rebuildTask;
     private readonly Dictionary<string, ActorEntity> _contractorCache;
     private readonly Dictionary<string, MissionCategoryEntity> _categoryCache;
 
-    public LocalDatabaseService(IP4kService p4kService, ILogger<LocalDatabaseService> logger, bool autoRebuild = false)
+    public LocalDatabaseService(IP4kService p4kService, ILogger<LocalDatabaseService> logger, ISettingsService settingsService, bool autoRebuild = false)
     {
         _p4kService = p4kService;
         _logger = logger;
+        _settingsService = settingsService;
         _contractorCache = new Dictionary<string, ActorEntity>(StringComparer.Ordinal);
         _categoryCache = new Dictionary<string, MissionCategoryEntity>(StringComparer.Ordinal);
-        
+
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var folder = Path.Combine(appData, "StarXelem");
         if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
@@ -79,16 +84,30 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
     }
 
-    public async Task EnsureDbAsync()
+    public async Task<bool> NeedsRebuildCheckAsync()
     {
-        if (File.Exists(_dbPath))
+        string? currentP4kVersion = _p4kService.SelectedP4KFile?.Manifest?.Data?.RequestedP4ChangeNum;
+        string? storedP4kVersion = await _settingsService.GetAsync("P4KVersion").ConfigureAwait(false);
+        return !File.Exists(_dbPath) || currentP4kVersion != storedP4kVersion;
+    }
+
+    public async Task EnsureDbAsync(IProgress<RebuildProgress>? progress = null)
+    {
+        if (!await NeedsRebuildCheckAsync().ConfigureAwait(false))
         {
-            _logger.LogInformation("Database already exists at {Path}", _dbPath);
+            _logger.LogInformation("Database already exists at {Path} (P4K version: {Version})", _dbPath, _p4kService.SelectedP4KFile?.Manifest?.Data?.RequestedP4ChangeNum);
             return;
         }
 
-        _logger.LogInformation("Database not found, rebuilding at {Path}", _dbPath);
-        await RebuildDbAsync();
+        string? storedP4kVersion = await _settingsService.GetAsync("P4KVersion").ConfigureAwait(false);
+        _logger.LogInformation("Database rebuild needed. Stored P4K: {Stored}, Current P4K: {Current}", storedP4kVersion, _p4kService.SelectedP4KFile?.Manifest?.Data?.RequestedP4ChangeNum);
+        await RebuildDbAsync(progress).ConfigureAwait(false);
+        
+        string? currentP4kVersion = _p4kService.SelectedP4KFile?.Manifest?.Data?.RequestedP4ChangeNum;
+        if (!string.IsNullOrEmpty(currentP4kVersion))
+        {
+            await _settingsService.SetAsync("P4KVersion", currentP4kVersion).ConfigureAwait(false);
+        }
     }
 
     private DbContextOptions<StarXelemDbContext> GetOptions()
@@ -108,7 +127,7 @@ public class LocalDatabaseService : ILocalDatabaseService
      * REBUILD ORCHESTRATION
      * ======================================================================== */
 
-    public async Task RebuildDbAsync()
+    public async Task RebuildDbAsync(IProgress<RebuildProgress>? progress = null)
     {
         if (_rebuildTask != null && !_rebuildTask.IsCompleted)
         {
@@ -127,7 +146,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         _rebuildCts = new CancellationTokenSource();
         var cancellationToken = _rebuildCts.Token;
 
-        _rebuildTask = RebuildDbCoreAsync(cancellationToken);
+        _rebuildTask = RebuildDbCoreAsync(cancellationToken, progress);
         try
         {
             await _rebuildTask.ConfigureAwait(false);
@@ -138,8 +157,10 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
     }
 
-    private async Task RebuildDbCoreAsync(CancellationToken cancellationToken)
+    private async Task RebuildDbCoreAsync(CancellationToken cancellationToken, IProgress<RebuildProgress>? progress)
     {
+        var total = Stopwatch.StartNew();
+        const int TotalPhases = 6;
         _logger.LogInformation("Rebuilding local database at {Path}", _dbPath);
         _entityClassToGuid.Clear();
         _contractorCache.Clear();
@@ -151,32 +172,57 @@ public class LocalDatabaseService : ILocalDatabaseService
         await db.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
 
         // Phase 1: Tag hierarchy
+        progress?.Report(new RebuildProgress(1, TotalPhases, "Chargement des tags…"));
+        var phase = Stopwatch.StartNew();
         var tagResolutionMap = new Dictionary<string, string>();
         await PopulateTagHierarchyAsync(db, tagResolutionMap).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 1/{Total}] Tags completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
         // Phase 2: Ships, manufacturers, and ship-tag associations
+        progress?.Report(new RebuildProgress(2, TotalPhases, "Chargement des vaisseaux…"));
+        phase.Restart();
         await PopulateShipsAndManufacturersAsync(db, tagResolutionMap, cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 2/{Total}] Ships & manufacturers completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
         // Phase 3: Contract generators
+        progress?.Report(new RebuildProgress(3, TotalPhases, "Chargement des générateurs de contrats…"));
+        phase.Restart();
         await PopulateContractGeneratorsAsync(db, cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 3/{Total}] Contract generators completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
         // Phase 4: Missions and their requirements/rewards/spawn rules
+        progress?.Report(new RebuildProgress(4, TotalPhases, "Chargement des missions…"));
+        phase.Restart();
         await PopulateMissionsAsync(db, cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 4/{Total}] Missions completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
         // Phase 5: Resolve spawn rules to actual ships
+        progress?.Report(new RebuildProgress(5, TotalPhases, "Résolution des règles d'apparition…"));
+        phase.Restart();
         await ProcessMissionShipSpawnShipsAsync(db, cancellationToken).ConfigureAwait(false);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 5/{Total}] Spawn rules completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
         // Phase 6: Blueprints
+        progress?.Report(new RebuildProgress(6, TotalPhases, "Chargement des plans de fabrication…"));
+        phase.Restart();
         await ProcessAllBlueprintsAsync(db, cancellationToken).ConfigureAwait(false);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 6/{Total}] Blueprints completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
 
-        _logger.LogInformation("Database rebuild completed.");
+        total.Stop();
+        _logger.LogInformation("Database rebuild completed in {Elapsed}ms.", total.ElapsedMilliseconds);
     }
 
     /* ========================================================================
@@ -229,7 +275,9 @@ public class LocalDatabaseService : ILocalDatabaseService
                 }
             }
             
+            db.ChangeTracker.AutoDetectChangesEnabled = false;
             db.Tags.AddRange(tagEntities);
+            db.ChangeTracker.AutoDetectChangesEnabled = true;
             await db.SaveChangesAsync();
             start.Stop();
             _logger.LogInformation("Tag hierarchy populated in {Elapsed}ms.", start.ElapsedMilliseconds);
@@ -290,14 +338,14 @@ public class LocalDatabaseService : ILocalDatabaseService
         start.Stop();
         _logger.LogInformation("Ships and manufacturers processed in {Elapsed}ms.", start.ElapsedMilliseconds);
 
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
         db.Manufacturers.AddRange(manufacturers);
         db.Ships.AddRange(ships);
+        db.ShipTags.AddRange(shipTags);
+        db.ChangeTracker.AutoDetectChangesEnabled = true;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Inserted {Count} manufacturer into the database.", manufacturers.Count);
         _logger.LogInformation("Inserted {Count} ship into the database.", ships.Count);
-
-        db.ShipTags.AddRange(shipTags);
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Inserted {Count} liaison ship <=> tag into the database.", shipTags.Count);
     }
 
@@ -394,7 +442,9 @@ public class LocalDatabaseService : ILocalDatabaseService
 
         var contractGenerators = ExtractContractGeneratorEntities(contracts);
 
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
         db.ContractGenerators.AddRange(contractGenerators);
+        db.ChangeTracker.AutoDetectChangesEnabled = true;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         start.Stop();
         _logger.LogInformation("Inserted {Count} contract generators into the database.", contractGenerators.Count);
@@ -469,6 +519,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         var contracts = await _p4kService.GetAllContractGenerator();
         contracts = await _p4kService.EnsureRecordsDepthAsync(contracts, 3);
 
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
         int missionCount = 0;
         foreach (var record in contracts)
         {
@@ -476,6 +527,7 @@ public class LocalDatabaseService : ILocalDatabaseService
             missionCount += await ProcessContractForDb(record, db, record.RecordName, cancellationToken);
         }
 
+        db.ChangeTracker.AutoDetectChangesEnabled = true;
         start.Stop();
         _logger.LogInformation("Missions and requirements processed in {Elapsed}ms.", start.ElapsedMilliseconds);
         _logger.LogInformation("Inserted {Count} missions into the database.", missionCount);
@@ -1413,13 +1465,11 @@ public class LocalDatabaseService : ILocalDatabaseService
         {
             blueprintEntity.CraftDuration = ResolveCraftDuration(costs.craftTime);
             db.Blueprints.Add(blueprintEntity);
-            await db.SaveChangesAsync();
             await IngestRecipeCostsAsync(blueprintEntity, costs, db);
         }
         else
         {
             db.Blueprints.Add(blueprintEntity);
-            await db.SaveChangesAsync();
         }
 
         return blueprintEntity;
@@ -1508,8 +1558,6 @@ public class LocalDatabaseService : ILocalDatabaseService
                     costEntities.Add(costEntity);
             }
 
-            await db.SaveChangesAsync();
-
             foreach (var modifierContext in costSelect.context.OfType<CraftingCostContext_ResultGameplayPropertyModifiers>())
             {
                 var modifiers = await ExtractModifierEntitiesAsync(modifierContext);
@@ -1517,7 +1565,7 @@ public class LocalDatabaseService : ILocalDatabaseService
                 {
                     foreach (var modifier in modifiers)
                     {
-                        modifier.CostId = costEntity.Id;
+                        modifier.Cost = costEntity;
                         db.BlueprintModifiers.Add(modifier);
                     }
                 }

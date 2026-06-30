@@ -62,6 +62,7 @@ public static class ServiceCollectionExtensions
             new LocalDatabaseService(
                 sp.GetRequiredService<IP4kService>(),
                 sp.GetRequiredService<ILogger<LocalDatabaseService>>(),
+                sp.GetRequiredService<ISettingsService>(),
                 autoRebuild: false));
         services.AddSingleton<ISettingsService, RegistrySettingsService>();
         services.AddSingleton<IReputationService, ReputationService>();
