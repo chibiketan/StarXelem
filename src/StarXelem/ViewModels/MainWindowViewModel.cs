@@ -315,8 +315,8 @@ public partial class MainWindowViewModel : ViewModelBase
             await _p4kService.FillDataCache().WaitAsync(ct).ConfigureAwait(false);
             UpdateP4kStatus("Chargement terminé");
             // On termine par attendre l'initialisation du client gRPC
-            await initClientTask;
             await RunRebuildWithPopupAsync().ConfigureAwait(false);
+            await initClientTask;
         }
         catch (OperationCanceledException)
         {

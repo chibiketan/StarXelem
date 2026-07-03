@@ -60,7 +60,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
 
     protected override async Task OnFirstShowAsync()
     {
-        await LoadItemList();
+        await LoadItemList().ConfigureAwait(false);
     }
 
     public bool CanLoadItemList()
@@ -71,9 +71,11 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     [RelayCommand(CanExecute = nameof(CanLoadItemList))]
     public async Task LoadItemList()
     {
-        IsLoading = true;
-
-        await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement de la base de données...");
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            IsLoading = true;
+            TreatmentStatus = "Chargement de la base de données...";
+        });
 
         HashSet<string>? obtainedIds = null;
         if (IsGrpcConnected)
@@ -87,7 +89,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         var dbBlueprints = await _localDatabaseService.GetBlueprintsAsync(obtainedIds).ConfigureAwait(false);
 
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Résolution des noms de ressources...");
-        var result = await MapToViewModelsAsync(dbBlueprints, obtainedIds);
+        var result = await MapToViewModelsAsync(dbBlueprints, obtainedIds).ConfigureAwait(false);
 
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
@@ -99,94 +101,93 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     }
 
     private async Task<List<BlueprintViewModel>> MapToViewModelsAsync(
-        List<DbBlueprintRow> dbRows, 
+        List<DbBlueprintRow> dbRows,
         HashSet<string>? obtainedIds)
     {
-        var results = new List<BlueprintViewModel>();
+        var tasks = dbRows.Select(async row => await MapRowToViewModelAsync(row, obtainedIds).ConfigureAwait(false));
+        return (await Task.WhenAll(tasks).ConfigureAwait(false)).ToList();
+    }
 
-        foreach (var row in dbRows)
+    private async Task<BlueprintViewModel> MapRowToViewModelAsync(
+        DbBlueprintRow row,
+        HashSet<string>? obtainedIds)
+    {
+        var categories = await Task.WhenAll(row.Costs.Select(async cost =>
         {
-            var categories = new List<BlueprintCategoryModel>();
+            var materials = new List<BlueprintMaterialModel>();
+            var modifiers = new List<BlueprintStatModelBase>();
 
-            foreach (var cost in row.Costs)
+            if (cost.CostType == "Resource" && !string.IsNullOrEmpty(cost.ResourceRef))
             {
-                var materials = new List<BlueprintMaterialModel>();
-                var modifiers = new List<BlueprintStatModelBase>();
-
-                if (cost.CostType == "Resource" && !string.IsNullOrEmpty(cost.ResourceRef))
+                var resourceName = await ResolveResourceNameAsync(cost.ResourceRef).ConfigureAwait(false);
+                materials.Add(new BlueprintResourceModel
                 {
-                    var resourceName = await ResolveResourceNameAsync(cost.ResourceRef);
-                    materials.Add(new BlueprintResourceModel
-                    {
-                        Name = resourceName,
-                        QuantityInScu = (float)(cost.ResourceAmount ?? 0m)
-                    });
-                }
-                else if (cost.CostType == "Item" && !string.IsNullOrEmpty(cost.ItemEntityClassRef))
+                    Name = resourceName,
+                    QuantityInScu = (float)(cost.ResourceAmount ?? 0m)
+                });
+            }
+            else if (cost.CostType == "Item" && !string.IsNullOrEmpty(cost.ItemEntityClassRef))
+            {
+                var itemName = await ResolveItemNameAsync(cost.ItemEntityClassRef).ConfigureAwait(false);
+                materials.Add(new BlueprintItemModel
                 {
-                    var itemName = await ResolveItemNameAsync(cost.ItemEntityClassRef);
-                    materials.Add(new BlueprintItemModel
-                    {
-                        Name = itemName,
-                        QuantityCount = cost.ItemCount ?? 1
-                    });
-                }
-
-                foreach (var mod in cost.Modifiers)
-                {
-                    if (mod.RangeType == "Linear")
-                    {
-                        modifiers.Add(new BlueprintStatLinearModel
-                        {
-                            Name = mod.PropertyName,
-                            Min = (float)mod.ModifierStart,
-                            Max = (float)mod.ModifierEnd
-                        });
-                    }
-                    else if (mod.RangeType == "Additive")
-                    {
-                        modifiers.Add(new BlueprintStatAdditiveModel
-                        {
-                            Name = mod.PropertyName,
-                            Bands = new List<BlueprintStatBandModel>
-                            {
-                                new BlueprintStatBandModel
-                                {
-                                    StartQuality = mod.StartQuality,
-                                    EndQuality = mod.EndQuality,
-                                    Value = (int)mod.ModifierStart
-                                }
-                            }
-                        });
-                    }
-                }
-
-                categories.Add(new BlueprintCategoryModel
-                {
-                    Name = cost.CostName,
-                    MaterialList = materials,
-                    StatModifierList = modifiers
+                    Name = itemName,
+                    QuantityCount = cost.ItemCount ?? 1
                 });
             }
 
-            var missionPools = row.MissionPools
-                .Select(mp => new MissionPoolInfo(mp.PoolName, mp.MissionTitle, mp.MissionDebugName))
-                .ToList();
-
-            results.Add(new BlueprintViewModel
+            foreach (var mod in cost.Modifiers)
             {
-                BlueprintId = row.SelfId,
-                Name = row.BlueprintName,
-                TierLevel = null,
-                RemainingUse = null,
-                CraftDuration = row.CraftDuration,
-                CategoryList = categories,
-                IsObtained = obtainedIds != null && obtainedIds.Contains(row.SelfId),
-                MissionPools = missionPools
-            });
-        }
+                if (mod.RangeType == "Linear")
+                {
+                    modifiers.Add(new BlueprintStatLinearModel
+                    {
+                        Name = mod.PropertyName,
+                        Min = (float)mod.ModifierStart,
+                        Max = (float)mod.ModifierEnd
+                    });
+                }
+                else if (mod.RangeType == "Additive")
+                {
+                    modifiers.Add(new BlueprintStatAdditiveModel
+                    {
+                        Name = mod.PropertyName,
+                        Bands = new List<BlueprintStatBandModel>
+                        {
+                            new BlueprintStatBandModel
+                            {
+                                StartQuality = mod.StartQuality,
+                                EndQuality = mod.EndQuality,
+                                Value = (int)mod.ModifierStart
+                            }
+                        }
+                    });
+                }
+            }
 
-        return results;
+            return new BlueprintCategoryModel
+            {
+                Name = cost.CostName,
+                MaterialList = materials,
+                StatModifierList = modifiers
+            };
+        }));
+
+        var missionPools = row.MissionPools
+            .Select(mp => new MissionPoolInfo(mp.PoolName, mp.MissionTitle, mp.MissionDebugName))
+            .ToList();
+
+        return new BlueprintViewModel
+        {
+            BlueprintId = row.SelfId,
+            Name = row.BlueprintName,
+            TierLevel = null,
+            RemainingUse = null,
+            CraftDuration = row.CraftDuration,
+            CategoryList = categories.ToList(),
+            IsObtained = obtainedIds != null && obtainedIds.Contains(row.SelfId),
+            MissionPools = missionPools
+        };
     }
 
     private async Task<string> ResolveResourceNameAsync(string resourceRef)

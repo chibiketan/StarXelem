@@ -15,11 +15,11 @@ public abstract class PageViewModelBase : ViewModelBase
     {
         if (!IsLoaded)
         {
-            await OnFirstShowAsync();
+            await OnFirstShowAsync().ConfigureAwait(false);
             IsLoaded = true;
         }
         
-        await OnShowAsync();
+        await OnShowAsync().ConfigureAwait(false);
     }
 
     protected virtual Task OnFirstShowAsync()
