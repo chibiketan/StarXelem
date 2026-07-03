@@ -160,7 +160,7 @@ public class LocalDatabaseService : ILocalDatabaseService
     private async Task RebuildDbCoreAsync(CancellationToken cancellationToken, IProgress<RebuildProgress>? progress)
     {
         var total = Stopwatch.StartNew();
-        const int TotalPhases = 6;
+        const int TotalPhases = 7;
         _logger.LogInformation("Rebuilding local database at {Path}", _dbPath);
         _entityClassToGuid.Clear();
         _contractorCache.Clear();
@@ -188,38 +188,47 @@ public class LocalDatabaseService : ILocalDatabaseService
         _logger.LogInformation("[Phase 2/{Total}] Ships & manufacturers completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 3: Contract generators
-        progress?.Report(new RebuildProgress(3, TotalPhases, "Chargement des générateurs de contrats…"));
+        // Phase 3: SCItems (must be before blueprints due to FK)
+        progress?.Report(new RebuildProgress(3, TotalPhases, "Chargement des objets (SCItems)…"));
+        phase.Restart();
+        await PopulateScItemsAsync(db, cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 3/{Total}] SCItems completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 4: Contract generators
+        progress?.Report(new RebuildProgress(4, TotalPhases, "Chargement des générateurs de contrats…"));
         phase.Restart();
         await PopulateContractGeneratorsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 3/{Total}] Contract generators completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 4/{Total}] Contract generators completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 4: Missions and their requirements/rewards/spawn rules
-        progress?.Report(new RebuildProgress(4, TotalPhases, "Chargement des missions…"));
-        phase.Restart();
-        await PopulateMissionsAsync(db, cancellationToken).ConfigureAwait(false);
-        phase.Stop();
-        _logger.LogInformation("[Phase 4/{Total}] Missions completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Phase 5: Resolve spawn rules to actual ships
-        progress?.Report(new RebuildProgress(5, TotalPhases, "Résolution des règles d'apparition…"));
-        phase.Restart();
-        await ProcessMissionShipSpawnShipsAsync(db, cancellationToken).ConfigureAwait(false);
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        phase.Stop();
-        _logger.LogInformation("[Phase 5/{Total}] Spawn rules completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Phase 6: Blueprints
-        progress?.Report(new RebuildProgress(6, TotalPhases, "Chargement des plans de fabrication…"));
+        // Phase 5: Blueprints (must be before missions due to FK)
+        progress?.Report(new RebuildProgress(5, TotalPhases, "Chargement des plans de fabrication…"));
         phase.Restart();
         await ProcessAllBlueprintsAsync(db, cancellationToken).ConfigureAwait(false);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 6/{Total}] Blueprints completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 5/{Total}] Blueprints completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 6: Missions and their requirements/rewards/spawn rules
+        progress?.Report(new RebuildProgress(6, TotalPhases, "Chargement des missions…"));
+        phase.Restart();
+        await PopulateMissionsAsync(db, cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 6/{Total}] Missions completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 7: Resolve spawn rules to actual ships
+        progress?.Report(new RebuildProgress(7, TotalPhases, "Résolution des règles d'apparition…"));
+        phase.Restart();
+        await ProcessMissionShipSpawnShipsAsync(db, cancellationToken).ConfigureAwait(false);
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 7/{Total}] Spawn rules completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        cancellationToken.ThrowIfCancellationRequested();
 
         total.Stop();
         _logger.LogInformation("Database rebuild completed in {Elapsed}ms.", total.ElapsedMilliseconds);
@@ -1465,7 +1474,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         {
             blueprintEntity.CraftDuration = ResolveCraftDuration(costs.craftTime);
             db.Blueprints.Add(blueprintEntity);
-            await IngestRecipeCostsAsync(blueprintEntity, costs, db);
+            await IngestRecipeCostsAsync(blueprintEntity, costs, db).ConfigureAwait(false);
         }
         else
         {
@@ -1540,7 +1549,7 @@ public class LocalDatabaseService : ILocalDatabaseService
 
         if (costs.optionalCosts != null)
         {
-            ProcessOptionalCosts(blueprintEntity, costs.optionalCosts, db);
+            await ProcessOptionalCostsAsync(blueprintEntity, costs.optionalCosts, db).ConfigureAwait(false);
         }
 
         foreach (var craftingCostOption in mandatoryCost.options)
@@ -1553,7 +1562,7 @@ public class LocalDatabaseService : ILocalDatabaseService
             var costEntities = new List<BlueprintRecipeCostEntity>();
             foreach (var costOption in costSelect.options)
             {
-                var costEntity = ProcessCostOption(blueprintEntity, costOption, categoryName, db);
+                var costEntity = await ProcessCostOptionAsync(blueprintEntity, costOption, categoryName, db).ConfigureAwait(false);
                 if (costEntity != null)
                     costEntities.Add(costEntity);
             }
@@ -1573,7 +1582,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
     }
 
-    private void ProcessOptionalCosts(BlueprintEntity blueprintEntity, dynamic[] optionalEntries, StarXelemDbContext db)
+    private async Task ProcessOptionalCostsAsync(BlueprintEntity blueprintEntity, dynamic[] optionalEntries, StarXelemDbContext db)
     {
         foreach (var opt in optionalEntries)
         {
@@ -1581,11 +1590,11 @@ public class LocalDatabaseService : ILocalDatabaseService
                 continue;
 
             var cost = optionalEntry.optionalCost;
-            ProcessCostOption(blueprintEntity, cost, "Optional", db);
+            await ProcessCostOptionAsync(blueprintEntity, cost, "Optional", db).ConfigureAwait(false);
         }
     }
 
-    private BlueprintRecipeCostEntity? ProcessCostOption(BlueprintEntity blueprintEntity, dynamic? costOption, string costName, StarXelemDbContext db)
+    private async Task<BlueprintRecipeCostEntity?> ProcessCostOptionAsync(BlueprintEntity blueprintEntity, dynamic? costOption, string costName, StarXelemDbContext db)
     {
         if (costOption == null)
             return null;
@@ -1614,7 +1623,7 @@ public class LocalDatabaseService : ILocalDatabaseService
                         BlueprintId = blueprintEntity.SelfId,
                         CostType = "Item",
                         CostName = costName,
-                        ItemEntityClassRef = itemCost.entityClass?.selfId.ToString() ?? "unknown",
+                        ItemEntityClassRef = itemCost.entityClass?.selfId.ToString(),
                         ItemCount = itemCost.quantity,
                         MinQuality = itemCost.minQuality
                     };
@@ -1693,6 +1702,369 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
 
         return modifiers;
+    }
+
+    /* ========================================================================
+     * PHASE 7: SCITEMS
+     * ======================================================================== */
+
+    private async Task PopulateScItemsAsync(StarXelemDbContext db, CancellationToken cancellationToken)
+    {
+        var start = Stopwatch.StartNew();
+        var items = new List<ScItemEntity>();
+        var itemTags = new HashSet<(string ScItemRecordId, string TagSelfId)>();
+        var itemTagEntities = new List<ScItemTagEntity>();
+        var manufacturerCache = new Dictionary<string, ManufacturerEntity>();
+        EnsureUnknownManufacturer(manufacturerCache);
+
+        var existingManufacturerIds = new HashSet<string>(db.Manufacturers.Select(m => m.Id));
+        int totalProcessed = 0;
+        int batchesSaved = 0;
+
+        _logger.LogInformation("Starting SCItems processing...");
+
+        await foreach (var record in _p4kService.GetAllEntityClassDefinition(3).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (record.Data is not EntityClassDefinition entityClass)
+                continue;
+
+            if (entityClass.Invisible)
+                continue;
+
+            var attachable = entityClass.Components.OfType<SAttachableComponentParams>().FirstOrDefault();
+            if (attachable?.AttachDef is not SItemDefinition itemDef)
+                continue;
+
+            if (itemDef.Type == EItemType.__Unknown || itemDef.Type == EItemType.UNDEFINED)
+                continue;
+
+            if (entityClass.Components.OfType<VehicleComponentParams>().Any())
+                continue;
+
+            var scItem = BuildScItemEntity(record, entityClass, itemDef, manufacturerCache);
+            items.Add(scItem);
+            totalProcessed++;
+
+            if (entityClass.tags != null)
+            {
+                foreach (var tag in entityClass.tags)
+                {
+                    if (tag == null)
+                        continue;
+                    var tagId = tag.selfId.ToString();
+                    if (!string.IsNullOrEmpty(tagId))
+                    {
+                        var key = (scItem.RecordId, tagId);
+                        if (itemTags.Add(key))
+                        {
+                            itemTagEntities.Add(new ScItemTagEntity
+                            {
+                                ScItemRecordId = scItem.RecordId,
+                                TagSelfId = tagId
+                            });
+                        }
+                    }
+                }
+            }
+
+            if (items.Count % 10_000 == 0)
+            {
+                db.ChangeTracker.AutoDetectChangesEnabled = false;
+                var newManufacturers = manufacturerCache.Values
+                    .Where(m => m.Id != "Unknown" && !existingManufacturerIds.Contains(m.Id))
+                    .ToList();
+                if (newManufacturers.Count > 0)
+                {
+                    db.Manufacturers.AddRange(newManufacturers);
+                    foreach (var m in newManufacturers)
+                    {
+                        existingManufacturerIds.Add(m.Id);
+                    }
+                }
+                db.ScItems.AddRange(items);
+                db.ScItemTags.AddRange(itemTagEntities);
+                db.ChangeTracker.AutoDetectChangesEnabled = true;
+                await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                batchesSaved++;
+                _logger.LogInformation("[SCItems {BatchesSaved}/~{EstimatedBatches}] Batch saved: {Processed} total items, {InBatch} in batch",
+                    batchesSaved, (totalProcessed / 10_000) + 2, totalProcessed, items.Count);
+                items.Clear();
+                itemTags.Clear();
+                itemTagEntities.Clear();
+            }
+        }
+
+        if (items.Count > 0)
+        {
+            db.ChangeTracker.AutoDetectChangesEnabled = false;
+            var newManufacturers = manufacturerCache.Values
+                .Where(m => m.Id != "Unknown" && !existingManufacturerIds.Contains(m.Id))
+                .ToList();
+            if (newManufacturers.Count > 0)
+            {
+                db.Manufacturers.AddRange(newManufacturers);
+                foreach (var m in newManufacturers)
+                {
+                    existingManufacturerIds.Add(m.Id);
+                }
+            }
+            db.ScItems.AddRange(items);
+            db.ScItemTags.AddRange(itemTagEntities);
+            db.ChangeTracker.AutoDetectChangesEnabled = true;
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            batchesSaved++;
+            _logger.LogInformation("[SCItems {BatchesSaved}/~{EstimatedBatches}] Final batch saved: {Processed} total items, {InBatch} in batch",
+                batchesSaved, (totalProcessed / 10_000) + 2, totalProcessed, items.Count);
+        }
+
+        start.Stop();
+        _logger.LogInformation("Inserted {Count} SCItems and {TagCount} SCItem tags into the database.", totalProcessed, itemTagEntities.Count);
+        _logger.LogInformation("SCItems processing completed in {Elapsed}ms.", start.ElapsedMilliseconds);
+    }
+
+    private ScItemEntity BuildScItemEntity(
+        DataCoreTypedRecord record,
+        EntityClassDefinition entityClass,
+        SItemDefinition itemDef,
+        Dictionary<string, ManufacturerEntity> manufacturerCache)
+    {
+        var components = entityClass.Components;
+
+        var healthParams = components.OfType<SHealthComponentParams>().FirstOrDefault();
+        var shieldParams = components.OfType<SCItemShieldGeneratorParams>().FirstOrDefault();
+        var jumpDriveParams = components.OfType<SCItemJumpDriveParams>().FirstOrDefault();
+        var distortionParams = components.OfType<SDistortionParams>().FirstOrDefault();
+        var armorParams = components.OfType<SCItemVehicleArmorParams>().FirstOrDefault();
+        var weaponParams = components.OfType<SCItemWeaponComponentParams>().FirstOrDefault();
+        var resourceParams = components.OfType<ItemResourceComponentParams>().FirstOrDefault();
+        var physicsParams = components.OfType<SEntityPhysicsControllerParams>().FirstOrDefault();
+        var purchasableParams = components.OfType<SCItemPurchasableParams>().FirstOrDefault();
+
+        var manufacturerId = ResolveScItemManufacturerId(itemDef, manufacturerCache);
+
+        var (powerGen, powerCons, coolantGen, coolantCons, fuelCap, resourceJson) =
+            ExtractResourceDeltas(resourceParams);
+
+        var shieldResistJson = shieldParams != null
+            ? System.Text.Json.JsonSerializer.Serialize(shieldParams.ShieldResistance)
+            : null;
+
+        var damageResist = healthParams?.DamageResistances as DamageResistance;
+
+        return new ScItemEntity
+        {
+            RecordId = record.RecordId.ToString(),
+            TechnicalName = record.RecordName,
+            TypeName = itemDef.Type.ToString(),
+            SubTypeName = itemDef.SubType.ToString(),
+            Size = itemDef.Size,
+            Grade = itemDef.Grade,
+            LocaleNameKey = itemDef.Localization.Name,
+            LocaleDescKey = itemDef.Localization.Description,
+            DisplayLocaleKey = purchasableParams?.displayName,
+            ManufacturerId = manufacturerId,
+            Mass = physicsParams?.PhysType?.Mass,
+            Health = healthParams?.Health,
+            IsSalvagable = healthParams?.IsSalvagable,
+            IsRepairable = healthParams?.IsRepairable,
+            ResistPhysical = damageResist?.PhysicalResistance.Multiplier,
+            ResistEnergy = damageResist?.EnergyResistance.Multiplier,
+            ResistDistortion = damageResist?.DistortionResistance.Multiplier,
+            ResistThermal = damageResist?.ThermalResistance.Multiplier,
+            ResistBiochemical = damageResist?.BiochemicalResistance.Multiplier,
+            ResistStun = damageResist?.StunResistance.Multiplier,
+            InventoryVolumeMicroSCU = itemDef.inventoryOccupancyVolume is SStandardCargoUnit scu
+                ? (long?)scu.standardCargoUnits
+                : null,
+            InvDimX = itemDef.inventoryOccupancyDimensions.x,
+            InvDimY = itemDef.inventoryOccupancyDimensions.y,
+            InvDimZ = itemDef.inventoryOccupancyDimensions.z,
+            TagsText = string.IsNullOrEmpty(itemDef.Tags) ? null : itemDef.Tags,
+            RequiredTagsText = string.IsNullOrEmpty(itemDef.RequiredTags) ? null : itemDef.RequiredTags,
+            PowerGeneration = powerGen,
+            PowerConsumption = powerCons,
+            CoolantGeneration = coolantGen,
+            CoolantConsumption = coolantCons,
+            ResourceDeltasJson = resourceJson,
+            DistortionDecayDelay = distortionParams?.DecayDelay,
+            DistortionDecayRate = distortionParams?.DecayRate,
+            DistortionMaximum = distortionParams?.Maximum,
+            ShieldHealth = shieldParams?.MaxShieldHealth,
+            ShieldRegen = shieldParams?.MaxShieldRegen,
+            ShieldDecayRatio = shieldParams?.DecayRatio,
+            ShieldDownedRegenDelay = shieldParams?.DownedRegenDelay,
+            ShieldDamagedRegenDelay = shieldParams?.DamagedRegenDelay,
+            ShieldResistancesJson = shieldResistJson,
+            JumpAlignmentRate = jumpDriveParams?.alignmentRate,
+            JumpAlignmentDecayRate = jumpDriveParams?.alignmentDecayRate,
+            JumpTuningRate = jumpDriveParams?.tuningRate,
+            JumpTuningDecayRate = jumpDriveParams?.tuningDecayRate,
+            JumpFuelUsageEfficiency = jumpDriveParams?.fuelUsageEfficiencyMultiplier,
+            SignalInfrared = armorParams?.signalInfrared,
+            SignalElectromagnetic = armorParams?.signalElectromagnetic,
+            SignalCrossSection = armorParams?.signalCrossSection,
+            ArmorMultPhysical = armorParams?.damageMultiplier is DamageInfo di ? di.DamagePhysical : null,
+            ArmorMultEnergy = armorParams?.damageMultiplier is DamageInfo di2 ? di2.DamageEnergy : null,
+            ArmorMultDistortion = armorParams?.damageMultiplier is DamageInfo di3 ? di3.DamageDistortion : null,
+            ArmorMultThermal = armorParams?.damageMultiplier is DamageInfo di4 ? di4.DamageThermal : null,
+            ArmorMultBiochemical = armorParams?.damageMultiplier is DamageInfo di5 ? di5.DamageBiochemical : null,
+            ArmorMultStun = armorParams?.damageMultiplier is DamageInfo di6 ? di6.DamageStun : null,
+            WeaponAmmoRef = weaponParams?.ammoContainerRecord?.selfId.ToString(),
+            FuelCapacity = fuelCap
+        };
+    }
+
+    private (int? PowerGen, int? PowerCons, float? CoolantGen, float? CoolantCons, float? FuelCap, string? Json)
+        ExtractResourceDeltas(ItemResourceComponentParams? resourceParams)
+    {
+        int? powerGen = null;
+        int? powerCons = null;
+        float? coolantGen = null;
+        float? coolantCons = null;
+        float? fuelCap = null;
+        var unmatched = new List<string>();
+
+        if (resourceParams?.states == null)
+            return (powerGen, powerCons, coolantGen, coolantCons, fuelCap, null);
+
+        foreach (var state in resourceParams.states)
+        {
+            if (state.deltas == null)
+                continue;
+
+            foreach (var delta in state.deltas)
+            {
+                if (delta == null)
+                    continue;
+
+                var handled = false;
+
+                if (delta is ItemResourceDeltaGeneration gen)
+                {
+                    var resEnum = gen.generation.resource;
+                    var amount = gen.generation.resourceAmountPerSecond;
+                    if (resEnum == ResourceNetworkResource.Power)
+                    {
+                        if (amount is SPowerSegmentResourceUnit pwr)
+                        {
+                            powerGen = (powerGen ?? 0) + pwr.units;
+                            handled = true;
+                        }
+                    }
+                    else if (resEnum == ResourceNetworkResource.Coolant)
+                    {
+                        if (amount is SStandardResourceUnit std)
+                        {
+                            coolantGen = (coolantGen ?? 0f) + std.standardResourceUnits;
+                            handled = true;
+                        }
+                    }
+                }
+                else if (delta is ItemResourceDeltaConsumption cons)
+                {
+                    var resEnum = cons.consumption.resource;
+                    var amount = cons.consumption.resourceAmountPerSecond;
+                    if (resEnum == ResourceNetworkResource.Power)
+                    {
+                        if (amount is SPowerSegmentResourceUnit pwr)
+                        {
+                            powerCons = (powerCons ?? 0) + pwr.units;
+                            handled = true;
+                        }
+                    }
+                    else if (resEnum == ResourceNetworkResource.Coolant)
+                    {
+                        if (amount is SStandardResourceUnit std)
+                        {
+                            coolantCons = (coolantCons ?? 0f) + std.standardResourceUnits;
+                            handled = true;
+                        }
+                    }
+                }
+                else if (delta is ItemResourceDeltaConversion conversion)
+                {
+                    handled = true;
+                }
+                else if (delta is ItemResourceDeltaStorage storage)
+                {
+                    var resEnum = storage.consumption.resource;
+                    var amount = storage.consumption.resourceAmountPerSecond;
+                    if (resEnum == ResourceNetworkResource.Fuel)
+                    {
+                        if (amount is SStandardResourceUnit std)
+                        {
+                            fuelCap = (fuelCap ?? 0f) + std.standardResourceUnits;
+                            handled = true;
+                        }
+                    }
+                }
+
+                if (!handled)
+                {
+                    unmatched.Add(delta.GetType().Name);
+                }
+            }
+        }
+
+        string? json = null;
+        if (unmatched.Count > 0)
+        {
+            json = System.Text.Json.JsonSerializer.Serialize(unmatched);
+        }
+
+        return (powerGen, powerCons, coolantGen, coolantCons, fuelCap, json);
+    }
+
+    private string ResolveScItemManufacturerId(
+        SItemDefinition itemDef,
+        Dictionary<string, ManufacturerEntity> manufacturerCache)
+    {
+        var manufacturer = itemDef.Manufacturer;
+
+        if (manufacturer == null)
+            return GetOrCreateUnknownManufacturer(manufacturerCache, null).Id;
+
+        var manufacturerId = !string.IsNullOrEmpty(manufacturer.Code)
+            ? manufacturer.Code
+            : (!string.IsNullOrEmpty(manufacturer.Localization.Name)
+                ? manufacturer.Localization.Name
+                : "Unknown");
+
+        if (manufacturerId == "Unknown")
+            return GetOrCreateUnknownManufacturer(manufacturerCache, null).Id;
+
+        if (!manufacturerCache.TryGetValue(manufacturerId, out var entity))
+        {
+            var nameKey = !string.IsNullOrEmpty(manufacturer.Localization.Name)
+                ? manufacturer.Localization.Name
+                : manufacturerId;
+            var descKey = !string.IsNullOrEmpty(manufacturer.Localization.Description)
+                ? manufacturer.Localization.Description
+                : string.Empty;
+
+            entity = new ManufacturerEntity
+            {
+                Id = manufacturerId,
+                Name = Task.Run(async () => await _p4kService.GetLocaleValue(nameKey)).Result ?? manufacturerId,
+                NameKey = nameKey,
+                Description = Task.Run(async () => await _p4kService.GetLocaleValue(descKey)).Result ?? string.Empty,
+                DescriptionKey = descKey,
+                Logo = manufacturer.Logo ?? string.Empty
+            };
+            manufacturerCache[manufacturerId] = entity;
+        }
+
+        return manufacturerId;
+    }
+
+    private void EnsureUnknownManufacturer(Dictionary<string, ManufacturerEntity> cache)
+    {
+        if (!cache.ContainsKey("Unknown"))
+        {
+            cache["Unknown"] = new ManufacturerEntity { Id = "Unknown", Name = "Unknown" };
+        }
     }
 
     /* ========================================================================

@@ -29,6 +29,9 @@ public class StarXelemDbContext : DbContext
 
     public DbSet<BlueprintModifierEntity> BlueprintModifiers => Set<BlueprintModifierEntity>();
 
+    public DbSet<ScItemEntity> ScItems => Set<ScItemEntity>();
+    public DbSet<ScItemTagEntity> ScItemTags => Set<ScItemTagEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -181,5 +184,48 @@ public class StarXelemDbContext : DbContext
             .WithMany()
             .HasForeignKey(ct => ct.TagSelfId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // ScItem -> Manufacturer
+        modelBuilder.Entity<ScItemEntity>()
+            .HasOne(si => si.Manufacturer)
+            .WithMany(m => m.ScItems)
+            .HasForeignKey(si => si.ManufacturerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // ScItemTag junction
+        modelBuilder.Entity<ScItemTagEntity>()
+            .HasKey(st => new { st.ScItemRecordId, st.TagSelfId });
+
+        modelBuilder.Entity<ScItemTagEntity>()
+            .HasOne(st => st.ScItem)
+            .WithMany(si => si.ScItemTags)
+            .HasForeignKey(st => st.ScItemRecordId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ScItemTagEntity>()
+            .HasOne(st => st.Tag)
+            .WithMany()
+            .HasForeignKey(st => st.TagSelfId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Blueprint -> Output ScItem
+        modelBuilder.Entity<BlueprintEntity>()
+            .HasOne(b => b.OutputItem)
+            .WithMany()
+            .HasForeignKey(b => b.OutputEntityClassRef)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // BlueprintRecipeCost -> ScItem
+        modelBuilder.Entity<BlueprintRecipeCostEntity>()
+            .HasOne(c => c.Item)
+            .WithMany(si => si.BlueprintCosts)
+            .HasForeignKey(c => c.ItemEntityClassRef)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Many-to-many: Blueprint <-> ScItem for required items
+        modelBuilder.Entity<BlueprintEntity>()
+            .HasMany(b => b.RequiredItems)
+            .WithMany()
+            .UsingEntity(j => j.ToTable("BlueprintScItems"));
     }
 }

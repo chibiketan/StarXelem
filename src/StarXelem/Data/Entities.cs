@@ -16,6 +16,7 @@ public class ManufacturerEntity
     public string Logo { get; set; } = string.Empty;
 
     public virtual ICollection<ShipEntity> Ships { get; set; } = new List<ShipEntity>();
+    public virtual ICollection<ScItemEntity> ScItems { get; set; } = new List<ScItemEntity>();
 }
 
     public class TagEntity
@@ -314,6 +315,11 @@ public class BlueprintEntity
     public TimeSpan? CraftDuration { get; set; }
 
     public virtual ICollection<BlueprintRecipeCostEntity> Costs { get; set; } = new List<BlueprintRecipeCostEntity>();
+
+    [ForeignKey("OutputEntityClassRef")]
+    public virtual ScItemEntity? OutputItem { get; set; }
+
+    public virtual ICollection<ScItemEntity> RequiredItems { get; set; } = new List<ScItemEntity>();
 }
 
 /// <summary>One cost (resource or item) or a Select-option inside a blueprint recipe.</summary>
@@ -340,6 +346,7 @@ public class BlueprintRecipeCostEntity
     public int? MinQuality { get; set; }
 
     public virtual ICollection<BlueprintModifierEntity> Modifiers { get; set; } = new List<BlueprintModifierEntity>();
+    public virtual ScItemEntity? Item { get; set; }
 }
 
 /// <summary>Modifier context applied to a cost slot (gameplay property modifiers).</summary>
