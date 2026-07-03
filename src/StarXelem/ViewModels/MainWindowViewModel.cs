@@ -28,6 +28,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly ISettingsService _settingsService;
     private readonly ILocalDatabaseService _localDatabaseService;
     private const string P4kFolderSettingName = "P4KFolder";
+    private const string SelectedP4kSettingName = "SelectedP4KPath";
 
     [ObservableProperty]
     private Task<IList<P4kFileModel>> _installedEnvs;
@@ -137,7 +138,16 @@ public partial class MainWindowViewModel : ViewModelBase
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 OnPropertyChanged(nameof(InstalledEnvs));
-                SelectedP4kFile = list?.FirstOrDefault();
+                var savedPath = _settingsService.GetAsync(SelectedP4kSettingName).Result;
+                if (!string.IsNullOrWhiteSpace(savedPath))
+                {
+                    var saved = list?.FirstOrDefault(e => string.Equals(Path.GetFullPath(e.Path), Path.GetFullPath(savedPath), StringComparison.OrdinalIgnoreCase));
+                    SelectedP4kFile = saved ?? list?.FirstOrDefault();
+                }
+                else
+                {
+                    SelectedP4kFile = list?.FirstOrDefault();
+                }
             });
         });
         Pages =
@@ -191,8 +201,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnSelectedP4kFileChanged(P4kFileModel? value)
     {
-        // On met à jour le fichier sélectionné dans le service
         _p4kService.SelectedP4KFile = value;
+        if (value != null)
+        {
+            SaveSelectedP4k(Path.GetFullPath(value.Path));
+        }
     }
 
     private async Task OpenDataP4kAsync(object? parameter)
@@ -456,6 +469,18 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             // Ignorer les erreurs d'accès au registre pour ne pas bloquer l'utilisateur
             _logger.LogWarning(ex, "Impossible de sauvegarder le dossier P4K dans les paramètres");
+        }
+    }
+
+    private void SaveSelectedP4k(string p4kPath)
+    {
+        try
+        {
+            _ = _settingsService.SetAsync(SelectedP4kSettingName, p4kPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Impossible de sauvegarder le P4K sélectionné");
         }
     }
 
