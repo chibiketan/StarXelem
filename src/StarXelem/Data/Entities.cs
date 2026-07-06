@@ -52,6 +52,7 @@ public class ShipEntity
 {
     [Key]
     public string EntityClassGuid { get; set; } = string.Empty;
+    public uint Crc32 { get; set; }
     public string TechnicalName { get; set; } = string.Empty;
     public string LocalizedName { get; set; } = string.Empty;
     
@@ -296,6 +297,7 @@ public class BlueprintEntity
 {
     [Key]
     public string SelfId { get; set; } = string.Empty;
+    public uint Crc32 { get; set; }
 
     public string BlueprintName { get; set; } = string.Empty;
 

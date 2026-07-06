@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Data;
+using System.Runtime.InteropServices;
 using System.Xml.Linq;
 
 namespace StarXelem.Services;
@@ -323,6 +324,7 @@ public class LocalDatabaseService : ILocalDatabaseService
                 continue;
 
             var guid = record.RecordId.ToString();
+            var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record.RecordId]));
             _entityClassToGuid[entityClass] = guid;
 
             // Extract and add ship tags
@@ -338,6 +340,7 @@ public class LocalDatabaseService : ILocalDatabaseService
             ships.Add(new ShipEntity
             {
                 EntityClassGuid = guid,
+                Crc32 = crc,
                 TechnicalName = record.RecordName,
                 LocalizedName = await _p4kService.GetEntityClassName(entityClass) ?? "Unknown",
                 ManufacturerId = manufacturerId
@@ -1460,6 +1463,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         var blueprintEntity = new BlueprintEntity
         {
             SelfId = blueprintId,
+            Crc32 = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([new CigGuid(blueprintId)])),
             BlueprintName = blueprintName,
             CategoryRef = craftingBlueprint.category?.selfId.ToString() ?? "",
             CategoryName = "Unknown",
@@ -1856,6 +1860,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         return new ScItemEntity
         {
             RecordId = record.RecordId.ToString(),
+            Crc32 = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record.RecordId])),
             TechnicalName = record.RecordName,
             TypeName = itemDef.Type.ToString(),
             SubTypeName = itemDef.SubType.ToString(),

@@ -9,6 +9,8 @@ public class ScItemEntity
     [Key]
     public string RecordId { get; set; } = string.Empty;
 
+    public uint Crc32 { get; set; }
+
     public string TechnicalName { get; set; } = string.Empty;
 
     public string TypeName { get; set; } = string.Empty;

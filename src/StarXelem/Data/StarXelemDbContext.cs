@@ -35,6 +35,10 @@ public class StarXelemDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<ShipEntity>().HasIndex(s => s.Crc32);
+        modelBuilder.Entity<ScItemEntity>().HasIndex(s => s.Crc32);
+        modelBuilder.Entity<BlueprintEntity>().HasIndex(b => b.Crc32);
         
         modelBuilder.Entity<MissionShipRequirementEntity>()
             .HasOne(msr => msr.Mission)
