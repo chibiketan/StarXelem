@@ -616,6 +616,25 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         return result;
     }
 
+    public async Task<List<DataCoreTypedRecord>> GetAllStarMapObjects()
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+
+        var records = _EntityClassDict.Values
+            .AsParallel()
+            .Where(r => r.Record.Data is StarMapObject)
+            .ToList();
+
+        // StarMapObject properties (name, type, parent, etc.) are at depth 1
+        await Task.WhenAll(records.AsParallel().Select(async r =>
+        {
+            if (r.depth < 1)
+                await UpdateCacheRecordWithDepth(r, 1);
+        })).ConfigureAwait(false);
+
+        return records.Select(r => r.Record).ToList();
+    }
+
     private void ResetSelectedFile()
     {
         // stop previous loading if any

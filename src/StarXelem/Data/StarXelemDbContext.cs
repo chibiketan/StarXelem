@@ -31,6 +31,7 @@ public class StarXelemDbContext : DbContext
 
     public DbSet<ScItemEntity> ScItems => Set<ScItemEntity>();
     public DbSet<ScItemTagEntity> ScItemTags => Set<ScItemTagEntity>();
+    public DbSet<LocationEntity> Locations => Set<LocationEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -231,5 +232,16 @@ public class StarXelemDbContext : DbContext
             .HasMany(b => b.RequiredItems)
             .WithMany()
             .UsingEntity(j => j.ToTable("BlueprintScItems"));
+
+        // Location
+        modelBuilder.Entity<LocationEntity>()
+            .HasIndex(l => l.Crc)
+            .IsUnique();
+
+        modelBuilder.Entity<LocationEntity>()
+            .HasOne(l => l.Parent)
+            .WithMany(p => p.Children)
+            .HasForeignKey(l => l.ParentCigGuid)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

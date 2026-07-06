@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using StarXelem.Data;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
 using StarXelem.ViewModels;
@@ -66,6 +67,7 @@ public static class ServiceCollectionExtensions
                 autoRebuild: false));
         services.AddSingleton<ISettingsService, RegistrySettingsService>();
         services.AddSingleton<IReputationService, ReputationService>();
+        services.AddSingleton<ILocationRepository, LocationRepository>();
 
         // Service API externe pour la communication avec Alliance Orbital (profil utilisateur)
         services.AddSingleton<IAllianceOrbitalService, AllianceOrbitalService>();

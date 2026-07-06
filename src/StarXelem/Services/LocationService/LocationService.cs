@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using Sc.External.Services.Entitygraph.V1;
 using StarBreaker.DataCoreGenerated;
+using StarXelem.Data;
 using StarXelem.Models;
 
 namespace StarXelem.Services.LocationService;
@@ -15,16 +16,19 @@ public class LocationService : ILocationService
 {
     private readonly IGrpcClientService _grpcClientService;
     private readonly IP4kService _p4KService;
+    private readonly ILocationRepository _locationRepository;
 
     /// <summary>
     /// Initialise une nouvelle instance de <see cref="LocationService"/>.
     /// </summary>
     /// <param name="grpcClientService">Service de communication gRPC avec le backend Star Citizen.</param>
     /// <param name="p4KService">Service d'accès aux données P4K (types d'entités et chaînes localisées).</param>
-    public LocationService(IGrpcClientService grpcClientService, IP4kService p4KService)
+    /// <param name="locationRepository">Repository d'accès aux emplacements persistés en base de données.</param>
+    public LocationService(IGrpcClientService grpcClientService, IP4kService p4KService, ILocationRepository locationRepository)
     {
         _grpcClientService = grpcClientService;
         _p4KService = p4KService;
+        _locationRepository = locationRepository;
     }
     
     /// <inheritdoc/>
@@ -247,20 +251,24 @@ public class LocationService : ILocationService
     /// <returns>Le nom localisé préfixé du type, ou un libellé de fallback si la résolution échoue.</returns>
     private async Task<string> ResolveLocationId(uint id, ELocationType type)
     {
-        // l'id correspond au hash CRC du type
-        // Donc recherche du type par son hash dans les données => Lecture du champ StarMapObject.name => récupération de la traduction, enjoy \o/
-        var locationName = await _locationCache.GetOrAdd(id, async (guid) =>
+        var locationName = await _locationCache.GetOrAdd(id, async (crc) =>
         {
-            var tmp = await _p4KService.GetEntityType(guid);
+            var location = await _locationRepository.GetByCrcAsync(crc);
+            if (location != null)
+            {
+                return location.NameLocalized;
+            }
+
+            var tmp = await _p4KService.GetEntityType(crc);
 
             if (null == tmp)
             {
                 return null;
             }
             var localKey = ((StarMapObject)tmp.Data).name;
-            var locationName = await _p4KService.GetLocaleValue(localKey);
+            var resolvedName = await _p4KService.GetLocaleValue(localKey);
 
-            return locationName;
+            return resolvedName;
         });
 
         if (String.IsNullOrEmpty(locationName))

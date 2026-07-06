@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
+using System;
 
 namespace StarXelem.Data;
 
@@ -418,4 +419,83 @@ public class MissionCompletionTagEntity
     public string TagSelfId { get; set; } = string.Empty;
     [ForeignKey("TagSelfId")]
     public virtual TagEntity? Tag { get; set; }
+}
+
+public class LocationEntity
+{
+    [Key]
+    public string CigGuid { get; set; } = string.Empty;
+
+    public uint Crc { get; set; }
+
+    public string SelfId { get; set; } = string.Empty;
+
+    public string NameKey { get; set; } = string.Empty;
+
+    public string NameLocalized { get; set; } = string.Empty;
+
+    public string? DescriptionKey { get; set; }
+
+    public string? DescriptionLocalized { get; set; }
+
+    public string Type { get; set; } = string.Empty;
+
+    public string? Jurisdiction { get; set; }
+
+    public string? Affiliation { get; set; }
+
+    public string? Callout1 { get; set; }
+
+    public string? Callout2 { get; set; }
+
+    public string? Callout3 { get; set; }
+
+    public string? RespawnLocationType { get; set; }
+
+    public string? LocationHierarchyTag { get; set; }
+
+    public string? NavIcon { get; set; }
+
+    public bool IsScannable { get; set; }
+
+    public double Size { get; set; }
+
+    public bool HideInStarmap { get; set; }
+
+    public bool HideInWorld { get; set; }
+
+    public bool HideWhenInAdoptionRadius { get; set; }
+
+    public bool BlockTravel { get; set; }
+
+    public bool OnlyShowWhenParentSelected { get; set; }
+
+    public float MinimumDisplaySize { get; set; }
+
+    public bool OverrideRotationSpeed { get; set; }
+
+    public float OverrideRotationSpeedValue { get; set; }
+
+    public bool ShowOrbitLine { get; set; }
+
+    public bool UseHoloMaterial { get; set; }
+
+    public bool NoAutoBodyRecovery { get; set; }
+
+    public string? StarMapGeomPath { get; set; }
+
+    public string? StarMapMaterialPath { get; set; }
+
+    public string? StarMapShapePath { get; set; }
+
+    public string? LocationImagePath { get; set; }
+
+    public string? LocationMedicalImagePath { get; set; }
+
+    [ForeignKey("ParentCigGuid")]
+    public virtual LocationEntity? Parent { get; set; }
+
+    public string? ParentCigGuid { get; set; }
+
+    public virtual ICollection<LocationEntity> Children { get; set; } = new List<LocationEntity>();
 }

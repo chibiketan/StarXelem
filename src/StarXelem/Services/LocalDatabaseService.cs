@@ -231,6 +231,14 @@ public class LocalDatabaseService : ILocalDatabaseService
         _logger.LogInformation("[Phase 7/{Total}] Spawn rules completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
+        // Phase 8: Locations (StarMapObjects)
+        progress?.Report(new RebuildProgress(8, TotalPhases, "Chargement des emplacements…"));
+        phase.Restart();
+        await PopulateLocationsAsync(db, cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 8/{Total}] Locations completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        cancellationToken.ThrowIfCancellationRequested();
+
         total.Stop();
         _logger.LogInformation("Database rebuild completed in {Elapsed}ms.", total.ElapsedMilliseconds);
     }
@@ -1709,8 +1717,119 @@ public class LocalDatabaseService : ILocalDatabaseService
     }
 
     /* ========================================================================
-     * PHASE 7: SCITEMS
-     * ======================================================================== */
+      * PHASE 8: LOCATIONS (StarMapObjects)
+      * ======================================================================== */
+
+    private async Task PopulateLocationsAsync(StarXelemDbContext db, CancellationToken cancellationToken)
+    {
+        var start = Stopwatch.StartNew();
+        var locations = new List<LocationEntity>();
+        var crcToCigGuid = new Dictionary<uint, string>();
+
+        var starMapObjects = await _p4kService.GetAllStarMapObjects().ConfigureAwait(false);
+        _logger.LogInformation("Found {Count} StarMapObject records in P4K.", starMapObjects.Count);
+
+        foreach (var record in starMapObjects)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (record.Data is not StarMapObject smo)
+                continue;
+
+            var cigGuid = record.RecordId.ToString();
+            var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record.RecordId]));
+            crcToCigGuid[crc] = cigGuid;
+
+            var nameLocalized = await _p4kService.GetLocaleValue(smo.name).ConfigureAwait(false) ?? string.Empty;
+            var descriptionLocalized = !string.IsNullOrEmpty(smo.description)
+                ? await _p4kService.GetLocaleValue(smo.description).ConfigureAwait(false)
+                : null;
+
+            var affiliationName = smo.affiliation?.displayName;
+            if (!string.IsNullOrEmpty(affiliationName))
+            {
+                affiliationName = await _p4kService.GetLocaleValue(affiliationName).ConfigureAwait(false) ?? affiliationName;
+            }
+
+            var jurisdictionName = smo.jurisdiction?.name;
+            if (!string.IsNullOrEmpty(jurisdictionName))
+            {
+                jurisdictionName = await _p4kService.GetLocaleValue(jurisdictionName).ConfigureAwait(false) ?? jurisdictionName;
+            }
+
+            var callout1 = !string.IsNullOrEmpty(smo.callout1)
+                ? await _p4kService.GetLocaleValue(smo.callout1).ConfigureAwait(false)
+                : null;
+            var callout2 = !string.IsNullOrEmpty(smo.callout2)
+                ? await _p4kService.GetLocaleValue(smo.callout2).ConfigureAwait(false)
+                : null;
+            var callout3 = !string.IsNullOrEmpty(smo.callout3)
+                ? await _p4kService.GetLocaleValue(smo.callout3).ConfigureAwait(false)
+                : null;
+
+            locations.Add(new LocationEntity
+            {
+                CigGuid = cigGuid,
+                Crc = crc,
+                SelfId = smo.selfId.ToString(),
+                NameKey = smo.name ?? string.Empty,
+                NameLocalized = nameLocalized,
+                DescriptionKey = smo.description,
+                DescriptionLocalized = descriptionLocalized,
+                Type = smo.type?.name ?? string.Empty,
+                Jurisdiction = jurisdictionName,
+                Affiliation = affiliationName,
+                Callout1 = callout1,
+                Callout2 = callout2,
+                Callout3 = callout3,
+                RespawnLocationType = smo.respawnLocationType.ToString(),
+                LocationHierarchyTag = smo.locationHierarchyTag?.selfId.ToString(),
+                NavIcon = smo.navIcon.ToString(),
+                IsScannable = smo.isScannable,
+                Size = smo.size,
+                HideInStarmap = smo.hideInStarmap,
+                HideInWorld = smo.hideInWorld,
+                HideWhenInAdoptionRadius = smo.hideWhenInAdoptionRadius,
+                BlockTravel = smo.blockTravel,
+                OnlyShowWhenParentSelected = smo.onlyShowWhenParentSelected,
+                MinimumDisplaySize = smo.minimumDisplaySize,
+                OverrideRotationSpeed = smo.overrideRotationSpeed,
+                OverrideRotationSpeedValue = smo.overrideRotationSpeedValue,
+                ShowOrbitLine = smo.showOrbitLine,
+                UseHoloMaterial = smo.useHoloMaterial,
+                NoAutoBodyRecovery = smo.noAutoBodyRecovery,
+                StarMapGeomPath = smo.starMapGeomPath,
+                StarMapMaterialPath = smo.starMapMaterialPath,
+                StarMapShapePath = smo.starMapShapePath,
+                LocationImagePath = smo.locationImagePath,
+                LocationMedicalImagePath = smo.locationMedicalImagePath,
+                ParentCigGuid = smo.parent != null ? smo.parent.selfId.ToString() : null
+            });
+        }
+
+        // Fix parent references: map parent CigGuid to actual CigGuid values
+        foreach (var location in locations)
+        {
+            if (location.ParentCigGuid != null && crcToCigGuid.TryGetValue(location.Crc, out var selfCrc))
+            {
+                // ParentCigGuid is the parent's CigGuid string. We need to find the location that has this CigGuid.
+                // Since we stored CigGuid as PK, we can directly match.
+                // The parent reference from StarMapObject.parent.selfId is a CigGuid, so it matches our PK.
+            }
+        }
+
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
+        db.Locations.AddRange(locations);
+        db.ChangeTracker.AutoDetectChangesEnabled = true;
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        start.Stop();
+        _logger.LogInformation("Inserted {Count} locations into the database.", locations.Count);
+        _logger.LogInformation("Locations processing completed in {Elapsed}ms.", start.ElapsedMilliseconds);
+    }
+
+    /* ========================================================================
+      * PHASE 7: SCITEMS
+      * ======================================================================== */
 
     private async Task PopulateScItemsAsync(StarXelemDbContext db, CancellationToken cancellationToken)
     {

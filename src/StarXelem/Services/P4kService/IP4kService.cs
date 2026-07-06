@@ -71,6 +71,7 @@ public interface IP4kService : INotifyPropertyChanged
 
     Task<List<DataCoreTypedRecord>> GetAllFactionReputations();
     Task<List<DataCoreTypedRecord>> GetAllCraftingBlueprintRecord();
+    Task<List<DataCoreTypedRecord>> GetAllStarMapObjects();
     Task<List<DataCoreTypedRecord>> EnsureRecordsDepthAsync(IEnumerable<DataCoreTypedRecord> records, int depth);
 }
 
