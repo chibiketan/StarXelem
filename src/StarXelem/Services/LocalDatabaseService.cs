@@ -53,6 +53,7 @@ public interface ILocalDatabaseService
     Task<List<ShipEntity>> GetShipsForMissionAsync(string missionDebugName);
     Task<(Dictionary<string, string> TitleSuffixMap, Dictionary<string, Dictionary<string, HashSet<string>>> DescriptionAppendMap)> GetBlueprintRewardMapsAsync(HashSet<string>? obtainedBlueprintIds = null);
     Task<List<DbBlueprintRow>> GetBlueprintsAsync(HashSet<string>? obtainedBlueprintIds = null);
+    IAsyncEnumerable<DbBlueprintRow> GetBlueprintsBatchedAsync(int batchSize = 200, CancellationToken cancellationToken = default);
 }
 
 public class LocalDatabaseService : ILocalDatabaseService
@@ -2246,39 +2247,81 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     public async Task<List<DbBlueprintRow>> GetBlueprintsAsync(HashSet<string>? obtainedBlueprintIds = null)
     {
+        var result = new List<DbBlueprintRow>();
+        await foreach (var row in GetBlueprintsBatchedAsync().ConfigureAwait(false))
+        {
+            result.Add(row);
+        }
+        return result;
+    }
+
+    public async IAsyncEnumerable<DbBlueprintRow> GetBlueprintsBatchedAsync(int batchSize = 200, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
         await using var db = new StarXelemDbContext(GetOptions());
 
-        var blueprints = await db.Blueprints
-            .OrderBy(b => b.BlueprintName) 
-            .ToListAsync()
-            .ConfigureAwait(false);
+        var totalBlueprints = await db.Blueprints.LongCountAsync(cancellationToken).ConfigureAwait(false);
+        int offset = 0;
 
-        var result = new List<DbBlueprintRow>();
-
-        foreach (var bp in blueprints)
+        while (offset < totalBlueprints)
         {
-            var costs = await db.BlueprintRecipeCosts
-                .Where(c => c.BlueprintId == bp.SelfId)
-                .ToListAsync()
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var batch = await db.Blueprints
+                .OrderBy(b => b.BlueprintName)
+                .Skip(offset)
+                .Take(batchSize)
+                .Include(b => b.Costs)
+                    .ThenInclude(c => c.Modifiers)
+                .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            var costRows = new List<DbBlueprintCostRow>();
-            foreach (var cost in costs)
+            if (batch.Count == 0)
+                break;
+
+            var blueprintIds = batch.Select(b => b.SelfId).ToHashSet();
+
+            var missionPoolsMap = new Dictionary<string, List<DbMissionPoolRow>>();
+            if (blueprintIds.Count > 0)
             {
-                var modifiers = await db.BlueprintModifiers
-                    .Where(m => m.CostId == cost.Id)
-                    .ToListAsync()
+                var pools = await db.MissionBlueprintEntries
+                    .Where(e => blueprintIds.Contains(e.BlueprintId))
+                    .Include(e => e.Pool)
+                    .ToListAsync(cancellationToken)
                     .ConfigureAwait(false);
 
-                costRows.Add(new DbBlueprintCostRow(
-                    cost.CostType,
-                    cost.CostName,
-                    cost.ResourceRef,
-                    cost.ResourceAmount,
-                    cost.ItemEntityClassRef,
-                    cost.ItemCount,
-                    cost.MinQuality,
-                    modifiers.Select(m => new DbBlueprintModifierRow(
+                var missionIds = pools.Select(e => e.Pool.MissionId).ToHashSet();
+                var missions = await db.Missions
+                    .Where(m => missionIds.Contains(m.Id))
+                    .ToDictionaryAsync(m => m.Id, m => m, cancellationToken)
+                    .ConfigureAwait(false);
+
+                foreach (var entry in pools)
+                {
+                    var bpId = entry.BlueprintId;
+                    if (!missionPoolsMap.TryGetValue(bpId, out var list))
+                    {
+                        list = new List<DbMissionPoolRow>();
+                        missionPoolsMap[bpId] = list;
+                    }
+
+                    if (missions.TryGetValue(entry.Pool.MissionId, out var mission))
+                    {
+                        list.Add(new DbMissionPoolRow(entry.Pool.PoolName, mission.Title, mission.DebugName));
+                    }
+                }
+            }
+
+            foreach (var bp in batch)
+            {
+                var costRows = bp.Costs.Select(c => new DbBlueprintCostRow(
+                    c.CostType,
+                    c.CostName,
+                    c.ResourceRef,
+                    c.ResourceAmount,
+                    c.ItemEntityClassRef,
+                    c.ItemCount,
+                    c.MinQuality,
+                    c.Modifiers.Select(m => new DbBlueprintModifierRow(
                         m.RangeType,
                         m.PropertyName,
                         m.StartQuality,
@@ -2286,31 +2329,25 @@ public class LocalDatabaseService : ILocalDatabaseService
                         m.ModifierStart,
                         m.ModifierEnd
                     )).ToArray()
-                ));
+                )).ToArray();
+
+                missionPoolsMap.TryGetValue(bp.SelfId, out var missionPools);
+
+                yield return new DbBlueprintRow(
+                    bp.SelfId,
+                    bp.BlueprintName,
+                    bp.CategoryName,
+                    bp.ProcessType,
+                    bp.OutputEntityClassRef,
+                    bp.CraftDuration,
+                    costRows,
+                    missionPools?.ToArray() ?? Array.Empty<DbMissionPoolRow>()
+                );
             }
 
-            var missionPools = await db.MissionBlueprintPools
-                .Where(mp => mp.Entries.Any(e => e.BlueprintId == bp.SelfId))
-                .Join(db.Missions,
-                    mp => mp.MissionId,
-                    m => m.Id,
-                    (mp, m) => new DbMissionPoolRow(mp.PoolName, m.Title, m.DebugName))
-                .ToListAsync()
-                .ConfigureAwait(false);
-
-            result.Add(new DbBlueprintRow(
-                bp.SelfId,
-                bp.BlueprintName,
-                bp.CategoryName,
-                bp.ProcessType,
-                bp.OutputEntityClassRef,
-                bp.CraftDuration,
-                costRows.ToArray(),
-                missionPools.ToArray()
-            ));
+            offset += batch.Count;
+            await Task.CompletedTask;
         }
-
-        return result;
     }
 
     private static string? StripRecordPrefix(string? recordName)

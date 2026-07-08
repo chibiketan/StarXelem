@@ -71,41 +71,62 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     [RelayCommand(CanExecute = nameof(CanLoadItemList))]
     public async Task LoadItemList()
     {
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        try
         {
-            IsLoading = true;
-            TreatmentStatus = "Chargement de la base de données...";
-        });
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsLoading = true;
+                TreatmentStatus = "Chargement de la base de données...";
+                _allBlueprints = new List<BlueprintViewModel>();
+                BlueprintList = new List<BlueprintViewModel>();
+            });
 
-        HashSet<string>? obtainedIds = null;
-        if (IsGrpcConnected)
-        {
-            await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement des BP obtenus...");
-            var grpcBps = await _clientService.GetBlueprintList().ConfigureAwait(false);
-            obtainedIds = grpcBps.Select(e => e.BlueprintId).ToHashSet();
+            HashSet<string>? obtainedIds = null;
+            if (IsGrpcConnected)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement des BP obtenus...");
+                var grpcBps = await _clientService.GetBlueprintList().ConfigureAwait(false);
+                obtainedIds = grpcBps.Select(e => e.BlueprintId).ToHashSet();
+            }
+
+            const int BatchSize = 200;
+            int totalLoaded = 0;
+
+            await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement des blueprints...");
+
+            await foreach (var row in _localDatabaseService.GetBlueprintsBatchedAsync(BatchSize).ConfigureAwait(false))
+            {
+                totalLoaded++;
+
+                var vm = await MapRowToViewModelAsync(row, obtainedIds).ConfigureAwait(false);
+                _allBlueprints!.Add(vm);
+
+                if (totalLoaded % BatchSize == 0)
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        TreatmentStatus = $"Chargement des blueprints… {totalLoaded} traités";
+                        ApplyFilter();
+                    });
+                }
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                TreatmentStatus = $"Terminé — {totalLoaded} blueprints chargés";
+                IsLoading = false;
+                ApplyFilter();
+            });
         }
-
-        await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement des blueprints...");
-        var dbBlueprints = await _localDatabaseService.GetBlueprintsAsync(obtainedIds).ConfigureAwait(false);
-
-        await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Résolution des noms de ressources...");
-        var result = await MapToViewModelsAsync(dbBlueprints, obtainedIds).ConfigureAwait(false);
-
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        catch (Exception ex)
         {
-            TreatmentStatus = "Terminé";
-            IsLoading = false;
-            _allBlueprints = result;
-            ApplyFilter();
-        });
-    }
-
-    private async Task<List<BlueprintViewModel>> MapToViewModelsAsync(
-        List<DbBlueprintRow> dbRows,
-        HashSet<string>? obtainedIds)
-    {
-        var tasks = dbRows.Select(async row => await MapRowToViewModelAsync(row, obtainedIds).ConfigureAwait(false));
-        return (await Task.WhenAll(tasks).ConfigureAwait(false)).ToList();
+            _logger.LogError(ex, "Erreur lors du chargement des blueprints");
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                TreatmentStatus = $"Erreur : {ex.Message}";
+                IsLoading = false;
+            });
+        }
     }
 
     private async Task<BlueprintViewModel> MapRowToViewModelAsync(
