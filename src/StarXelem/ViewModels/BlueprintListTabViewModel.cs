@@ -29,6 +29,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     [ObservableProperty] private string _treatmentStatus = "";
     [ObservableProperty] private string _search = "";
     [ObservableProperty] private bool _showOnlyObtained;
+    [ObservableProperty] private bool _showOnlyWithMissions;
     [ObservableProperty] private bool _isGrpcConnected;
 
     // Stocke la liste complète pour le filtrage
@@ -195,7 +196,9 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         }));
 
         var missionPools = row.MissionPools
-            .Select(mp => new MissionPoolInfo(mp.PoolName, mp.MissionTitle, mp.MissionDebugName))
+            .GroupBy(mp => mp.PoolName)
+            .Select(g => new MissionPoolGroup(g.Key,
+                g.Select(mp => new MissionInfo(mp.MissionTitle, mp.MissionDebugName)).ToList()))
             .ToList();
 
         return new BlueprintViewModel
@@ -283,6 +286,11 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         ApplyFilter();
     }
 
+    partial void OnShowOnlyWithMissionsChanged(bool value)
+    {
+        ApplyFilter();
+    }
+
     private void ApplyFilter()
     {
         var source = _allBlueprints ?? new List<BlueprintViewModel>();
@@ -290,7 +298,12 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         var filtered = source;
         if (ShowOnlyObtained)
         {
-            filtered = source.Where(b => b.IsObtained).ToList();
+            filtered = filtered.Where(b => b.IsObtained).ToList();
+        }
+
+        if (ShowOnlyWithMissions)
+        {
+            filtered = filtered.Where(b => b.MissionPools.Count > 0).ToList();
         }
 
         if (string.IsNullOrWhiteSpace(Search))
@@ -326,15 +339,25 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     }
 }
 
-public class MissionPoolInfo
+public class MissionPoolGroup
 {
     public string PoolName { get; }
+    public List<MissionInfo> Missions { get; }
+
+    public MissionPoolGroup(string poolName, List<MissionInfo> missions)
+    {
+        PoolName = poolName;
+        Missions = missions;
+    }
+}
+
+public class MissionInfo
+{
     public string MissionTitle { get; }
     public string MissionDebugName { get; }
 
-    public MissionPoolInfo(string poolName, string missionTitle, string missionDebugName)
+    public MissionInfo(string missionTitle, string missionDebugName)
     {
-        PoolName = poolName;
         MissionTitle = missionTitle;
         MissionDebugName = missionDebugName;
     }
@@ -407,7 +430,7 @@ public partial class BlueprintViewModel : ViewModelBase
     public bool IsObtained { get; set; }
 
     /// <summary>Liste des pools de mission qui récompensent ce Blueprint.</summary>
-    public List<MissionPoolInfo> MissionPools { get; set; } = new();
+    public List<MissionPoolGroup> MissionPools { get; set; } = new();
 
     public string ItemIconKey => (Type, Subtype) switch
     {
