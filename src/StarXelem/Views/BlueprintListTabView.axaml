@@ -10,7 +10,21 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:DataType="vm:BlueprintListTabViewModel"
              d:DataContext="{x:Static local:DesignData.BlueprintListTabViewModel}"
-             x:Class="StarXelem.Views.BlueprintListTabView">
+              x:Class="StarXelem.Views.BlueprintListTabView">
+    <UserControl.Styles>
+        <Style Selector="ic|SymbolIcon.loading">
+            <Style.Animations>
+                <Animation Duration="0:0:1" IterationCount="Infinite">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="RotateTransform.Angle" Value="90" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="RotateTransform.Angle" Value="450" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+    </UserControl.Styles>
     <UserControl.Resources>
         <ResourceDictionary>
             <conv:HumanScuConverter x:Key="ScuConverter" />
@@ -26,7 +40,7 @@
             <TextBlock Grid.Column="0" Classes="title">BLUEPRINT</TextBlock>
             <Button Grid.Row="0" Grid.Column="1" Classes="btn principal" Command="{Binding LoadItemListCommand}">
                 <Grid ColumnDefinitions="Auto,*,Auto">
-                    <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync">
+                    <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync" Classes.loading="{Binding IsLoading}">
                         <ic:SymbolIcon.RenderTransform>
                             <RotateTransform Angle="90"/>
                         </ic:SymbolIcon.RenderTransform>

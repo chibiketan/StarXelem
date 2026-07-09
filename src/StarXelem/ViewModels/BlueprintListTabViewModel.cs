@@ -25,7 +25,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Copy);
     [ObservableProperty] public IList<BlueprintViewModel>? _blueprintList;
     [ObservableProperty] public BlueprintViewModel? _selectedBluePrint;
-    [ObservableProperty] private bool _isLoading = false;
+    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(LoadItemListCommand))] private bool _isLoading = false;
     [ObservableProperty] private string _treatmentStatus = "";
     [ObservableProperty] private string _search = "";
     [ObservableProperty] private bool _showOnlyObtained;
@@ -57,6 +57,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             ShowOnlyObtained = false;
         }
         LoadItemListCommand.NotifyCanExecuteChanged();
+        SendToOrbitalAllianceCommand.NotifyCanExecuteChanged();
     }
 
     protected override async Task OnFirstShowAsync()
@@ -74,13 +75,13 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     {
         try
         {
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            await Dispatcher.UIThread.InvokeAsync(() => // Set IsLoading BEFORE any await so the button disables synchronously
             {
                 IsLoading = true;
                 TreatmentStatus = "Chargement de la base de données...";
                 _allBlueprints = new List<BlueprintViewModel>();
                 BlueprintList = new List<BlueprintViewModel>();
-            });
+            }).GetTask().ConfigureAwait(false);
 
             HashSet<string>? obtainedIds = null;
             if (IsGrpcConnected)
@@ -93,7 +94,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             const int BatchSize = 200;
             int totalLoaded = 0;
 
-            await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement des blueprints...");
+            await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement des blueprints...").GetTask().ConfigureAwait(false);
 
             await foreach (var row in _localDatabaseService.GetBlueprintsBatchedAsync(BatchSize).ConfigureAwait(false))
             {
@@ -117,7 +118,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                 TreatmentStatus = $"Terminé — {totalLoaded} blueprints chargés";
                 IsLoading = false;
                 ApplyFilter();
-            });
+            }).GetTask().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -126,7 +127,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             {
                 TreatmentStatus = $"Erreur : {ex.Message}";
                 IsLoading = false;
-            });
+            }).GetTask().ConfigureAwait(false);
         }
     }
 
@@ -272,7 +273,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
 
     private bool CanSendToOrbitalAlliance()
     {
-        return _allBlueprints is { Count: > 0 };
+        return IsGrpcConnected && _allBlueprints is { Count: > 0 };
     }
 
     partial void OnSearchChanged(string value)
@@ -330,7 +331,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     {
         var vm = App.Current.Services.GetRequiredService<Popup.SendToOrbitalAlliancePopupContentViewModel>();
 
-        vm.BlueprintsToSend = _allBlueprints;
+        vm.BlueprintsToSend = _allBlueprints?.Where(b => b.IsObtained).ToList();
         WeakReferenceMessenger.Default.Send(new Popup.ShowPopupMessage(
             showCloseButton: true,
             onClose: null,
