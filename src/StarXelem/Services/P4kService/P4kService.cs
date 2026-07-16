@@ -1,7 +1,9 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -459,7 +461,7 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         await Task.WhenAll(records.AsParallel().Select(async r =>
         {
             if (r.depth < depth)
-                await UpdateCacheRecordWithDepth(r, depth).ConfigureAwait(false);
+                await UpdateCacheRecordWithDepth(r, depth);
         })).ConfigureAwait(false);
         
         foreach (var record in records)
@@ -644,20 +646,25 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         // chargement du fichier p4k
         await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
 
-        var oldval = DataCoreBinaryGenerated.s_maxRecursiveLoad;
-        try
+        UpdateState(P4kFileLoadState.CacheLoading);
+        // Tentative d'exécution dans un thread modifiée pour avoir une grosse Stacktrace
+        await LargeStackThreadPool.Shared.EnqueueAsync(() =>
+        //await LargeStackRunner.RunAsync(() =>
         {
-            UpdateState(P4kFileLoadState.CacheLoading);
-            DataCoreBinaryGenerated.s_maxRecursiveLoad = newDepth;
-            var record = df.GetFromRecord(cacheEntry.Record.RecordId);
-            
-            cacheEntry.Record = record;
-            cacheEntry.depth = newDepth;
-        }
-        finally
-        {
-            DataCoreBinaryGenerated.s_maxRecursiveLoad = oldval;
-        }
+            var oldval = DataCoreBinaryGenerated.s_maxRecursiveLoad;
+            try
+            {
+                DataCoreBinaryGenerated.s_maxRecursiveLoad = newDepth;
+                var record = df.GetFromRecord(cacheEntry.Record.RecordId);
+                
+                cacheEntry.Record = record;
+                cacheEntry.depth = newDepth;
+            }
+            finally
+            {
+                DataCoreBinaryGenerated.s_maxRecursiveLoad = oldval;
+            }
+        });
 
         // After an individual record refresh, ensure we stay in CacheLoaded state.
         // This prevents the UI indicator from showing wrong state after depth updates.
@@ -671,5 +678,129 @@ public class P4kService : IP4kService, INotifyPropertyChanged
     {
         public required int depth { get; set; }
         public required DataCoreTypedRecord Record { get; set; }
+    }
+}
+
+public static class LargeStackRunner
+{
+    private const int DefaultStackSizeMb = 64;
+
+    public static T Run<T>(Func<T> func, int stackSizeMb = DefaultStackSizeMb)
+    {
+        T result = default!;
+        Exception? capturedException = null;
+
+        var thread = new Thread(() =>
+        {
+            try   { result = func(); }
+            catch (Exception ex) { capturedException = ex; }
+        }, stackSizeMb * 1024 * 1024);
+
+        thread.IsBackground = true;
+        thread.Start();
+        thread.Join();
+
+        if (capturedException is not null)
+            ExceptionDispatchInfo.Capture(capturedException).Throw();
+
+        return result!;
+    }
+    
+    public static Task<T> RunAsync<T>(Func<T> func, int stackSizeMb = DefaultStackSizeMb)
+    {
+        var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var thread = new Thread(() =>
+        {
+            try   { tcs.SetResult(func()); }
+            catch (OperationCanceledException ex) { tcs.SetCanceled(ex.CancellationToken); }
+            catch (Exception ex)                  { tcs.SetException(ex); }
+        }, stackSizeMb * 1024 * 1024);
+
+        thread.IsBackground = true;
+        thread.Start();
+
+        return tcs.Task;
+    }
+
+    public static Task RunAsync(Action action, int stackSizeMb = DefaultStackSizeMb)
+        => RunAsync<object?>(() => { action(); return null; }, stackSizeMb);
+
+    public static void Run(Action action, int stackSizeMb = DefaultStackSizeMb)
+        => Run<object?>(() => { action(); return null; }, stackSizeMb);
+}
+
+public sealed class LargeStackThreadPool : IDisposable
+{
+    private readonly BlockingCollection<Action> _queue = new();
+    private readonly Thread[] _threads;
+    private readonly CancellationTokenSource _cts = new();
+
+    public static readonly LargeStackThreadPool Shared = new();
+
+    public LargeStackThreadPool(int threadCount = 10, int stackSizeMb = 64)
+    {
+        _threads = Enumerable.Range(0, threadCount)
+            .Select(i =>
+            {
+                var t = new Thread(WorkLoop, stackSizeMb * 1024 * 1024)
+                {
+                    IsBackground = true,
+                    Name = $"LargeStack-{i}"
+                };
+                t.Start();
+                return t;
+            })
+            .ToArray();
+    }
+
+    // Boucle 100% synchrone — le travail reste sur CE thread, pas de fuite vers le ThreadPool
+    private void WorkLoop()
+    {
+        try
+        {
+            foreach (var work in _queue.GetConsumingEnumerable(_cts.Token))
+                work();
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    public Task<T> EnqueueAsync<T>(Func<T> func, CancellationToken ct = default)
+    {
+        var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        if (ct.IsCancellationRequested)
+        {
+            tcs.SetCanceled(ct);
+            return tcs.Task;
+        }
+
+        try
+        {
+            _queue.Add(() =>
+            {
+                if (ct.IsCancellationRequested) { tcs.SetCanceled(ct); return; }
+
+                try   { tcs.SetResult(func()); }
+                catch (OperationCanceledException ex) { tcs.SetCanceled(ex.CancellationToken); }
+                catch (Exception ex)                  { tcs.SetException(ex); }
+            });
+        }
+        catch (InvalidOperationException) { tcs.SetCanceled(); } // pool disposed
+
+        return tcs.Task;
+    }
+
+    public Task EnqueueAsync(Action action, CancellationToken ct = default)
+        => EnqueueAsync<object?>(() => { action(); return null; }, ct);
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _queue.CompleteAdding();
+        foreach (var t in _threads)
+            t.Join(TimeSpan.FromSeconds(5));
+        _cts.Dispose();
+        _queue.Dispose();
     }
 }

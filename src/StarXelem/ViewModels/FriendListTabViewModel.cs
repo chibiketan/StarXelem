@@ -5,7 +5,6 @@ using Cig.Protocols.Common;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FluentAvalonia.UI.Controls;
-using Sc.Internal.Services.UniverseHierarchy.V1;
 using StarBreaker.Common;
 using StarBreaker.DataCore;
 using StarBreaker.DataCoreGenerated;

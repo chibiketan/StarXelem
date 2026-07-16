@@ -119,9 +119,11 @@ public class DesignP4kService : IP4kService
     {
         return Task.FromResult(new List<DataCoreTypedRecord>
         {
-            new DataCoreTypedRecord("TEST", "TEST", new CigGuid(), new ContractGenerator()
+            new DataCoreTypedRecord("TEST", "TEST", new CigGuid(), new ContractGenerator
             {
-                generators = [new ContractGeneratorHandler_List
+                generators =
+                [
+                    new ContractGeneratorHandler_List
                     {
                         debugName = "my_test",
                         contractParams = new ContractParamOverrides
@@ -131,7 +133,8 @@ public class DesignP4kService : IP4kService
                                 new ContractStringParam
                                 {
                                     param = ContractStringParamType.Contractor,
-                                    value = "TestContractor"
+                                    value = "TestContractor",
+                                    selfId = default
                                 }
                             ],
                             boolParamOverrides =
@@ -150,9 +153,14 @@ public class DesignP4kService : IP4kService
                             [
                             ],
                             missionTypeOverride = null,
-                            overridePhaseMissionDetailsDisplayInfo = []
+                            overridePhaseMissionDetailsDisplayInfo =
+                            [
+                            ],
+                            selfId = default
                         },
-                        required_active_scenarios = [],
+                        required_active_scenarios =
+                        [
+                        ],
                         notForRelease = false,
                         workInProgress = false,
                         contracts =
@@ -166,34 +174,57 @@ public class DesignP4kService : IP4kService
                                 template = null,
                                 paramOverrides = new ContractParamOverrides
                                 {
-                                    stringParamOverrides = [
+                                    stringParamOverrides =
+                                    [
                                         new ContractStringParam
                                         {
                                             param = ContractStringParamType.Title,
-                                            value = "TestContractTitle"
+                                            value = "TestContractTitle",
+                                            selfId = default
                                         },
                                         new ContractStringParam
                                         {
                                             param = ContractStringParamType.Description,
-                                            value = "TestContractDescription"
-                                        }                                        
+                                            value = "TestContractDescription",
+                                            selfId = default
+                                        }
                                     ],
-                                    boolParamOverrides = [],
-                                    intParamOverrides = [],
-                                    propertyTagReplacement = [],
-                                    propertyOverrides = [],
-                                    modifierOverrides = [],
+                                    boolParamOverrides =
+                                    [
+                                    ],
+                                    intParamOverrides =
+                                    [
+                                    ],
+                                    propertyTagReplacement =
+                                    [
+                                    ],
+                                    propertyOverrides =
+                                    [
+                                    ],
+                                    modifierOverrides =
+                                    [
+                                    ],
                                     missionTypeOverride = null,
-                                    overridePhaseMissionDetailsDisplayInfo = []
+                                    overridePhaseMissionDetailsDisplayInfo =
+                                    [
+                                    ],
+                                    selfId = default
                                 },
-                                subContracts = [],
-                                additionalPrerequisites = [],
+                                subContracts =
+                                [
+                                ],
+                                additionalPrerequisites =
+                                [
+                                ],
                                 generationParams = null,
                                 contractLifeTime = null,
-                                contractPlugins = [],
+                                contractPlugins =
+                                [
+                                ],
                                 contractResults = new ContractResults
                                 {
-                                    contractResults = [
+                                    contractResults =
+                                    [
                                         new ContractResult_Item
                                         {
                                             entityClass = null,
@@ -202,7 +233,10 @@ public class DesignP4kService : IP4kService
                                             awardOnlyToMissionOwner = false,
                                             targetLocation = default,
                                             notification = null,
-                                            missionResults = []
+                                            missionResults =
+                                            [
+                                            ],
+                                            selfId = default
                                         },
                                         new ContractResult_Item
                                         {
@@ -212,7 +246,10 @@ public class DesignP4kService : IP4kService
                                             awardOnlyToMissionOwner = true,
                                             targetLocation = default,
                                             notification = null,
-                                            missionResults = []
+                                            missionResults =
+                                            [
+                                            ],
+                                            selfId = default
                                         },
                                         new ContractResult_Item
                                         {
@@ -222,49 +259,68 @@ public class DesignP4kService : IP4kService
                                             awardOnlyToMissionOwner = true,
                                             targetLocation = default,
                                             notification = null,
-                                            missionResults = []
+                                            missionResults =
+                                            [
+                                            ],
+                                            selfId = default
                                         },
                                         new ContractResult_Item
                                         {
-                                        entityClass = null,
-                                        amount = 42,
-                                        sendToPlayerHomeLocation = true,
-                                        awardOnlyToMissionOwner = false,
-                                        targetLocation = default,
-                                        notification = null,
-                                        missionResults = []
+                                            entityClass = null,
+                                            amount = 42,
+                                            sendToPlayerHomeLocation = true,
+                                            awardOnlyToMissionOwner = false,
+                                            targetLocation = default,
+                                            notification = null,
+                                            missionResults =
+                                            [
+                                            ],
+                                            selfId = default
                                         },
                                         new ContractResult_ItemsWeighting
                                         {
                                             awardOnlyToMissionOwner = true,
                                             targetLocation = default,
                                             notification = null,
-                                            missionResults = [],
-                                            itemAwardStructure = [
+                                            missionResults =
+                                            [
+                                            ],
+                                            itemAwardStructure =
+                                            [
                                                 new ItemAwardWeightings
                                                 {
                                                     weighting = 0,
-                                                    awards = [
+                                                    awards =
+                                                    [
                                                         new ItemAwardEntityClass
                                                         {
                                                             amountToAward = 33,
-                                                            entityClass = null
+                                                            entityClass = null,
+                                                            selfId = default
                                                         }
-                                                    ]
+                                                    ],
+                                                    selfId = default
                                                 }
-                                            ]
+                                            ],
+                                            selfId = default
                                         }
                                     ],
                                     contractBuyInAmount = 0,
                                     timeToComplete = 0,
-                                    difficulty = null
+                                    difficulty = null,
+                                    selfId = default
                                 },
-                                required_active_scenarios = []
+                                required_active_scenarios =
+                                [
+                                ],
+                                selfId = default
                             }
                         ],
                         defaultAvailability = new ContractAvailability
                         {
-                            prerequisites = [],
+                            prerequisites =
+                            [
+                            ],
                             notifyOnAvailable = false,
                             maxPlayersPerInstance = 0,
                             onceOnly = false,
@@ -276,11 +332,16 @@ public class DesignP4kService : IP4kService
                             hasPersonalCooldown = false,
                             personalCooldownTime = 0,
                             personalCooldownTimeVariation = 0,
-                            hideInMobiGlas = false
-                        }
+                            hideInMobiGlas = false,
+                            selfId = default
+                        },
+                        selfId = default
                     }
                 ],
-                required_active_scenarios = []
+                required_active_scenarios =
+                [
+                ],
+                selfId = default
             })
         });
     }

@@ -826,9 +826,9 @@ public class GrpcClientService : IGrpcClientService
         {
             //var guidCrc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([new CigGuid(responseResult.BlueprintId)]));
             var blueprint = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(responseResult.BlueprintId), 2);
-            var category = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(responseResult.CategoryId), 1);
+            // var category = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(responseResult.CategoryId), 1);
             //var categoryBis = ((BlueprintCategoryDatabaseRecord)typeDb.Data).categories.FirstOrDefault(c => c)
-            var itemClass = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(responseResult.ItemClassId), 1);
+            // var itemClass = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(responseResult.ItemClassId), 1);
             Console.WriteLine("Coucou");
         }
         

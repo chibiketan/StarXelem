@@ -9,7 +9,6 @@ using CommunityToolkit.Mvvm.Messaging;
 using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Sc.External.Services.Entitlement.V1;
-using Sc.Internal.Services.UniverseHierarchy.V1;
 using StarBreaker.Common;
 using StarBreaker.DataCore;
 using StarBreaker.DataCoreGenerated;
