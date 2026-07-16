@@ -225,7 +225,7 @@ internal sealed class MissionMappingService : IMissionMappingService
         var objectives = await ExtractObjectivesFromContract(contract).ConfigureAwait(false);
 
         title = ReplaceMissionToken(title,  token => ReplaceTokenFromContractCallback(contract, token));
-        description = ReplaceMissionToken(description,  token => ReplaceTokenFromContractCallback(contract, token));
+        description = ReplaceMissionToken(description ?? "",  token => ReplaceTokenFromContractCallback(contract, token));
         
         // manage prerequisites
         List<MissionPrerequisiteViewModel> prerequisiteList = await ExtractPrerequisiteVMListFromContract(contract);
@@ -329,6 +329,12 @@ internal sealed class MissionMappingService : IMissionMappingService
     private async Task<List<MissionObjectiveViewModel>> ExtractObjectivesFromContract(ContractBase contract)
     {
         var result = new List<MissionObjectiveViewModel>(10);
+        if (null == contract.template)
+        {
+            // pas de template, on retourne une liste vide
+            return result;
+        }
+        
         foreach (var templateObjectiveToken in contract.template.objectiveTokens)
         {
             List<MissionObjectiveViewModel> stepResult;

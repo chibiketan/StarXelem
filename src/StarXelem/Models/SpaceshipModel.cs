@@ -1,7 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Sc.External.Services.Entitlement.V2;
 using Sc.External.Services.Entitygraph.V1;
-using StarBreaker.DataCoreGenerated;
 using StarXelem.Extensions;
 
 namespace StarXelem.Models;
@@ -9,7 +8,6 @@ namespace StarXelem.Models;
 public class SpaceshipModel
 {
     public string Name => !IsNameValid(Entitlement.Metadata.Name) ? "" : Entitlement.Metadata.Name;
-    public string Ship => (EntityClassDefinition?.Components.FirstOrDefault(c => c is VehicleComponentParams) as VehicleComponentParams)?.vehicleName ?? Entitlement.EntityClassGuid;
     public string? PackageSource => Entitlement.Metadata.SourceSku;
     public string Shipname { get; set; }
     public bool IsRealPurchase => Entitlement.Metadata.RealMoney;
@@ -35,7 +33,6 @@ public class SpaceshipModel
     public string? ClassRecordName { get; set; }
 
     public Entitlement Entitlement { get; }
-    public EntityClassDefinition? EntityClassDefinition { get; set; }
     public EntityItemQueryResult? EntityProperties { get; set; }
     public EntityStowContext? StowContext { get; set; }
 

@@ -10,7 +10,6 @@ using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Sc.External.Services.Entitlement.V1;
 using StarBreaker.Common;
-using StarBreaker.DataCore;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Models;
 using StarXelem.Services;
@@ -21,9 +20,9 @@ namespace StarXelem.ViewModels;
 
 public partial class ShipTabViewModel : PageViewModelBase
 {
-    private const string dataCorePath = "Data\\Game2.dcb";
     private readonly IGrpcClientService  _clientService;
     private readonly IP4kService _p4KService;
+    private readonly ILocalDatabaseService _localDatabaseService;
     private readonly ILocationService _locationService;
     private readonly IAllianceOrbitalService _allianceOrbitalService;
     public override string Name => "Mon hangar";
@@ -38,10 +37,11 @@ public partial class ShipTabViewModel : PageViewModelBase
     /// <summary>Indique si la synchronisation de flotte est en cours.</summary>
     [ObservableProperty] private bool _isSyncing;
 
-    public ShipTabViewModel(IGrpcClientService clientService, IP4kService p4kService, ILocationService locationService, IAllianceOrbitalService allianceOrbitalService)
+    public ShipTabViewModel(IGrpcClientService clientService, IP4kService p4kService, ILocalDatabaseService localDatabaseService, ILocationService locationService, IAllianceOrbitalService allianceOrbitalService)
     {
         _clientService = clientService;
         _p4KService = p4kService;
+        _localDatabaseService = localDatabaseService;
         _locationService = locationService;
         _allianceOrbitalService = allianceOrbitalService;
 
@@ -61,13 +61,18 @@ public partial class ShipTabViewModel : PageViewModelBase
 
         foreach (var spaceship in spaceships)
         {
-            var record = await _p4KService.GetRecordWithSpecificDepth(new CigGuid(spaceship.Entitlement.EntityClassGuid), 1);
+            var guid = spaceship.Entitlement.EntityClassGuid;
+            var shipEntity = await _localDatabaseService.GetShipByGuidAsync(guid);
 
-            if (null != record)
+            if (shipEntity != null)
             {
-                spaceship.ClassRecordName = record.RecordName.Split('.', 2).Last();
-                spaceship.EntityClassDefinition = record.Data as EntityClassDefinition;
-                spaceship.Shipname = await _p4KService.GetEntityClassName(record.Data as EntityClassDefinition) ?? "inconnue";
+                spaceship.ClassRecordName = shipEntity.TechnicalName;
+                spaceship.Shipname = shipEntity.LocalizedName;
+            }
+            else
+            {
+                spaceship.ClassRecordName = guid;
+                spaceship.Shipname = guid;
             }
         }
         

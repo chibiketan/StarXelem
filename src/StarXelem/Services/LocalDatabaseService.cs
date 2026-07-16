@@ -54,6 +54,7 @@ public interface ILocalDatabaseService
     Task<(Dictionary<string, string> TitleSuffixMap, Dictionary<string, Dictionary<string, HashSet<string>>> DescriptionAppendMap)> GetBlueprintRewardMapsAsync(HashSet<string>? obtainedBlueprintIds = null);
     Task<List<DbBlueprintRow>> GetBlueprintsAsync(HashSet<string>? obtainedBlueprintIds = null);
     IAsyncEnumerable<DbBlueprintRow> GetBlueprintsBatchedAsync(int batchSize = 200, CancellationToken cancellationToken = default);
+    Task<ShipEntity?> GetShipByGuidAsync(string entityClassGuid);
 }
 
 public class LocalDatabaseService : ILocalDatabaseService
@@ -162,7 +163,7 @@ public class LocalDatabaseService : ILocalDatabaseService
     private async Task RebuildDbCoreAsync(CancellationToken cancellationToken, IProgress<RebuildProgress>? progress)
     {
         var total = Stopwatch.StartNew();
-        const int TotalPhases = 7;
+        const int TotalPhases = 9;
         _logger.LogInformation("Rebuilding local database at {Path}", _dbPath);
         _entityClassToGuid.Clear();
         _contractorCache.Clear();
@@ -173,71 +174,79 @@ public class LocalDatabaseService : ILocalDatabaseService
         await db.Database.EnsureDeletedAsync(cancellationToken).ConfigureAwait(false);
         await db.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
 
-        // Phase 1: Tag hierarchy
-        progress?.Report(new RebuildProgress(1, TotalPhases, "Chargement des tags…"));
+        // Phase 1: Locale entries
+        progress?.Report(new RebuildProgress(1, TotalPhases, "Chargement des locales…"));
         var phase = Stopwatch.StartNew();
+        await PopulateLocaleAsync(db, cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 1/{Total}] Locale completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 2: Tag hierarchy
+        progress?.Report(new RebuildProgress(2, TotalPhases, "Chargement des tags…"));
+        phase.Restart();
         var tagResolutionMap = new Dictionary<string, string>();
         await PopulateTagHierarchyAsync(db, tagResolutionMap).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 1/{Total}] Tags completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 2/{Total}] Tags completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 2: Ships, manufacturers, and ship-tag associations
-        progress?.Report(new RebuildProgress(2, TotalPhases, "Chargement des vaisseaux…"));
+        // Phase 3: Ships, manufacturers, and ship-tag associations
+        progress?.Report(new RebuildProgress(3, TotalPhases, "Chargement des vaisseaux…"));
         phase.Restart();
         await PopulateShipsAndManufacturersAsync(db, tagResolutionMap, cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 2/{Total}] Ships & manufacturers completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 3/{Total}] Ships & manufacturers completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 3: SCItems (must be before blueprints due to FK)
-        progress?.Report(new RebuildProgress(3, TotalPhases, "Chargement des objets (SCItems)…"));
+        // Phase 4: SCItems (must be before blueprints due to FK)
+        progress?.Report(new RebuildProgress(4, TotalPhases, "Chargement des objets (SCItems)…"));
         phase.Restart();
         await PopulateScItemsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 3/{Total}] SCItems completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 4/{Total}] SCItems completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 4: Contract generators
-        progress?.Report(new RebuildProgress(4, TotalPhases, "Chargement des générateurs de contrats…"));
+        // Phase 5: Contract generators
+        progress?.Report(new RebuildProgress(5, TotalPhases, "Chargement des générateurs de contrats…"));
         phase.Restart();
         await PopulateContractGeneratorsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 4/{Total}] Contract generators completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 5/{Total}] Contract generators completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 5: Blueprints (must be before missions due to FK)
-        progress?.Report(new RebuildProgress(5, TotalPhases, "Chargement des plans de fabrication…"));
+        // Phase 6: Blueprints (must be before missions due to FK)
+        progress?.Report(new RebuildProgress(6, TotalPhases, "Chargement des plans de fabrication…"));
         phase.Restart();
         await ProcessAllBlueprintsAsync(db, cancellationToken).ConfigureAwait(false);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 5/{Total}] Blueprints completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 6/{Total}] Blueprints completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 6: Missions and their requirements/rewards/spawn rules
-        progress?.Report(new RebuildProgress(6, TotalPhases, "Chargement des missions…"));
+        // Phase 7: Missions and their requirements/rewards/spawn rules
+        progress?.Report(new RebuildProgress(7, TotalPhases, "Chargement des missions…"));
         phase.Restart();
         await PopulateMissionsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 6/{Total}] Missions completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 7/{Total}] Missions completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 7: Resolve spawn rules to actual ships
-        progress?.Report(new RebuildProgress(7, TotalPhases, "Résolution des règles d'apparition…"));
+        // Phase 8: Resolve spawn rules to actual ships
+        progress?.Report(new RebuildProgress(8, TotalPhases, "Résolution des règles d'apparition…"));
         phase.Restart();
         await ProcessMissionShipSpawnShipsAsync(db, cancellationToken).ConfigureAwait(false);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 7/{Total}] Spawn rules completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 8/{Total}] Spawn rules completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 8: Locations (StarMapObjects)
-        progress?.Report(new RebuildProgress(8, TotalPhases, "Chargement des emplacements…"));
+        // Phase 9: Locations (StarMapObjects)
+        progress?.Report(new RebuildProgress(9, TotalPhases, "Chargement des emplacements…"));
         phase.Restart();
         await PopulateLocationsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 8/{Total}] Locations completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 9/{Total}] Locations completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
         total.Stop();
@@ -245,7 +254,61 @@ public class LocalDatabaseService : ILocalDatabaseService
     }
 
     /* ========================================================================
-     * PHASE 1: TAG HIERARCHY
+     * PHASE 1: LOCALE ENTRIES
+     * ======================================================================== */
+
+    private async Task PopulateLocaleAsync(StarXelemDbContext db, CancellationToken cancellationToken)
+    {
+        var start = Stopwatch.StartNew();
+        var localeEntries = new List<LocaleEntry>();
+
+        try
+        {
+            using var stream = _p4kService.P4KFileSystem.OpenRead("Data\\Localization\\english\\global.ini");
+            using var reader = new StreamReader(stream);
+
+            string? line;
+            while ((line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false)) != null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var equalsIndex = line.IndexOf('=');
+                if (equalsIndex <= 0)
+                    continue;
+
+                var rawKey = line.Substring(0, equalsIndex);
+                var value = line.Substring(equalsIndex + 1);
+
+                // Strip trailing ,P and prefix with @
+                string key;
+                if (rawKey.EndsWith(",P"))
+                {
+                    key = "@" + rawKey.Substring(0, rawKey.Length - 2);
+                }
+                else
+                {
+                    key = "@" + rawKey;
+                }
+
+                localeEntries.Add(new LocaleEntry { Key = key, Value = value });
+            }
+
+            db.ChangeTracker.AutoDetectChangesEnabled = false;
+            db.LocaleEntries.AddRange(localeEntries);
+            db.ChangeTracker.AutoDetectChangesEnabled = true;
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to populate locale entries from P4K");
+        }
+
+        start.Stop();
+        _logger.LogInformation("Locale entries populated in {Elapsed}ms. ({Count} entries)", start.ElapsedMilliseconds, localeEntries.Count);
+    }
+
+    /* ========================================================================
+     * PHASE 2: TAG HIERARCHY
      * ======================================================================== */
 
     private async Task PopulateTagHierarchyAsync(StarXelemDbContext db, Dictionary<string, string> map)
@@ -2243,6 +2306,14 @@ public class LocalDatabaseService : ILocalDatabaseService
         return await db.Ships
             .Where(s => s.MissionRequirements.Any(mr => mr.MissionId == missionId))
             .ToListAsync();
+    }
+
+    public async Task<ShipEntity?> GetShipByGuidAsync(string entityClassGuid)
+    {
+        using var db = new StarXelemDbContext(GetOptions());
+        return await db.Ships
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.EntityClassGuid == entityClassGuid);
     }
 
     public async Task<List<DbBlueprintRow>> GetBlueprintsAsync(HashSet<string>? obtainedBlueprintIds = null)
