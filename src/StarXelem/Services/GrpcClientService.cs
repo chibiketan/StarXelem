@@ -137,6 +137,17 @@ public class GrpcClientService : IGrpcClientService
     
     public async Task<IList<EntityItemQueryResult>> QueryGraphBySearch(ItemQueryModel itemQueryModel)
     {
+        // Pas d'inventory de fourni, pas de données possibles
+        if (null == itemQueryModel.InventoryIdList)
+        {
+            return new List<EntityItemQueryResult>();
+        }
+        // Changement de logique pour la recherche
+        // Maintenant il faut renseigner le champ InventoryId avec l'identifiant de l'inventaire à charger.
+        // Si ce champ est vide, on obtient une erreur.
+        // Si je met le joueur dans ce champ et que je cherche un élément à Area18, il ne viendra pas.
+        // => Conséquence de ça, si je veut les objets complets du joueur et que ce dernier possède 8 conteneurs, je dois faire 8 requêtes au minimum
+        
         // Helpers pour simplifier la création des filtres
         static ScalarValue ULong(ulong v) => new ScalarValue { UnsignedBigintValue = v };
         static ScalarValue Int(int v) => new ScalarValue { IntegerValue = v };
@@ -198,15 +209,15 @@ public class GrpcClientService : IGrpcClientService
         {
             var stowedIn = new EdgeFilter { EdgeType = "STOWED_IN" };
             stowedIn.Values.AddRange(itemQueryModel.InventoryIdList!.Select(id => Str(id)));
-
+        
             var or = new EntityCompositeFilter { Operator = LogicalOperator.Or };
             or.Filters.Add(new EntityFilter { EdgeFilter = stowedIn });
-
+        
             if (itemQueryModel.useConnectedUserOwner)
             {
                 or.Filters.Add(PropEqULong("ownerId", _playerInfo.Player.Geid));
             }
-
+        
             andFilters.Add(new EntityFilter { CompositeFilter = or });
         }
 
@@ -239,8 +250,11 @@ public class GrpcClientService : IGrpcClientService
                         },
                         OutgoingEdges = true,
                         Snapshots = true,
-                        EntityClasses = false
+                        EntityClasses = false,
+                        SnapshotFlags = 0,
+                        SnapshotExcludeFlags = 0
                     },
+                    // InventoryId défini lors de l'appel
                     Language = "",
                     Pagination = new PaginationArguments { First = 250, After = "" },
                     Sort = new EntitySortingArguments
@@ -256,10 +270,11 @@ public class GrpcClientService : IGrpcClientService
         var nodes = new List<Node>(800);
 
         // Exécution paginée générique
-        async Task RunPagedQueryAsync()
+        async Task RunPagedQueryAsync(string inventoryId)
         {
             EntityQueryResponse? response = null;
             await semaphoreSlim.WaitAsync().ConfigureAwait(false);
+            request.Body.Query.InventoryId = inventoryId;
             try
             {
                 do
@@ -286,8 +301,12 @@ public class GrpcClientService : IGrpcClientService
             }
         }
 
-        // 1) Requête principale
-        await RunPagedQueryAsync().ConfigureAwait(false);
+        // 1) Requête principale par conteneur
+        foreach (var inventoryId in itemQueryModel.InventoryIdList)
+        {
+            await RunPagedQueryAsync(inventoryId).ConfigureAwait(false);
+            
+        }
 
         // 2) Chargement optionnel du contenu des inventaires trouvés
         if (itemQueryModel.LoadInventoryContent)

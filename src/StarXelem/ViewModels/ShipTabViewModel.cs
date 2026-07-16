@@ -74,12 +74,24 @@ public partial class ShipTabViewModel : PageViewModelBase
         // récupérer les instances de vaisseaux
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Récupération des instances de vaisseaux");
         var spaceshipUrnList = spaceships.Select(v => v.Entitlement.Urn).ToList();
+        var stowContextList = await _clientService.GetEntityStowContextByParentUrnList(spaceshipUrnList, spaceships.Select(s => Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([new CigGuid(s.Entitlement.EntityClassGuid)]))).ToList());
 
+        foreach (var stowContext in stowContextList)
+        {
+            var ss = spaceships.FirstOrDefault(s => s.Entitlement.Urn == stowContext.ParentUrn);
+
+            if (null != ss)
+            {
+                ss.StowContext = stowContext;
+            }
+        }
+        
         var queryParameters = new ItemQueryModel
         {
             ParentUrnList = spaceshipUrnList,
             useConnectedUserOwner = true,
-            TypeList = [EItemType.NOITEM_Vehicle]
+            TypeList = [EItemType.NOITEM_Vehicle],
+            InventoryIdList = spaceships.Where(s => null != s.StowContext?.InventoryId).Select(s => s.StowContext!.InventoryId).ToList()
         };
         
         var spaceshipEntityList = await _clientService.QueryGraphBySearch(queryParameters);
@@ -104,18 +116,6 @@ public partial class ShipTabViewModel : PageViewModelBase
             else
             {
                 spaceship.ReadableLocation = await _locationService.ResolveLocation(spaceship.EntityProperties, [EItemType.NOITEM_Vehicle]);
-            }
-        }
-        
-        var stowContextList = await _clientService.GetEntityStowContextByParentUrnList(spaceshipUrnList, spaceships.Select(s => Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([new CigGuid(s.Entitlement.EntityClassGuid)]))).ToList());
-
-        foreach (var stowContext in stowContextList)
-        {
-            var ss = spaceships.FirstOrDefault(s => s.Entitlement.Urn == stowContext.ParentUrn);
-
-            if (null != ss)
-            {
-                ss.StowContext = stowContext;
             }
         }
         
