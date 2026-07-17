@@ -63,7 +63,8 @@ public class ShipEntity
     public uint Crc32 { get; set; }
     public string TechnicalName { get; set; } = string.Empty;
     public string LocalizedName { get; set; } = string.Empty;
-    
+    public bool IsVisible { get; set; }
+
     [Required]
     public string ManufacturerId { get; set; } = string.Empty;
     [ForeignKey("ManufacturerId")]
@@ -71,6 +72,25 @@ public class ShipEntity
 
     public virtual ICollection<ShipTagEntity> ShipTags { get; set; } = new List<ShipTagEntity>();
     public virtual ICollection<MissionShipRequirementEntity> MissionRequirements { get; set; } = new List<MissionShipRequirementEntity>();
+    public virtual ICollection<ShipLoadoutEntryEntity> LoadoutEntries { get; set; } = new List<ShipLoadoutEntryEntity>();
+}
+
+public class ShipLoadoutEntryEntity
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Required]
+    public string ShipGuid { get; set; } = string.Empty;
+    [ForeignKey("ShipGuid")]
+    public virtual ShipEntity? Ship { get; set; }
+
+    public string PortName { get; set; } = string.Empty;
+    public string ComponentType { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string ComponentClass { get; set; } = "Unknown";
+    public int Size { get; set; }
+    public string Grade { get; set; } = string.Empty;
 }
 
 public class ActorEntity

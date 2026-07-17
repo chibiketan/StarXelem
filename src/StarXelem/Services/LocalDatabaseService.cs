@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Data;
+using StarXelem.Models;
 using System.Runtime.InteropServices;
 using System.Xml.Linq;
 
@@ -57,6 +58,9 @@ public interface ILocalDatabaseService
     Task<List<DbBlueprintRow>> GetBlueprintsAsync(HashSet<string>? obtainedBlueprintIds = null);
     IAsyncEnumerable<DbBlueprintRow> GetBlueprintsBatchedAsync(int batchSize = 200, CancellationToken cancellationToken = default);
     Task<ShipEntity?> GetShipByGuidAsync(string entityClassGuid);
+    Task<List<ManufacturerEntity>> GetManufacturersAsync();
+    Task<List<ShipLoadoutEntryEntity>> GetShipLoadoutAsync(string shipGuid);
+    Task<List<ShipEntity>> GetShipsAsync();
 }
 
 public class LocalDatabaseService : ILocalDatabaseService
@@ -128,6 +132,7 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     private readonly Dictionary<EntityClassDefinition, string> _entityClassToGuid = new();
     private Dictionary<string, string> _itemNamesCache = new();
+    private Dictionary<string, CigGuid> _componentGuidMap = new();
 
     /* ========================================================================
      * REBUILD ORCHESTRATION
@@ -166,14 +171,15 @@ public class LocalDatabaseService : ILocalDatabaseService
     private async Task RebuildDbCoreAsync(CancellationToken cancellationToken, IProgress<RebuildProgress>? progress)
     {
         var total = Stopwatch.StartNew();
-        const int TotalPhases = 9;
+        const int TotalPhases = 10;
         _logger.LogInformation("Rebuilding local database at {Path}", _dbPath);
         _entityClassToGuid.Clear();
         _contractorCache.Clear();
         _categoryCache.Clear();
+        _componentGuidMap.Clear();
 
         using var db = new StarXelemDbContext(GetOptions());
-        
+
         await db.Database.EnsureDeletedAsync(cancellationToken).ConfigureAwait(false);
         await db.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
 
@@ -202,58 +208,66 @@ public class LocalDatabaseService : ILocalDatabaseService
         _logger.LogInformation("[Phase 3/{Total}] Ships & manufacturers completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 4: SCItems (must be before blueprints due to FK)
-        progress?.Report(new RebuildProgress(4, TotalPhases, "Chargement des objets (SCItems)…"));
+        // Phase 4: Ship loadouts
+        progress?.Report(new RebuildProgress(4, TotalPhases, "Chargement des loadouts des vaisseaux…"));
+        phase.Restart();
+        await PopulateShipLoadoutsAsync(db, cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 4/{Total}] Ship loadouts completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 5: SCItems (must be before blueprints due to FK)
+        progress?.Report(new RebuildProgress(5, TotalPhases, "Chargement des objets (SCItems)…"));
         phase.Restart();
         await PopulateScItemsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 4/{Total}] SCItems completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 5/{Total}] SCItems completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 5: Contract generators
-        progress?.Report(new RebuildProgress(5, TotalPhases, "Chargement des générateurs de contrats…"));
+        // Phase 6: Contract generators
+        progress?.Report(new RebuildProgress(6, TotalPhases, "Chargement des générateurs de contrats…"));
         phase.Restart();
         await PopulateContractGeneratorsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 5/{Total}] Contract generators completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 6/{Total}] Contract generators completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Pre-populate item names cache from ScItems (populated in phase 4)
+        // Pre-populate item names cache from ScItems (populated in phase 5)
         _itemNamesCache = db.ScItems.ToDictionary(si => si.RecordId, si => si.LocalizedName);
         _logger.LogInformation("Item names cache built with {Count} entries.", _itemNamesCache.Count);
 
-        // Phase 6: Blueprints (must be before missions due to FK)
-        progress?.Report(new RebuildProgress(6, TotalPhases, "Chargement des plans de fabrication…"));
+        // Phase 7: Blueprints (must be before missions due to FK)
+        progress?.Report(new RebuildProgress(7, TotalPhases, "Chargement des plans de fabrication…"));
         phase.Restart();
         await ProcessAllBlueprintsAsync(db, cancellationToken).ConfigureAwait(false);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 6/{Total}] Blueprints completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 7/{Total}] Blueprints completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 7: Missions and their requirements/rewards/spawn rules
-        progress?.Report(new RebuildProgress(7, TotalPhases, "Chargement des missions…"));
+        // Phase 8: Missions and their requirements/rewards/spawn rules
+        progress?.Report(new RebuildProgress(8, TotalPhases, "Chargement des missions…"));
         phase.Restart();
         await PopulateMissionsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 7/{Total}] Missions completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 8/{Total}] Missions completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 8: Resolve spawn rules to actual ships
-        progress?.Report(new RebuildProgress(8, TotalPhases, "Résolution des règles d'apparition…"));
+        // Phase 9: Resolve spawn rules to actual ships
+        progress?.Report(new RebuildProgress(9, TotalPhases, "Résolution des règles d'apparition…"));
         phase.Restart();
         await ProcessMissionShipSpawnShipsAsync(db, cancellationToken).ConfigureAwait(false);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 8/{Total}] Spawn rules completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 9/{Total}] Spawn rules completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 9: Locations (StarMapObjects)
-        progress?.Report(new RebuildProgress(9, TotalPhases, "Chargement des emplacements…"));
+        // Phase 10: Locations (StarMapObjects)
+        progress?.Report(new RebuildProgress(10, TotalPhases, "Chargement des emplacements…"));
         phase.Restart();
         await PopulateLocationsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 9/{Total}] Locations completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 10/{Total}] Locations completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
         total.Stop();
@@ -383,14 +397,15 @@ public class LocalDatabaseService : ILocalDatabaseService
      * ======================================================================== */
 
     private async Task PopulateShipsAndManufacturersAsync(
-        StarXelemDbContext db, 
-        Dictionary<string, string> tagResolutionMap, 
+        StarXelemDbContext db,
+        Dictionary<string, string> tagResolutionMap,
         CancellationToken cancellationToken)
     {
         var ships = new List<ShipEntity>();
         var manufacturers = new List<ManufacturerEntity>();
         var manufacturerCache = new Dictionary<string, ManufacturerEntity>();
         var shipTags = new List<ShipTagEntity>();
+        var componentGuidMap = new Dictionary<string, CigGuid>();
         var start = Stopwatch.StartNew();
 
         await foreach (var record in _p4kService.GetAllEntityClassDefinition(1).ConfigureAwait(false))
@@ -399,32 +414,56 @@ public class LocalDatabaseService : ILocalDatabaseService
                 continue;
 
             var vehicleParams = entityClass.Components.OfType<VehicleComponentParams>().FirstOrDefault();
-            if (vehicleParams == null)
-                continue;
-
-            var guid = record.RecordId.ToString();
-            var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record.RecordId]));
-            _entityClassToGuid[entityClass] = guid;
-
-            // Extract and add ship tags
-            var extractedTags = ExtractShipTags(entityClass, tagResolutionMap);
-            foreach (var tagId in extractedTags)
+            if (vehicleParams != null)
             {
-                shipTags.Add(new ShipTagEntity { ShipGuid = guid, TagSelfId = tagId });
+                var guid = record.RecordId.ToString();
+                var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record.RecordId]));
+                _entityClassToGuid[entityClass] = guid;
+
+                // Extract and add ship tags
+                var extractedTags = ExtractShipTags(entityClass, tagResolutionMap);
+                foreach (var tagId in extractedTags)
+                {
+                    shipTags.Add(new ShipTagEntity { ShipGuid = guid, TagSelfId = tagId });
+                }
+
+                // Resolve manufacturer
+                var manufacturerId = ResolveManufacturerId(vehicleParams.manufacturer, manufacturerCache, manufacturers);
+
+                // Compute IsVisible from TechnicalName patterns
+                var isVisible = ComputeIsVisible(record.RecordName);
+
+                ships.Add(new ShipEntity
+                {
+                    EntityClassGuid = guid,
+                    Crc32 = crc,
+                    TechnicalName = record.RecordName,
+                    LocalizedName = await _p4kService.GetEntityClassName(entityClass) ?? "Unknown",
+                    ManufacturerId = manufacturerId,
+                    IsVisible = isVisible
+                });
             }
 
-            // Resolve manufacturer
-            var manufacturerId = ResolveManufacturerId(vehicleParams.manufacturer, manufacturerCache, manufacturers);
-
-            ships.Add(new ShipEntity
+            // Build component GUID map for attachable components
+            var attachableComponent = entityClass.Components.OfType<SAttachableComponentParams>().FirstOrDefault();
+            if (attachableComponent != null)
             {
-                EntityClassGuid = guid,
-                Crc32 = crc,
-                TechnicalName = record.RecordName,
-                LocalizedName = await _p4kService.GetEntityClassName(entityClass) ?? "Unknown",
-                ManufacturerId = manufacturerId
-            });
+                switch (attachableComponent.AttachDef.Type)
+                {
+                    case EItemType.QuantumDrive:
+                    case EItemType.Cooler:
+                    case EItemType.Shield:
+                    case EItemType.PowerPlant:
+                    case EItemType.JumpDrive:
+                    case EItemType.Radar:
+                        var key = record.RecordName.Split(".", 2).Last();
+                        componentGuidMap[key] = record.RecordId;
+                        break;
+                }
+            }
         }
+
+        _componentGuidMap = componentGuidMap;
 
         start.Stop();
         _logger.LogInformation("Ships and manufacturers processed in {Elapsed}ms.", start.ElapsedMilliseconds);
@@ -438,6 +477,208 @@ public class LocalDatabaseService : ILocalDatabaseService
         _logger.LogInformation("Inserted {Count} manufacturer into the database.", manufacturers.Count);
         _logger.LogInformation("Inserted {Count} ship into the database.", ships.Count);
         _logger.LogInformation("Inserted {Count} liaison ship <=> tag into the database.", shipTags.Count);
+    }
+
+    private static bool ComputeIsVisible(string technicalName)
+    {
+        return !technicalName.Contains("_ai_", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.Contains("_unmanned_", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.Contains("salvageabledebris", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.Contains("_pu_", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.Contains("_ea_", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.Contains("_fleetweek", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.EndsWith("_temp", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.EndsWith("_template", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.EndsWith("_tutorial", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.EndsWith("_advocacy", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.EndsWith("_indestructible", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.EndsWith("_pu", StringComparison.InvariantCultureIgnoreCase);
+    }
+
+    /* ========================================================================
+     * PHASE 4: SHIP LOADOUTS
+     * ======================================================================== */
+
+    private async Task PopulateShipLoadoutsAsync(StarXelemDbContext db, CancellationToken cancellationToken)
+    {
+        var start = Stopwatch.StartNew();
+        var loadoutEntries = new List<ShipLoadoutEntryEntity>();
+        var ships = await db.Ships.ToListAsync(cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Processing loadouts for {Count} ships.", ships.Count);
+
+        foreach (var ship in ships)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                var guid = new CigGuid(ship.EntityClassGuid);
+                var record = await _p4kService.GetEntityType(
+                    Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([guid]))).ConfigureAwait(false);
+
+                if (record?.Data is not EntityClassDefinition entityClass)
+                    continue;
+
+                var defaultLoadout = entityClass.Components.OfType<SEntityComponentDefaultLoadoutParams>().FirstOrDefault();
+                if (defaultLoadout?.loadout == null)
+                    continue;
+
+                var entryIndex = 0;
+                VisitLoadoutEntries(defaultLoadout.loadout, entry =>
+                {
+                    var loadoutEntry = ResolveLoadoutEntry(entry, ship, entryIndex++);
+                    if (loadoutEntry != null)
+                        loadoutEntries.Add(loadoutEntry);
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to process loadout for ship {ShipGuid} ({TechnicalName})", ship.EntityClassGuid, ship.TechnicalName);
+            }
+        }
+
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
+        db.ShipLoadoutEntries.AddRange(loadoutEntries);
+        db.ChangeTracker.AutoDetectChangesEnabled = true;
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        start.Stop();
+        _logger.LogInformation("Inserted {Count} ship loadout entries into the database.", loadoutEntries.Count);
+    }
+
+    private void VisitLoadoutEntries(SItemPortLoadoutBaseParams? loadout, Action<SItemPortLoadoutEntryParams> visitor)
+    {
+        if (loadout is SItemPortLoadoutManualParams manualLoadout)
+        {
+            foreach (var entry in manualLoadout.entries)
+            {
+                visitor(entry);
+                VisitLoadoutEntries(entry.loadout, visitor);
+            }
+        }
+    }
+
+    private static readonly HashSet<EItemType> s_allowedLoadoutItemTypes = new()
+    {
+        // Attachable components
+        EItemType.QuantumDrive,
+        EItemType.Cooler,
+        EItemType.Shield,
+        EItemType.PowerPlant,
+        EItemType.JumpDrive,
+        EItemType.Radar,
+        // Weapons
+        EItemType.Bomb,
+        EItemType.BombLauncher,
+        EItemType.Missile,
+        EItemType.MissileLauncher,
+        EItemType.MissileController,
+        EItemType.WeaponGun,
+        EItemType.WeaponDefensive,
+        EItemType.WeaponMining,
+        EItemType.WeaponMount,
+        EItemType.WeaponController,
+        EItemType.Turret,
+        EItemType.TurretBase,
+        EItemType.UtilityTurret,
+        // Passive systems
+        EItemType.Armor,
+        EItemType.Module,
+        // Ajout des éléments de minage et des peintures
+        EItemType.MiningModifier,
+        EItemType.Paints
+    };
+
+    private ShipLoadoutEntryEntity? ResolveLoadoutEntry(SItemPortLoadoutEntryParams entry, ShipEntity ship, int index)
+    {
+        EntityClassDefinition? entityClass = null;
+
+        if (!string.IsNullOrEmpty(entry.entityClassName))
+        {
+            if (_componentGuidMap.TryGetValue(entry.entityClassName, out var guid))
+            {
+                var record = _p4kService.GetEntityType(
+                    Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([guid]))).GetAwaiter().GetResult();
+                entityClass = record?.Data as EntityClassDefinition;
+            }
+        }
+        else if (entry.entityClassReference != null)
+        {
+            entityClass = entry.entityClassReference;
+        }
+
+        if (entityClass is null)
+            return null;
+
+        var attachable = entityClass.Components.OfType<SAttachableComponentParams>().FirstOrDefault();
+
+        // Skip entries without attachable component params (placeholders, port labels, non-component items)
+        if (attachable?.AttachDef is not { } attachDef)
+            return null;
+
+        // Filter on allowed item types
+        if (!s_allowedLoadoutItemTypes.Contains(attachDef.Type))
+            return null;
+
+        string displayName;
+        string componentClass = "Unknown";
+        int size = attachDef.Size;
+        string grade = attachDef.Grade > 0 ? new string((char)(attachDef.Grade - 1 + 'A'), 1) : string.Empty;
+
+        displayName = _p4kService.GetLocaleValue(attachDef.Localization.Name).GetAwaiter().GetResult() ?? entry.entityClassName ?? "Unknown";
+
+        var desc = _p4kService.GetLocaleValue(attachDef.Localization.Description).GetAwaiter().GetResult();
+        if (!string.IsNullOrEmpty(desc))
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(desc, @"Class:\s*(\w+)");
+            if (match.Success && Enum.TryParse<ComponentClass>(match.Groups[1].Value, out var parsedClass))
+            {
+                componentClass = parsedClass.ToString();
+            }
+        }
+
+        return new ShipLoadoutEntryEntity
+        {
+            ShipGuid = ship.EntityClassGuid,
+            PortName = entry.itemPortName,
+            ComponentType = EItemTypeToString(attachDef.Type),
+            DisplayName = displayName,
+            ComponentClass = componentClass,
+            Size = size,
+            Grade = grade
+        };
+    }
+
+    private static string EItemTypeToString(EItemType type)
+    {
+        return type switch
+        {
+            // Attachable components
+            EItemType.PowerPlant => "PowerPlant",
+            EItemType.Cooler => "Cooler",
+            EItemType.Shield => "Shield",
+            EItemType.Radar => "Radar",
+            EItemType.QuantumDrive => "QuantumDrive",
+            EItemType.JumpDrive => "JumpDrive",
+            // Weapons
+            EItemType.Bomb => "Bomb",
+            EItemType.BombLauncher => "BombLauncher",
+            EItemType.Missile => "Missile",
+            EItemType.MissileLauncher => "MissileLauncher",
+            EItemType.MissileController => "MissileController",
+            EItemType.WeaponGun => "WeaponGun",
+            EItemType.WeaponDefensive => "WeaponDefensive",
+            EItemType.WeaponMining => "WeaponMining",
+            EItemType.WeaponMount => "WeaponMount",
+            EItemType.WeaponController => "WeaponController",
+            EItemType.Turret => "Turret",
+            EItemType.TurretBase => "TurretBase",
+            EItemType.UtilityTurret => "UtilityTurret",
+            // Passive systems
+            EItemType.Armor => "Armor",
+            EItemType.Module => "Module",
+            _ => "Unknown"
+        };
     }
 
     private IEnumerable<string> ExtractShipTags(EntityClassDefinition entityClass, Dictionary<string, string> tagResolutionMap)
@@ -2348,6 +2589,33 @@ public class LocalDatabaseService : ILocalDatabaseService
         return await db.Ships
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.EntityClassGuid == entityClassGuid);
+    }
+
+    public async Task<List<ManufacturerEntity>> GetManufacturersAsync()
+    {
+        using var db = new StarXelemDbContext(GetOptions());
+        return await db.Manufacturers
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<List<ShipLoadoutEntryEntity>> GetShipLoadoutAsync(string shipGuid)
+    {
+        using var db = new StarXelemDbContext(GetOptions());
+        return await db.ShipLoadoutEntries
+            .AsNoTracking()
+            .Where(sle => sle.ShipGuid == shipGuid)
+            .ToListAsync();
+    }
+
+    public async Task<List<ShipEntity>> GetShipsAsync()
+    {
+        using var db = new StarXelemDbContext(GetOptions());
+        return await db.Ships
+            .AsNoTracking()
+            .Include(s => s.ShipTags)
+                .ThenInclude(st => st.Tag)
+            .ToListAsync();
     }
 
     public async Task<List<DbBlueprintRow>> GetBlueprintsAsync(HashSet<string>? obtainedBlueprintIds = null)

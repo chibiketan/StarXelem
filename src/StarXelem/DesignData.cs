@@ -68,7 +68,6 @@ public static class DesignData
         
         P4kShipTabViewModel.Ships.Add(new P4kShipModel
         {
-            EntityClass = null,
             Guid = "test_guid",
             Name = "Test ship",
             TechnicalName = "test_ship",
@@ -142,6 +141,46 @@ public static class DesignData
                 Class = ComponentClass.Industrial,
                 DisplayName = "Powerplant D0",
                 PortName = "PowerplantD0"
+            }
+        ]);
+
+        // Weapons
+        P4kShipTabViewModel.WeaponList.AddRange([
+            new ()
+            {
+                Grade = "A",
+                Size = 1,
+                Class = ComponentClass.Military,
+                DisplayName = "Pirate Cannon A1",
+                PortName = "WeaponA1"
+            },
+            new ()
+            {
+                Grade = "B",
+                Size = 1,
+                Class = ComponentClass.Military,
+                DisplayName = "Pirate Cannon B1",
+                PortName = "WeaponB1"
+            }
+        ]);
+
+        // Missiles
+        P4kShipTabViewModel.MissileList.AddRange([
+            new ()
+            {
+                Grade = "A",
+                Size = 1,
+                Class = ComponentClass.Military,
+                DisplayName = "Missile Launcher A1",
+                PortName = "MissileA1"
+            },
+            new ()
+            {
+                Grade = "B",
+                Size = 1,
+                Class = ComponentClass.Military,
+                DisplayName = "Missile Launcher B1",
+                PortName = "MissileB1"
             }
         ]);
 

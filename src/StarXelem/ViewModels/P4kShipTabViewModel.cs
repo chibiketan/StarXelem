@@ -1,14 +1,7 @@
 ﻿using System.Collections.ObjectModel;
-using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.JavaScript;
-using System.Text.RegularExpressions;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using FluentAvalonia.UI.Controls;
-using StarBreaker.Common;
-using StarBreaker.DataCore;
-using StarBreaker.DataCoreGenerated;
 using StarXelem.Data;
 using StarXelem.Models;
 using StarXelem.Services;
@@ -18,7 +11,6 @@ namespace StarXelem.ViewModels;
 
 public partial class P4kShipTabViewModel : PageViewModelBase
 {
-    private readonly IP4kService _p4kService;
     private readonly ILocalDatabaseService _localDatabaseService;
     private readonly ILogger<P4kShipTabViewModel> _logger;
     private bool _isLoaded = false;
@@ -41,125 +33,73 @@ public partial class P4kShipTabViewModel : PageViewModelBase
     [ObservableProperty] private List<P4kShipComponentModel> _quantumdriveList = new();
     [ObservableProperty] private List<P4kShipComponentModel> _radarList = new();
     [ObservableProperty] private List<P4kShipComponentModel> _quantumjumpList = new();
+    [ObservableProperty] private List<P4kShipComponentModel> _weaponList = new();
+    [ObservableProperty] private List<P4kShipComponentModel> _missileList = new();
     [ObservableProperty] private String _tagList = "";
-    private Dictionary<String, CigGuid> _componentGuidMap = new(); 
 
-    public P4kShipTabViewModel(IP4kService p4kService, ILocalDatabaseService localDatabaseService, ILogger<P4kShipTabViewModel> logger)
+    public P4kShipTabViewModel(ILocalDatabaseService localDatabaseService, ILogger<P4kShipTabViewModel> logger)
     {
-        _p4kService = p4kService;
         _localDatabaseService = localDatabaseService;
         _logger = logger;
     }
 
     protected override async Task OnFirstShowAsync()
     {
-        if (IsLoading || _p4kService.SelectedP4KFile == null) return;
+        if (IsLoading) return;
 
         UpdateIsLoading(true);
         try
         {
+            // Load manufacturers from DB
+            var manufacturers = await _localDatabaseService.GetManufacturersAsync().ConfigureAwait(false);
+            var allManufacturerList = new List<P4kShipManufacturerModel>();
+            var manufacturerNames = new HashSet<string>();
+
+            foreach (var m in manufacturers)
+            {
+                if (manufacturerNames.Add(m.Name))
+                {
+                    allManufacturerList.Add(new P4kShipManufacturerModel { Name = m.Name });
+                }
+            }
+
+            allManufacturerList = allManufacturerList.OrderBy(m => m.Name).ToList();
+            allManufacturerList.Insert(0, new P4kShipManufacturerModel { Name = "Tous" });
+
+            // Load ships from DB
+            var ships = await _localDatabaseService.GetShipsAsync().ConfigureAwait(false);
             var shipList = new List<P4kShipModel>();
-            var uniqueManufacturerSet = new HashSet<SCItemManufacturer>(20);
-            var componentGuidMap = new Dictionary<string, CigGuid>(200);
 
-            var records = _p4kService.GetAllEntityClassDefinition(1);
-
-            await foreach (var record in records.ConfigureAwait(false))
+            foreach (var ship in ships)
             {
-                var entityDef = (EntityClassDefinition)record.Data;
-                
-                // Traitement des véhicules
-                var vehicleParams = entityDef.Components.OfType<VehicleComponentParams>().FirstOrDefault();
-                if (vehicleParams != null)
-                {
-                    var eaEntityDataParams = entityDef.StaticEntityClassData.OfType<EAEntityDataParams>().FirstOrDefault();
-                    var technicalName = record.RecordName;
-                    var displayName = await _p4kService.GetLocaleValue(vehicleParams.vehicleName).ConfigureAwait(false) ?? technicalName;
-                    var manufacturer = await _p4kService.GetLocaleValue(vehicleParams.manufacturer?.Localization.Name).ConfigureAwait(false) ?? vehicleParams.manufacturer?.Localization.Name;
-                    var tags = String.Join(", ", (entityDef.tags?.Where(t => null != t?.tagName).Select(t => $"[{t.tagName}]") ?? Enumerable.Empty<string>())
-                        .Concat(eaEntityDataParams?.inclusionParams.tags.tags.Where(t => null != t).Select(t => $"[{t.tagName}]") ?? Enumerable.Empty<string>() ));
+                // Build tags string from ShipTags
+                var tags = ship.ShipTags
+                    .Select(st => $"[{st.Tag?.Name ?? st.TagSelfId}]")
+                    .ToList();
 
-                    if (vehicleParams.manufacturer != null)
-                    {
-                        uniqueManufacturerSet.Add(vehicleParams.manufacturer);
-                    }
-                    
-                    // var entitlementEntityParams = entityDef.StaticEntityClassData.OfType<DefaultEntitlementEntityParams>().FirstOrDefault();
-                    var isVisible = !technicalName.Contains("_ai_", StringComparison.InvariantCultureIgnoreCase)
-                                    && !technicalName.Contains("_unmanned_", StringComparison.InvariantCultureIgnoreCase)
-                                    && !technicalName.Contains("salvageabledebris", StringComparison.InvariantCultureIgnoreCase)
-                                    && !technicalName.Contains("_pu_", StringComparison.InvariantCultureIgnoreCase)
-                                    && !technicalName.Contains("_ea_", StringComparison.InvariantCultureIgnoreCase)
-                                    && !technicalName.Contains("_fleetweek", StringComparison.InvariantCultureIgnoreCase)
-                                    && !technicalName.EndsWith("_temp", StringComparison.InvariantCultureIgnoreCase)
-                                    && !technicalName.EndsWith("_template", StringComparison.InvariantCultureIgnoreCase)
-                                    && !technicalName.EndsWith("_tutorial", StringComparison.InvariantCultureIgnoreCase)
-                                    && !technicalName.EndsWith("_advocacy", StringComparison.InvariantCultureIgnoreCase)
-                                    && !technicalName.EndsWith("_indestructible", StringComparison.InvariantCultureIgnoreCase)
-                                    && !technicalName.EndsWith("_pu", StringComparison.InvariantCultureIgnoreCase);
-                
-                        shipList.Add(new P4kShipModel
-                        {
-                            Name = displayName,
-                            TechnicalName = technicalName,
-                            Guid = record.RecordId.ToString(),
-                            EntityClass = entityDef,
-                            Manufacturer = manufacturer,
-                            Tags = tags,
-                            // Pour être visible il doit être "inclus" et avoir un entitlement
-                            // IsVisible = null != entitlementEntityParams && eaEntityDataParams?.inclusionMode == EAEntityInclusionMode.ReadyToInclude
-                            IsVisible = isVisible
-                        });
-                }
-                
-                // Traitement des composants
-                // On prépare un mapping entre nom du type de l'objet et son id pour le récupérer vite plus tard
-                var attachableComponent = entityDef.Components.OfType<SAttachableComponentParams>().FirstOrDefault();
-                
-                if (null != attachableComponent)
+                shipList.Add(new P4kShipModel
                 {
-                    switch (attachableComponent.AttachDef.Type)
-                    {
-                        case EItemType.QuantumDrive:
-                        case EItemType.Cooler:
-                        case EItemType.Shield:
-                        case EItemType.PowerPlant:
-                        case EItemType.JumpDrive:
-                        case EItemType.Radar:
-                            componentGuidMap.Add(record.RecordName.Split(".", 2).Last(), record.RecordId);
-                            break;
-                    }
-                }
-                
-                _componentGuidMap = componentGuidMap;
-            }
-            
-            _allShips = shipList;
-            // Mise à jour de la liste des fabricants
-            var allManufacturer = new List<P4kShipManufacturerModel>(uniqueManufacturerSet.Count);
-            
-            foreach (var manufacturer in uniqueManufacturerSet)
-            {
-                allManufacturer.Add(new P4kShipManufacturerModel
-                {
-                    Manufacturer = manufacturer,
-                    Name = await _p4kService.GetLocaleValue(manufacturer.Localization.Name) ?? manufacturer.Localization.Name
+                    Name = ship.LocalizedName,
+                    TechnicalName = ship.TechnicalName,
+                    Guid = ship.EntityClassGuid,
+                    Manufacturer = ship.Manufacturer?.Name,
+                    Tags = string.Join(", ", tags),
+                    IsVisible = ship.IsVisible
                 });
-                
             }
-            
-            allManufacturer = allManufacturer.OrderBy(m => m.Name).ToList();
-            allManufacturer.Insert(0, new P4kShipManufacturerModel { Name = "Tous" });
+
+            _allShips = shipList;
+
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                AllManufacturer = allManufacturer;
-                SelectedManufacturer = allManufacturer.First();
+                AllManufacturer = allManufacturerList;
+                SelectedManufacturer = allManufacturerList.First();
                 ApplyShipFilter();
             }, DispatcherPriority.Default);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error loading ships from P4K");
+            _logger.LogError(ex, "Error loading ships from database");
         }
         finally
         {
@@ -173,7 +113,7 @@ public partial class P4kShipTabViewModel : PageViewModelBase
         if (ShowOnlyVisible)
             query = query.Where(s => s.IsVisible);
 
-        if (null != SelectedManufacturer?.Manufacturer)
+        if (SelectedManufacturer?.Name != "Tous" && !string.IsNullOrEmpty(SelectedManufacturer?.Name))
         {
             query = query.Where(s => SelectedManufacturer.Name == s.Manufacturer);
         }
@@ -181,34 +121,10 @@ public partial class P4kShipTabViewModel : PageViewModelBase
         Ships = new ObservableCollection<P4kShipModel>(query.OrderBy(s => s.Name));
     }
 
-    private void VisitLoadoutEntries(SItemPortLoadoutBaseParams? loadout, Action<SItemPortLoadoutEntryParams> visitor)
-    {
-        if (loadout is SItemPortLoadoutManualParams manualLoadout)
-        {
-            foreach (var entry in manualLoadout.entries)
-            {
-                visitor(entry);
-                VisitLoadoutEntries(entry.loadout, visitor);
-            }
-        }
-    }
-
     partial void OnSelectedShipChanged(P4kShipModel? value)
     {
         MissionsForSelectedShip.Clear();
-        var prefix = new Dictionary<string, string>()
-        {
-            { "hardpoint_cooler", "cooler" },
-            { "hardpoint_power_plant", "powerplant" },
-            { "hardpoint_powerplant", "powerplant" },
-            { "hardpoint_shield", "shield" },
-            { "hardpoint_radar", "Radar" },
-            { "hardpoint_quantum_drive", "QuantumDrive" }, // jumpdrive is internal to this
-            { "hardpoint_weapon", "armes endpoint (gimbal) et missile rack" },
-            { "hardpoint_gun", "armes endpoint (weapon)" },
-            { "hardpoint_missile", "missile (rack ?)" },
-            { "missile", "missile" },
-        };
+        Components.Clear();
 
         if (value == null) return;
 
@@ -226,131 +142,105 @@ public partial class P4kShipTabViewModel : PageViewModelBase
             });
         });
 
-        Components.Clear();
-        // Utiliser le displayIcon présent dans (EntityUIDisplayParams)StaticEntityClassData[0].displayIcon ?
-        var defaultLoadout = value.EntityClass.Components.OfType<SEntityComponentDefaultLoadoutParams>().FirstOrDefault();
-        var quantumdriveList = new List<P4kShipComponentModel>(); 
-        var jumpdriveList = new List<P4kShipComponentModel>(); 
-        var coolerList = new List<P4kShipComponentModel>(); 
-        var powerplantList = new List<P4kShipComponentModel>(); 
-        var shieldList = new List<P4kShipComponentModel>(); 
-        var radarList = new List<P4kShipComponentModel>(); 
-        
-        VisitLoadoutEntries(defaultLoadout?.loadout, async loadoutEntry =>
+        // Load loadout from DB
+        _ = Task.Run(async () =>
         {
-            var flag = "Unknown";
-            var foundPrefix = prefix.FirstOrDefault(p => loadoutEntry.itemPortName.StartsWith(p.Key, StringComparison.InvariantCultureIgnoreCase));
+            var loadoutEntries = await _localDatabaseService.GetShipLoadoutAsync(value.Guid).ConfigureAwait(false);
 
-            if (null != foundPrefix.Value)
-            {
-                flag = foundPrefix.Value;
-            }
+            var quantumdriveList = new List<P4kShipComponentModel>();
+            var jumpdriveList = new List<P4kShipComponentModel>();
+            var coolerList = new List<P4kShipComponentModel>();
+            var powerplantList = new List<P4kShipComponentModel>();
+            var shieldList = new List<P4kShipComponentModel>();
+            var radarList = new List<P4kShipComponentModel>();
+            var weaponList = new List<P4kShipComponentModel>();
+            var missileList = new List<P4kShipComponentModel>();
+            var componentsList = new List<P4kShipComponentModel>();
 
-            EntityClassDefinition entityClass = null;
-            
-            // TODO filtrer pour ne récupérer que les armes, les missiles et les composants internes
-            // TODO gérer plusieurs listes pour avoir un affichage plus propre/pro !
-            if (!String.IsNullOrEmpty(loadoutEntry.entityClassName))
+            foreach (var entry in loadoutEntries)
             {
-                // On a une classe, on recherche l'objet réel
-                if (_componentGuidMap.TryGetValue(loadoutEntry.entityClassName, out var guid))
+                var componentClass = ParseComponentClass(entry.ComponentClass);
+                var component = new P4kShipComponentModel
                 {
-                    // On a un id, on récupère l'objet
-                    var record = await _p4kService.GetEntityType(Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([guid]))).ConfigureAwait(false);
-
-                    entityClass = (EntityClassDefinition)record!.Data;
-                }
-            }
-            else if (null != loadoutEntry.entityClassReference)
-            {
-                entityClass = loadoutEntry.entityClassReference;
-            }
-            
-            Components.Add(new P4kShipComponentModel
-            {
-                PortName = loadoutEntry.itemPortName,
-                DisplayName = !String.IsNullOrEmpty(loadoutEntry.entityClassName) ? loadoutEntry.entityClassName : loadoutEntry.entityClassReference?.Category,
-                Grade = "",
-                Size = 0,
-                Class = ComponentClass.Unknown
-            });
-
-            if (entityClass?.Components.OfType<SAttachableComponentParams>().FirstOrDefault() is { } test)
-            {
-                var size = test.AttachDef.Size;
-                var grade = new String((char)(test.AttachDef.Grade - 1 + 'A'), 1);
-                var eClass = ComponentClass.Unknown;
-
-                var component = new P4kShipComponentModel()
-                {
-                    Grade = grade,
-                    Size = size,
-                    DisplayName = await _p4kService.GetLocaleValue(test.AttachDef.Localization.Name).ConfigureAwait(false) ?? "NOT FOUND",
-                    PortName = loadoutEntry.itemPortName,
-                    Class = await TranslateToComponentClass(test.AttachDef.Localization.Description).ConfigureAwait(false)
+                    PortName = entry.PortName,
+                    DisplayName = entry.DisplayName,
+                    Class = componentClass,
+                    Size = entry.Size,
+                    Grade = entry.Grade
                 };
 
-                
-                
-                switch (test.AttachDef.Type)
+                componentsList.Add(component);
+
+                switch (entry.ComponentType)
                 {
-                    case EItemType.QuantumDrive:
+                    case "QuantumDrive":
                         quantumdriveList.Add(component);
                         break;
-                    case EItemType.Cooler:
+                    case "Cooler":
                         coolerList.Add(component);
                         break;
-                    case EItemType.Shield:
+                    case "Shield":
                         shieldList.Add(component);
                         break;
-                    case EItemType.PowerPlant:
+                    case "PowerPlant":
                         powerplantList.Add(component);
                         break;
-                    case EItemType.JumpDrive:
+                    case "JumpDrive":
                         jumpdriveList.Add(component);
                         break;
-                    case EItemType.Radar:
+                    case "Radar":
                         radarList.Add(component);
+                        break;
+                    case "WeaponGun":
+                    case "WeaponDefensive":
+                    case "WeaponMining":
+                    case "WeaponMount":
+                    case "WeaponController":
+                    case "Turret":
+                    case "TurretBase":
+                    case "UtilityTurret":
+                    case "Bomb":
+                    case "BombLauncher":
+                        weaponList.Add(component);
+                        break;
+                    case "Missile":
+                    case "MissileLauncher":
+                    case "MissileController":
+                        missileList.Add(component);
                         break;
                 }
             }
-        });
 
-        QuantumdriveList = quantumdriveList;
-        QuantumjumpList = jumpdriveList;
-        RadarList = radarList;
-        CoolerList = coolerList;
-        PowerplantList = powerplantList;
-        ShieldList = shieldList;
-        TagList = String.Join(", ", value.Tags.Split(", "));
-    }
-
-    async Task<ComponentClass> TranslateToComponentClass(string name)
-    {
-        var description = await _p4kService.GetLocaleValue(name);
-        var searchRegex = new Regex(@"Class:\s*(\w+)");
-        var cClass = ComponentClass.Unknown;
-        // On retire le '@' devant la description
-        var searchResult = searchRegex.Match(description);
-        if (searchResult.Success)
-        {
-            // On a trouvé la classe, on l'extrait
-            if (!ComponentClass.TryParse(searchResult.Groups[1].Value, out cClass))
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                cClass = ComponentClass.Unknown;
-            }
-        }
+                Components.Clear();
+                foreach (var c in componentsList)
+                    Components.Add(c);
 
-        return cClass;
+                QuantumdriveList = quantumdriveList;
+                QuantumjumpList = jumpdriveList;
+                RadarList = radarList;
+                CoolerList = coolerList;
+                PowerplantList = powerplantList;
+                ShieldList = shieldList;
+                WeaponList = weaponList;
+                MissileList = missileList;
+                TagList = string.Join(", ", value.Tags.Split(", "));
+            });
+        });
     }
-    
+
+    private static ComponentClass ParseComponentClass(string className)
+    {
+        if (Enum.TryParse<ComponentClass>(className, out var result))
+            return result;
+        return ComponentClass.Unknown;
+    }
+
     partial void OnSelectedManufacturerChanged(P4kShipManufacturerModel? value)
     {
-        // La liste n'est pas encore chargée, on ne fait rien
         if (IsLoading || _allShips.Count == 0)
-        {
             return;
-        }
 
         if (Dispatcher.UIThread.CheckAccess())
         {
@@ -364,8 +254,6 @@ public partial class P4kShipTabViewModel : PageViewModelBase
 
     partial void OnShowOnlyVisibleChanged(bool value)
     {
-        // Rafraîchir la liste lors du changement de la case à cocher
-        // Sécuriser l'appel côté UI
         if (Dispatcher.UIThread.CheckAccess())
         {
             ApplyShipFilter();
@@ -375,7 +263,7 @@ public partial class P4kShipTabViewModel : PageViewModelBase
             Dispatcher.UIThread.Post(ApplyShipFilter);
         }
     }
-    
+
     private void UpdateIsLoading(bool value)
     {
         if (Dispatcher.UIThread.CheckAccess())
@@ -388,4 +276,3 @@ public partial class P4kShipTabViewModel : PageViewModelBase
         }
     }
 }
-

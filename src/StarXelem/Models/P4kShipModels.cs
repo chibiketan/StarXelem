@@ -1,15 +1,12 @@
-﻿using StarBreaker.DataCoreGenerated;
-
-namespace StarXelem.Models;
+﻿namespace StarXelem.Models;
 
 public class P4kShipModel
 {
     public required string Name { get; set; }
     public required string TechnicalName { get; set; }
     public required string Guid { get; set; }
-    public required EntityClassDefinition EntityClass { get; init; }
     public string? Manufacturer { get; set; }
-    public string Tags { get; set; }
+    public string Tags { get; set; } = string.Empty;
     public bool IsVisible { get; set; }
 }
 
@@ -40,7 +37,6 @@ public class P4kShipComponentModel
 
 public class P4kShipManufacturerModel
 {
-    public SCItemManufacturer? Manufacturer { get; set; }
     public required string Name { get; set; }
 }
 

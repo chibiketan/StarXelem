@@ -34,6 +34,7 @@ public class StarXelemDbContext : DbContext
     public DbSet<LocationEntity> Locations => Set<LocationEntity>();
     public DbSet<LocaleEntry> LocaleEntries => Set<LocaleEntry>();
     public DbSet<ResourceEntity> Resources => Set<ResourceEntity>();
+    public DbSet<ShipLoadoutEntryEntity> ShipLoadoutEntries => Set<ShipLoadoutEntryEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -239,6 +240,16 @@ public class StarXelemDbContext : DbContext
             .HasMany(b => b.RequiredItems)
             .WithMany()
             .UsingEntity(j => j.ToTable("BlueprintScItems"));
+
+        // ShipLoadoutEntry
+        modelBuilder.Entity<ShipLoadoutEntryEntity>()
+            .HasOne(sle => sle.Ship)
+            .WithMany(s => s.LoadoutEntries)
+            .HasForeignKey(sle => sle.ShipGuid)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ShipLoadoutEntryEntity>()
+            .HasIndex(sle => sle.ShipGuid);
 
         // Location
         modelBuilder.Entity<LocationEntity>()
