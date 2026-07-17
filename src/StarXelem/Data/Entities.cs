@@ -355,6 +355,9 @@ public class BlueprintRecipeCostEntity
     public int? ItemCount { get; set; }
     public int? MinQuality { get; set; }
 
+    public string? ResourceName { get; set; }
+    public string? ItemName { get; set; }
+
     public virtual ICollection<BlueprintModifierEntity> Modifiers { get; set; } = new List<BlueprintModifierEntity>();
     public virtual ScItemEntity? Item { get; set; }
 }
@@ -388,6 +391,19 @@ public class BlueprintModifierEntity
 
     /// <summary>Modifier value at end quality (Linear only, 0 for Additive).</summary>
     public decimal ModifierEnd { get; set; }
+}
+
+/// <summary>Raw resource from P4K (e.g. Iron, Copper) — populated during blueprint cost ingestion.</summary>
+public class ResourceEntity
+{
+    [Key]
+    public string SelfId { get; set; } = string.Empty;
+
+    public uint? Crc32 { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string? NameKey { get; set; }
 }
 
 public class MissionRequiredTagEntity

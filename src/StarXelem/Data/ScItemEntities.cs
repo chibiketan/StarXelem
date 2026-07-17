@@ -13,6 +13,8 @@ public class ScItemEntity
 
     public string TechnicalName { get; set; } = string.Empty;
 
+    public string LocalizedName { get; set; } = string.Empty;
+
     public string TypeName { get; set; } = string.Empty;
 
     public string SubTypeName { get; set; } = string.Empty;

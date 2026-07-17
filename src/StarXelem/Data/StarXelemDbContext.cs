@@ -33,6 +33,7 @@ public class StarXelemDbContext : DbContext
     public DbSet<ScItemTagEntity> ScItemTags => Set<ScItemTagEntity>();
     public DbSet<LocationEntity> Locations => Set<LocationEntity>();
     public DbSet<LocaleEntry> LocaleEntries => Set<LocaleEntry>();
+    public DbSet<ResourceEntity> Resources => Set<ResourceEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,6 +42,7 @@ public class StarXelemDbContext : DbContext
         modelBuilder.Entity<ShipEntity>().HasIndex(s => s.Crc32);
         modelBuilder.Entity<ScItemEntity>().HasIndex(s => s.Crc32);
         modelBuilder.Entity<BlueprintEntity>().HasIndex(b => b.Crc32);
+        modelBuilder.Entity<ResourceEntity>().HasIndex(r => r.Crc32);
 
         modelBuilder.Entity<LocaleEntry>()
             .HasIndex(l => l.Key)

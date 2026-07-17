@@ -7,8 +7,6 @@ using CommunityToolkit.Mvvm.Messaging;
 using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-
-using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Services;
 
@@ -20,7 +18,6 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
 
     private readonly IGrpcClientService _clientService;
     private readonly ILocalDatabaseService _localDatabaseService;
-    private readonly IP4kService _p4kService;
     public override string Name => "Blueprints";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Copy);
     [ObservableProperty] public IList<BlueprintViewModel>? _blueprintList;
@@ -38,13 +35,11 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     public BlueprintListTabViewModel(
         ILogger<BlueprintListTabViewModel> logger,
         IGrpcClientService clientService,
-        ILocalDatabaseService localDatabaseService,
-        IP4kService p4kService)
+        ILocalDatabaseService localDatabaseService)
     {
         _logger = logger;
         _clientService = clientService;
         _localDatabaseService = localDatabaseService;
-        _p4kService = p4kService;
 
         _clientService.OnStatusChanged += (sender, status) => { OnConnectedStatusChanged(status); };
     }
@@ -142,19 +137,17 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
 
             if (cost.CostType == "Resource" && !string.IsNullOrEmpty(cost.ResourceRef))
             {
-                var resourceName = await ResolveResourceNameAsync(cost.ResourceRef).ConfigureAwait(false);
                 materials.Add(new BlueprintResourceModel
                 {
-                    Name = resourceName,
+                    Name = cost.ResourceName ?? cost.ResourceRef,
                     QuantityInScu = (float)(cost.ResourceAmount ?? 0m)
                 });
             }
             else if (cost.CostType == "Item" && !string.IsNullOrEmpty(cost.ItemEntityClassRef))
             {
-                var itemName = await ResolveItemNameAsync(cost.ItemEntityClassRef).ConfigureAwait(false);
                 materials.Add(new BlueprintItemModel
                 {
-                    Name = itemName,
+                    Name = cost.ItemName ?? cost.ItemEntityClassRef,
                     QuantityCount = cost.ItemCount ?? 1
                 });
             }
@@ -213,44 +206,6 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             IsObtained = obtainedIds != null && obtainedIds.Contains(row.SelfId),
             MissionPools = missionPools
         };
-    }
-
-    private async Task<string> ResolveResourceNameAsync(string resourceRef)
-    {
-        try
-        {
-            var record = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(resourceRef), 0);
-            if (record?.RecordName != null)
-            {
-                var dotIndex = record.RecordName.IndexOf('.');
-                if (dotIndex >= 0)
-                    return record.RecordName.Substring(dotIndex + 1);
-            }
-            return resourceRef;
-        }
-        catch
-        {
-            return resourceRef;
-        }
-    }
-
-    private async Task<string> ResolveItemNameAsync(string entityClassRef)
-    {
-        try
-        {
-            var record = await _p4kService.GetRecordWithSpecificDepth(new CigGuid(entityClassRef), 1);
-            if (record?.Data is EntityClassDefinition entityClass)
-            {
-                var name = await _p4kService.GetEntityClassName(entityClass);
-                if (!string.IsNullOrEmpty(name))
-                    return name;
-            }
-            return entityClassRef;
-        }
-        catch
-        {
-            return entityClassRef;
-        }
     }
 
     [RelayCommand(CanExecute = nameof(CanClearSearch))]

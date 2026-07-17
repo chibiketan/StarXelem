@@ -27,6 +27,8 @@ public record DbBlueprintCostRow(
     string? ItemEntityClassRef,
     int? ItemCount,
     int? MinQuality,
+    string? ResourceName,
+    string? ItemName,
     DbBlueprintModifierRow[] Modifiers);
 
 public record DbBlueprintModifierRow(
@@ -125,6 +127,7 @@ public class LocalDatabaseService : ILocalDatabaseService
     }
 
     private readonly Dictionary<EntityClassDefinition, string> _entityClassToGuid = new();
+    private Dictionary<string, string> _itemNamesCache = new();
 
     /* ========================================================================
      * REBUILD ORCHESTRATION
@@ -214,6 +217,10 @@ public class LocalDatabaseService : ILocalDatabaseService
         phase.Stop();
         _logger.LogInformation("[Phase 5/{Total}] Contract generators completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
+
+        // Pre-populate item names cache from ScItems (populated in phase 4)
+        _itemNamesCache = db.ScItems.ToDictionary(si => si.RecordId, si => si.LocalizedName);
+        _logger.LogInformation("Item names cache built with {Count} entries.", _itemNamesCache.Count);
 
         // Phase 6: Blueprints (must be before missions due to FK)
         progress?.Report(new RebuildProgress(6, TotalPhases, "Chargement des plans de fabrication…"));
@@ -1680,13 +1687,28 @@ public class LocalDatabaseService : ILocalDatabaseService
             case CraftingCost_Resource resourceCost:
                 {
                     float rawQuantity = (resourceCost.quantity as SStandardCargoUnit)?.standardCargoUnits ?? 0f;
+                    var resourceRef = resourceCost.resource?.selfId.ToString() ?? "unknown";
+                    string? resourceName = null;
+                    if (resourceRef != "unknown")
+                    {
+                        try
+                        {
+                            var resRecord = Task.Run(async () => await _p4kService.GetRecordWithSpecificDepth(new CigGuid(resourceRef), 0)).Result;
+                            resourceName = StripRecordPrefix(resRecord?.RecordName);
+                        }
+                        catch
+                        {
+                            resourceName = null;
+                        }
+                    }
                     var entity = new BlueprintRecipeCostEntity
                     {
                         BlueprintId = blueprintEntity.SelfId,
                         CostType = "Resource",
                         CostName = costName,
-                        ResourceRef = resourceCost.resource?.selfId.ToString() ?? "unknown",
-                        ResourceAmount = (decimal)rawQuantity
+                        ResourceRef = resourceRef,
+                        ResourceAmount = (decimal)rawQuantity,
+                        ResourceName = resourceName
                     };
                     db.BlueprintRecipeCosts.Add(entity);
                     return entity;
@@ -1694,14 +1716,21 @@ public class LocalDatabaseService : ILocalDatabaseService
 
             case CraftingCost_Item itemCost:
                 {
+                    var itemRef = itemCost.entityClass?.selfId.ToString();
+                    string? itemName = null;
+                    if (!string.IsNullOrEmpty(itemRef))
+                    {
+                        itemName = _itemNamesCache.GetValueOrDefault(itemRef);
+                    }
                     var entity = new BlueprintRecipeCostEntity
                     {
                         BlueprintId = blueprintEntity.SelfId,
                         CostType = "Item",
                         CostName = costName,
-                        ItemEntityClassRef = itemCost.entityClass?.selfId.ToString(),
+                        ItemEntityClassRef = itemRef,
                         ItemCount = itemCost.quantity,
-                        MinQuality = itemCost.minQuality
+                        MinQuality = itemCost.minQuality,
+                        ItemName = itemName
                     };
                     db.BlueprintRecipeCosts.Add(entity);
                     return entity;
@@ -2040,11 +2069,16 @@ public class LocalDatabaseService : ILocalDatabaseService
 
         var damageResist = healthParams?.DamageResistances as DamageResistance;
 
+        var localizedName = Task.Run(async () => await _p4kService.GetEntityClassName(entityClass)).Result
+            ?? StripRecordPrefix(record.RecordName)
+            ?? record.RecordName;
+
         return new ScItemEntity
         {
             RecordId = record.RecordId.ToString(),
             Crc32 = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record.RecordId])),
             TechnicalName = record.RecordName,
+            LocalizedName = localizedName,
             TypeName = itemDef.Type.ToString(),
             SubTypeName = itemDef.SubType.ToString(),
             Size = itemDef.Size,
@@ -2392,6 +2426,8 @@ public class LocalDatabaseService : ILocalDatabaseService
                     c.ItemEntityClassRef,
                     c.ItemCount,
                     c.MinQuality,
+                    c.ResourceName,
+                    c.ItemName,
                     c.Modifiers.Select(m => new DbBlueprintModifierRow(
                         m.RangeType,
                         m.PropertyName,
