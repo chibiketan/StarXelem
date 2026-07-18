@@ -27,6 +27,7 @@ public partial class P4kShipTabViewModel : PageViewModelBase
     [ObservableProperty] private bool _showOnlyVisible = true;
     [ObservableProperty] private List<P4kShipManufacturerModel> _allManufacturer = new();
     [ObservableProperty] private P4kShipManufacturerModel? _selectedManufacturer;
+    private List<P4kShipManufacturerModel> _manufacturersWithShips = new();
     [ObservableProperty] private List<P4kShipComponentModel> _coolerList = new();
     [ObservableProperty] private List<P4kShipComponentModel> _shieldList = new();
     [ObservableProperty] private List<P4kShipComponentModel> _powerplantList = new();
@@ -64,7 +65,6 @@ public partial class P4kShipTabViewModel : PageViewModelBase
             }
 
             allManufacturerList = allManufacturerList.OrderBy(m => m.Name).ToList();
-            allManufacturerList.Insert(0, new P4kShipManufacturerModel { Name = "Tous" });
 
             // Load ships from DB
             var ships = await _localDatabaseService.GetShipsAsync().ConfigureAwait(false);
@@ -90,10 +90,21 @@ public partial class P4kShipTabViewModel : PageViewModelBase
 
             _allShips = shipList;
 
+            // Filter manufacturers to only those with at least one ship
+            var manufacturersWithShipsNames = shipList
+                .Select(s => s.Manufacturer)
+                .Where(m => !string.IsNullOrEmpty(m))
+                .Distinct()
+                .ToHashSet();
+
+            _manufacturersWithShips = allManufacturerList
+                .Where(m => manufacturersWithShipsNames.Contains(m.Name))
+                .ToList();
+
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                AllManufacturer = allManufacturerList;
-                SelectedManufacturer = allManufacturerList.First();
+                ApplyManufacturerFilter();
+                SelectedManufacturer = AllManufacturer.FirstOrDefault();
                 ApplyShipFilter();
             }, DispatcherPriority.Default);
         }
@@ -105,6 +116,23 @@ public partial class P4kShipTabViewModel : PageViewModelBase
         {
             UpdateIsLoading(false);
         }
+    }
+
+    private void ApplyManufacturerFilter()
+    {
+        IEnumerable<string> visibleManufacturers = _allShips
+            .Where(s => !string.IsNullOrEmpty(s.Manufacturer))
+            .Select(s => s.Manufacturer!);
+
+        if (ShowOnlyVisible)
+            visibleManufacturers = visibleManufacturers.Where(m => _allShips.Any(s => s.Manufacturer == m && s.IsVisible));
+
+        var filtered = _manufacturersWithShips
+            .Where(m => visibleManufacturers.Contains(m.Name))
+            .ToList();
+
+        filtered.Insert(0, new P4kShipManufacturerModel { Name = "Tous" });
+        AllManufacturer = filtered;
     }
 
     private void ApplyShipFilter()
@@ -166,7 +194,10 @@ public partial class P4kShipTabViewModel : PageViewModelBase
                     DisplayName = entry.DisplayName,
                     Class = componentClass,
                     Size = entry.Size,
-                    Grade = entry.Grade
+                    Grade = entry.Grade,
+                    WeaponType = entry.WeaponType,
+                    GuidanceType = entry.GuidanceType,
+                    AlphaDamage = entry.AlphaDamage
                 };
 
                 componentsList.Add(component);
@@ -256,11 +287,16 @@ public partial class P4kShipTabViewModel : PageViewModelBase
     {
         if (Dispatcher.UIThread.CheckAccess())
         {
+            ApplyManufacturerFilter();
             ApplyShipFilter();
         }
         else
         {
-            Dispatcher.UIThread.Post(ApplyShipFilter);
+            Dispatcher.UIThread.Post(() =>
+            {
+                ApplyManufacturerFilter();
+                ApplyShipFilter();
+            });
         }
     }
 

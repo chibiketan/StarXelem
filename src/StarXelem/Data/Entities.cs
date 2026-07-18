@@ -91,6 +91,13 @@ public class ShipLoadoutEntryEntity
     public string ComponentClass { get; set; } = "Unknown";
     public int Size { get; set; }
     public string Grade { get; set; } = string.Empty;
+    public string? WeaponType { get; set; }
+    public string? GuidanceType { get; set; }
+    public float? AlphaDamage { get; set; }
+
+    public string? ComponentRecordId { get; set; }
+    [ForeignKey("ComponentRecordId")]
+    public virtual ScItemEntity? Component { get; set; }
 }
 
 public class ActorEntity

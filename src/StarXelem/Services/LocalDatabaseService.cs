@@ -208,20 +208,20 @@ public class LocalDatabaseService : ILocalDatabaseService
         _logger.LogInformation("[Phase 3/{Total}] Ships & manufacturers completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 4: Ship loadouts
-        progress?.Report(new RebuildProgress(4, TotalPhases, "Chargement des loadouts des vaisseaux…"));
-        phase.Restart();
-        await PopulateShipLoadoutsAsync(db, cancellationToken).ConfigureAwait(false);
-        phase.Stop();
-        _logger.LogInformation("[Phase 4/{Total}] Ship loadouts completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Phase 5: SCItems (must be before blueprints due to FK)
-        progress?.Report(new RebuildProgress(5, TotalPhases, "Chargement des objets (SCItems)…"));
+        // Phase 4: SCItems (must be before loadouts due to FK on ComponentRecordId)
+        progress?.Report(new RebuildProgress(4, TotalPhases, "Chargement des objets (SCItems)…"));
         phase.Restart();
         await PopulateScItemsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
-        _logger.LogInformation("[Phase 5/{Total}] SCItems completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        _logger.LogInformation("[Phase 4/{Total}] SCItems completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 5: Ship loadouts (depends on ScItems for ComponentRecordId FK)
+        progress?.Report(new RebuildProgress(5, TotalPhases, "Chargement des loadouts des vaisseaux…"));
+        phase.Restart();
+        await PopulateShipLoadoutsAsync(db, cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 5/{Total}] Ship loadouts completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
         // Phase 6: Contract generators
@@ -482,17 +482,21 @@ public class LocalDatabaseService : ILocalDatabaseService
     private static bool ComputeIsVisible(string technicalName)
     {
         return !technicalName.Contains("_ai_", StringComparison.InvariantCultureIgnoreCase)
-            && !technicalName.Contains("_unmanned_", StringComparison.InvariantCultureIgnoreCase)
             && !technicalName.Contains("salvageabledebris", StringComparison.InvariantCultureIgnoreCase)
             && !technicalName.Contains("_pu_", StringComparison.InvariantCultureIgnoreCase)
             && !technicalName.Contains("_ea_", StringComparison.InvariantCultureIgnoreCase)
             && !technicalName.Contains("_fleetweek", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.Contains("unmanned", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.Contains("mission", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.Contains("_Temp", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.Contains("bombless", StringComparison.InvariantCultureIgnoreCase)
             && !technicalName.EndsWith("_temp", StringComparison.InvariantCultureIgnoreCase)
             && !technicalName.EndsWith("_template", StringComparison.InvariantCultureIgnoreCase)
             && !technicalName.EndsWith("_tutorial", StringComparison.InvariantCultureIgnoreCase)
             && !technicalName.EndsWith("_advocacy", StringComparison.InvariantCultureIgnoreCase)
             && !technicalName.EndsWith("_indestructible", StringComparison.InvariantCultureIgnoreCase)
-            && !technicalName.EndsWith("_pu", StringComparison.InvariantCultureIgnoreCase);
+            && !technicalName.EndsWith("_pu", StringComparison.InvariantCultureIgnoreCase)
+            && !technicalName.EndsWith("_test", StringComparison.InvariantCultureIgnoreCase);
     }
 
     /* ========================================================================
@@ -516,8 +520,11 @@ public class LocalDatabaseService : ILocalDatabaseService
                 var record = await _p4kService.GetEntityType(
                     Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([guid]))).ConfigureAwait(false);
 
-                if (record?.Data is not EntityClassDefinition entityClass)
+                if (record?.Data is not EntityClassDefinition )
                     continue;
+
+                record = (await _p4kService.EnsureRecordsDepthAsync([record], 3)).First();
+                var entityClass = (EntityClassDefinition)record.Data;
 
                 var defaultLoadout = entityClass.Components.OfType<SEntityComponentDefaultLoadoutParams>().FirstOrDefault();
                 if (defaultLoadout?.loadout == null)
@@ -526,7 +533,7 @@ public class LocalDatabaseService : ILocalDatabaseService
                 var entryIndex = 0;
                 VisitLoadoutEntries(defaultLoadout.loadout, entry =>
                 {
-                    var loadoutEntry = ResolveLoadoutEntry(entry, ship, entryIndex++);
+                    var loadoutEntry = ResolveLoadoutEntry(entry, ship, entryIndex++, out string? techName);
                     if (loadoutEntry != null)
                         loadoutEntries.Add(loadoutEntry);
                 });
@@ -589,41 +596,62 @@ public class LocalDatabaseService : ILocalDatabaseService
         EItemType.Paints
     };
 
-    private ShipLoadoutEntryEntity? ResolveLoadoutEntry(SItemPortLoadoutEntryParams entry, ShipEntity ship, int index)
+    private ShipLoadoutEntryEntity? ResolveLoadoutEntry(SItemPortLoadoutEntryParams entry, ShipEntity ship, int index, out string? technicalNameOut)
     {
         EntityClassDefinition? entityClass = null;
+        string? technicalName = entry.entityClassName;
 
         if (!string.IsNullOrEmpty(entry.entityClassName))
         {
             if (_componentGuidMap.TryGetValue(entry.entityClassName, out var guid))
             {
                 var record = _p4kService.GetEntityType(
-                    Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([guid]))).GetAwaiter().GetResult();
+                    Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([guid])), 3).GetAwaiter().GetResult();
                 entityClass = record?.Data as EntityClassDefinition;
+                technicalName = record?.RecordName ?? entry.entityClassName;
             }
         }
         else if (entry.entityClassReference != null)
         {
             entityClass = entry.entityClassReference;
+            // Get technical name from entity class selfId
+            if (entityClass.selfId != default)
+            {
+                var crc32 = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([entityClass.selfId]));
+                var record = _p4kService.GetEntityType(crc32).GetAwaiter().GetResult();
+                technicalName = record?.RecordName;
+            }
         }
 
         if (entityClass is null)
+        {
+            technicalNameOut = technicalName;
             return null;
+        }
 
         var attachable = entityClass.Components.OfType<SAttachableComponentParams>().FirstOrDefault();
 
         // Skip entries without attachable component params (placeholders, port labels, non-component items)
         if (attachable?.AttachDef is not { } attachDef)
+        {
+            technicalNameOut = technicalName;
             return null;
+        }
 
         // Filter on allowed item types
         if (!s_allowedLoadoutItemTypes.Contains(attachDef.Type))
+        {
+            technicalNameOut = technicalName;
             return null;
+        }
 
         string displayName;
         string componentClass = "Unknown";
         int size = attachDef.Size;
         string grade = attachDef.Grade > 0 ? new string((char)(attachDef.Grade - 1 + 'A'), 1) : string.Empty;
+        string? weaponType = null;
+        string? guidanceType = null;
+        float? alphaDamage = null;
 
         displayName = _p4kService.GetLocaleValue(attachDef.Localization.Name).GetAwaiter().GetResult() ?? entry.entityClassName ?? "Unknown";
 
@@ -637,6 +665,136 @@ public class LocalDatabaseService : ILocalDatabaseService
             }
         }
 
+        // Resolve weapon type and alpha damage from SAmmoContainerComponentParams in entity components
+        // (requires load depth >= 3 for ammoParamsRecord to be populated)
+        if (attachDef.Type == EItemType.WeaponGun)
+        {
+            var ammoContainerComponent = entityClass.Components.OfType<SAmmoContainerComponentParams>().FirstOrDefault();
+            if (ammoContainerComponent?.ammoParamsRecord != null)
+            {
+                var ammoParams = ammoContainerComponent.ammoParamsRecord;
+                var ammoCat = ammoParams.ammoCategory;
+
+                string ammoTypeName = ammoCat switch
+                {
+                    AmmoCategory._5mm => "Ballistic",
+                    AmmoCategory._7mm => "Ballistic",
+                    AmmoCategory._10mm => "Ballistic",
+                    AmmoCategory._50cal => "Ballistic",
+                    AmmoCategory._50cal_pistol => "Ballistic",
+                    AmmoCategory._12g => "Ballistic",
+                    AmmoCategory.Coil => "Ballistic",
+                    AmmoCategory.Laser => "Laser",
+                    AmmoCategory.Plasma => "Plasma",
+                    AmmoCategory.Electron => "Electron",
+                    _ => null
+                };
+
+                // Resolve alpha damage from projectile params
+                if (ammoParams.projectileParams != null)
+                {
+                    var damageBase = ammoParams.projectileParams switch
+                    {
+                        BulletProjectileParams bullet => bullet.damage,
+                        TachyonProjectileParams tachyon => tachyon.damage,
+                        _ => null
+                    };
+
+                    if (damageBase is DamageInfo damageInfo)
+                    {
+                        alphaDamage = damageInfo.DamagePhysical
+                                     + damageInfo.DamageEnergy
+                                     + damageInfo.DamageDistortion
+                                     + damageInfo.DamageThermal
+                                     + damageInfo.DamageBiochemical
+                                     + damageInfo.DamageStun;
+                    }
+                }
+
+                // TODO pour les sucker punch, regarder également sur la partie explosion
+                // Fallback: detonation explosion damage (Jericho, Suckerpunch – explosive ordnance)
+                if (alphaDamage == null || alphaDamage <= 1)
+                {
+                    if (ammoParams.projectileParams?.detonationParams?.explosionParams?.damage is DamageInfo detonationDmg)
+                    {
+                        alphaDamage = detonationDmg.DamagePhysical
+                                     + detonationDmg.DamageEnergy
+                                     + detonationDmg.DamageDistortion
+                                     + detonationDmg.DamageThermal
+                                     + detonationDmg.DamageBiochemical
+                                     + detonationDmg.DamageStun;
+                    }
+                }
+
+                // Fallback: beam damage per second (Supremacy-10T Laser Beam)
+                if (alphaDamage == null || alphaDamage <= 0)
+                {
+                    var weaponComponent = entityClass.Components.OfType<SCItemWeaponComponentParams>().FirstOrDefault();
+                    if (weaponComponent?.fireActions != null)
+                    {
+                        foreach (var action in weaponComponent.fireActions)
+                        {
+                            if (action is SWeaponActionFireBeamParams beamAction && beamAction.damagePerSecond is DamageInfo beamDmg)
+                            {
+                                alphaDamage = beamDmg.DamagePhysical
+                                             + beamDmg.DamageEnergy
+                                             + beamDmg.DamageDistortion
+                                             + beamDmg.DamageThermal
+                                             + beamDmg.DamageBiochemical
+                                             + beamDmg.DamageStun;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Combine ammo type with weapon subtype from names
+                if (ammoTypeName != null)
+                {
+                    var weaponSubtype = InferWeaponSubtypeFromName(technicalName, displayName);
+                    weaponType = !string.IsNullOrEmpty(weaponSubtype)
+                        ? $"{ammoTypeName} {weaponSubtype}"
+                        : ammoTypeName;
+                }
+            }
+
+            // Fallback: infer weapon type from technical name and display name
+            if (weaponType == null)
+            {
+                var baseType = InferWeaponTypeFromName(technicalName, displayName);
+                var weaponSubtype = InferWeaponSubtypeFromName(technicalName, displayName);
+                weaponType = !string.IsNullOrEmpty(baseType)
+                    ? (!string.IsNullOrEmpty(weaponSubtype) ? $"{baseType} {weaponSubtype}" : baseType)
+                    : weaponSubtype;
+            }
+        }
+
+        // Resolve missile guidance type from targeting params
+        if (attachDef.Type == EItemType.Missile)
+        {
+            var missileParams = entityClass.Components.OfType<SCItemMissileParams>().FirstOrDefault();
+            if (missileParams?.targetingParams != null)
+            {
+                guidanceType = missileParams.targetingParams.trackingSignalType switch
+                {
+                    ESignatureType.Infrared => "IR",
+                    ESignatureType.Electromagnetic => "EM",
+                    ESignatureType.CrossSection => "CrossSection",
+                    ESignatureType.Decibel => "Decibel",
+                    ESignatureType.Resource => "Resource",
+                    ESignatureType.Identity => "Identity",
+                    ESignatureType.CommsSignal => "CommsSignal",
+                    ESignatureType.Interactable => "Interactable",
+                    _ => null
+                };
+            }
+        }
+
+        technicalNameOut = technicalName;
+        var componentRecordId = entityClass.selfId != default
+            ? entityClass.selfId.ToString()
+            : null;
+
         return new ShipLoadoutEntryEntity
         {
             ShipGuid = ship.EntityClassGuid,
@@ -645,7 +803,11 @@ public class LocalDatabaseService : ILocalDatabaseService
             DisplayName = displayName,
             ComponentClass = componentClass,
             Size = size,
-            Grade = grade
+            Grade = grade,
+            WeaponType = weaponType,
+            GuidanceType = guidanceType,
+            AlphaDamage = alphaDamage,
+            ComponentRecordId = componentRecordId
         };
     }
 
@@ -679,6 +841,144 @@ public class LocalDatabaseService : ILocalDatabaseService
             EItemType.Module => "Module",
             _ => "Unknown"
         };
+    }
+
+
+    private (string? WeaponType, float? AlphaDamage) ResolveWeaponTypeAndDamage(CigGuid ammoContainerGuid, string? technicalName, string weaponName)
+    {
+        if (ammoContainerGuid == default)
+            return (null, null);
+
+        try
+        {
+            var crc32 = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([ammoContainerGuid]));
+            var record = _p4kService.GetEntityType(crc32).GetAwaiter().GetResult();
+            var ammoEntityClass = record?.Data as EntityClassDefinition;
+            if (ammoEntityClass == null)
+            {
+                _logger.LogWarning("GetEntityType returned null for ammo container of {Weapon}", weaponName);
+                return (null, null);
+            }
+
+            var ammoContainerParams = ammoEntityClass.Components.OfType<SAmmoContainerComponentParams>().FirstOrDefault();
+            if (ammoContainerParams == null)
+            {
+                _logger.LogWarning("No SAmmoContainerComponentParams in ammo container entity for {Weapon}", weaponName);
+                return (null, null);
+            }
+
+            if (ammoContainerParams.ammoParamsRecord == null)
+            {
+                _logger.LogWarning("ammoParamsRecord is null in ammo container for {Weapon}", weaponName);
+                return (null, null);
+            }
+
+            var ammoParams = ammoContainerParams.ammoParamsRecord;
+            var ammoCat = ammoParams.ammoCategory;
+
+            string ammoTypeName = ammoCat switch
+            {
+                AmmoCategory._5mm => "Ballistic",
+                AmmoCategory._7mm => "Ballistic",
+                AmmoCategory._10mm => "Ballistic",
+                AmmoCategory._50cal => "Ballistic",
+                AmmoCategory._50cal_pistol => "Ballistic",
+                AmmoCategory._12g => "Ballistic",
+                AmmoCategory.Coil => "Ballistic",
+                AmmoCategory.Laser => "Laser",
+                AmmoCategory.Plasma => "Plasma",
+                AmmoCategory.Electron => "Electron",
+                _ => null
+            };
+
+            // Resolve alpha damage from projectile params
+            float? alphaDamage = null;
+            if (ammoParams.projectileParams != null)
+            {
+                var damageBase = ammoParams.projectileParams switch
+                {
+                    BulletProjectileParams bullet => bullet.damage,
+                    TachyonProjectileParams tachyon => tachyon.damage,
+                    _ => null
+                };
+
+                if (damageBase is DamageInfo damageInfo)
+                {
+                    alphaDamage = damageInfo.DamagePhysical
+                                 + damageInfo.DamageEnergy
+                                 + damageInfo.DamageDistortion
+                                 + damageInfo.DamageThermal
+                                 + damageInfo.DamageBiochemical
+                                 + damageInfo.DamageStun;
+                }
+                else
+                {
+                    // Damage type is not DamageInfo (e.g., DamageOverTime, DamageZone)
+                }
+            }
+
+            // Combine ammo type with weapon subtype from technical name
+            string? weaponType;
+            if (ammoTypeName != null)
+            {
+                var weaponSubtype = InferWeaponSubtypeFromName(technicalName, weaponName);
+                weaponType = !string.IsNullOrEmpty(weaponSubtype)
+                    ? $"{ammoTypeName} {weaponSubtype}"
+                    : ammoTypeName;
+            }
+            else
+            {
+                weaponType = null;
+            }
+
+            return (weaponType, alphaDamage);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to resolve weapon type for {Weapon}", weaponName);
+            return (null, null);
+        }
+    }
+
+    private static string? InferWeaponTypeFromName(string? technicalName, string displayName)
+    {
+        // Priority 1: technical name contains explicit weapon type keywords
+        if (!string.IsNullOrEmpty(technicalName))
+        {
+            var tech = technicalName.ToLowerInvariant();
+            if (tech.Contains("laser")) return "Laser";
+            if (tech.Contains("ballistic")) return "Ballistic";
+            if (tech.Contains("plasma")) return "Plasma";
+            if (tech.Contains("distortion")) return "Distortion";
+            if (tech.Contains("massdriver")) return "Ballistic";
+            if (tech.Contains("neutron")) return "Electron";
+            if (tech.Contains("tachyon")) return "Distortion";
+            if (tech.Contains("rpod")) return "Ballistic";
+        }
+
+        // Priority 2: display name heuristics
+        var name = displayName.ToLowerInvariant();
+        if (name.Contains("laser") || name.Contains("jericho")) return "Laser";
+        if (name.Contains("plasma") || name.Contains("tigerstrike")) return "Plasma";
+        if (name.Contains("electron")) return "Electron";
+        if (name.Contains("distortion") || name.Contains("tachyon")) return "Distortion";
+        if (name.Contains("gatling") || name.Contains("repeater") || name.Contains("cannon") || name.Contains("railgun") || name.Contains("coilgun") || name.Contains("scattergun") || name.Contains("mass driver")) return "Ballistic";
+        return null;
+    }
+
+    private static string? InferWeaponSubtypeFromName(string? technicalName, string displayName)
+    {
+        var tech = (technicalName ?? string.Empty).ToLowerInvariant();
+        var name = displayName.ToLowerInvariant();
+
+        if (tech.Contains("repeater") || name.Contains("repeater")) return "Repeater";
+        if (tech.Contains("gatling") || name.Contains("gatling")) return "Gatling";
+        if (tech.Contains("cannon") || name.Contains("cannon")) return "Cannon";
+        if (tech.Contains("scattergun") || name.Contains("scattergun")) return "Scattergun";
+        if (tech.Contains("railgun") || name.Contains("railgun")) return "Railgun";
+        if (tech.Contains("coilgun") || name.Contains("coilgun")) return "Coilgun";
+        if (tech.Contains("massdriver") || name.Contains("mass driver")) return "Mass Driver";
+        return null;
     }
 
     private IEnumerable<string> ExtractShipTags(EntityClassDefinition entityClass, Dictionary<string, string> tagResolutionMap)
@@ -2295,6 +2595,8 @@ public class LocalDatabaseService : ILocalDatabaseService
         var distortionParams = components.OfType<SDistortionParams>().FirstOrDefault();
         var armorParams = components.OfType<SCItemVehicleArmorParams>().FirstOrDefault();
         var weaponParams = components.OfType<SCItemWeaponComponentParams>().FirstOrDefault();
+        var ammoContainerParams = components.OfType<SAmmoContainerComponentParams>().FirstOrDefault();
+        var missileParams = components.OfType<SCItemMissileParams>().FirstOrDefault();
         var resourceParams = components.OfType<ItemResourceComponentParams>().FirstOrDefault();
         var physicsParams = components.OfType<SEntityPhysicsControllerParams>().FirstOrDefault();
         var purchasableParams = components.OfType<SCItemPurchasableParams>().FirstOrDefault();
@@ -2309,6 +2611,12 @@ public class LocalDatabaseService : ILocalDatabaseService
             : null;
 
         var damageResist = healthParams?.DamageResistances as DamageResistance;
+
+        // Extract damage from weapon projectile or missile explosion
+        var (dmgPhysical, dmgEnergy, dmgDistortion, dmgThermal, dmgBiochemical, dmgStun) =
+            ExtractItemDamage(ammoContainerParams, missileParams, weaponParams);
+
+
 
         var localizedName = Task.Run(async () => await _p4kService.GetEntityClassName(entityClass)).Result
             ?? StripRecordPrefix(record.RecordName)
@@ -2375,7 +2683,13 @@ public class LocalDatabaseService : ILocalDatabaseService
             ArmorMultBiochemical = armorParams?.damageMultiplier is DamageInfo di5 ? di5.DamageBiochemical : null,
             ArmorMultStun = armorParams?.damageMultiplier is DamageInfo di6 ? di6.DamageStun : null,
             WeaponAmmoRef = weaponParams?.ammoContainerRecord?.selfId.ToString(),
-            FuelCapacity = fuelCap
+            FuelCapacity = fuelCap,
+            DamagePhysical = dmgPhysical,
+            DamageEnergy = dmgEnergy,
+            DamageDistortion = dmgDistortion,
+            DamageThermal = dmgThermal,
+            DamageBiochemical = dmgBiochemical,
+            DamageStun = dmgStun
         };
     }
 
@@ -2478,6 +2792,71 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
 
         return (powerGen, powerCons, coolantGen, coolantCons, fuelCap, json);
+    }
+
+    private (float? Physical, float? Energy, float? Distortion, float? Thermal, float? Biochemical, float? Stun)
+        ExtractItemDamage(SAmmoContainerComponentParams? ammoContainer, SCItemMissileParams? missileParams, SCItemWeaponComponentParams? weaponParams)
+    {
+        DamageInfo? damageInfo = null;
+        bool hasNonZeroDamage = false;
+
+        // Weapon: extract from ammo container projectile params (standard projectile damage)
+        if (ammoContainer?.ammoParamsRecord?.projectileParams != null)
+        {
+            var proj = ammoContainer.ammoParamsRecord.projectileParams;
+            damageInfo = proj switch
+            {
+                BulletProjectileParams bullet => bullet.damage as DamageInfo,
+                TachyonProjectileParams tachyon => tachyon.damage as DamageInfo,
+                _ => null
+            };
+            if (damageInfo != null)
+            {
+                hasNonZeroDamage = damageInfo.DamagePhysical + damageInfo.DamageEnergy
+                    + damageInfo.DamageDistortion + damageInfo.DamageThermal
+                    + damageInfo.DamageBiochemical + damageInfo.DamageStun > 1f;
+            }
+        }
+
+        // Weapon: extract from detonation explosion (Jericho, Suckerpunch – explosive ordnance)
+        if (!hasNonZeroDamage && ammoContainer?.ammoParamsRecord?.projectileParams?.detonationParams?.explosionParams?.damage is DamageInfo detonationDamage)
+        {
+            damageInfo = detonationDamage;
+            hasNonZeroDamage = true;
+        }
+
+        // Weapon: extract from beam fire actions (Supremacy-10T Laser Beam – damagePerSecond)
+        if (!hasNonZeroDamage && weaponParams?.fireActions != null)
+        {
+            foreach (var action in weaponParams.fireActions)
+            {
+                if (action is SWeaponActionFireBeamParams beamAction && beamAction.damagePerSecond is DamageInfo beamDamage)
+                {
+                    damageInfo = beamDamage;
+                    hasNonZeroDamage = true;
+                    break;
+                }
+            }
+        }
+
+        // Missile: extract from explosion params
+        if (!hasNonZeroDamage && missileParams?.explosionParams?.damage is DamageInfo missileDamage)
+        {
+            damageInfo = missileDamage;
+            hasNonZeroDamage = true;
+        }
+
+        if (damageInfo == null)
+            return (null, null, null, null, null, null);
+
+        return (
+            damageInfo.DamagePhysical,
+            damageInfo.DamageEnergy,
+            damageInfo.DamageDistortion,
+            damageInfo.DamageThermal,
+            damageInfo.DamageBiochemical,
+            damageInfo.DamageStun
+        );
     }
 
     private string ResolveScItemManufacturerId(
@@ -2615,6 +2994,7 @@ public class LocalDatabaseService : ILocalDatabaseService
             .AsNoTracking()
             .Include(s => s.ShipTags)
                 .ThenInclude(st => st.Tag)
+            .Include(s => s.Manufacturer)
             .ToListAsync();
     }
 

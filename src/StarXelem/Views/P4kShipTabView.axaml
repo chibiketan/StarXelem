@@ -210,9 +210,9 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
                             <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
-                            <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
                             <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
-                            <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
+                             <DataGridTextColumn Width="130" Header="Type" Binding="{Binding WeaponType}" />
+                             <DataGridTextColumn Width="80" Header="Dégâts" Binding="{Binding AlphaDamage}" />
                         </DataGrid.Columns>
                     </DataGrid>
                 </StackPanel>
@@ -232,7 +232,7 @@
                             <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
                             <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
                             <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
-                            <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
+                             <DataGridTextColumn Width="80" Header="Guidage" Binding="{Binding GuidanceType}" />
                         </DataGrid.Columns>
                     </DataGrid>
                 </StackPanel>

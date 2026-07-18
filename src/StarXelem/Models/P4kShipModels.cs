@@ -17,6 +17,9 @@ public class P4kShipComponentModel
     public required ComponentClass Class { get; set; }
     public required int Size { get; set; }
     public required string Grade { get; set; }
+    public string? WeaponType { get; set; }
+    public string? GuidanceType { get; set; }
+    public float? AlphaDamage { get; set; }
 
     public string? ClassIconPath
     {

@@ -142,6 +142,20 @@ public class ScItemEntity
 
     public float? WeaponAccuracyRangeMax { get; set; }
 
+    /* ---- Weapon/Missile damage (from projectile/explosion DamageInfo) ---- */
+
+    public float? DamagePhysical { get; set; }
+
+    public float? DamageEnergy { get; set; }
+
+    public float? DamageDistortion { get; set; }
+
+    public float? DamageThermal { get; set; }
+
+    public float? DamageBiochemical { get; set; }
+
+    public float? DamageStun { get; set; }
+
     /* ---- FuelTank ---- */
 
     public float? FuelCapacity { get; set; }

@@ -105,6 +105,11 @@ public class DesignP4kService : IP4kService
         return Task.FromResult<DataCoreTypedRecord?>(null);
     }
 
+    public Task<DataCoreTypedRecord?> GetEntityType(uint guidCrc, int depth)
+    {
+        return Task.FromResult<DataCoreTypedRecord?>(null);
+    }
+
     public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition(int depth)
     {
         yield break;

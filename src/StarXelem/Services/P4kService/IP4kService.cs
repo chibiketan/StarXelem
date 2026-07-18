@@ -38,6 +38,7 @@ public interface IP4kService : INotifyPropertyChanged
     /// <returns>La valeur trouvée qui correspond à la clé, sinon null</returns>
     Task<string?> GetLocaleValue(string? key);
     Task<DataCoreTypedRecord?> GetEntityType(uint guidCrc);
+    Task<DataCoreTypedRecord?> GetEntityType(uint guidCrc, int depth);
 
     /// <summary>
     /// Retourne l'ensemble des enregistrements de type EntityClassDefinition
