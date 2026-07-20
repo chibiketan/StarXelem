@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StarBreaker.Common;
@@ -61,6 +62,7 @@ public interface ILocalDatabaseService
     Task<List<ManufacturerEntity>> GetManufacturersAsync();
     Task<List<ShipLoadoutEntryEntity>> GetShipLoadoutAsync(string shipGuid);
     Task<List<ShipEntity>> GetShipsAsync();
+    Task<Dictionary<string, List<MissionEntity>>> GetAllMissionCategoriesWithMissionsAsync();
 }
 
 public class LocalDatabaseService : ILocalDatabaseService
@@ -115,6 +117,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
     }
 
+    private static readonly Regex MissionTokenRegex = new(@"~mission\(([^)]+)\)", RegexOptions.Compiled);
     private readonly Dictionary<EntityClassDefinition, string> _entityClassToGuid = new();
     private Dictionary<string, string> _itemNamesCache = new();
     private Dictionary<string, CigGuid> _componentGuidMap = new();
@@ -1181,7 +1184,7 @@ public class LocalDatabaseService : ILocalDatabaseService
                     continue;
 
                 var contractorEntity = ResolveContractor(contract, handlerContractorKey, db);
-                var categoryEntity = ResolveCategory(contract, db);
+                var categoryEntity = ResolveCategory(contract, handler.contractParams?.missionTypeOverride, db);
                 var mission = CreateMissionEntity(contract, generator, handlerIndex, generatorName, contractorEntity, categoryEntity);
 
                 db.Missions.Add(mission);
@@ -1203,6 +1206,8 @@ public class LocalDatabaseService : ILocalDatabaseService
                 await ProcessSpawnableShipsAsync(contract, db, mission.Id);
                 await ProcessMissionRewards(mission.Id, contract, db);
                 await ProcessMissionRequiredTagsAsync(mission.Id, contract, db);
+                await ProcessMissionPrerequisitesAsync(mission.Id, contract, db);
+                await ProcessMissionObjectivesAsync(mission.Id, contract, db);
             }
 
             handlerIndex++;
@@ -1288,6 +1293,18 @@ public class LocalDatabaseService : ILocalDatabaseService
         return null;
     }
 
+    private static dynamic? FindStandingPropOverride(object? overrides)
+    {
+        if (overrides == null)
+            return null;
+        foreach (dynamic p in (overrides as dynamic[] ?? Array.Empty<dynamic>()))
+        {
+            if (p.extendedTextToken == "StandingName")
+                return p;
+        }
+        return null;
+    }
+
     private ActorEntity? ResolveContractor(ContractBase contract, string? handlerContractorKey, StarXelemDbContext db)
     {
         string? contractorKey = null;
@@ -1342,13 +1359,17 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     /* ---- Category resolution ---- */
 
-    private MissionCategoryEntity? ResolveCategory(ContractBase contract, StarXelemDbContext db)
+    private MissionCategoryEntity? ResolveCategory(ContractBase contract, MissionType? handlerMissionTypeOverride, StarXelemDbContext db)
     {
         string? categoryKey = null;
 
         if (contract.paramOverrides?.missionTypeOverride != null)
         {
             categoryKey = contract.paramOverrides.missionTypeOverride.LocalisedTypeName;
+        }
+        else if (handlerMissionTypeOverride != null)
+        {
+            categoryKey = handlerMissionTypeOverride.LocalisedTypeName;
         }
         else
         {
@@ -1391,6 +1412,86 @@ public class LocalDatabaseService : ILocalDatabaseService
             ?.FirstOrDefault(p => p.param == ContractStringParamType.Description)?.value 
             ?? contract.template?.contractDisplayInfo?.displayString[2];
 
+        // Extract standing type from handler contractParams
+        string? standingType = null;
+        string? standingName = null;
+        int? maxStanding = null;
+        string? maxStandingDisplayName = null;
+        int? minStandingRaw = null;
+        string? minStandingDisplayName = null;
+
+        // Get handler reference for reputationScope access
+        dynamic? handler = null;
+        if (handlerIndex >= 0 && handlerIndex < generator.generators.Length)
+        {
+            handler = generator.generators[handlerIndex];
+            var standingProp = FindStandingPropOverride(handler.contractParams?.propertyOverrides);
+            if (standingProp?.value != null)
+            {
+                standingName = standingProp.value.ToString();
+                standingType = "ReputationStanding_" + standingName;
+            }
+        }
+
+        // Also check contract-level overrides
+        if (string.IsNullOrEmpty(standingType))
+        {
+            var contractStanding = contract.paramOverrides?.propertyOverrides?.FirstOrDefault(p => p.extendedTextToken == "StandingName");
+            if (contractStanding?.value != null)
+            {
+                standingName = contractStanding.value.ToString();
+                standingType = "ReputationStanding_" + standingName;
+            }
+        }
+
+        // Extract min/max standing from CareerContract
+        if (contract is CareerContract careerContract)
+        {
+            if (careerContract.minStanding != null)
+            {
+                minStandingRaw = (int)careerContract.minStanding.minReputation;
+                minStandingDisplayName = careerContract.minStanding.displayName;
+            }
+
+            if (careerContract.maxStanding != null)
+            {
+                // Default: use the standing's own minReputation
+                maxStanding = (int)careerContract.maxStanding.minReputation;
+                maxStandingDisplayName = careerContract.maxStanding.displayName;
+
+                // If handler has reputationScope, use index-lookup algorithm
+                if (handler is ContractGeneratorHandler_Career careerHandler
+                    && careerHandler.reputationScope != null)
+                {
+                    var scopeParams = careerHandler.reputationScope;
+                    var standings = scopeParams.standingMap.standings;
+                    var size = standings.Length;
+                    var foundIndex = -1;
+
+                    for (int i = 0; i < size; i++)
+                    {
+                        if (standings[i]?.name == careerContract.maxStanding.name)
+                        {
+                            foundIndex = i;
+                            break;
+                        }
+                    }
+
+                    if (foundIndex > -1)
+                    {
+                        if (foundIndex < size - 1)
+                        {
+                            maxStanding = (int)(standings[foundIndex + 1].minReputation - 1);
+                        }
+                        else
+                        {
+                            maxStanding = (int)scopeParams.standingMap.reputationCeiling;
+                        }
+                    }
+                }
+            }
+        }
+
         return new MissionEntity
         {
             Id = contract.id.ToString(),
@@ -1404,7 +1505,13 @@ public class LocalDatabaseService : ILocalDatabaseService
             WorkInProgress = (bool)contract.workInProgress,
             GeneratorId = $"{generator.selfId}-{handlerIndex}",
             Contractor = contractorEntity,
-            Category = categoryEntity
+            Category = categoryEntity,
+            StandingType = standingType,
+            StandingName = standingName,
+            MaxStanding = maxStanding,
+            MaxStandingDisplayName = maxStandingDisplayName,
+            MinStandingRaw = minStandingRaw,
+            MinStandingDisplayName = minStandingDisplayName
         };
     }
 
@@ -1749,6 +1856,281 @@ public class LocalDatabaseService : ILocalDatabaseService
         return Task.CompletedTask;
     }
 
+    /* ---- Structured prerequisites (type-based dispatch) ---- */
+
+    private async Task ProcessMissionPrerequisitesAsync(string missionId, ContractBase contract, StarXelemDbContext db)
+    {
+        try
+        {
+            if (contract.additionalPrerequisites == null)
+                return;
+
+            int order = 0;
+            foreach (var prerequisite in contract.additionalPrerequisites)
+            {
+                var entity = new MissionPrerequisiteEntity { MissionId = missionId, OrderIndex = order++ };
+
+                if (prerequisite is ContractPrerequisite_Reputation rep)
+                {
+                    entity.PrerequisiteType = "Reputation";
+                    if (rep.minStanding != null)
+                    {
+                        entity.MinReputation = (int)rep.minStanding.minReputation;
+                        entity.ScopeNameKey = rep.scope?.scopeName;
+                        entity.FactionNameKey = rep.factionReputation?.name;
+                    }
+                    if (rep.maxStanding != null)
+                    {
+                        entity.MaxReputation = (int)rep.maxStanding.minReputation;
+                    }
+                    var scopeName = await _p4kService.GetLocaleValue(rep.scope?.scopeName).ConfigureAwait(false);
+                    var factionName = await _p4kService.GetLocaleValue(rep.factionReputation?.name).ConfigureAwait(false);
+                    entity.DisplayLabel = $"[Réputation] entre {rep.minStanding?.minReputation ?? -1} et {rep.maxStanding?.minReputation ?? -1} sur {scopeName ?? "Inconnue"} pour {factionName ?? "Inconnue"}";
+                }
+                else if (prerequisite is ContractPrerequisite_AreaTags areaTags)
+                {
+                    entity.PrerequisiteType = "AreaTags";
+                    entity.RequiredTagNames = GetTagListNames(areaTags.requiredAreaTags);
+                    entity.ExcludedTagNames = GetTagListNames(areaTags.excludedAreaTags);
+                    var requiredLabels = areaTags.requiredAreaTags?.tags?.Select(t => t?.tagName).Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>();
+                    var excludedLabels = areaTags.excludedAreaTags?.tags?.Select(t => t?.tagName).Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>();
+                    var reqResolved = requiredLabels.Count > 0 ? string.Join(", ", await Task.WhenAll(requiredLabels.Select(n => _p4kService.GetLocaleValue(n))).ConfigureAwait(false)) : "";
+                    var exclResolved = excludedLabels.Count > 0 ? string.Join(", ", await Task.WhenAll(excludedLabels.Select(n => _p4kService.GetLocaleValue(n))).ConfigureAwait(false)) : "";
+                    entity.DisplayLabel = $"[Tags zone] requis: {reqResolved}; exclus: {exclResolved}";
+                }
+                else if (prerequisite is ContractPrerequisite_CompletedContractTags completedTags)
+                {
+                    entity.PrerequisiteType = "CompletedContractTags";
+                    entity.RequiredTagNames = GetTagListNames(completedTags.requiredCompletedContractTags);
+                    entity.ExcludedTagNames = GetTagListNames(completedTags.excludedCompletedContractTags);
+                    var requiredLabels = completedTags.requiredCompletedContractTags?.tags?.Select(t => t?.tagName).Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>();
+                    var excludedLabels = completedTags.excludedCompletedContractTags?.tags?.Select(t => t?.tagName).Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>();
+                    var reqResolved = requiredLabels.Count > 0 ? string.Join(", ", await Task.WhenAll(requiredLabels.Select(n => _p4kService.GetLocaleValue(n))).ConfigureAwait(false)) : "";
+                    var exclResolved = excludedLabels.Count > 0 ? string.Join(", ", await Task.WhenAll(excludedLabels.Select(n => _p4kService.GetLocaleValue(n))).ConfigureAwait(false)) : "";
+                    entity.DisplayLabel = $"[Tags contrats] requis: {reqResolved}; exclus: {exclResolved}";
+                }
+                else if (prerequisite is ContractPrerequisite_CrimeStat crimeStat)
+                {
+                    entity.PrerequisiteType = "CrimeStat";
+                    entity.MinCrimeStat = (int)crimeStat.minCrimeStat;
+                    entity.MaxCrimeStat = (int)crimeStat.maxCrimeStat;
+                    entity.JurisdictionNameKey = crimeStat.crimeStatJurisdictionOverride.ToString();
+                    entity.DisplayLabel = $"[Stat criminal] entre {crimeStat.minCrimeStat} et {crimeStat.maxCrimeStat}";
+                }
+                else if (prerequisite is ContractPrerequisite_JournalEntries journalEntries)
+                {
+                    entity.PrerequisiteType = "JournalEntries";
+                    if (journalEntries.requiredJournalEntries != null && journalEntries.requiredJournalEntries.Length > 0)
+                    {
+                        entity.RequiredJournalTitles = string.Join(",", journalEntries.requiredJournalEntries.Select(j => j.Title));
+                        var titles = journalEntries.requiredJournalEntries.Select(j => j.Title).ToList();
+                        var resolved = string.Join(", ", await Task.WhenAll(titles.Select(t => _p4kService.GetLocaleValue(t))).ConfigureAwait(false));
+                        entity.DisplayLabel = $"[Journal] entrées requises: {resolved}";
+                    }
+                    else
+                    {
+                        entity.DisplayLabel = "[Journal] entrée requise";
+                    }
+                }
+                else if (prerequisite is ContractPrerequisite_Locality locality)
+                {
+                    entity.PrerequisiteType = "Locality";
+                    var localityData = locality.localityAvailable;
+                    if (localityData?.availableLocations != null && localityData.availableLocations.Length > 0)
+                    {
+                        var names = localityData.availableLocations.Select(l => l?.name).Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>();
+                        entity.LocationNameKey = string.Join(",", names);
+                        var resolvedNames = names.Count > 0 ? string.Join(" OU ", await Task.WhenAll(names.Select(n => _p4kService.GetLocaleValue(n))).ConfigureAwait(false)) : "";
+                        entity.DisplayLabel = $"[Localité] {resolvedNames}";
+                    }
+                    else
+                    {
+                        entity.DisplayLabel = "[Localité] non spécifiée";
+                    }
+                }
+                else if (prerequisite is ContractPrerequisite_Location location)
+                {
+                    entity.PrerequisiteType = "Location";
+                    var locationName = location.locationAvailable?.name;
+                    entity.LocationNameKey = locationName;
+                    var resolvedName = locationName != null ? await _p4kService.GetLocaleValue(locationName).ConfigureAwait(false) : "";
+                    entity.DisplayLabel = $"[Lieu] {resolvedName ?? "Inconnue"}";
+                }
+                else if (prerequisite is ContractPrerequisite_LocationProperty locationProp)
+                {
+                    entity.PrerequisiteType = "LocationProperty";
+                    entity.LocationLevelType = locationProp.locationLevelType.ToString();
+                    // Resolve propertyVariableName from contract paramOverrides
+                    var varName = locationProp.propertyVariableName;
+                    if (!string.IsNullOrEmpty(varName) && contract.paramOverrides?.propertyOverrides != null)
+                    {
+                        var propOverride = contract.paramOverrides.propertyOverrides.FirstOrDefault(p => p.missionVariableName == varName);
+                        if (propOverride.value != null)
+                        {
+                            entity.LocationNameKey = propOverride.value.ToString();
+                        }
+                    }
+                    entity.DisplayLabel = $"[Propriété de lieu] niveau {locationProp.locationLevelType}, propriété {varName}";
+                }
+                else
+                {
+                    entity.PrerequisiteType = prerequisite.GetType().Name;
+                    entity.DisplayLabel = $"[Prérequis] {prerequisite.GetType().Name}";
+                }
+
+                db.MissionPrerequisites.Add(entity);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Échec du parsing des prérequis structurés pour la mission {MissionId}", missionId);
+        }
+    }
+
+    private static string GetTagListNames(StarBreaker.DataCoreGenerated.TagList tagList)
+    {
+        if (tagList?.tags?.Length > 0)
+            return string.Join(",", tagList.tags.Select(t => t.tagName));
+        return null;
+    }
+
+    /* ---- Mission objectives ---- */
+
+    private async Task ProcessMissionObjectivesAsync(string missionId, ContractBase contract, StarXelemDbContext db)
+    {
+        try
+        {
+            var objectiveTokens = contract.template?.objectiveTokens;
+            if (objectiveTokens == null || objectiveTokens.Length == 0)
+                return;
+
+            // Map from CigGuid to DB objective entity for parent linking
+            var objectiveMap = new Dictionary<string, MissionObjectiveEntity>();
+
+            foreach (var rootToken in objectiveTokens)
+            {
+                if (rootToken == null) continue;
+                await ProcessObjectiveTokenAsync(missionId, rootToken, null, 0, db, objectiveMap);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Échec du parsing des objectifs pour la mission {MissionId}", missionId);
+        }
+    }
+
+    private async Task ProcessObjectiveTokenAsync(
+        string missionId,
+        ObjectiveToken token,
+        MissionObjectiveEntity? parentEntity,
+        int order,
+        StarXelemDbContext db,
+        Dictionary<string, MissionObjectiveEntity> objectiveMap)
+    {
+        // Extract display text
+        var text = token.displayInfo?.shortDescription ?? token.debugName ?? "";
+
+        // Extract type from category enum
+        var category = token.displayInfo?.category;
+        var type = category != null
+            ? Enum.GetName(typeof(EMissionObjectiveCategory), category.Value) ?? "Objective"
+            : "Objective";
+
+        var obj = new MissionObjectiveEntity
+        {
+            MissionId = missionId,
+            Type = type,
+            Text = text,
+            TextKey = token.displayInfo?.shortDescription,
+            Order = order,
+            Parent = parentEntity  // Use navigation property instead of ParentId
+        };
+
+        db.MissionObjectives.Add(obj);
+
+        // Store mapping for child resolution (use token ID as key)
+        var tokenId = token.id.ToString();
+        objectiveMap[tokenId] = obj;
+
+        // Extract ~mission() tokens from objective text
+        if (!string.IsNullOrEmpty(text))
+        {
+            var matches = MissionTokenRegex.Matches(text);
+            foreach (Match match in matches)
+            {
+                var tokenName = match.Groups[1].Value;
+                await ResolveAndStoreToken(missionId, obj, tokenName, db);
+            }
+        }
+
+        // Recursively process child mission phases
+        var children = token.childMissionPhases;
+        if (children != null && children.Length > 0)
+        {
+            int childOrder = 0;
+            foreach (var child in children)
+            {
+                if (child == null) continue;
+                await ProcessObjectiveTokenAsync(missionId, child, obj, childOrder++, db, objectiveMap);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Resolve a ~mission() token name and store it as a MissionTokenEntity linked to an objective.
+    /// </summary>
+    private async Task ResolveAndStoreToken(string missionId, MissionObjectiveEntity objectiveEntity, string tokenName, StarXelemDbContext db)
+    {
+        // Check if token already exists for this mission+objective+name combination
+        var existing = db.MissionTokens
+            .FirstOrDefault(t => t.MissionId == missionId && t.Objective == objectiveEntity && t.TokenName == tokenName);
+        if (existing != null)
+        {
+            // Same token already stored for this objective, skip
+            return;
+        }
+
+        // Resolve token value from contract stringParamOverrides
+        string? resolvedValue = null;
+
+        // Infer value type from token name pattern
+        string valueType = InferTokenType(tokenName);
+
+        // Try locale lookup for the token value
+        try
+        {
+            resolvedValue = await _p4kService.GetLocaleValue(tokenName);
+        }
+        catch
+        {
+            // Ignore resolution failures
+        }
+
+        db.MissionTokens.Add(new MissionTokenEntity
+        {
+            MissionId = missionId,
+            Objective = objectiveEntity,  // Use navigation property instead of ObjectiveId
+            TokenName = tokenName,
+            ValueType = valueType,
+            ResolvedValue = resolvedValue ?? tokenName
+        });
+    }
+
+    /// <summary>
+    /// Infer the value type from a token name pattern.
+    /// </summary>
+    private static string InferTokenType(string tokenName)
+    {
+        var lower = tokenName.ToLowerInvariant();
+        if (lower.Contains("faction") || lower.Contains("org")) return "Organization";
+        if (lower.Contains("location")) return "Location";
+        if (lower.Contains("item")) return "HaulingItem";
+        if (lower.Contains("amount") || lower.Contains("count")) return "HaulingAmount";
+        if (lower.Contains("destination")) return "HaulingDestination";
+        if (lower.Contains("ai") || lower.Contains("npc")) return "AIName";
+        return "Unknown";
+    }
+
     private async Task<int> ProcessSingleReward(
         string missionId, 
         ContractResultBase resultBase, 
@@ -1822,7 +2204,10 @@ public class LocalDatabaseService : ILocalDatabaseService
                         MissionId = missionId,
                         RewardType = "ContractResult_Item",
                         DisplayValue = string.Format("{0} x {1}", entityName, item.amount),
-                        IsCalculated = false
+                        IsCalculated = false,
+                        Count = item.amount,
+                        OnlyToMissionOwner = item.awardOnlyToMissionOwner,
+                        SendToHomeLocation = item.sendToPlayerHomeLocation
                     });
                 }
                 return 1;
@@ -3223,5 +3608,39 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
 
         return (titleSuffixMap, descAppendMap);
+    }
+
+    /// <summary>
+    /// Get all missions grouped by category with full navigation properties loaded.
+    /// </summary>
+    public async Task<Dictionary<string, List<MissionEntity>>> GetAllMissionCategoriesWithMissionsAsync()
+    {
+        using var db = await _factory.CreateDbContextAsync();
+        var missions = await db.Missions
+            .AsNoTracking()
+            .Include(m => m.Category)
+            .Include(m => m.Contractor)
+            .Include(m => m.Objectives)
+            .Include(m => m.Prerequisites)
+            .Include(m => m.Tokens)
+            .Include(m => m.ShipRequirements)
+                .ThenInclude(sr => sr.Ship)
+            .Include(m => m.ShipSpawns)
+                .ThenInclude(sp => sp.Tags)
+                    .ThenInclude(st => st.Tag)
+            .Include(m => m.Rewards)
+            .Include(m => m.RequiredTags)
+                .ThenInclude(rt => rt.Tag)
+            .Include(m => m.CompletionTags)
+                .ThenInclude(ct => ct.Tag)
+            .Include(m => m.BlueprintPools)
+            .ToListAsync();
+
+        return missions
+            .GroupBy(m => m.Category?.Id ?? "Uncategorized")
+            .ToDictionary(
+                g => g.Key,
+                g => g.ToList()
+            );
     }
 }

@@ -179,11 +179,33 @@ public class MissionEntity
     public decimal AUECReward { get; set; }
     public decimal AUECCost { get; set; }
 
+    /// <summary>Standing type name from handler propertyOverrides, e.g. "ReputationStanding_General".</summary>
+    public string? StandingType { get; set; }
+
+    /// <summary>Standing name extracted from StandingType for display, e.g. "General".</summary>
+    public string? StandingName { get; set; }
+
+    /// <summary>Max standing level the mission can reach (last level's minReputation - 1).</summary>
+    public int? MaxStanding { get; set; }
+
+    /// <summary>Locale key for the max standing display name, e.g. "StandingName_Rookie".</summary>
+    public string? MaxStandingDisplayName { get; set; }
+
+    /// <summary>Min standing raw reputation value from contract.minStanding.minReputation.</summary>
+    public int? MinStandingRaw { get; set; }
+
+    /// <summary>Locale key for the min standing display name, e.g. "StandingName_Rookie".</summary>
+    public string? MinStandingDisplayName { get; set; }
+
     public virtual ICollection<MissionShipRequirementEntity> ShipRequirements { get; set; } = new List<MissionShipRequirementEntity>();
     public virtual ICollection<MissionShipSpawnEntity> ShipSpawns { get; set; } = new List<MissionShipSpawnEntity>();
     public virtual ICollection<MissionBlueprintPoolEntity> BlueprintPools { get; set; } = new List<MissionBlueprintPoolEntity>();
     public virtual ICollection<MissionRequiredTagEntity> RequiredTags { get; set; } = new List<MissionRequiredTagEntity>();
     public virtual ICollection<MissionCompletionTagEntity> CompletionTags { get; set; } = new List<MissionCompletionTagEntity>();
+    public virtual ICollection<MissionRewardEntity> Rewards { get; set; } = new List<MissionRewardEntity>();
+    public virtual ICollection<MissionObjectiveEntity> Objectives { get; set; } = new List<MissionObjectiveEntity>();
+    public virtual ICollection<MissionPrerequisiteEntity> Prerequisites { get; set; } = new List<MissionPrerequisiteEntity>();
+    public virtual ICollection<MissionTokenEntity> Tokens { get; set; } = new List<MissionTokenEntity>();
 }
 
 public class MissionShipRequirementEntity
@@ -281,6 +303,140 @@ public class MissionRewardEntity
 
     /// <summary>True for aUEC (CalculatedReward) where the value is computed, not fixed.</summary>
     public bool IsCalculated { get; set; }
+
+    /// <summary>Count for Item rewards (amount of the item).</summary>
+    public int? Count { get; set; }
+
+    /// <summary>True if reward is only given to mission owner (not split among party).</summary>
+    public bool? OnlyToMissionOwner { get; set; }
+
+    /// <summary>True if item reward is sent to home location.</summary>
+    public bool? SendToHomeLocation { get; set; }
+}
+
+/* ---- Mission objective hierarchy ---- */
+
+/// <summary>
+/// Represents one objective in a mission's objective tree.
+/// ParentId provides hierarchy (null = root objective).
+/// </summary>
+public class MissionObjectiveEntity
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Required]
+    public string MissionId { get; set; } = string.Empty;
+    [ForeignKey("MissionId")]
+    public virtual MissionEntity? Mission { get; set; }
+
+    /// <summary>Self-referencing FK for objective hierarchy. Null = root objective.</summary>
+    public int? ParentId { get; set; }
+    [ForeignKey("ParentId")]
+    public virtual MissionObjectiveEntity? Parent { get; set; }
+
+    public virtual ICollection<MissionObjectiveEntity> Children { get; set; } = new List<MissionObjectiveEntity>();
+
+    /// <summary>Objective type, e.g. "All", "Or", "Objective", "Destroy", "Defend", etc.</summary>
+    public string Type { get; set; } = string.Empty;
+
+    /// <summary>Display text for the objective (may contain ~mission() tokens).</summary>
+    public string Text { get; set; } = string.Empty;
+
+    /// <summary>Locale key if available.</summary>
+    public string? TextKey { get; set; }
+
+    /// <summary>Order within parent's children.</summary>
+    public int Order { get; set; }
+
+    /// <summary>Tokens extracted from this objective's text.</summary>
+    public virtual ICollection<MissionTokenEntity> Tokens { get; set; } = new List<MissionTokenEntity>();
+}
+
+/* ---- Mission prerequisites (structured) ---- */
+
+/// <summary>
+/// Structured prerequisite from contract.additionalPrerequisites.
+/// Each row represents one prerequisite with structured fields per type.
+/// </summary>
+public class MissionPrerequisiteEntity
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Required]
+    public string MissionId { get; set; } = string.Empty;
+    [ForeignKey("MissionId")]
+    public virtual MissionEntity? Mission { get; set; }
+
+    /// <summary>Prerequisite type: "Reputation", "AreaTags", "CompletedContractTags", "CrimeStat", "JournalEntries", "Locality", "Location", "LocationProperty", etc.</summary>
+    public string PrerequisiteType { get; set; } = string.Empty;
+
+    /// <summary>Order among prerequisites.</summary>
+    public int OrderIndex { get; set; }
+
+    /// <summary>Display label (final text after locale resolution — no tokens).</summary>
+    public string? DisplayLabel { get; set; }
+
+    // --- Reputation ---
+    public int? MinReputation { get; set; }
+    public int? MaxReputation { get; set; }
+    public string? ScopeNameKey { get; set; }
+    public string? FactionNameKey { get; set; }
+
+    // --- Location / Locality ---
+    public string? LocationNameKey { get; set; }
+    public string? LocationLevelType { get; set; }
+
+    // --- CrimeStat ---
+    public int? MinCrimeStat { get; set; }
+    public int? MaxCrimeStat { get; set; }
+    public string? JurisdictionNameKey { get; set; }
+
+    // --- Tags (AreaTags, CompletedContractTags) ---
+    public string? RequiredTagNames { get; set; }
+    public string? ExcludedTagNames { get; set; }
+
+    // --- JournalEntries ---
+    public string? RequiredJournalTitles { get; set; }
+    public string? ExcludedJournalTitles { get; set; }
+}
+
+/* ---- Mission tokens (~mission() for display resolution) ---- */
+
+/// <summary>
+/// Token extracted from ~mission(...) in title, description, or objective text.
+/// Linked to either a Mission (title/description tokens) or an Objective (objective tokens).
+/// </summary>
+public class MissionTokenEntity
+{
+    [Key]
+    public int Id { get; set; }
+
+    /// <summary>FK to mission (for title/description tokens).</summary>
+    public string? MissionId { get; set; }
+    [ForeignKey("MissionId")]
+    public virtual MissionEntity? Mission { get; set; }
+
+    /// <summary>FK to objective (for objective tokens).</summary>
+    public int? ObjectiveId { get; set; }
+    [ForeignKey("ObjectiveId")]
+    public virtual MissionObjectiveEntity? Objective { get; set; }
+
+    /// <summary>Token name as it appears in the text, e.g. "factionToken", "locationToken".</summary>
+    public string TokenName { get; set; } = string.Empty;
+
+    /// <summary>Value type: "Organization", "AIName", "Location", "HaulingItem", "HaulingAmount", "HaulingTotal", "HaulingDestination".</summary>
+    public string ValueType { get; set; } = string.Empty;
+
+    /// <summary>Resolved display value (plain text for basic display).</summary>
+    public string ResolvedValue { get; set; } = string.Empty;
+
+    /// <summary>Locale key for the value (if applicable) — allows language switching.</summary>
+    public string? ValueKey { get; set; }
+
+    /// <summary>Order among tokens.</summary>
+    public int Order { get; set; }
 }
 
 /* ---- Blueprint pool linkage — mission → pool → entries ---- */

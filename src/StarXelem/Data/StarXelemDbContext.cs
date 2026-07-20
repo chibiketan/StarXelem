@@ -35,6 +35,9 @@ public class StarXelemDbContext : DbContext
     public DbSet<LocaleEntry> LocaleEntries => Set<LocaleEntry>();
     public DbSet<ResourceEntity> Resources => Set<ResourceEntity>();
     public DbSet<ShipLoadoutEntryEntity> ShipLoadoutEntries => Set<ShipLoadoutEntryEntity>();
+    public DbSet<MissionObjectiveEntity> MissionObjectives => Set<MissionObjectiveEntity>();
+    public DbSet<MissionPrerequisiteEntity> MissionPrerequisites => Set<MissionPrerequisiteEntity>();
+    public DbSet<MissionTokenEntity> MissionTokens => Set<MissionTokenEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -261,5 +264,51 @@ public class StarXelemDbContext : DbContext
             .WithMany(p => p.Children)
             .HasForeignKey(l => l.ParentCigGuid)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // MissionObjectiveEntity - self-referencing hierarchy
+        modelBuilder.Entity<MissionObjectiveEntity>()
+            .HasOne(mo => mo.Mission)
+            .WithMany(m => m.Objectives)
+            .HasForeignKey(mo => mo.MissionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MissionObjectiveEntity>()
+            .HasOne(mo => mo.Parent)
+            .WithMany(mo => mo.Children)
+            .HasForeignKey(mo => mo.ParentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // MissionPrerequisiteEntity
+        modelBuilder.Entity<MissionPrerequisiteEntity>()
+            .HasOne(mp => mp.Mission)
+            .WithMany(m => m.Prerequisites)
+            .HasForeignKey(mp => mp.MissionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // MissionTokenEntity
+        modelBuilder.Entity<MissionTokenEntity>()
+            .HasOne(mt => mt.Mission)
+            .WithMany(m => m.Tokens)
+            .HasForeignKey(mt => mt.MissionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MissionTokenEntity>()
+            .HasOne(mt => mt.Objective)
+            .WithMany(mo => mo.Tokens)
+            .HasForeignKey(mt => mt.ObjectiveId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Composite indexes for query performance
+        modelBuilder.Entity<MissionObjectiveEntity>()
+            .HasIndex(mo => new { mo.MissionId, mo.Order });
+
+        modelBuilder.Entity<MissionPrerequisiteEntity>()
+            .HasIndex(mp => new { mp.MissionId, mp.OrderIndex });
+
+        modelBuilder.Entity<MissionTokenEntity>()
+            .HasIndex(mt => new { mt.MissionId, mt.Order });
+
+        modelBuilder.Entity<MissionTokenEntity>()
+            .HasIndex(mt => new { mt.ObjectiveId, mt.Order });
     }
 }
