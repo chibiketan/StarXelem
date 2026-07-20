@@ -40,10 +40,14 @@ public partial class App : Application
             // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
             DisableAvaloniaDataAnnotationValidation();
 
+            var mainWindowVm = Services.GetRequiredService<MainWindowViewModel>();
             desktop.MainWindow = new MainWindow
             {
-                DataContext = Services.GetRequiredService<MainWindowViewModel>(),
+                DataContext = mainWindowVm,
             };
+
+            // Gérer la configuration CLI (--screen, --screenshot, --close)
+            _ = mainWindowVm.HandleLaunchConfigAsync();
         }
 
         if (Design.IsDesignMode)

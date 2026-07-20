@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -543,4 +546,169 @@ public partial class MainWindowViewModel : ViewModelBase
 
     // Expose l'état du service pour les bindings UI (ex: couleur de l'icône dans MainWindow)
     public P4kService.P4kFileLoadState FileLoadState => _p4kService.FileLoadState;
+
+    /// <summary>
+    /// Gère les arguments CLI : --screen, --screenshot, --close
+    /// </summary>
+    public async Task HandleLaunchConfigAsync()
+    {
+        var hasScreen = !string.IsNullOrWhiteSpace(AppConfig.ScreenName);
+        var hasScreenshot = !string.IsNullOrWhiteSpace(AppConfig.ScreenshotPath);
+        var hasClose = AppConfig.AutoClose;
+
+        if (!hasScreen && !hasScreenshot && !hasClose)
+            return;
+
+        // 1. Navigation vers l'onglet demandé
+        if (hasScreen)
+        {
+            var targetPage = FindPageByScreenName(AppConfig.ScreenName!);
+            if (targetPage != null)
+            {
+                // Petit délai pour que l'UI soit prête
+                await Task.Delay(200).ConfigureAwait(false);
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    CurrentPage = targetPage;
+                });
+            }
+            else
+            {
+                _logger.LogWarning("Onglet CLI inconnu : {ScreenName}", AppConfig.ScreenName);
+            }
+        }
+
+        // 2. Capture d'écran
+        if (hasScreenshot)
+        {
+            try
+            {
+                // Attendre que le P4K soit chargé (CacheLoaded)
+                await WaitForP4kReadyAsync();
+
+                // Attendre que la DB soit prête
+                await WaitForDbReadyAsync();
+
+                // Délai pour que la navigation soit rendue dans l'UI
+                await Task.Delay(500).ConfigureAwait(false);
+
+                // Capture de la fenêtre
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    var desktop = Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+                    var window = desktop?.MainWindow;
+                    if (window == null)
+                    {
+                        _logger.LogWarning("Impossible de capturer : MainWindow est null");
+                        return;
+                    }
+
+                    var pixelSize = new PixelSize(
+                        (int)window.Bounds.Width,
+                        (int)window.Bounds.Height);
+
+                    var rtb = new RenderTargetBitmap(pixelSize);
+                    rtb.Render(window);
+
+                    rtb.Save(AppConfig.ScreenshotPath!);
+                    _logger.LogInformation("Capture enregistrée : {Path}", AppConfig.ScreenshotPath);
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors de la capture d'écran");
+            }
+        }
+
+        // 3. Fermeture automatique
+        if (hasClose)
+        {
+            // Si screenshot, on attend un peu après la capture ; sinon délai standard
+            var delayMs = hasScreenshot ? 500 : 1000;
+            await Task.Delay(delayMs).ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var desktop = Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+                desktop?.Shutdown();
+            });
+        }
+    }
+
+    /// <summary>
+    /// Trouve la page correspondant au nom d'onglet CLI.
+    /// </summary>
+    private PageViewModelBase? FindPageByScreenName(string screenName)
+    {
+        return screenName switch
+        {
+            "ship" => _pages.FirstOrDefault(p => p is ShipTabViewModel),
+            "p4kship" => _pages.FirstOrDefault(p => p is P4kShipTabViewModel),
+            "items" => _pages.FirstOrDefault(p => p is ItemsTabViewModel),
+            "blueprints" => _pages.FirstOrDefault(p => p is BlueprintListTabViewModel),
+            "friends" => _pages.FirstOrDefault(p => p is FriendListTabViewModel),
+            "missions" => _pages.FirstOrDefault(p => p is MissionsTabViewModel),
+            "extractions" => _pages.FirstOrDefault(p => p is ExtractionTabViewModel),
+            "reputations" => _pages.FirstOrDefault(p => p is ReputationTabViewModel),
+            "settings" => _pages.FirstOrDefault(p => p is SettingsTabViewModel),
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Attend que le P4K atteigne l'état CacheLoaded (timeout 5s).
+    /// </summary>
+    private async Task WaitForP4kReadyAsync()
+    {
+        // Guard : vérifier l'état actuel AVANT de s'abonner (race condition)
+        if (_p4kService.FileLoadState == P4kService.P4kFileLoadState.CacheLoaded)
+            return;
+
+        var tcs = new TaskCompletionSource<bool>();
+        void OnStateChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(IP4kService.FileLoadState))
+            {
+                if (_p4kService.FileLoadState == P4kService.P4kFileLoadState.CacheLoaded)
+                    tcs.TrySetResult(true);
+                // Si erreur ou annulé, on libère aussi
+                if (_p4kService.FileLoadState is P4kService.P4kFileLoadState.Error
+                    or P4kService.P4kFileLoadState.Cancelled)
+                    tcs.TrySetResult(false);
+            }
+        }
+
+        try
+        {
+            _p4kService.PropertyChanged += OnStateChanged;
+            await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
+        }
+        finally
+        {
+            _p4kService.PropertyChanged -= OnStateChanged;
+        }
+    }
+
+    /// <summary>
+    /// Attend que la DB soit prête (NeedsRebuildCheckAsync == false), timeout 5s.
+    /// </summary>
+    private async Task WaitForDbReadyAsync()
+    {
+        try
+        {
+            var readyTask = _localDatabaseService.NeedsRebuildCheckAsync();
+            var result = await Task.WhenAny(readyTask, Task.Delay(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
+
+            // Si c'est le timeout qui a gagné, on continue quand même
+            if (result == readyTask)
+            {
+                // DB est prête (needsRebuild == false) ou non, on continue
+                _ = await readyTask.ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Timeout ou erreur en attendant la DB");
+        }
+    }
 }
