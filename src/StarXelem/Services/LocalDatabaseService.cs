@@ -2004,7 +2004,6 @@ public class LocalDatabaseService : ILocalDatabaseService
             if (objectiveTokens == null || objectiveTokens.Length == 0)
                 return;
 
-            // Map from CigGuid to DB objective entity for parent linking
             var objectiveMap = new Dictionary<string, MissionObjectiveEntity>();
 
             foreach (var rootToken in objectiveTokens)
@@ -2027,98 +2026,250 @@ public class LocalDatabaseService : ILocalDatabaseService
         StarXelemDbContext db,
         Dictionary<string, MissionObjectiveEntity> objectiveMap)
     {
-        // Extract display text
-        var text = token.displayInfo?.shortDescription ?? token.debugName ?? "";
+        var handler = token.objectiveHandler;
 
-        // Extract type from category enum
-        var category = token.displayInfo?.category;
-        var type = category != null
-            ? Enum.GetName(typeof(EMissionObjectiveCategory), category.Value) ?? "Objective"
-            : "Objective";
+        if (handler is ObjectiveHandler_Hauling haulingHandler)
+        {
+            // Process each hauling order, creating one objective per order (like old code)
+            if (haulingHandler.haulingOrders != null)
+            {
+                for (int i = 0; i < haulingHandler.haulingOrders.Length; i++)
+                {
+                    var haulingOrder = haulingHandler.haulingOrders[i];
+                    if (haulingOrder == null) continue;
+
+                    var obj = await ProcessHaulingOrderAsync(
+                        missionId, haulingHandler, haulingOrder, parentEntity, order + i, db);
+
+                    if (obj != null)
+                    {
+                        objectiveMap[token.id.ToString()] = obj;
+
+                        // Process child phases under this objective
+                        if (token.childMissionPhases != null && token.childMissionPhases.Length > 0
+                            && i == 0)
+                        {
+                            int childOrder = 0;
+                            foreach (var child in token.childMissionPhases)
+                            {
+                                if (child == null) continue;
+                                await ProcessObjectiveTokenAsync(missionId, child, obj, childOrder++, db, objectiveMap);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Try handler-specific display info first, then token displayInfo, then debugName
+            string? textKey = null;
+
+            // Handlers with travelObjectiveInfo (WithModule derivatives: Local, NearLocation, PlayerAttached, EntityAttached)
+            if (handler is ObjectiveHandler_WithModule withModuleHandler)
+            {
+                var travelInfo = withModuleHandler.travelObjectiveInfo;
+                if (!string.IsNullOrEmpty(travelInfo.shortDescription))
+                {
+                    textKey = travelInfo.shortDescription;
+                }
+            }
+
+            // MeetAndTalk also has travelObjectiveInfo but inherits directly from ObjectiveHandlerBase
+            if (string.IsNullOrEmpty(textKey) && handler is ObjectiveHandler_MeetAndTalk meetAndTalkHandler)
+            {
+                var meetInfo = meetAndTalkHandler.travelObjectiveInfo;
+                if (!string.IsNullOrEmpty(meetInfo.shortDescription))
+                {
+                    textKey = meetInfo.shortDescription;
+                }
+            }
+
+            // Fallback to token displayInfo
+            if (string.IsNullOrEmpty(textKey))
+            {
+                textKey = token.displayInfo?.shortDescription;
+            }
+
+            // Resolve locale value
+            string? resolvedText = null;
+            if (!string.IsNullOrEmpty(textKey))
+            {
+                try { resolvedText = await _p4kService.GetLocaleValue(textKey).ConfigureAwait(false); }
+                catch { }
+            }
+
+            // Final fallback chain: resolved text > debugName > raw key
+            var text = !string.IsNullOrEmpty(resolvedText) ? resolvedText : (token.debugName ?? textKey ?? "");
+
+            // Skip objectives that resolved to uninitialized placeholder
+            if (text.Contains("UNINITIALIZED", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var obj = new MissionObjectiveEntity
+            {
+                MissionId = missionId,
+                Type = "Objective",
+                Text = text,
+                TextKey = textKey,
+                Order = order,
+                Parent = parentEntity
+            };
+            db.MissionObjectives.Add(obj);
+            objectiveMap[token.id.ToString()] = obj;
+
+            if (token.childMissionPhases != null && token.childMissionPhases.Length > 0)
+            {
+                int childOrder = 0;
+                foreach (var child in token.childMissionPhases)
+                {
+                    if (child == null) continue;
+                    await ProcessObjectiveTokenAsync(missionId, child, obj, childOrder++, db, objectiveMap);
+                }
+            }
+        }
+    }
+
+    private async Task<MissionObjectiveEntity?> ProcessHaulingOrderAsync(
+        string missionId,
+        ObjectiveHandler_Hauling handler,
+        HaulingOrderBase haulingOrder,
+        MissionObjectiveEntity? parentEntity,
+        int order,
+        StarXelemDbContext db)
+    {
+        var settings = handler.objectiveSettings;
+        var displayInfo = default(ObjectiveDisplayInfo);
+        var hasDisplayInfo = false;
+        Dictionary<string, string>? tokenMap = null;
+
+        switch (haulingOrder)
+        {
+            case HaulingOrder_EntityClass hoEc:
+                displayInfo = settings.itemDeliverObjective;
+                hasDisplayInfo = true;
+                {
+                    var itemName = await _p4kService.GetEntityClassName(hoEc.entityClass).ConfigureAwait(false) ?? "Inconnu";
+                    tokenMap = new Dictionary<string, string>();
+                    AddTokenIfSet(tokenMap, settings.itemExtendedTextToken, itemName);
+                    AddTokenIfSet(tokenMap, settings.amountExtendedTextToken, "0");
+                    AddTokenIfSet(tokenMap, settings.totalExtendedTextToken, Math.Max(hoEc.minAmount, hoEc.maxAmount).ToString(System.Globalization.CultureInfo.CurrentCulture));
+                    AddTokenIfSet(tokenMap, settings.dropOffLocationExtendedTextToken, "[Destination]");
+                }
+                break;
+            case HaulingOrder_EntityClasses hoEcs:
+                displayInfo = settings.itemDeliverObjective;
+                hasDisplayInfo = true;
+                {
+                    var itemName = hoEcs.haulingEntityClasses?.orderDisplayName != null
+                        ? await _p4kService.GetLocaleValue(hoEcs.haulingEntityClasses.orderDisplayName).ConfigureAwait(false) ?? "Inconnu"
+                        : "Inconnu";
+                    tokenMap = new Dictionary<string, string>();
+                    AddTokenIfSet(tokenMap, settings.itemExtendedTextToken, itemName);
+                    AddTokenIfSet(tokenMap, settings.amountExtendedTextToken, "0");
+                    AddTokenIfSet(tokenMap, settings.totalExtendedTextToken, Math.Max(hoEcs.minAmount, hoEcs.maxAmount).ToString(System.Globalization.CultureInfo.CurrentCulture));
+                    AddTokenIfSet(tokenMap, settings.dropOffLocationExtendedTextToken, "[Destination]");
+                }
+                break;
+            case HaulingOrder_Resource hoRes:
+                displayInfo = settings.resourceDeliverObjective;
+                hasDisplayInfo = true;
+                {
+                    var resourceName = hoRes.resource?.displayName != null
+                        ? await _p4kService.GetLocaleValue(hoRes.resource.displayName).ConfigureAwait(false) ?? "Inconnu"
+                        : "Inconnu";
+                    tokenMap = new Dictionary<string, string>();
+                    AddTokenIfSet(tokenMap, settings.itemExtendedTextToken, resourceName);
+                    AddTokenIfSet(tokenMap, settings.amountExtendedTextToken, "0");
+                    AddTokenIfSet(tokenMap, settings.totalExtendedTextToken, Math.Max(hoRes.minSCU, hoRes.maxSCU).ToString(System.Globalization.CultureInfo.CurrentCulture));
+                    AddTokenIfSet(tokenMap, settings.dropOffLocationExtendedTextToken, "[Destination]");
+                }
+                break;
+            case HaulingOrder_ResourceUnlimitedDropOff hoResUnl:
+                displayInfo = settings.resourceDeliverObjective;
+                hasDisplayInfo = true;
+                {
+                    var resourceName = hoResUnl.resource?.displayName != null
+                        ? await _p4kService.GetLocaleValue(hoResUnl.resource.displayName).ConfigureAwait(false) ?? "Inconnu"
+                        : "Inconnu";
+                    tokenMap = new Dictionary<string, string>();
+                    AddTokenIfSet(tokenMap, settings.itemExtendedTextToken, resourceName);
+                    AddTokenIfSet(tokenMap, settings.amountExtendedTextToken, "0");
+                    AddTokenIfSet(tokenMap, settings.totalExtendedTextToken, "0");
+                    AddTokenIfSet(tokenMap, settings.dropOffLocationExtendedTextToken, "[Destination]");
+                }
+                break;
+            default:
+                return null;
+        }
+
+        if (!hasDisplayInfo) return null;
+
+        var textKey = displayInfo.shortDescription;
+        string? resolvedText = null;
+        if (!string.IsNullOrEmpty(textKey))
+        {
+            try { resolvedText = await _p4kService.GetLocaleValue(textKey).ConfigureAwait(false); }
+            catch { }
+        }
+
+        var text = !string.IsNullOrEmpty(resolvedText) ? resolvedText : textKey ?? "";
+        if (tokenMap != null && !string.IsNullOrEmpty(text))
+        {
+            text = ReplaceMissionTokens(text, tokenMap);
+        }
 
         var obj = new MissionObjectiveEntity
         {
             MissionId = missionId,
-            Type = type,
+            Type = "Hauling",
             Text = text,
-            TextKey = token.displayInfo?.shortDescription,
+            TextKey = textKey,
             Order = order,
-            Parent = parentEntity  // Use navigation property instead of ParentId
+            Parent = parentEntity
         };
-
         db.MissionObjectives.Add(obj);
 
-        // Store mapping for child resolution (use token ID as key)
-        var tokenId = token.id.ToString();
-        objectiveMap[tokenId] = obj;
-
-        // Extract ~mission() tokens from objective text
-        if (!string.IsNullOrEmpty(text))
+        if (tokenMap != null)
         {
-            var matches = MissionTokenRegex.Matches(text);
-            foreach (Match match in matches)
+            foreach (var kvp in tokenMap)
             {
-                var tokenName = match.Groups[1].Value;
-                await ResolveAndStoreToken(missionId, obj, tokenName, db);
+                db.MissionTokens.Add(new MissionTokenEntity
+                {
+                    MissionId = missionId,
+                    Objective = obj,
+                    TokenName = kvp.Key,
+                    ValueType = InferTokenType(kvp.Key),
+                    ResolvedValue = kvp.Value
+                });
             }
         }
 
-        // Recursively process child mission phases
-        var children = token.childMissionPhases;
-        if (children != null && children.Length > 0)
-        {
-            int childOrder = 0;
-            foreach (var child in children)
-            {
-                if (child == null) continue;
-                await ProcessObjectiveTokenAsync(missionId, child, obj, childOrder++, db, objectiveMap);
-            }
-        }
+        return obj;
     }
 
-    /// <summary>
-    /// Resolve a ~mission() token name and store it as a MissionTokenEntity linked to an objective.
-    /// </summary>
-    private async Task ResolveAndStoreToken(string missionId, MissionObjectiveEntity objectiveEntity, string tokenName, StarXelemDbContext db)
+    private static void AddTokenIfSet(Dictionary<string, string> map, string? tokenName, string value)
     {
-        // Check if token already exists for this mission+objective+name combination
-        var existing = db.MissionTokens
-            .FirstOrDefault(t => t.MissionId == missionId && t.Objective == objectiveEntity && t.TokenName == tokenName);
-        if (existing != null)
-        {
-            // Same token already stored for this objective, skip
-            return;
-        }
-
-        // Resolve token value from contract stringParamOverrides
-        string? resolvedValue = null;
-
-        // Infer value type from token name pattern
-        string valueType = InferTokenType(tokenName);
-
-        // Try locale lookup for the token value
-        try
-        {
-            resolvedValue = await _p4kService.GetLocaleValue(tokenName);
-        }
-        catch
-        {
-            // Ignore resolution failures
-        }
-
-        db.MissionTokens.Add(new MissionTokenEntity
-        {
-            MissionId = missionId,
-            Objective = objectiveEntity,  // Use navigation property instead of ObjectiveId
-            TokenName = tokenName,
-            ValueType = valueType,
-            ResolvedValue = resolvedValue ?? tokenName
-        });
+        if (!string.IsNullOrEmpty(tokenName))
+            map[tokenName] = value;
     }
 
-    /// <summary>
-    /// Infer the value type from a token name pattern.
-    /// </summary>
+    private static string ReplaceMissionTokens(string text, Dictionary<string, string> tokenMap)
+    {
+        var matches = MissionTokenRegex.Matches(text);
+        foreach (Match match in matches.Cast<Match>().Reverse())
+        {
+            var tokenName = match.Groups[1].Value;
+            if (tokenMap.TryGetValue(tokenName, out var value))
+            {
+                text = text.Substring(0, match.Index) + value + text.Substring(match.Index + match.Length);
+            }
+        }
+        return text;
+    }
+
     private static string InferTokenType(string tokenName)
     {
         var lower = tokenName.ToLowerInvariant();

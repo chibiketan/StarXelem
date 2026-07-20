@@ -571,6 +571,35 @@ public partial class MainWindowViewModel : ViewModelBase
                 {
                     CurrentPage = targetPage;
                 });
+                
+                // Si on a le ViewModel mission, on va simuler le rafraîchissement et la sélection d'une mission particulière
+                if (targetPage is MissionsTabViewModel missionsTabViewModel)
+                {
+                    // On charge les missions
+                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        await missionsTabViewModel.RefreshCommand.ExecuteAsync(null).ConfigureAwait(false);
+                    });
+
+                    do
+                    {
+                        await Task.Delay(200).ConfigureAwait(false);
+                    } while (missionsTabViewModel.IsLoading);
+
+                    var cat = missionsTabViewModel.CategoryList.FirstOrDefault(c => c.Name.Contains("battaglia", StringComparison.InvariantCultureIgnoreCase));
+
+                    if (cat is { })
+                    {
+                        var mis = cat.MissionList.FirstOrDefault(m => m.DebugName?.Contains("Battaglia_ScanRocks_Easy", StringComparison.CurrentCultureIgnoreCase) ?? false);
+                        
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            missionsTabViewModel.SelectedCategory = cat;
+                            missionsTabViewModel.SelectedMission = mis;
+                        });
+                        
+                    }
+                }
             }
             else
             {

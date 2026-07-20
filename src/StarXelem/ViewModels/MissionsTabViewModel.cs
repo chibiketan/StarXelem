@@ -90,7 +90,8 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
                 {
                     var categoryKey = kvp.Key;
                     var missions = kvp.Value;
-                    var categoryVm = new MissionCategoryItemViewModel { Name = categoryKey };
+                    var categoryName = missions.FirstOrDefault()?.Category?.Name ?? categoryKey;
+                    var categoryVm = new MissionCategoryItemViewModel { Name = categoryName };
 
                     foreach (var mission in missions)
                     {
