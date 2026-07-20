@@ -68,24 +68,20 @@ public class LocalDatabaseService : ILocalDatabaseService
     private readonly IP4kService _p4kService;
     private readonly ILogger<LocalDatabaseService> _logger;
     private readonly ISettingsService _settingsService;
-    private readonly string _dbPath;
+    private readonly IDbContextFactory _factory;
     private CancellationTokenSource _rebuildCts = new();
     private Task? _rebuildTask;
     private readonly Dictionary<string, ActorEntity> _contractorCache;
     private readonly Dictionary<string, MissionCategoryEntity> _categoryCache;
 
-    public LocalDatabaseService(IP4kService p4kService, ILogger<LocalDatabaseService> logger, ISettingsService settingsService, bool autoRebuild = false)
+    public LocalDatabaseService(IP4kService p4kService, ILogger<LocalDatabaseService> logger, ISettingsService settingsService, IDbContextFactory factory, bool autoRebuild = false)
     {
         _p4kService = p4kService;
         _logger = logger;
         _settingsService = settingsService;
+        _factory = factory;
         _contractorCache = new Dictionary<string, ActorEntity>(StringComparer.Ordinal);
         _categoryCache = new Dictionary<string, MissionCategoryEntity>(StringComparer.Ordinal);
-
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var folder = Path.Combine(appData, "StarXelem");
-        if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
-        _dbPath = Path.Combine(folder, "database.db");
 
         if (autoRebuild && _p4kService is P4kService p4k)
         {
@@ -97,14 +93,14 @@ public class LocalDatabaseService : ILocalDatabaseService
     {
         string? currentP4kVersion = _p4kService.SelectedP4KFile?.Manifest?.Data?.RequestedP4ChangeNum;
         string? storedP4kVersion = await _settingsService.GetAsync("P4KVersion").ConfigureAwait(false);
-        return !File.Exists(_dbPath) || currentP4kVersion != storedP4kVersion;
+        return !File.Exists(_factory.DbPath) || currentP4kVersion != storedP4kVersion;
     }
 
     public async Task EnsureDbAsync(IProgress<RebuildProgress>? progress = null)
     {
         if (!await NeedsRebuildCheckAsync().ConfigureAwait(false))
         {
-            _logger.LogInformation("Database already exists at {Path} (P4K version: {Version})", _dbPath, _p4kService.SelectedP4KFile?.Manifest?.Data?.RequestedP4ChangeNum);
+            _logger.LogInformation("Database already exists at {Path} (P4K version: {Version})", _factory.DbPath, _p4kService.SelectedP4KFile?.Manifest?.Data?.RequestedP4ChangeNum);
             return;
         }
 
@@ -117,17 +113,6 @@ public class LocalDatabaseService : ILocalDatabaseService
         {
             await _settingsService.SetAsync("P4KVersion", currentP4kVersion).ConfigureAwait(false);
         }
-    }
-
-    private DbContextOptions<StarXelemDbContext> GetOptions()
-    {
-        return new DbContextOptionsBuilder<StarXelemDbContext>()
-            .UseSqlite($"Data Source={_dbPath}")
-#if DEBUG
-            .EnableSensitiveDataLogging()
-            .EnableDetailedErrors()
-#endif
-            .Options;
     }
 
     private readonly Dictionary<EntityClassDefinition, string> _entityClassToGuid = new();
@@ -172,13 +157,13 @@ public class LocalDatabaseService : ILocalDatabaseService
     {
         var total = Stopwatch.StartNew();
         const int TotalPhases = 10;
-        _logger.LogInformation("Rebuilding local database at {Path}", _dbPath);
+        _logger.LogInformation("Rebuilding local database at {Path}", _factory.DbPath);
         _entityClassToGuid.Clear();
         _contractorCache.Clear();
         _categoryCache.Clear();
         _componentGuidMap.Clear();
 
-        using var db = new StarXelemDbContext(GetOptions());
+        using var db = await _factory.CreateDbContextAsync();
 
         await db.Database.EnsureDeletedAsync(cancellationToken).ConfigureAwait(false);
         await db.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
@@ -2948,7 +2933,7 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     public async Task<List<MissionEntity>> GetMissionsForShipAsync(string shipGuid)
     {
-        using var db = new StarXelemDbContext(GetOptions());
+        using var db = await _factory.CreateDbContextAsync();
         return await db.Missions
             .Where(m => m.ShipRequirements.Any(sr => sr.ShipGuid == shipGuid))
             .ToListAsync();
@@ -2956,7 +2941,7 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     public async Task<List<ShipEntity>> GetShipsForMissionAsync(string missionId)
     {
-        using var db = new StarXelemDbContext(GetOptions());
+        using var db = await _factory.CreateDbContextAsync();
         return await db.Ships
             .Where(s => s.MissionRequirements.Any(mr => mr.MissionId == missionId))
             .ToListAsync();
@@ -2964,7 +2949,7 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     public async Task<ShipEntity?> GetShipByGuidAsync(string entityClassGuid)
     {
-        using var db = new StarXelemDbContext(GetOptions());
+        using var db = await _factory.CreateDbContextAsync();
         return await db.Ships
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.EntityClassGuid == entityClassGuid);
@@ -2972,7 +2957,7 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     public async Task<List<ManufacturerEntity>> GetManufacturersAsync()
     {
-        using var db = new StarXelemDbContext(GetOptions());
+        using var db = await _factory.CreateDbContextAsync();
         return await db.Manufacturers
             .AsNoTracking()
             .ToListAsync();
@@ -2980,7 +2965,7 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     public async Task<List<ShipLoadoutEntryEntity>> GetShipLoadoutAsync(string shipGuid)
     {
-        using var db = new StarXelemDbContext(GetOptions());
+        using var db = await _factory.CreateDbContextAsync();
         return await db.ShipLoadoutEntries
             .AsNoTracking()
             .Where(sle => sle.ShipGuid == shipGuid)
@@ -2989,7 +2974,7 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     public async Task<List<ShipEntity>> GetShipsAsync()
     {
-        using var db = new StarXelemDbContext(GetOptions());
+        using var db = await _factory.CreateDbContextAsync();
         return await db.Ships
             .AsNoTracking()
             .Include(s => s.ShipTags)
@@ -3010,7 +2995,7 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     public async IAsyncEnumerable<DbBlueprintRow> GetBlueprintsBatchedAsync(int batchSize = 200, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await using var db = new StarXelemDbContext(GetOptions());
+        await using var db = await _factory.CreateDbContextAsync();
 
         var totalBlueprints = await db.Blueprints.LongCountAsync(cancellationToken).ConfigureAwait(false);
         int offset = 0;
@@ -3163,7 +3148,7 @@ public class LocalDatabaseService : ILocalDatabaseService
     /// </returns>
     public async Task<(Dictionary<string, string> TitleSuffixMap, Dictionary<string, Dictionary<string, HashSet<string>>> DescriptionAppendMap)> GetBlueprintRewardMapsAsync(HashSet<string>? obtainedBlueprintIds = null)
     {
-        await using var db = new StarXelemDbContext(GetOptions());
+        await using var db = await _factory.CreateDbContextAsync();
         var titleSuffixMap = new Dictionary<string, string>();
         var descAppendMap = new Dictionary<string, Dictionary<string, HashSet<string>>>();
 

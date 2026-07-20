@@ -64,10 +64,14 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<IP4kService>(),
                 sp.GetRequiredService<ILogger<LocalDatabaseService>>(),
                 sp.GetRequiredService<ISettingsService>(),
+                sp.GetRequiredService<IDbContextFactory>(),
                 autoRebuild: false));
         services.AddSingleton<ISettingsService, RegistrySettingsService>();
         services.AddSingleton<IReputationService, ReputationService>();
+        services.AddSingleton<IDbContextFactory, DbContextFactory>();
         services.AddSingleton<ILocationRepository, LocationRepository>();
+        services.AddSingleton<IScItemRepository, ScItemRepository>();
+        services.AddSingleton<ILocaleEntryRepository, LocaleEntryRepository>();
 
         // Service API externe pour la communication avec Alliance Orbital (profil utilisateur)
         services.AddSingleton<IAllianceOrbitalService, AllianceOrbitalService>();

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Data.Sqlite;
+using StarXelem.Data;
 using StarXelem.Models;
 using StarXelem.Services;
 
@@ -18,7 +19,8 @@ async Task RunAsync()
 
     var p4kService = new P4kService(p4kLogger);
     var settingsLogger = loggerFactory.CreateLogger<RegistrySettingsService>();
-    var dbService = new LocalDatabaseService(p4kService, dbLogger, new RegistrySettingsService(settingsLogger), autoRebuild: false);
+    var factory = new DbContextFactory();
+    var dbService = new LocalDatabaseService(p4kService, dbLogger, new RegistrySettingsService(settingsLogger), factory, autoRebuild: false);
 
     string p4kPath;
 
@@ -53,11 +55,10 @@ async Task RunAsync()
 
     await dbService.RebuildDbAsync();
 
-    var dbPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "StarXelem", "database.db");
-    loggerFactory.CreateLogger<Program>().LogInformation("BDD reconstruite avec succes: {DbPath}", dbPath);
+    loggerFactory.CreateLogger<Program>().LogInformation("BDD reconstruite avec succes: {DbPath}", factory.DbPath);
 
     // Check specific weapons
-    using var conn = new SqliteConnection($"Data Source={dbPath}");
+    using var conn = new SqliteConnection($"Data Source={factory.DbPath}");
     conn.Open();
     var cmd = conn.CreateCommand();
     cmd.CommandText = @"SELECT LocalizedName, TypeName, SubTypeName, DamagePhysical, DamageEnergy, DamageDistortion, DamageThermal, DamageBiochemical, DamageStun 

@@ -4,29 +4,22 @@ namespace StarXelem.Data;
 
 public class LocationRepository : ILocationRepository
 {
-    private static string GetDbPath()
-    {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var folder = Path.Combine(appData, "StarXelem");
-        return Path.Combine(folder, "database.db");
-    }
+    private readonly IDbContextFactory _factory;
 
-    private DbContextOptions<StarXelemDbContext> GetOptions()
+    public LocationRepository(IDbContextFactory factory)
     {
-        return new DbContextOptionsBuilder<StarXelemDbContext>()
-            .UseSqlite($"Data Source={GetDbPath()}")
-            .Options;
+        _factory = factory;
     }
 
     public async Task<LocationEntity?> GetByCrcAsync(uint crc)
     {
-        await using var db = new StarXelemDbContext(GetOptions());
+        await using var db = await _factory.CreateDbContextAsync();
         return await db.Locations.FirstOrDefaultAsync(l => l.Crc == crc);
     }
 
     public async Task<List<LocationEntity>> GetAllAsync()
     {
-        await using var db = new StarXelemDbContext(GetOptions());
+        await using var db = await _factory.CreateDbContextAsync();
         return await db.Locations.ToListAsync();
     }
 }

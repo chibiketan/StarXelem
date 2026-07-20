@@ -15,20 +15,23 @@ namespace StarXelem.Services.LocationService;
 public class LocationService : ILocationService
 {
     private readonly IGrpcClientService _grpcClientService;
-    private readonly IP4kService _p4KService;
     private readonly ILocationRepository _locationRepository;
+    private readonly IScItemRepository _scItemRepository;
+    private readonly ILocaleEntryRepository _localeEntryRepository;
 
     /// <summary>
     /// Initialise une nouvelle instance de <see cref="LocationService"/>.
     /// </summary>
     /// <param name="grpcClientService">Service de communication gRPC avec le backend Star Citizen.</param>
-    /// <param name="p4KService">Service d'accès aux données P4K (types d'entités et chaînes localisées).</param>
     /// <param name="locationRepository">Repository d'accès aux emplacements persistés en base de données.</param>
-    public LocationService(IGrpcClientService grpcClientService, IP4kService p4KService, ILocationRepository locationRepository)
+    /// <param name="scItemRepository">Repository d'accès aux items SC persistés en base de données.</param>
+    /// <param name="localeEntryRepository">Repository d'accès aux entrées de localisation.</param>
+    public LocationService(IGrpcClientService grpcClientService, ILocationRepository locationRepository, IScItemRepository scItemRepository, ILocaleEntryRepository localeEntryRepository)
     {
         _grpcClientService = grpcClientService;
-        _p4KService = p4KService;
         _locationRepository = locationRepository;
+        _scItemRepository = scItemRepository;
+        _localeEntryRepository = localeEntryRepository;
     }
     
     /// <inheritdoc/>
@@ -97,20 +100,18 @@ public class LocationService : ILocationService
                 }
             }
 
-            var entityType = await _p4KService.GetEntityType(results[0].EntityNodeProperties.ClassGuidCrc);
-            var typeName = entityType.RecordName;
-            var c = (entityType?.Data as EntityClassDefinition)?.Components
-                .OfType<SAttachableComponentParams>().FirstOrDefault();
+            var scItem = await _scItemRepository.GetByCrc32Async(results[0].EntityNodeProperties.ClassGuidCrc);
+            var typeName = scItem?.TechnicalName ?? "Inconnu";
 
-            if (null != c)
+            if (scItem != null)
             {
-                if (c.AttachDef.Localization.Name == "@LOC_PLACEHOLDER")
+                if (scItem.LocaleNameKey == "@LOC_PLACEHOLDER")
                 {
                     // C'est un placeholder, on va chercher son possesseur
                     return await ResolveLocation(results[0], allowedTypes);
                 }
                 
-                var tmpeName = await _p4KService.GetLocaleValue(c.AttachDef.Localization.Name);
+                var tmpeName = await _localeEntryRepository.GetValueByKeyAsync(scItem.LocaleNameKey);
 
                 if (!string.IsNullOrEmpty(tmpeName))
                 {
@@ -217,20 +218,18 @@ public class LocationService : ILocationService
             }
         }
 
-        var entityType = await _p4KService.GetEntityType(results[0].EntityNodeProperties!.ClassGuidCrc);
-        var typeName = entityType!.RecordName;
-        var c = (entityType?.Data as EntityClassDefinition)?.Components
-            .OfType<SAttachableComponentParams>().FirstOrDefault();
+        var scItem = await _scItemRepository.GetByCrc32Async(results[0].EntityNodeProperties!.ClassGuidCrc);
+        var typeName = scItem?.TechnicalName ?? "Inconnu";
 
-        if (null != c)
+        if (scItem != null)
         {
-            if (c.AttachDef.Localization.Name == "@LOC_PLACEHOLDER")
+            if (scItem.LocaleNameKey == "@LOC_PLACEHOLDER")
             {
                 // C'est un placeholder, on va chercher son possesseur
                 return await ResolveLocation(results[0], allowedTypes);
             }
 
-            var tmpeName = await _p4KService.GetLocaleValue(c.AttachDef.Localization.Name);
+            var tmpeName = await _localeEntryRepository.GetValueByKeyAsync(scItem.LocaleNameKey);
 
             if (!string.IsNullOrEmpty(tmpeName))
             {
@@ -259,16 +258,7 @@ public class LocationService : ILocationService
                 return location.NameLocalized;
             }
 
-            var tmp = await _p4KService.GetEntityType(crc);
-
-            if (null == tmp)
-            {
-                return null;
-            }
-            var localKey = ((StarMapObject)tmp.Data).name;
-            var resolvedName = await _p4KService.GetLocaleValue(localKey);
-
-            return resolvedName;
+            return null;
         });
 
         if (String.IsNullOrEmpty(locationName))

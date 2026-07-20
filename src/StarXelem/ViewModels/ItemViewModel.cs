@@ -1,9 +1,8 @@
 ﻿using System.Collections.Concurrent;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Sc.External.Services.Entitygraph.V1;
-using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
-using StarBreaker.P4k;
+using StarXelem.Data;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
 using StarXelem.ViewModels;
@@ -12,12 +11,12 @@ namespace StarXelem.Models;
 
 public partial class ItemViewModel : ViewModelBase
 {
-    private readonly IP4kService _p4KFileService;
     private readonly ILocationService _locationService;
     private readonly IGrpcClientService _grpcClientService;
     private readonly ItemsTabViewModel _parent;
     private readonly EntityItemQueryResult _entityNodeProperties;
-    private readonly DataCoreTypedRecord? _entityClassProperties;
+    private readonly ScItemEntity? _scItem;
+    private readonly ILocaleEntryRepository _localeRepository;
     private readonly System.Lazy<Task<string?>> _location;
     public readonly Lazy<Task<string>> _owner;
 
@@ -30,7 +29,7 @@ public partial class ItemViewModel : ViewModelBase
     public uint LocationId => _entityNodeProperties.EntityNodeProperties.LocationId;
     public string? StowLocation => null;
     public string? StowShard => null;
-    public string? LocalTypeName => _entityClassProperties?.RecordName;
+    public string? LocalTypeName => _scItem?.TechnicalName;
     public Task<string?> Location => _location.Value;
     
     public EntityEdge? Edge => _entityNodeProperties.EntityEdge;
@@ -46,14 +45,14 @@ public partial class ItemViewModel : ViewModelBase
 //    public string? TypeName => _entityClassProperties?.ClassName;
     public Task<string?> Name => GetLocaleValue();
     
-    public ItemViewModel(IP4kService p4kFileService, ILocationService locationService, IGrpcClientService grpcClientService, ItemsTabViewModel parent, EntityItemQueryResult entityItemResult, DataCoreTypedRecord? entityClassProperties = null)
+    public ItemViewModel(ILocaleEntryRepository localeRepository, ILocationService locationService, IGrpcClientService grpcClientService, ItemsTabViewModel parent, EntityItemQueryResult entityItemResult, ScItemEntity? scItem = null)
     {
-        _p4KFileService = p4kFileService;
+        _localeRepository = localeRepository;
         _locationService = locationService;
         _grpcClientService = grpcClientService;
         _parent = parent;
         _entityNodeProperties = entityItemResult;
-        _entityClassProperties = entityClassProperties;
+        _scItem = scItem;
         _location = new Lazy<Task<string?>>(() => GetLocation().ContinueWith(t =>
         {
             OnPropertyChanged(nameof(Location));
@@ -64,15 +63,19 @@ public partial class ItemViewModel : ViewModelBase
 
     private async Task<string?> GetLocaleValue()
     {
-        var c = (_entityClassProperties?.Data as EntityClassDefinition)?.Components
-            .OfType<SAttachableComponentParams>().FirstOrDefault();
+        var localeKey = _scItem?.LocaleNameKey;
 
-        if (null != c)
+        if (!string.IsNullOrEmpty(localeKey))
         {
-            return await _p4KFileService.GetLocaleValue(c.AttachDef.Localization.Name);
+            var resolved = await _localeRepository.GetValueByKeyAsync(localeKey);
+            if (!string.IsNullOrEmpty(resolved))
+            {
+                return resolved;
+            }
         }
 
-        return null;
+        // Fallback sur le nom localisé directement
+        return _scItem?.LocalizedName;
     }
 
     private async Task<string> GetOwner(ulong ownerId)
