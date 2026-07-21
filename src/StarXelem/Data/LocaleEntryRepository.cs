@@ -17,7 +17,7 @@ public class LocaleEntryRepository : ILocaleEntryRepository
         if (!File.Exists(_factory.DbPath)) return null;
 
         await using var db = await _factory.CreateDbContextAsync();
-        var entry = await db.LocaleEntries.FirstOrDefaultAsync(l => l.Key == key);
+        var entry = await db.LocaleEntries.AsNoTracking().FirstOrDefaultAsync(l => l.Key == key);
         return entry?.Value;
     }
 }

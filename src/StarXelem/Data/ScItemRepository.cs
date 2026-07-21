@@ -16,6 +16,6 @@ public class ScItemRepository : IScItemRepository
         if (!File.Exists(_factory.DbPath)) return null;
 
         await using var db = await _factory.CreateDbContextAsync();
-        return await db.ScItems.FirstOrDefaultAsync(s => s.Crc32 == crc32);
+        return await db.ScItems.AsNoTracking().FirstOrDefaultAsync(s => s.Crc32 == crc32);
     }
 }

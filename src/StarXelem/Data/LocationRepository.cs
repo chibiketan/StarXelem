@@ -14,12 +14,12 @@ public class LocationRepository : ILocationRepository
     public async Task<LocationEntity?> GetByCrcAsync(uint crc)
     {
         await using var db = await _factory.CreateDbContextAsync();
-        return await db.Locations.FirstOrDefaultAsync(l => l.Crc == crc);
+        return await db.Locations.AsNoTracking().FirstOrDefaultAsync(l => l.Crc == crc);
     }
 
     public async Task<List<LocationEntity>> GetAllAsync()
     {
         await using var db = await _factory.CreateDbContextAsync();
-        return await db.Locations.ToListAsync();
+        return await db.Locations.AsNoTracking().ToListAsync();
     }
 }

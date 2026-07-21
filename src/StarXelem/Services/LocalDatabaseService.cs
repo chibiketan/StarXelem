@@ -75,6 +75,7 @@ public class LocalDatabaseService : ILocalDatabaseService
     private Task? _rebuildTask;
     private readonly Dictionary<string, ActorEntity> _contractorCache;
     private readonly Dictionary<string, MissionCategoryEntity> _categoryCache;
+    private readonly SemaphoreSlim _dbLock = new(1, 1);
 
     public LocalDatabaseService(IP4kService p4kService, ILogger<LocalDatabaseService> logger, ISettingsService settingsService, IDbContextFactory factory, bool autoRebuild = false)
     {
@@ -158,15 +159,18 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     private async Task RebuildDbCoreAsync(CancellationToken cancellationToken, IProgress<RebuildProgress>? progress)
     {
-        var total = Stopwatch.StartNew();
-        const int TotalPhases = 10;
-        _logger.LogInformation("Rebuilding local database at {Path}", _factory.DbPath);
-        _entityClassToGuid.Clear();
-        _contractorCache.Clear();
-        _categoryCache.Clear();
-        _componentGuidMap.Clear();
+        await _dbLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var total = Stopwatch.StartNew();
+            const int TotalPhases = 10;
+            _logger.LogInformation("Rebuilding local database at {Path}", _factory.DbPath);
+            _entityClassToGuid.Clear();
+            _contractorCache.Clear();
+            _categoryCache.Clear();
+            _componentGuidMap.Clear();
 
-        using var db = await _factory.CreateDbContextAsync();
+            using var db = await _factory.CreateDbContextAsync();
 
         await db.Database.EnsureDeletedAsync(cancellationToken).ConfigureAwait(false);
         await db.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
@@ -260,6 +264,11 @@ public class LocalDatabaseService : ILocalDatabaseService
 
         total.Stop();
         _logger.LogInformation("Database rebuild completed in {Elapsed}ms.", total.ElapsedMilliseconds);
+        }
+        finally
+        {
+            _dbLock.Release();
+        }
     }
 
     /* ========================================================================
@@ -3469,54 +3478,86 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     public async Task<List<MissionEntity>> GetMissionsForShipAsync(string shipGuid)
     {
-        using var db = await _factory.CreateDbContextAsync();
-        return await db.Missions
-            .Where(m => m.ShipRequirements.Any(sr => sr.ShipGuid == shipGuid))
-            .ToListAsync();
+        await _dbLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await using var db = await _factory.CreateDbContextAsync();
+            return await db.Missions
+                .AsNoTracking()
+                .Where(m => m.ShipRequirements.Any(sr => sr.ShipGuid == shipGuid))
+                .ToListAsync();
+        }
+        finally { _dbLock.Release(); }
     }
 
     public async Task<List<ShipEntity>> GetShipsForMissionAsync(string missionId)
     {
-        using var db = await _factory.CreateDbContextAsync();
-        return await db.Ships
-            .Where(s => s.MissionRequirements.Any(mr => mr.MissionId == missionId))
-            .ToListAsync();
+        await _dbLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await using var db = await _factory.CreateDbContextAsync();
+            return await db.Ships
+                .AsNoTracking()
+                .Where(s => s.MissionRequirements.Any(mr => mr.MissionId == missionId))
+                .ToListAsync();
+        }
+        finally { _dbLock.Release(); }
     }
 
     public async Task<ShipEntity?> GetShipByGuidAsync(string entityClassGuid)
     {
-        using var db = await _factory.CreateDbContextAsync();
-        return await db.Ships
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.EntityClassGuid == entityClassGuid);
+        await _dbLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await using var db = await _factory.CreateDbContextAsync();
+            return await db.Ships
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.EntityClassGuid == entityClassGuid);
+        }
+        finally { _dbLock.Release(); }
     }
 
     public async Task<List<ManufacturerEntity>> GetManufacturersAsync()
     {
-        using var db = await _factory.CreateDbContextAsync();
-        return await db.Manufacturers
-            .AsNoTracking()
-            .ToListAsync();
+        await _dbLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await using var db = await _factory.CreateDbContextAsync();
+            return await db.Manufacturers
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        finally { _dbLock.Release(); }
     }
 
     public async Task<List<ShipLoadoutEntryEntity>> GetShipLoadoutAsync(string shipGuid)
     {
-        using var db = await _factory.CreateDbContextAsync();
-        return await db.ShipLoadoutEntries
-            .AsNoTracking()
-            .Where(sle => sle.ShipGuid == shipGuid)
-            .ToListAsync();
+        await _dbLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await using var db = await _factory.CreateDbContextAsync();
+            return await db.ShipLoadoutEntries
+                .AsNoTracking()
+                .Where(sle => sle.ShipGuid == shipGuid)
+                .ToListAsync();
+        }
+        finally { _dbLock.Release(); }
     }
 
     public async Task<List<ShipEntity>> GetShipsAsync()
     {
-        using var db = await _factory.CreateDbContextAsync();
-        return await db.Ships
-            .AsNoTracking()
-            .Include(s => s.ShipTags)
-                .ThenInclude(st => st.Tag)
-            .Include(s => s.Manufacturer)
-            .ToListAsync();
+        await _dbLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await using var db = await _factory.CreateDbContextAsync();
+            return await db.Ships
+                .AsNoTracking()
+                .Include(s => s.ShipTags)
+                    .ThenInclude(st => st.Tag)
+                .Include(s => s.Manufacturer)
+                .ToListAsync();
+        }
+        finally { _dbLock.Release(); }
     }
 
     public async Task<List<DbBlueprintRow>> GetBlueprintsAsync(HashSet<string>? obtainedBlueprintIds = null)
@@ -3531,7 +3572,10 @@ public class LocalDatabaseService : ILocalDatabaseService
 
     public async IAsyncEnumerable<DbBlueprintRow> GetBlueprintsBatchedAsync(int batchSize = 200, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await using var db = await _factory.CreateDbContextAsync();
+        await _dbLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using var db = await _factory.CreateDbContextAsync();
 
         var totalBlueprints = await db.Blueprints.LongCountAsync(cancellationToken).ConfigureAwait(false);
         int offset = 0;
@@ -3621,9 +3665,11 @@ public class LocalDatabaseService : ILocalDatabaseService
                 );
             }
 
-            offset += batch.Count;
+             offset += batch.Count;
             await Task.CompletedTask;
         }
+        }
+        finally { _dbLock.Release(); }
     }
 
     private static string? StripRecordPrefix(string? recordName)
@@ -3684,9 +3730,12 @@ public class LocalDatabaseService : ILocalDatabaseService
     /// </returns>
     public async Task<(Dictionary<string, string> TitleSuffixMap, Dictionary<string, Dictionary<string, HashSet<string>>> DescriptionAppendMap)> GetBlueprintRewardMapsAsync(HashSet<string>? obtainedBlueprintIds = null)
     {
-        await using var db = await _factory.CreateDbContextAsync();
-        var titleSuffixMap = new Dictionary<string, string>();
-        var descAppendMap = new Dictionary<string, Dictionary<string, HashSet<string>>>();
+        await _dbLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await using var db = await _factory.CreateDbContextAsync();
+            var titleSuffixMap = new Dictionary<string, string>();
+            var descAppendMap = new Dictionary<string, Dictionary<string, HashSet<string>>>();
 
         var missions = await db.Missions
             .Where(m => m.NotForRelease == false && m.WorkInProgress == false && m.Generator!.NotForRelease == false && m.Generator.WorkInProgress == false)
@@ -3759,6 +3808,8 @@ public class LocalDatabaseService : ILocalDatabaseService
         }
 
         return (titleSuffixMap, descAppendMap);
+        }
+        finally { _dbLock.Release(); }
     }
 
     /// <summary>
@@ -3766,7 +3817,10 @@ public class LocalDatabaseService : ILocalDatabaseService
     /// </summary>
     public async Task<Dictionary<string, List<MissionEntity>>> GetAllMissionCategoriesWithMissionsAsync()
     {
-        using var db = await _factory.CreateDbContextAsync();
+        await _dbLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await using var db = await _factory.CreateDbContextAsync();
         var missions = await db.Missions
             .AsNoTracking()
             .Include(m => m.Category)
@@ -3793,5 +3847,7 @@ public class LocalDatabaseService : ILocalDatabaseService
                 g => g.Key,
                 g => g.ToList()
             );
+        }
+        finally { _dbLock.Release(); }
     }
 }
