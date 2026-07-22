@@ -2305,8 +2305,16 @@ public class LocalDatabaseService : ILocalDatabaseService
                     var mission = db.Missions.Find(missionId);
                     if (mission != null)
                         mission.AUECReward = (decimal)computed;
+
+                    db.MissionRewards.Add(new MissionRewardEntity
+                    {
+                        MissionId = missionId,
+                        RewardType = "ContractResult_CalculatedReward",
+                        DisplayValue = string.Format("{0:N0} aUEC", computed),
+                        IsCalculated = true
+                    });
                 }
-                return 0;
+                return 1;
 
             case BlueprintRewards blueprintRewards:
                 {

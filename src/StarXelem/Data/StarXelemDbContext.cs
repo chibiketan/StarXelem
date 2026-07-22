@@ -124,7 +124,7 @@ public class StarXelemDbContext : DbContext
         // Rewards
         modelBuilder.Entity<MissionRewardEntity>()
             .HasOne(r => r.Mission)
-            .WithMany()
+            .WithMany(m => m.Rewards)
             .HasForeignKey(r => r.MissionId)
             .OnDelete(DeleteBehavior.Cascade);
 
