@@ -169,6 +169,11 @@ public class DesignP4kService : IP4kService
         return Task.FromResult(new List<DataCoreTypedRecord>());
     }
 
+    public Task<object?> GetRecordById(CigGuid recordId)
+    {
+        return Task.FromResult<object?>(null);
+    }
+
     private static P4kEntry[] GetFakeEntries() =>
     [
         new(@"Data\entry1", 69, 69, 0, false, 123, 0xffff, 0xdeadbeef),

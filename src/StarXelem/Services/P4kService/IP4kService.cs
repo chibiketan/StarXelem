@@ -74,5 +74,10 @@ public interface IP4kService : INotifyPropertyChanged
     Task<List<DataCoreTypedRecord>> GetAllCraftingBlueprintRecord();
     Task<List<DataCoreTypedRecord>> GetAllStarMapObjects();
     Task<List<DataCoreTypedRecord>> EnsureRecordsDepthAsync(IEnumerable<DataCoreTypedRecord> records, int depth);
+
+    /// <summary>
+    /// Récupère un enregistrement arbitraire par son CigGuid (utile pour ResourceType, MineableComposition, etc.)
+    /// </summary>
+    Task<object?> GetRecordById(CigGuid recordId);
 }
 

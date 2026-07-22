@@ -218,7 +218,72 @@ public partial class ExtractionTabViewModel : PageViewModelBase
                     _logger.LogWarning("Impossible d'ajouter la clé {0} dans le tableau car elle existe déjà. nouvelle valeur : '{1}', ancienne valeur : {2}", localisationKey.Substring(1), $"{className}{size}{grade}", replacementMap[localisationKey.Substring(1)]);
                 }
             }
-            
+
+            // Build mineral-to-signature maps from mineable entities
+            UpdateStatusMessage("Extraction des signatures radar des minéraux...");
+            var mineralSignatureMap = new Dictionary<string, int>(); // localized name -> signature
+            var mineralSignatureMapLower = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase); // lowercase name -> signature
+            var excludedWords = new []{"deposit", "ore", "raw", "items", "commodities", "r"};
+
+            await foreach (var entityDefinition in _p4kService.GetAllEntityClassDefinition(0).ConfigureAwait(false))
+            {
+                var entityType = entityDefinition.Data as EntityClassDefinition;
+                if (!(entityType?.Components.OfType<MineableParams>().Any() ?? false) || !entityType.Components.OfType<SSCSignatureSystemParams>().Any())
+                    continue;
+
+                var entityDefinitionWithDepth = await _p4kService.EnsureRecordsDepthAsync([entityDefinition], 3);
+                entityType = (EntityClassDefinition)entityDefinitionWithDepth[0].Data;
+                var mineableParams = entityType.Components.OfType<MineableParams>().First();
+                var signatureParams = entityType.Components.OfType<SSCSignatureSystemParams>().First();
+                // Extract radar signature (index 4 = mineral channel)
+                // baseSignatureParams is typed as SSCSignatureParamsBase but the actual runtime type is SSCSignatureSystemBaseSignatureParams
+                var baseSigParams = signatureParams.radarProperties?.baseSignatureParams as SSCSignatureSystemBaseSignatureParams;
+                if (baseSigParams?.signatures == null || baseSigParams.signatures.Length < 5)
+                    continue;
+
+                var signatureValue = (int)Math.Round(baseSigParams.signatures[4]);
+
+                // Skip generic signatures (FPS=3000, GroundVehicle=4000)
+                if (signatureValue is 3000 or 4000)
+                    continue;
+
+                // Extract mineral names from composition
+                if (mineableParams.composition?.compositionArray == null)
+                    continue;
+
+
+                foreach (var part in mineableParams.composition.compositionArray)
+                {
+                    if (part.mineableElement?.resourceType == null)
+                        continue;
+
+                    var resourceType = part.mineableElement.resourceType;
+                    var displayName = resourceType.displayName;
+
+                    if (string.IsNullOrEmpty(displayName))
+                        continue;
+
+                    // Get localized mineral name
+                    var localizedName = await _p4kService.GetLocaleValue(displayName).ConfigureAwait(false);
+                    if (string.IsNullOrEmpty(localizedName))
+                        continue;
+
+                    // Add to maps if not already present (keep first/unique signature)
+                    if (!mineralSignatureMap.ContainsKey(localizedName))
+                    {
+                        mineralSignatureMap[localizedName] = signatureValue;
+                        var mineralKeyName = String.Concat(localizedName
+                            .Split(" ", StringSplitOptions.RemoveEmptyEntries)
+                            .Select(w => w.Trim('@', '(', ')').ToLowerInvariant())
+                            .Where(w => !excludedWords.Contains(w)));
+                
+                        mineralSignatureMapLower[mineralKeyName.ToLowerInvariant()] = signatureValue;
+                    }
+                }
+            }
+
+            _logger.LogInformation("Found {Count} minerals with unique radar signatures", mineralSignatureMap.Count);
+
             await Dispatcher.UIThread.InvokeAsync(() => LangProgress = 60);
 
             // Query DB for missions with blueprint pools to build BP suffix maps
@@ -293,9 +358,30 @@ public partial class ExtractionTabViewModel : PageViewModelBase
                     {
                         val += $"<EM{i}>Un texte d'essai avec la balise EM{i}</EM{i}>\\n";
                     }
-                    split[1] = $"Test des couleurs EM\\n\\n{val}\\n\\n\\n\\n{split[1]}";
+                    var content = split[1];
+                    // Append radar signatures to mineral names in the compendium
+                    foreach (var (mineralName, signature) in mineralSignatureMap)
+                    {
+                        // Use word boundary regex to match the mineral name and append signature
+                        var escapedName = Regex.Escape(mineralName);
+                        content = Regex.Replace(content, escapedName, $"{mineralName} (RS {signature})");
+                    }
+                    split[1] = $"Test des couleurs EM\\n\\n{val}\\n\\n\\n\\n{content}";
                 }
-                
+
+                // Handle mineabletype_primary_* keys for mission objectives
+                if (key.StartsWith("mineabletype_primary_"))
+                {
+                    var mineralKey = key["mineabletype_primary_".Length..].ToLowerInvariant();
+
+                    if (mineralKey == "aluminium") mineralKey = "aluminum"; // why CIG, why ?
+                    if (mineralKey == "savrillium") mineralKey = "savrilium"; // why CIG, why ?
+                    if (mineralSignatureMapLower.TryGetValue(mineralKey, out var rsSignature))
+                    {
+                        split[1] = $"{split[1]} (RS {rsSignature})";
+                    }
+                }
+
                 fileWriter.WriteLine(string.Join('=', split));
             }
 

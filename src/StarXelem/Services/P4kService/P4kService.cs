@@ -635,6 +635,29 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         return records.Select(r => r.Record).ToList();
     }
 
+    /// <summary>
+    /// Récupère un enregistrement arbitraire par son CigGuid via le DataForge.
+    /// Utile pour charger des records qui ne sont pas des EntityClassDefinition (ResourceType, MineableComposition, etc.)
+    /// </summary>
+    public async Task<object?> GetRecordById(CigGuid recordId)
+    {
+        await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
+
+        return await LargeStackThreadPool.Shared.EnqueueAsync(() =>
+        {
+            var oldval = DataCoreBinaryGenerated.s_maxRecursiveLoad;
+            try
+            {
+                DataCoreBinaryGenerated.s_maxRecursiveLoad = 5;
+                return df.GetFromRecord(recordId)?.Data;
+            }
+            finally
+            {
+                DataCoreBinaryGenerated.s_maxRecursiveLoad = oldval;
+            }
+        }).ConfigureAwait(false);
+    }
+
     private void ResetSelectedFile()
     {
         // stop previous loading if any
