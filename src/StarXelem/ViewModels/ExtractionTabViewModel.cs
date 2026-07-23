@@ -227,6 +227,20 @@ public partial class ExtractionTabViewModel : PageViewModelBase
 
             await foreach (var entityDefinition in _p4kService.GetAllEntityClassDefinition(0).ConfigureAwait(false))
             {
+                // Seuls les rochers minables "canoniques" (mineablerock_asteroid{rarete}_{mineral}, mineablerock_surface{rarete}_{mineral}, ...)
+                // portent la vraie signature radar du minéral. Les rochers génériques par classe spectrale d'astéroïde
+                // (AsteroidCTypeMineableRock, AsteroidSTypeMineableRock, ...) partagent tous une signature générique de
+                // type d'astéroïde (ex: 4720) pour un mix de minéraux, et polluent la map si on les laisse passer.
+                // Les entités de test (mineablerock_test_*) doivent aussi être ignorées.
+                // RecordName contient le nom complet de la balise racine du fichier XML, ex:
+                // "EntityClassDefinition.MineableRock_AsteroidCommon_Aluminum" et non juste le nom du rocher,
+                // d'où l'utilisation de Contains(".MineableRock_") plutôt que StartsWith.
+                var recordName = entityDefinition.RecordName;
+                if (string.IsNullOrEmpty(recordName)
+                    || !recordName.Contains(".MineableRock_", StringComparison.OrdinalIgnoreCase)
+                    || recordName.Contains("test", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 var entityType = entityDefinition.Data as EntityClassDefinition;
                 if (!(entityType?.Components.OfType<MineableParams>().Any() ?? false) || !entityType.Components.OfType<SSCSignatureSystemParams>().Any())
                     continue;
@@ -247,38 +261,35 @@ public partial class ExtractionTabViewModel : PageViewModelBase
                 if (signatureValue is 3000 or 4000)
                     continue;
 
-                // Extract mineral names from composition
-                if (mineableParams.composition?.compositionArray == null)
+                // Extract the primary mineral name from the composition.
+                // compositionArray peut contenir plusieurs minéraux (le minéral principal du rocher,
+                // répété sur plusieurs paliers de qualité, suivi de minéraux secondaires/traces qui ont
+                // leur propre rocher dédié ailleurs). Seul le premier élément correspond au minéral
+                // principal désigné par le nom du rocher ; les suivants ne doivent pas hériter de cette
+                // signature (ex: le rocher "Bexalite" contient aussi de l'or et du borase en traces).
+                var primaryPart = mineableParams.composition?.compositionArray?.FirstOrDefault();
+                if (primaryPart?.mineableElement?.resourceType == null)
                     continue;
 
+                var displayName = primaryPart.mineableElement.resourceType.displayName;
+                if (string.IsNullOrEmpty(displayName))
+                    continue;
 
-                foreach (var part in mineableParams.composition.compositionArray)
+                // Get localized mineral name
+                var localizedName = await _p4kService.GetLocaleValue(displayName).ConfigureAwait(false);
+                if (string.IsNullOrEmpty(localizedName))
+                    continue;
+
+                // Add to maps if not already present (keep first/unique signature)
+                if (!mineralSignatureMap.ContainsKey(localizedName))
                 {
-                    if (part.mineableElement?.resourceType == null)
-                        continue;
+                    mineralSignatureMap[localizedName] = signatureValue;
+                    var mineralKeyName = String.Concat(localizedName
+                        .Split(" ", StringSplitOptions.RemoveEmptyEntries)
+                        .Select(w => w.Trim('@', '(', ')').ToLowerInvariant())
+                        .Where(w => !excludedWords.Contains(w)));
 
-                    var resourceType = part.mineableElement.resourceType;
-                    var displayName = resourceType.displayName;
-
-                    if (string.IsNullOrEmpty(displayName))
-                        continue;
-
-                    // Get localized mineral name
-                    var localizedName = await _p4kService.GetLocaleValue(displayName).ConfigureAwait(false);
-                    if (string.IsNullOrEmpty(localizedName))
-                        continue;
-
-                    // Add to maps if not already present (keep first/unique signature)
-                    if (!mineralSignatureMap.ContainsKey(localizedName))
-                    {
-                        mineralSignatureMap[localizedName] = signatureValue;
-                        var mineralKeyName = String.Concat(localizedName
-                            .Split(" ", StringSplitOptions.RemoveEmptyEntries)
-                            .Select(w => w.Trim('@', '(', ')').ToLowerInvariant())
-                            .Where(w => !excludedWords.Contains(w)));
-                
-                        mineralSignatureMapLower[mineralKeyName.ToLowerInvariant()] = signatureValue;
-                    }
+                    mineralSignatureMapLower[mineralKeyName.ToLowerInvariant()] = signatureValue;
                 }
             }
 
