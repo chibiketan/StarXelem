@@ -567,6 +567,9 @@ public class LocalDatabaseService : ILocalDatabaseService
         var ships = await db.Ships.ToListAsync(cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Processing loadouts for {Count} ships.", ships.Count);
 
+        const int ReleaseCacheEveryNShips = 100;
+        var shipIndex = 0;
+
         foreach (var ship in ships)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -598,6 +601,18 @@ public class LocalDatabaseService : ILocalDatabaseService
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to process loadout for ship {ShipGuid} ({TechnicalName})", ship.EntityClassGuid, ship.TechnicalName);
+            }
+
+            // Chaque vaisseau (et ses composants montés) est étendu en profondeur 3 et reste résident dans
+            // le cache P4kService jusqu'à ce qu'on le vide explicitement. Sans purge périodique, les ~1105
+            // vaisseaux s'accumulent tous en mémoire simultanément (constaté : pic de cette phase à lui
+            // seul ~19 Go). On libère régulièrement pour ne garder qu'un petit nombre de vaisseaux résidents
+            // à la fois ; le prochain accès (vaisseau suivant) re-matérialise à la demande, à coût unitaire.
+            shipIndex++;
+            if (shipIndex % ReleaseCacheEveryNShips == 0)
+            {
+                _p4kService.ReleaseHeavyCache();
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Default, blocking: true, compacting: false);
             }
         }
 

@@ -324,10 +324,72 @@ les phases 4, 5 et 7.
 -67 % par rapport aux ~22 Go initiaux rapportés par l'utilisateur), pour un coût de +11 s sur le temps total
 (93,5 s au lieu de 82,6 s) — compromis jugé acceptable.
 
-**Objectif des 5 Go non atteint.** Le `WorkingSet` (14,8 Go) reste nettement au-dessus du tas managé après
-nettoyage (3,3 Go après phase 9) : sans compaction en cours de rebuild, les segments libérés par le GC léger
-restent réservés par le process (pas rendus à l'OS) pour être réutilisés par les allocations de la phase
-suivante — cohérent avec le comportement standard du GC .NET. Une piste de suite (non testée dans cette
-itération, cf. décision utilisateur de continuer l'investigation) : un unique passage de compaction ciblé
-après la phase la plus lourde, plutôt qu'à chaque point de vidage, pour tenter de rapprocher le `WorkingSet`
-du tas managé sans payer le coût de compaction à répétition.
+**Objectif des 5 Go non atteint à ce stade.** Le `WorkingSet` (14,8 Go) reste nettement au-dessus du tas
+managé après nettoyage (3,3 Go après phase 9) : sans compaction en cours de rebuild, les segments libérés
+par le GC léger restent réservés par le process (pas rendus à l'OS) pour être réutilisés par les allocations
+de la phase suivante — cohérent avec le comportement standard du GC .NET. Voir Itération 6 pour la suite.
+
+## Itération 6 (2026-07-24, suite) : purge périodique DANS la phase Loadouts — ✅ Appliqué — objectif < 5 Go atteint
+
+### Constat
+
+En creusant pourquoi le pic restait à 14,8 Go malgré les 3 points de libération inter-phases, les logs de
+l'Itération 5 montraient que la phase 5 (Loadouts) **à elle seule** faisait grimper la mémoire de 11,1 Go
+(sortie de phase 4) à 18,4 Go de tas managé (19,7 Go de WorkingSet) — soit ~7 Go accumulés rien que pendant
+cette phase, avant même son propre point de libération de fin de phase.
+
+Cause : `PopulateShipLoadoutsAsync` boucle sur les 1 105 vaisseaux **séquentiellement**, et pour chacun :
+étend son `EntityClassDefinition` complet (arbre de composants/points d'ancrage) en profondeur 3, puis
+résout chaque composant monté (`ResolveLoadoutEntry` → `GetEntityType(crc, 3)`). Ces objets restent résidents
+dans le cache partagé de `P4kService` jusqu'à la fin de la phase — les 1 105 vaisseaux (structures riches,
+plus volumineuses en moyenne qu'un simple SCItem) s'accumulent donc **tous simultanément** en mémoire.
+
+### Piste appliquée
+
+Purge périodique DANS la boucle elle-même : tous les 100 vaisseaux, appel à
+`_p4kService.ReleaseHeavyCache()` + `GC.Collect` léger (même pattern que `ReleaseP4kCacheAndCollect`, inliné
+directement dans `PopulateShipLoadoutsAsync`). Comme les vaisseaux sont traités indépendamment les uns des
+autres (les entrées de loadout déjà extraites sont stockées dans une liste locale, pas dans le cache), rien
+n'est perdu : le vaisseau suivant re-matérialise à la demande, à coût unitaire, au lieu de laisser les 1 000+
+précédents s'empiler.
+
+### Résultats mesurés (2 runs de confirmation, résultats stables)
+
+| Mesure | Avant (Itération 5) | **Avec purge tous les 100 vaisseaux** (run 1 / run 2) |
+|---|---|---|
+| Pic mémoire phase 5 (avant son propre vidage) | 19 675 Mo | **8 958 Mo / 8 933 Mo** |
+| Pic mémoire (phase 9, fin de rebuild) | 14 807 Mo | **4 436 Mo / 4 174 Mo** ✅ (< 5 Go) |
+| Temps total | 93,5 s | 100,5 s / 100,9 s |
+| Résiduel final après GC | ~2,3 Go | ~2,3 Go |
+
+**Validation de correction** (identique sur les 2 runs, et identique à tous les runs précédents) :
+23 371 SCItems, 402/23 371 items avec dégâts, **27 754 ship loadout entries** (nombre exact identique à la
+baseline — aucune entrée perdue à cause de la purge périodique), 1 597 blueprints, 2 499 missions, aucune
+exception.
+
+### Décision
+
+**Conservé — objectif utilisateur atteint.** Pic mémoire ramené de **22,2 Go (baseline) à ~4,3 Go**
+(-80 %), sous la barre des 5 Go demandée, pour un coût total de +17-18 s sur le temps de rebuild par rapport
+à la toute première baseline (~80 s → ~100 s). Stabilité confirmée sur 2 runs consécutifs avec des chiffres
+cohérents (écart < 6 % entre les deux).
+
+### Récapitulatif de toute la série d'optimisations
+
+| Étape | Pic mémoire (WorkingSet, fin de rebuild) | Résiduel final | Temps total |
+|---|---|---|---|
+| État initial (rapporté par l'utilisateur) | ~22 Go, **persistant** après le rebuild | ~22 Go | ≥ 180 s |
+| Itération 1 (ChangeTracker.Clear, pragmas SQLite, GC final + ConserveMemory) | ~23 Go (transitoire) | **~2,3 Go** | ~76-90 s |
+| Itération 4 (filtrage avant expansion en profondeur, SCItems) | ~22,2 Go | ~2,3 Go | ~80-90 s |
+| Itération 5 (libération inter-phases 4/5/7) | 14,8 Go | ~2,3 Go | ~93,5 s |
+| **Itération 6 (purge intra-phase Loadouts)** | **~4,3 Go** | ~2,3 Go | ~100 s |
+
+### Pistes de suite non explorées
+
+- Le même principe (purge périodique intra-boucle) pourrait s'appliquer à d'autres boucles volumineuses si
+  de nouveaux besoins de profondeur 3 sur de grands ensembles apparaissent à l'avenir (aucune identifiée
+  actuellement au-delà des Loadouts).
+- Le `WorkingSet` reste un peu au-dessus du tas managé à chaque point de purge (pas de compaction
+  intermédiaire) : un ajustement du seuil (100 vaisseaux) ou une compaction ponctuelle pourrait encore
+  affiner le pic, mais le gain marginal ne semble plus justifier le risque/coût au vu de l'objectif déjà
+  atteint.
