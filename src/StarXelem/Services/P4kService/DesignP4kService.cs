@@ -115,6 +115,12 @@ public class DesignP4kService : IP4kService
         yield break;
     }
 
+    public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinitionFiltered(
+        int filterDepth, int finalDepth, Func<EntityClassDefinition, bool> predicate)
+    {
+        yield break;
+    }
+
     public Task FillDataCache()
     {
         return Task.CompletedTask;

@@ -470,6 +470,48 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Comme <see cref="GetAllEntityClassDefinition"/>, mais évite d'étendre TOUS les EntityClassDefinition
+    /// du jeu jusqu'à <paramref name="finalDepth"/> : le prédicat est d'abord évalué à une profondeur plus
+    /// légère (<paramref name="filterDepth"/>), et seuls les enregistrements retenus sont ensuite étendus
+    /// jusqu'à <paramref name="finalDepth"/>. Réduit fortement le nombre d'objets lourdement matérialisés
+    /// quand seule une fraction des entités du jeu est réellement utile à l'appelant (ex: SCItems parmi
+    /// vaisseaux/PNJ/props).
+    /// </summary>
+    public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinitionFiltered(
+        int filterDepth,
+        int finalDepth,
+        Func<EntityClassDefinition, bool> predicate)
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+
+        var records = _EntityClassDict.Values
+            .AsParallel()
+            .Where(r => r.Record.Data is EntityClassDefinition)
+            .ToList();
+
+        await Task.WhenAll(records.AsParallel().Select(async r =>
+        {
+            if (r.depth < filterDepth)
+                await UpdateCacheRecordWithDepth(r, filterDepth);
+        })).ConfigureAwait(false);
+
+        var matching = records
+            .Where(r => r.Record.Data is EntityClassDefinition ec && predicate(ec))
+            .ToList();
+
+        await Task.WhenAll(matching.AsParallel().Select(async r =>
+        {
+            if (r.depth < finalDepth)
+                await UpdateCacheRecordWithDepth(r, finalDepth);
+        })).ConfigureAwait(false);
+
+        foreach (var record in matching)
+        {
+            yield return record.Record;
+        }
+    }
+
     public async Task FillDataCache()
     {
         UpdateState(P4kFileLoadState.CacheLoading);

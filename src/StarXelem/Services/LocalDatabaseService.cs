@@ -3064,24 +3064,40 @@ public class LocalDatabaseService : ILocalDatabaseService
 
         _logger.LogInformation("Starting SCItems processing...");
 
-        await foreach (var record in _p4kService.GetAllEntityClassDefinition(3).ConfigureAwait(false))
+        // Filtre évalué à une profondeur légère (1, déjà atteinte pour tout le monde par la phase Ships) :
+        // seuls les enregistrements retenus (les objets équipables) sont ensuite étendus en profondeur 3,
+        // au lieu d'étendre en profondeur 3 TOUS les EntityClassDefinition du jeu (vaisseaux, PNJ, props...)
+        // avant de les filtrer. Réduit fortement la mémoire matérialisée par cette phase.
+        var itemsEnumerable = _p4kService.GetAllEntityClassDefinitionFiltered(
+            filterDepth: 1,
+            finalDepth: 3,
+            predicate: ec =>
+            {
+                if (ec.Invisible)
+                    return false;
+
+                var attachable = ec.Components.OfType<SAttachableComponentParams>().FirstOrDefault();
+                if (attachable?.AttachDef is not SItemDefinition itemDef)
+                    return false;
+
+                if (itemDef.Type == EItemType.__Unknown || itemDef.Type == EItemType.UNDEFINED)
+                    return false;
+
+                if (ec.Components.OfType<VehicleComponentParams>().Any())
+                    return false;
+
+                return true;
+            });
+
+        await foreach (var record in itemsEnumerable.ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             if (record.Data is not EntityClassDefinition entityClass)
                 continue;
 
-            if (entityClass.Invisible)
-                continue;
-
             var attachable = entityClass.Components.OfType<SAttachableComponentParams>().FirstOrDefault();
             if (attachable?.AttachDef is not SItemDefinition itemDef)
-                continue;
-
-            if (itemDef.Type == EItemType.__Unknown || itemDef.Type == EItemType.UNDEFINED)
-                continue;
-
-            if (entityClass.Components.OfType<VehicleComponentParams>().Any())
                 continue;
 
             var scItem = BuildScItemEntity(record, entityClass, itemDef, manufacturerCache);

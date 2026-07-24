@@ -47,6 +47,14 @@ public interface IP4kService : INotifyPropertyChanged
     IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition(int depth);
 
     /// <summary>
+    /// Comme <see cref="GetAllEntityClassDefinition"/>, mais évalue d'abord <paramref name="predicate"/> à
+    /// une profondeur légère (<paramref name="filterDepth"/>) et n'étend jusqu'à <paramref name="finalDepth"/>
+    /// que les enregistrements retenus, pour éviter de matérialiser en profondeur des entités non pertinentes.
+    /// </summary>
+    IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinitionFiltered(
+        int filterDepth, int finalDepth, Func<EntityClassDefinition, bool> predicate);
+
+    /// <summary>
     /// Provoque le lancement de l'alimentation des différents cache ce qui permet d'avoir des données prêtes et une requête rapide
     /// </summary>
     /// <returns></returns>
