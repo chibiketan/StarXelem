@@ -55,6 +55,14 @@ public interface IP4kService : INotifyPropertyChanged
         int filterDepth, int finalDepth, Func<EntityClassDefinition, bool> predicate);
 
     /// <summary>
+    /// Comme <see cref="GetAllEntityClassDefinitionFiltered"/>, mais n'étend le sous-ensemble retenu que
+    /// par lots de <paramref name="batchSize"/> éléments, sans jamais retenir plus d'un lot en mémoire à
+    /// la fois — permet à l'appelant de vider le cache lourd entre deux lots pour borner le pic mémoire.
+    /// </summary>
+    IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinitionFilteredBatched(
+        int filterDepth, int finalDepth, Func<EntityClassDefinition, bool> predicate, int batchSize);
+
+    /// <summary>
     /// Provoque le lancement de l'alimentation des différents cache ce qui permet d'avoir des données prêtes et une requête rapide
     /// </summary>
     /// <returns></returns>

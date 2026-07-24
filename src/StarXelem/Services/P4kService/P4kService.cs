@@ -512,6 +512,72 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Comme <see cref="GetAllEntityClassDefinitionFiltered"/>, mais n'étend le sous-ensemble retenu
+    /// jusqu'à <paramref name="finalDepth"/> QUE par lots de <paramref name="batchSize"/> éléments, au
+    /// lieu de tous les étendre d'un coup avant de rien céder au consommateur. Ne conserve entre deux lots
+    /// que les identifiants (légers) des enregistrements retenus, jamais les objets matérialisés
+    /// eux-mêmes : si l'appelant vide le cache lourd (<see cref="ReleaseHeavyCache"/>) entre deux
+    /// itérations de la boucle de consommation, la mémoire du lot précédent devient effectivement
+    /// récupérable par le GC, et le pic mémoire reste borné à la taille d'un lot plutôt qu'à l'ensemble
+    /// filtré complet.
+    /// </summary>
+    public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinitionFilteredBatched(
+        int filterDepth,
+        int finalDepth,
+        Func<EntityClassDefinition, bool> predicate,
+        int batchSize)
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+
+        var candidates = _EntityClassDict.Values
+            .AsParallel()
+            .Where(r => r.Record.Data is EntityClassDefinition)
+            .ToList();
+
+        await Task.WhenAll(candidates.AsParallel().Select(async r =>
+        {
+            if (r.depth < filterDepth)
+                await UpdateCacheRecordWithDepth(r, filterDepth);
+        })).ConfigureAwait(false);
+
+        // On ne garde que les identifiants (légers) des enregistrements retenus : aucune référence vers
+        // les CacheEntry/DataCoreTypedRecord (potentiellement volumineux) ne doit survivre au-delà du lot
+        // en cours de traitement.
+        var matchingIds = candidates
+            .Where(r => r.Record.Data is EntityClassDefinition ec && predicate(ec))
+            .Select(r => r.Record.RecordId)
+            .ToList();
+        candidates = null!;
+
+        for (var offset = 0; offset < matchingIds.Count; offset += batchSize)
+        {
+            // Le cache peut avoir été vidé par l'appelant depuis le lot précédent (entre deux
+            // MoveNextAsync) : LoadDatabaseIfNeeded() est un no-op si le cache est toujours chaud, et
+            // reconstruit sinon (peu coûteux : uniquement des enregistrements "vides", profondeur -1).
+            await LoadDatabaseIfNeeded().ConfigureAwait(false);
+
+            var batchIds = matchingIds.GetRange(offset, Math.Min(batchSize, matchingIds.Count - offset));
+            var batchEntries = new List<CacheEntry>(batchIds.Count);
+            foreach (var id in batchIds)
+            {
+                if (_entityClassGuidDict.TryGetValue(id, out var entry))
+                    batchEntries.Add(entry);
+            }
+
+            await Task.WhenAll(batchEntries.AsParallel().Select(async r =>
+            {
+                if (r.depth < finalDepth)
+                    await UpdateCacheRecordWithDepth(r, finalDepth);
+            })).ConfigureAwait(false);
+
+            foreach (var entry in batchEntries)
+            {
+                yield return entry.Record;
+            }
+        }
+    }
+
     public async Task FillDataCache()
     {
         UpdateState(P4kFileLoadState.CacheLoading);

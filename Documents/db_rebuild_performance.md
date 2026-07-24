@@ -382,14 +382,86 @@ cohérents (écart < 6 % entre les deux).
 | Itération 1 (ChangeTracker.Clear, pragmas SQLite, GC final + ConserveMemory) | ~23 Go (transitoire) | **~2,3 Go** | ~76-90 s |
 | Itération 4 (filtrage avant expansion en profondeur, SCItems) | ~22,2 Go | ~2,3 Go | ~80-90 s |
 | Itération 5 (libération inter-phases 4/5/7) | 14,8 Go | ~2,3 Go | ~93,5 s |
-| **Itération 6 (purge intra-phase Loadouts)** | **~4,3 Go** | ~2,3 Go | ~100 s |
+| Itération 6 (purge intra-phase Loadouts) | ~4,3 Go | ~2,3 Go | ~100 s |
+| **Itération 7 (généralisation : purge intra-phase SCItems)** | **~4,0 Go** | ~2,3 Go | ~99-107 s |
+
+## Itération 7 (2026-07-24, suite) : généralisation du principe de purge intra-boucle à la phase SCItems — ✅ Appliqué
+
+### Analyse en profondeur avant généralisation
+
+Avant de reproduire le pattern de l'Itération 6 (purge intra-boucle) sur d'autres phases, analyse de
+`GetAllEntityClassDefinitionFiltered` (Itération 4) : cette méthode filtre bien à profondeur légère
+d'abord, mais étend ENSUITE **tous** les enregistrements retenus (23 371) à la profondeur finale en un seul
+`Task.WhenAll`, **avant de céder le moindre élément au consommateur** (`await foreach` dans
+`PopulateScItemsAsync`). Contrairement à la boucle des Loadouts (où chaque vaisseau est étendu et consommé
+un par un), toute la mémoire de la phase SCItems est donc allouée d'un bloc, en amont de toute itération —
+une purge périodique dans la boucle *consommatrice* n'aurait eu aucun effet, puisque le travail est déjà
+fait avant que la boucle ne démarre.
+
+Cartographie des autres points d'appel à profondeur dans `LocalDatabaseService.cs` pour identifier d'autres
+cibles de généralisation :
+- Phase 3 (Ships) : `GetAllEntityClassDefinition(1)` — blanket sur tout le jeu mais à profondeur 1 (déjà
+  la plus légère), coût mesuré modeste (~7 s) ; faible valeur à retravailler.
+- Phase 6 (Contract generators, ~271 éléments) et phase 8 (Missions, ré-résout les mêmes ~271 contrats) :
+  `EnsureRecordsDepthAsync(contracts, 3)` — déjà ciblé sur un petit ensemble propre (pas de gaspillage sur
+  des entités non pertinentes), donc pas candidat au filtrage. Effet de bord identifié : le vidage ajouté en
+  Itération 5 après la phase 7 force la phase 8 à ré-étendre ces 271 contrats depuis zéro (coût mesuré :
+  phase Missions passée de ~750 ms à ~3 s) — négligeable en absolu, documenté ici par souci de complétude.
+- Phase 7 (Blueprints, 1 597 éléments) : `GetRecordWithSpecificDepth(blueprintId, 4)` par blueprint —
+  profondeur 4 (plus profonde que SCItems/Loadouts), mais la croissance mémoire mesurée sur cette phase
+  reste modeste (~2,3 Go sur les logs de l'Itération 5) comparée à SCItems (~11,7 Go) ou Loadouts
+  (~7,3 Go) : gain potentiel jugé trop faible pour justifier l'effort de restructuration à ce stade.
+
+**Conclusion de l'analyse : SCItems est la seule cible restante à fort potentiel.**
+
+### Piste appliquée
+
+Nouvelle méthode `IP4kService.GetAllEntityClassDefinitionFilteredBatched(filterDepth, finalDepth,
+predicate, batchSize)` : découpe l'étape d'extension en profondeur finale par lots de `batchSize` éléments
+au lieu de tout étendre d'un coup. Point d'attention technique critique : la méthode d'origine
+(`GetAllEntityClassDefinitionFiltered`) conservait une liste `matching` de `CacheEntry` (objets lourds)
+pendant toute la durée de l'énumération — même après avoir cédé un élément au consommateur, la liste locale
+du producteur continuait à le référencer, empêchant tout GC même si l'appelant vidait le cache. Corrigé en
+ne conservant, entre deux lots, que les **identifiants légers** (`CigGuid`) des enregistrements retenus : la
+liste des objets lourds réels (`batchEntries`) est reconstruite à chaque lot et redevient collectible dès
+que le lot suivant commence. `LoadDatabaseIfNeeded()` est réappelé à chaque lot pour gérer le cas où
+l'appelant a vidé le cache entre deux lots (repeuplement à profondeur -1, peu coûteux).
+
+`PopulateScItemsAsync` utilise cette variante avec `batchSize: 2000` et purge (`ReleaseHeavyCache` + GC
+léger) tous les 2 000 items traités — indépendamment du seuil de sauvegarde SQL existant (10 000).
+
+### Résultats mesurés
+
+| Mesure | Avant (Itération 6) | **Avec purge intra-phase SCItems** |
+|---|---|---|
+| Mémoire après phase 4 (avant son propre vidage) | 13 355 Mo | **4 193 Mo** |
+| Mémoire après phase 5 (avant son propre vidage) | 8 958 Mo | **3 376 Mo** (repart d'une base plus basse) |
+| Pic mémoire (phase 9, fin de rebuild) | ~4 300 Mo | **~3 950-4 000 Mo** |
+| Temps total | ~100 s | ~99-107 s |
+| Résiduel final | ~2,3 Go | ~2,3 Go |
+
+**Validation de correction (critique)** : **23 371 SCItems exactement** (identique à tous les runs
+précédents — le découpage en lots n'a fait perdre ni dupliqué aucun enregistrement), 402/23 371 items avec
+dégâts, 27 754 ship loadout entries, 1 597 blueprints, 2 499 missions, aucune exception.
+
+### Décision
+
+**Conservé.** Le gain le plus spectaculaire porte sur la phase SCItems elle-même (13,4 Go → 4,2 Go, soit
+-69 %), avec un effet d'entraînement sur la phase Loadouts qui repart d'une base bien plus basse. Le pic
+mémoire global de fin de rebuild ne baisse que marginalement par rapport à l'Itération 6 (~4,3 Go → ~4,0 Go)
+car il était déjà dominé par d'autres phases (Blueprints ~5 Go, résiduel de fin de rebuild) une fois
+Loadouts corrigé — mais l'empreinte mémoire est maintenant beaucoup plus **stable et basse tout au long du
+rebuild**, pas seulement à la toute fin, ce qui est également bénéfique pour une machine qui ferait tourner
+le jeu en parallèle pendant toute la durée du rebuild.
 
 ### Pistes de suite non explorées
 
-- Le même principe (purge périodique intra-boucle) pourrait s'appliquer à d'autres boucles volumineuses si
-  de nouveaux besoins de profondeur 3 sur de grands ensembles apparaissent à l'avenir (aucune identifiée
-  actuellement au-delà des Loadouts).
+- Le même principe (purge périodique intra-boucle, via une variante "Batched" du producteur si nécessaire)
+  pourrait s'appliquer à Blueprints (profondeur 4, 1 597 éléments) si un besoin de réduction supplémentaire
+  apparaît — non fait ici, gain estimé trop faible au vu de la croissance mémoire mesurée sur cette phase.
 - Le `WorkingSet` reste un peu au-dessus du tas managé à chaque point de purge (pas de compaction
-  intermédiaire) : un ajustement du seuil (100 vaisseaux) ou une compaction ponctuelle pourrait encore
-  affiner le pic, mais le gain marginal ne semble plus justifier le risque/coût au vu de l'objectif déjà
-  atteint.
+  intermédiaire) : un ajustement des seuils de lot ou une compaction ponctuelle pourrait encore affiner le
+  pic, mais le gain marginal ne semble plus justifier le risque/coût au vu de l'objectif déjà largement
+  dépassé (~4 Go, contre les 5 Go visés).
+- Voir aussi la section suivante (test de réduction des profondeurs demandées) pour une autre piste de
+  réduction du pic, indépendante de la purge.

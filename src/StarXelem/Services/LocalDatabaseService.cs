@@ -3105,9 +3105,14 @@ public class LocalDatabaseService : ILocalDatabaseService
         // seuls les enregistrements retenus (les objets équipables) sont ensuite étendus en profondeur 3,
         // au lieu d'étendre en profondeur 3 TOUS les EntityClassDefinition du jeu (vaisseaux, PNJ, props...)
         // avant de les filtrer. Réduit fortement la mémoire matérialisée par cette phase.
-        var itemsEnumerable = _p4kService.GetAllEntityClassDefinitionFiltered(
+        // La variante "Batched" n'étend ET ne retient qu'un lot à la fois (au lieu des ~23 000 objets
+        // retenus d'un coup) : combinée à la purge périodique ci-dessous, borne le pic mémoire de cette
+        // phase à la taille d'un lot plutôt qu'à l'ensemble complet.
+        const int ScItemsCacheReleaseEveryNBatchItems = 2_000;
+        var itemsEnumerable = _p4kService.GetAllEntityClassDefinitionFilteredBatched(
             filterDepth: 1,
             finalDepth: 3,
+            batchSize: ScItemsCacheReleaseEveryNBatchItems,
             predicate: ec =>
             {
                 if (ec.Invisible)
@@ -3125,6 +3130,8 @@ public class LocalDatabaseService : ILocalDatabaseService
 
                 return true;
             });
+
+        var itemsSinceLastCacheRelease = 0;
 
         await foreach (var record in itemsEnumerable.ConfigureAwait(false))
         {
@@ -3188,6 +3195,14 @@ public class LocalDatabaseService : ILocalDatabaseService
                 items.Clear();
                 itemTags.Clear();
                 itemTagEntities.Clear();
+            }
+
+            itemsSinceLastCacheRelease++;
+            if (itemsSinceLastCacheRelease >= ScItemsCacheReleaseEveryNBatchItems)
+            {
+                _p4kService.ReleaseHeavyCache();
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Default, blocking: true, compacting: false);
+                itemsSinceLastCacheRelease = 0;
             }
         }
 
