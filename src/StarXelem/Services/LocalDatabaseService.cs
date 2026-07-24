@@ -175,6 +175,14 @@ public class LocalDatabaseService : ILocalDatabaseService
         await db.Database.EnsureDeletedAsync(cancellationToken).ConfigureAwait(false);
         await db.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
 
+        // Pragmas SQLite : le rebuild recrée entièrement la base, donc on peut sacrifier
+        // la durabilité (synchronous=OFF) et écrire en WAL pour accélérer fortement les écritures.
+        await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode = WAL;", cancellationToken).ConfigureAwait(false);
+        await db.Database.ExecuteSqlRawAsync("PRAGMA synchronous = OFF;", cancellationToken).ConfigureAwait(false);
+        await db.Database.ExecuteSqlRawAsync("PRAGMA temp_store = MEMORY;", cancellationToken).ConfigureAwait(false);
+
+        LogMemoryUsage("Avant reconstruction");
+
         // Phase 1: Locale entries
         progress?.Report(new RebuildProgress(1, TotalPhases, "Chargement des locales…"));
         var phase = Stopwatch.StartNew();
@@ -233,8 +241,13 @@ public class LocalDatabaseService : ILocalDatabaseService
         phase.Restart();
         await ProcessAllBlueprintsAsync(db, cancellationToken).ConfigureAwait(false);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        db.ChangeTracker.Clear();
+        // NB: _blueprintCache reste alimenté ici : ProcessBlueprintPoolsAsync (appelé pendant la phase 8,
+        // pour les récompenses de mission de type pool de plans) réutilise ce cache pour éviter de
+        // ré-insérer un plan déjà enregistré. Il n'est vidé qu'après la phase 8 (voir PopulateMissionsAsync).
         phase.Stop();
         _logger.LogInformation("[Phase 7/{Total}] Blueprints completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        LogMemoryUsage("Après phase 7 (Blueprints)");
         cancellationToken.ThrowIfCancellationRequested();
 
         // Phase 8: Missions and their requirements/rewards/spawn rules
@@ -250,8 +263,10 @@ public class LocalDatabaseService : ILocalDatabaseService
         phase.Restart();
         await ProcessMissionShipSpawnShipsAsync(db, cancellationToken).ConfigureAwait(false);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        db.ChangeTracker.Clear();
         phase.Stop();
         _logger.LogInformation("[Phase 9/{Total}] Spawn rules completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        LogMemoryUsage("Après phase 9 (Spawn rules)");
         cancellationToken.ThrowIfCancellationRequested();
 
         // Phase 10: Locations (StarMapObjects)
@@ -262,13 +277,33 @@ public class LocalDatabaseService : ILocalDatabaseService
         _logger.LogInformation("[Phase 10/{Total}] Locations completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
+        // Libère les caches lourds du P4kService (records EntityClassDefinition chargés en profondeur 1 et 3
+        // pour toutes les entités du jeu) : ils ne sont plus nécessaires une fois la BDD alimentée, et ils
+        // représentent l'essentiel de l'empreinte mémoire du rebuild. Ils seront reconstruits paresseusement
+        // (et beaucoup plus légèrement) si un autre appelant en a de nouveau besoin.
+        _p4kService.ReleaseHeavyCache();
+        _itemNamesCache = new Dictionary<string, string>();
+        db.ChangeTracker.Clear();
+
         total.Stop();
         _logger.LogInformation("Database rebuild completed in {Elapsed}ms.", total.ElapsedMilliseconds);
+        LogMemoryUsage("Après reconstruction (avant GC forcé)");
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        LogMemoryUsage("Après reconstruction (après GC forcé)");
         }
         finally
         {
             _dbLock.Release();
         }
+    }
+
+    private void LogMemoryUsage(string label)
+    {
+        var workingSetMb = Environment.WorkingSet / 1024.0 / 1024.0;
+        var managedMb = GC.GetTotalMemory(false) / 1024.0 / 1024.0;
+        _logger.LogInformation("[Mémoire] {Label} : WorkingSet={WorkingSetMb:F0} Mo, Managed={ManagedMb:F0} Mo", label, workingSetMb, managedMb);
     }
 
     /* ========================================================================
@@ -315,6 +350,7 @@ public class LocalDatabaseService : ILocalDatabaseService
             db.LocaleEntries.AddRange(localeEntries);
             db.ChangeTracker.AutoDetectChangesEnabled = true;
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            db.ChangeTracker.Clear();
         }
         catch (Exception ex)
         {
@@ -379,6 +415,7 @@ public class LocalDatabaseService : ILocalDatabaseService
             db.Tags.AddRange(tagEntities);
             db.ChangeTracker.AutoDetectChangesEnabled = true;
             await db.SaveChangesAsync();
+            db.ChangeTracker.Clear();
             start.Stop();
             _logger.LogInformation("Tag hierarchy populated in {Elapsed}ms.", start.ElapsedMilliseconds);
             _logger.LogInformation("Populated {Count} tags into database and resolution map.", tagEntities.Count);
@@ -471,6 +508,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         db.ShipTags.AddRange(shipTags);
         db.ChangeTracker.AutoDetectChangesEnabled = true;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        db.ChangeTracker.Clear();
         _logger.LogInformation("Inserted {Count} manufacturer into the database.", manufacturers.Count);
         _logger.LogInformation("Inserted {Count} ship into the database.", ships.Count);
         _logger.LogInformation("Inserted {Count} liaison ship <=> tag into the database.", shipTags.Count);
@@ -545,6 +583,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         db.ShipLoadoutEntries.AddRange(loadoutEntries);
         db.ChangeTracker.AutoDetectChangesEnabled = true;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        db.ChangeTracker.Clear();
 
         start.Stop();
         _logger.LogInformation("Inserted {Count} ship loadout entries into the database.", loadoutEntries.Count);
@@ -1075,6 +1114,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         db.ContractGenerators.AddRange(contractGenerators);
         db.ChangeTracker.AutoDetectChangesEnabled = true;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        db.ChangeTracker.Clear();
         start.Stop();
         _logger.LogInformation("Inserted {Count} contract generators into the database.", contractGenerators.Count);
     }
@@ -1161,6 +1201,12 @@ public class LocalDatabaseService : ILocalDatabaseService
         _logger.LogInformation("Missions and requirements processed in {Elapsed}ms.", start.ElapsedMilliseconds);
         _logger.LogInformation("Inserted {Count} missions into the database.", missionCount);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        db.ChangeTracker.Clear();
+        // Ces caches ne servent qu'à dédupliquer les entités partagées le temps de cette phase :
+        // ils peuvent être libérés maintenant que tout est enregistré en base.
+        _contractorCache.Clear();
+        _categoryCache.Clear();
+        _blueprintCache.Clear();
     }
 
     private async Task<int> ProcessContractForDb(DataCoreTypedRecord record, StarXelemDbContext db, string generatorName, CancellationToken cancellationToken)
@@ -3082,6 +3128,7 @@ public class LocalDatabaseService : ILocalDatabaseService
                 db.ScItemTags.AddRange(itemTagEntities);
                 db.ChangeTracker.AutoDetectChangesEnabled = true;
                 await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                db.ChangeTracker.Clear();
                 batchesSaved++;
                 _logger.LogInformation("[SCItems {BatchesSaved}/~{EstimatedBatches}] Batch saved: {Processed} total items, {InBatch} in batch",
                     batchesSaved, (totalProcessed / 10_000) + 2, totalProcessed, items.Count);
@@ -3109,6 +3156,7 @@ public class LocalDatabaseService : ILocalDatabaseService
             db.ScItemTags.AddRange(itemTagEntities);
             db.ChangeTracker.AutoDetectChangesEnabled = true;
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            db.ChangeTracker.Clear();
             batchesSaved++;
             _logger.LogInformation("[SCItems {BatchesSaved}/~{EstimatedBatches}] Final batch saved: {Processed} total items, {InBatch} in batch",
                 batchesSaved, (totalProcessed / 10_000) + 2, totalProcessed, items.Count);

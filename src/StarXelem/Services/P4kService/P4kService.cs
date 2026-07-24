@@ -639,6 +639,17 @@ public class P4kService : IP4kService, INotifyPropertyChanged
     /// Récupère un enregistrement arbitraire par son CigGuid via le DataForge.
     /// Utile pour charger des records qui ne sont pas des EntityClassDefinition (ResourceType, MineableComposition, etc.)
     /// </summary>
+    public void ReleaseHeavyCache()
+    {
+        var count = _EntityClassDict.Count;
+        _EntityClassDict.Clear();
+        _entityClassGuidDict.Clear();
+        // Permet à LoadDatabaseIfNeeded() de reconstruire le cache (à profondeur minimale, donc bon marché)
+        // la prochaine fois qu'il sera nécessaire, au lieu de le considérer comme déjà chargé.
+        _loadingDatabaseTask = null;
+        _logger.LogInformation("Cache lourd P4kService libéré ({Count} enregistrements).", count);
+    }
+
     public async Task<object?> GetRecordById(CigGuid recordId)
     {
         await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);

@@ -7,6 +7,11 @@
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
         <ApplicationIcon>Assets\xelem-logo.ico</ApplicationIcon>
+        <!-- Incite le GC à rendre la mémoire à l'OS de façon plus agressive (au prix d'un peu de débit) :
+             important pour une appli censée cohabiter avec le jeu, dont l'empreinte mémoire doit rester sobre. -->
+        <ConserveMemory>9</ConserveMemory>
+        <ServerGarbageCollection>false</ServerGarbageCollection>
+        <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     </PropertyGroup>
 
     <ItemGroup>

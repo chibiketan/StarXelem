@@ -79,5 +79,12 @@ public interface IP4kService : INotifyPropertyChanged
     /// Récupère un enregistrement arbitraire par son CigGuid (utile pour ResourceType, MineableComposition, etc.)
     /// </summary>
     Task<object?> GetRecordById(CigGuid recordId);
+
+    /// <summary>
+    /// Vide le cache lourd des enregistrements EntityClassDefinition (chargés en profondeur pour toutes les
+    /// entités du jeu). Ce cache sera reconstruit paresseusement (profondeur minimale) au prochain accès.
+    /// À utiliser après une opération massive (ex: reconstruction de la BDD locale) pour libérer la mémoire.
+    /// </summary>
+    void ReleaseHeavyCache();
 }
 
