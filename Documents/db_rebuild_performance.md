@@ -465,3 +465,85 @@ le jeu en parallèle pendant toute la durée du rebuild.
   dépassé (~4 Go, contre les 5 Go visés).
 - Voir aussi la section suivante (test de réduction des profondeurs demandées) pour une autre piste de
   réduction du pic, indépendante de la purge.
+
+## Itération 8 (2026-07-24, suite) : test de réduction des profondeurs de résolution — ❌ Abandonnée (bug découvert, non résolu)
+
+### Objectif
+
+Vérifier si les profondeurs de résolution demandées (3 pour SCItems/Loadouts/ContractGenerators/Missions,
+4 pour Blueprints) sont réellement nécessaires, en les réduisant d'un cran et en comparant l'intégralité des
+données restituées en base (pas un échantillon) avant/après.
+
+### Méthode
+
+Pour chaque profondeur testée : export CSV trié de la/les table(s) concernée(s) à la profondeur d'origine
+(référence), réduction de la profondeur d'un cran dans le code, rebuild, export CSV de nouveau, `diff` strict
+(et vérification par somme de contrôle MD5) entre les deux exports. Les colonnes techniques non stables
+d'un run à l'autre (clés auto-incrémentées) sont exclues de la comparaison ou remplacées par des clés
+stables via jointure SQL.
+
+### Résultats des tests **isolés** (une seule profondeur réduite à la fois)
+
+| Profondeur | Réduite de → à | Table(s) comparée(s) | Résultat |
+|---|---|---|---|
+| SCItems | 3 → 2 | ScItems (23 371 lignes × 65 colonnes) | **Diff vide**, checksum identique |
+| Loadouts (vaisseau + composants) | 3 → 2 | ShipLoadoutEntries (27 754 lignes) | **Diff vide**, checksum identique |
+| Blueprints | 4 → 3 | Blueprints, BlueprintRecipeCosts, BlueprintModifiers (12 395 lignes) | **Diff vide** sur les 3 tables |
+| ContractGenerators / Missions | 3 → 2 | ContractGenerators, Missions (2 770 lignes) + comptages MissionRewards/Spawns/RequiredTags | **Diff vide**, comptages identiques |
+
+Chaque réduction, **testée isolément**, ne montre donc aucune perte de donnée détectable.
+
+### Découverte lors du test **combiné** : un bug d'interaction rare
+
+En combinant les 4 réductions ensemble, un run a montré **1 ligne manquante sur 27 754** dans
+`ShipLoadoutEntries` (un composant PowerPlant "Fierell Cascade" sur un vaisseau spécifique). Hypothèse
+initiale : interaction avec la réduction de profondeur Loadouts elle-même. **Invalidée** : en refaisant le
+test avec Loadouts remis à sa profondeur d'origine (3) mais SCItems/Blueprints/ContractGenerators toujours
+réduits, **la même ligne manque à nouveau** (2 runs consécutifs, résultat identique et reproductible).
+
+Ceci démontre que le problème n'est pas la profondeur de Loadouts en tant que telle, mais un **effet de bord
+inter-phases** : réduire la profondeur d'AUTRES phases (SCItems/Blueprints/ContractGenerators) modifie,
+d'une façon qui reste à élucider, la résolution d'UN composant précis pendant la phase Loadouts —
+probablement lié à l'état du cache partagé `P4kService` (timing des purges périodiques, ordre
+d'énumération d'un dictionnaire, ou state affecté par les cycles de vidage/rechargement) au moment où
+`ResolveLoadoutEntry` résout ce composant particulier via `_componentGuidMap`.
+
+Éléments d'investigation déjà écartés :
+- Le composant manquant est bien présent et correctement résolu dans la table `ScItems` (donc pas un
+  problème de résolution P4K en amont).
+- Aucune autre entité du jeu ne partage le même nom court (`TechnicalName` après `Split(".", 2).Last()`)
+  dans `ScItems` — pas de collision de clé évidente dans `_componentGuidMap` provenant du sous-ensemble
+  d'objets équipables (reste à vérifier côté entités NON retenues comme SCItems, non fait par manque de
+  temps).
+- La phase où `_componentGuidMap` est construite (Phase 3, Ships) n'est touchée par aucune des réductions
+  testées — son enrichissement devrait être strictement identique entre les runs.
+- Aucune exception ni avertissement n'est loggé pour ce vaisseau/composant : `ResolveLoadoutEntry` retourne
+  silencieusement `null` (comportement normal pour un port non pertinent), ce qui suggère que la résolution
+  de l'entité échoue silencieusement dans ce cas précis plutôt que de planter.
+
+### Décision
+
+**Abandonnée — aucune des réductions de profondeur n'a été appliquée.** Bien que chaque réduction testée
+isolément soit propre, la découverte d'un effet de bord inter-phases reproductible (même à très faible
+fréquence, 1 ligne sur 27 754) lors de la combinaison est un signal qu'il existe une dépendance cachée non
+comprise entre l'état du cache P4kService et la résolution de certains composants de loadout. Committer ces
+changements sans comprendre la cause exposerait le projet à un risque de perte de données silencieuse
+(aucune exception, aucun log d'erreur) pour un nombre indéterminé d'autres composants potentiellement
+affectés dans des conditions similaires non testées ici. Le code est revenu à l'état du dernier commit
+validé (`54eaeb0`).
+
+### Pistes pour une future investigation
+
+- Ajouter un logging détaillé (ou un breakpoint conditionnel) dans `ResolveLoadoutEntry` et
+  `UpdateCacheRecordWithDepth` spécifiquement pour le composant `50e95028-4764-416c-9380-7d9d52d8d82b`
+  (Fierell Cascade, vaisseau `0045b223-9bea-4ef5-a873-d1316830fe43`, port `hardpoint_power_plant`) pour
+  observer précisément à quel moment et pourquoi sa résolution échoue quand SCItems/Blueprints/
+  ContractGenerators tournent à profondeur réduite.
+- Vérifier si `_componentGuidMap` contient une collision de clé provenant d'une entité NON retenue comme
+  SCItem (donc invisible dans la comparaison faite ici, qui ne portait que sur la table `ScItems`) —
+  nécessiterait une requête directe sur `_EntityClassDict`/`_entityClassGuidDict` en cours d'exécution, pas
+  simplement sur la BDD finale.
+- Envisager de réexécuter le test combiné plusieurs fois supplémentaires (5-10 runs) pour caractériser la
+  fréquence exacte du problème et voir s'il touche systématiquement le même composant ou des composants
+  différents à chaque run (ce qui orienterait vers une vraie race condition plutôt qu'un biais déterministe
+  lié à la profondeur elle-même).
