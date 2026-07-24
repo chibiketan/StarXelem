@@ -267,3 +267,67 @@ d'investigation).
 - Retester la libération du cache + GC entre phases (Itération 2, précédemment abandonnée) maintenant que
   la phase SCItems ne pousse plus l'intégralité du jeu à profondeur 3 : le volume à recycler est plus
   faible, le ratio coût (GC)/bénéfice (mémoire récupérée) pourrait être meilleur qu'avant.
+
+## Itération 5 (2026-07-24, suite) : vidage du cache p4k + GC léger entre phases — ✅ Appliqué
+
+### Ce qui a changé par rapport à l'Itération 2
+
+L'Itération 2 avait conclu à l'abandon de la libération de cache en cours de rebuild : sans le filtrage de
+l'Itération 4, le cache était énorme (~20 Go), le `GC.Collect` agressif+compactant nécessaire pour vraiment
+récupérer la mémoire coûtait plusieurs secondes à chaque appel, et les phases suivantes redemandaient
+souvent les MÊMES enregistrements (déjà résolus en profondeur 3) — d'où une régression nette (temps ET pic
+en hausse).
+
+Deux choses ont changé :
+1. **Le cache est désormais bien plus petit** après l'Itération 4 (seuls les objets équipables, pas
+   l'intégralité du jeu, atteignent la profondeur 3).
+2. **Vérification explicite des dépendances croisées entre phases** avant de choisir les points de vidage :
+   - Après la phase 4 (SCItems) : la phase 5 (Loadouts) rappelle bien `_p4kService.GetEntityType(crc, 3)`
+     pour les MÊMES objets équipables montés sur les vaisseaux (`ResolveLoadoutEntry`, ligne ~662 de
+     `LocalDatabaseService.cs`) — donc vidage à ce point coûte une ré-expansion partielle en phase 5, mais
+     limitée aux composants réellement montés (pas tout le catalogue), donc peu coûteuse en pratique.
+   - Après la phase 5 (Loadouts) : plus aucune phase suivante ne référence les `EntityClassDefinition` de
+     vaisseaux/composants — vidage sans coût de ré-expansion.
+   - Après la phase 7 (Blueprints) : les phases suivantes (Missions, Spawn rules, Locations) travaillent sur
+     d'autres types d'enregistrements (`ContractGenerator`, résolution DB) — vidage sans coût de
+     ré-expansion (hormis quelques blueprints referencés depuis des pools de récompense de mission, résolus
+     à la demande via `_blueprintCache`, un cache distinct non affecté).
+3. **GC "léger" au lieu d'"agressif+compactant"** : `GC.Collect(GC.MaxGeneration, GCCollectionMode.Default,
+   blocking: true, compacting: false)`. Une collecte Gen2 simple récupère déjà l'essentiel de la mémoire
+   managée libérée par le vidage du cache, sans payer le coût de la compaction (déplacement physique des
+   objets vivants) — coût jugé disproportionné pour un nettoyage effectué plusieurs fois par rebuild
+   (contrairement au nettoyage final, fait une seule fois, où la compaction + `ConserveMemory=9` reste
+   justifiée pour rendre la mémoire à l'OS).
+
+### Implémentation
+
+Nouvelle méthode privée `LocalDatabaseService.ReleaseP4kCacheAndCollect(string phaseLabel)` : logge la
+mémoire, appelle `_p4kService.ReleaseHeavyCache()`, puis le GC léger, puis logge de nouveau. Appelée après
+les phases 4, 5 et 7.
+
+### Résultats mesurés (comparaison à 3 niveaux)
+
+| Mesure | Baseline (commit 838c4e4) | + libération après phase 4 seule | **+ libération après phases 4, 5, 7** |
+|---|---|---|---|
+| Managed après phase 5 | — | — | 2 116 Mo (depuis 18 378 Mo) |
+| Managed après phase 7 | 21 895 Mo | — | **2 099 Mo** (depuis 4 440 Mo) |
+| Pic WorkingSet (phase 9) | 22 174 Mo | 17 315 Mo | **14 807 Mo** |
+| Temps total | ~80-90 s | 82,6 s | 93,5 s |
+| Résiduel final après GC | ~2,3 Go | ~2,3 Go | ~2,3 Go |
+
+**Validation de correction** (identique sur les 3 runs) : 23 371 SCItems, 402/23 371 items avec dégâts,
+1 597 blueprints, 2 499 missions, 271 générateurs de contrats, 1 105 vaisseaux — aucune exception.
+
+### Décision
+
+**Conservé.** Pic mémoire ramené de **22,2 Go à 14,8 Go** (-33 % par rapport à la baseline post-Itération 4,
+-67 % par rapport aux ~22 Go initiaux rapportés par l'utilisateur), pour un coût de +11 s sur le temps total
+(93,5 s au lieu de 82,6 s) — compromis jugé acceptable.
+
+**Objectif des 5 Go non atteint.** Le `WorkingSet` (14,8 Go) reste nettement au-dessus du tas managé après
+nettoyage (3,3 Go après phase 9) : sans compaction en cours de rebuild, les segments libérés par le GC léger
+restent réservés par le process (pas rendus à l'OS) pour être réutilisés par les allocations de la phase
+suivante — cohérent avec le comportement standard du GC .NET. Une piste de suite (non testée dans cette
+itération, cf. décision utilisateur de continuer l'investigation) : un unique passage de compaction ciblé
+après la phase la plus lourde, plutôt qu'à chaque point de vidage, pour tenter de rapprocher le `WorkingSet`
+du tas managé sans payer le coût de compaction à répétition.

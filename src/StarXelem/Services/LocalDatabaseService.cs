@@ -214,6 +214,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         await PopulateScItemsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
         _logger.LogInformation("[Phase 4/{Total}] SCItems completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        ReleaseP4kCacheAndCollect("Après phase 4 (SCItems)");
         cancellationToken.ThrowIfCancellationRequested();
 
         // Phase 5: Ship loadouts (depends on ScItems for ComponentRecordId FK)
@@ -222,6 +223,10 @@ public class LocalDatabaseService : ILocalDatabaseService
         await PopulateShipLoadoutsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
         _logger.LogInformation("[Phase 5/{Total}] Ship loadouts completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        // Plus aucune phase suivante ne référence les EntityClassDefinition de vaisseaux/composants montés
+        // (contract generators, blueprints et missions portent sur d'autres types d'enregistrements) :
+        // sûr de libérer ici la matérialisation en profondeur 3 accumulée par les phases 4 et 5.
+        ReleaseP4kCacheAndCollect("Après phase 5 (Loadouts)");
         cancellationToken.ThrowIfCancellationRequested();
 
         // Phase 6: Contract generators
@@ -247,7 +252,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         // ré-insérer un plan déjà enregistré. Il n'est vidé qu'après la phase 8 (voir PopulateMissionsAsync).
         phase.Stop();
         _logger.LogInformation("[Phase 7/{Total}] Blueprints completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
-        LogMemoryUsage("Après phase 7 (Blueprints)");
+        ReleaseP4kCacheAndCollect("Après phase 7 (Blueprints)");
         cancellationToken.ThrowIfCancellationRequested();
 
         // Phase 8: Missions and their requirements/rewards/spawn rules
@@ -304,6 +309,23 @@ public class LocalDatabaseService : ILocalDatabaseService
         var workingSetMb = Environment.WorkingSet / 1024.0 / 1024.0;
         var managedMb = GC.GetTotalMemory(false) / 1024.0 / 1024.0;
         _logger.LogInformation("[Mémoire] {Label} : WorkingSet={WorkingSetMb:F0} Mo, Managed={ManagedMb:F0} Mo", label, workingSetMb, managedMb);
+    }
+
+    /// <summary>
+    /// Vide le cache lourd du P4kService (records EntityClassDefinition déjà consommés par la phase qui
+    /// vient de se terminer) et déclenche une collecte Gen2 "légère" (bloquante mais NON compactante).
+    /// Volontairement plus léger qu'un GC agressif+compactant : celui-ci coûte plusieurs secondes sur un
+    /// tas de plusieurs Go pour un gain marginal en cours de rebuild (mesuré), alors qu'une collecte simple
+    /// récupère déjà l'essentiel de la mémoire libérée par le vidage du cache, à moindre coût.
+    /// Les phases suivantes qui ont encore besoin de records déjà vus les re-matérialisent à la demande
+    /// (LoadDatabaseIfNeeded les retrouve à profondeur -1, coût de rescan négligeable).
+    /// </summary>
+    private void ReleaseP4kCacheAndCollect(string phaseLabel)
+    {
+        LogMemoryUsage($"{phaseLabel}, avant vidage cache P4K");
+        _p4kService.ReleaseHeavyCache();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Default, blocking: true, compacting: false);
+        LogMemoryUsage($"{phaseLabel}, après vidage cache P4K + GC léger");
     }
 
     /* ========================================================================
