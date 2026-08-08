@@ -44,7 +44,9 @@ jobs:
       - name: Copy manifest and assets
         shell: pwsh
         run: |
-          (Get-Content src/StarXelem/AppxManifest.xml) -replace 'Version="[\d\.]+"', 'Version="${{ steps.version.outputs.full_version }}"' | Set-Content out/publish/AppxManifest.xml
+          [xml]$manifest = Get-Content -Path src/StarXelem/AppxManifest.xml -Raw
+          $manifest.Package.Identity.Version = "${{ steps.version.outputs.full_version }}"
+          $manifest.Save("$PWD/out/publish/AppxManifest.xml")
           Copy-Item -Recurse src/StarXelem/DeployAssets out/publish/Assets
 
       - name: Package MSIX
