@@ -50,13 +50,15 @@ jobs:
       - name: Package MSIX
         shell: pwsh
         run: |
-          & "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.22621.0\x64\makeappx.exe" pack /d out/publish /p out/StarXelem.msix
-
+          $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          & $makeappx pack /d out/publish /p out/StarXelem.msix
+  
       - name: Sign MSIX (test cert)
         shell: pwsh
         run: |
           [IO.File]::WriteAllBytes("test-cert.pfx", [Convert]::FromBase64String("${{ secrets.MSSTORE_TEST_CERT_PFX_BASE64 }}"))
-          & "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /fd SHA256 /a /f test-cert.pfx /p "${{ secrets.MSSTORE_TEST_CERT_PASSWORD }}" out/StarXelem.msix
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          & $signtool sign /fd SHA256 /a /f test-cert.pfx /p "${{ secrets.MSSTORE_TEST_CERT_PASSWORD }}" out/StarXelem.msix
 
       - name: Install msstore CLI
         run: winget install --id Microsoft.MSStoreCLI --accept-package-agreements --accept-source-agreements
