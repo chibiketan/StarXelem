@@ -4,26 +4,78 @@ on:
   push:
     tags:
       - 'v*.*.*'
-
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag à republier manuellement (ex: v1.0.0-beta.1)'
+        required: true
 jobs:
-  build-windows:
-    name: Build Windows x64
+  build-and-release:
     runs-on: windows-latest
     permissions:
       contents: write
       deployments: write
-      
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Determine version info
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.ref || github.ref_name }}"
+          $isBeta = $tag -match '-beta'
+          $version = $tag.TrimStart('v') -replace '-beta.*',''
+          $parts = $version.Split('.')
+          $fullVersion = "$($parts[0]).$($parts[1]).$($parts[2]).${{ github.run_number }}"
+          echo "is_beta=$isBeta" >> $env:GITHUB_OUTPUT
+          echo "full_version=$fullVersion" >> $env:GITHUB_OUTPUT
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore
-        run: dotnet restore src/StarXelem/StarXelem.csproj
+      - name: Publish
+        run: dotnet publish src/StarXelem/StarXelem.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o out/publish
+
+      - name: Copy manifest and assets
+        shell: pwsh
+        run: |
+          (Get-Content AppxManifest.xml) -replace 'Version="[\d\.]+"', 'Version="${{ steps.version.outputs.full_version }}"' | Set-Content out/publish/AppxManifest.xml
+          Copy-Item -Recurse Assets out/publish/Assets
+
+      - name: Package MSIX
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.22621.0\x64\makeappx.exe" pack /d out/publish /p out/StarXelem.msix
+
+      - name: Sign MSIX (test cert)
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("test-cert.pfx", [Convert]::FromBase64String("${{ secrets.MSSTORE_TEST_CERT_PFX_BASE64 }}"))
+          & "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /fd SHA256 /a /f test-cert.pfx /p "${{ secrets.MSSTORE_TEST_CERT_PASSWORD }}" out/StarXelem.msix
+
+      - name: Install msstore CLI
+        run: winget install --id Microsoft.MSStoreCLI --accept-package-agreements --accept-source-agreements
+
+      - name: Configure msstore credentials
+        shell: pwsh
+        run: |
+          msstore reconfigure --tenantId ${{ secrets.AZURE_AD_TENANT_ID }} --sellerId ${{ secrets.SELLER_ID }} --clientId ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }} --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
+
+      - name: Publish stable submission
+        if: steps.version.outputs.is_beta == 'False'
+        run: msstore publish out --input out/StarXelem.msix --productId ${{ secrets.MSSTORE_PRODUCT_ID }}
+
+      - name: Publish beta flight
+        if: steps.version.outputs.is_beta == 'True'
+        shell: pwsh
+        run: |
+          msstore flights submission update ${{ secrets.MSSTORE_PRODUCT_ID }} ${{ secrets.MSSTORE_FLIGHT_ID_BETA }} --package out/StarXelem.msix
+          msstore flights submission publish ${{ secrets.MSSTORE_PRODUCT_ID }} ${{ secrets.MSSTORE_FLIGHT_ID_BETA }}
 
       - name: Publish win-x64
         run: >
@@ -40,13 +92,16 @@ jobs:
           -o publish/win-x64
 
       - name: Zip
-        run: Compress-Archive -Path publish/win-x64/* -DestinationPath StarXelem-${{ github.ref_name }}-win-x64.zip
+        run: Compress-Archive -Path publish/win-x64/* -DestinationPath out/StarXelem-${{ github.ref_name }}-win-x64.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: StarXelem ${{ github.ref_name }}
-          files: StarXelem-${{ github.ref_name }}-win-x64.zip
+          files: |
+            out/StarXelem.msix
+            out/StarXelem-${{ github.ref_name }}-win-x64.zip
           generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          tag_name: ${{ github.event.inputs.ref || github.ref_name }}
+          prerelease: ${{ steps.version.outputs.isBeta }}
