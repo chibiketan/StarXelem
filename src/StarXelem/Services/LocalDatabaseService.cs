@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
+using StarXelem.Constants;
 using StarXelem.Data;
 using StarXelem.Models;
 using System.Runtime.InteropServices;
@@ -96,7 +97,9 @@ public class LocalDatabaseService : ILocalDatabaseService
     {
         string? currentP4kVersion = _p4kService.SelectedP4KFile?.Manifest?.Data?.RequestedP4ChangeNum;
         string? storedP4kVersion = await _settingsService.GetAsync("P4KVersion").ConfigureAwait(false);
-        return !File.Exists(_factory.DbPath) || currentP4kVersion != storedP4kVersion;
+        string? storedDbVersion = await _settingsService.GetAsync("DatabaseVersion").ConfigureAwait(false);
+        bool dbVersionMismatch = !int.TryParse(storedDbVersion, out int parsedDbVersion) || parsedDbVersion != DatabaseConstants.DatabaseVersion;
+        return !File.Exists(_factory.DbPath) || currentP4kVersion != storedP4kVersion || dbVersionMismatch;
     }
 
     public async Task EnsureDbAsync(IProgress<RebuildProgress>? progress = null)
@@ -150,6 +153,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         try
         {
             await _rebuildTask.ConfigureAwait(false);
+            await _settingsService.SetAsync("DatabaseVersion", DatabaseConstants.DatabaseVersion.ToString()).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
