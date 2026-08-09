@@ -63,7 +63,12 @@ jobs:
           & $signtool sign /fd SHA256 /a /f test-cert.pfx /p "${{ secrets.MSSTORE_TEST_CERT_PASSWORD }}" out/StarXelem.msix
 
       - name: Install msstore CLI
-        run: winget install --id Microsoft.MSStoreCLI --accept-package-agreements --accept-source-agreements
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Invoke-WebRequest -Uri "https://github.com/microsoft/msstore-cli/releases/latest/download/MSStoreCLI-win-x64.zip" -OutFile msstore.zip
+          Expand-Archive -Path msstore.zip -DestinationPath msstore-cli
+          echo "$PWD\msstore-cli" >> $env:GITHUB_PATH
 
       - name: Configure msstore credentials
         shell: pwsh
