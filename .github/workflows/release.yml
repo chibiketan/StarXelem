@@ -28,8 +28,7 @@ jobs:
           $tag = "${{ github.event.inputs.ref || github.ref_name }}"
           $isBeta = $tag -match '-beta'
           $version = $tag.TrimStart('v') -replace '-beta.*',''
-          $parts = $version.Split('.')
-          $fullVersion = "$($parts[0]).$($parts[1]).$($parts[2]).${{ github.run_number }}"
+          $fullVersion = "$version.0"
           echo "is_beta=$isBeta" >> $env:GITHUB_OUTPUT
           echo "full_version=$fullVersion" >> $env:GITHUB_OUTPUT
 
@@ -77,15 +76,12 @@ jobs:
 
       - name: Publish stable submission
         if: steps.version.outputs.is_beta == 'False'
-        run: msstore publish out --input out/StarXelem.msix --productId ${{ secrets.MSSTORE_PRODUCT_ID }}
+        run: msstore publish out/StarXelem.msix --appId ${{ secrets.MSSTORE_PRODUCT_ID }}
 
       - name: Publish beta flight
         if: steps.version.outputs.is_beta == 'True'
-        shell: pwsh
-        run: |
-          msstore flights submission update ${{ secrets.MSSTORE_PRODUCT_ID }} ${{ secrets.MSSTORE_FLIGHT_ID_BETA }} --package out/StarXelem.msix
-          msstore flights submission publish ${{ secrets.MSSTORE_PRODUCT_ID }} ${{ secrets.MSSTORE_FLIGHT_ID_BETA }}
-
+        run: msstore publish out/StarXelem.msix --appId ${{ secrets.MSSTORE_PRODUCT_ID }} --flightId ${{ secrets.MSSTORE_FLIGHT_ID_BETA }}
+        
       - name: Publish win-x64
         run: >
           dotnet publish src/StarXelem/StarXelem.csproj
@@ -113,4 +109,4 @@ jobs:
           generate_release_notes: true
           draft: false
           tag_name: ${{ github.event.inputs.ref || github.ref_name }}
-          prerelease: ${{ steps.version.outputs.isBeta }}
+          prerelease: ${{ steps.version.outputs.isBeta == 'True' }}
