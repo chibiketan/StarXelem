@@ -65,7 +65,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          Invoke-WebRequest -Uri "https://github.com/microsoft/msstore-cli/releases/latest/download/MSStoreCLI-win-x64.zip" -OutFile msstore.zip
+          Invoke-WebRequest -Uri "https://github.com/microsoft/msstore-cli/releases/download/v0.3.9/MSStoreCLI-win-x64.zip" -OutFile msstore.zip
           Expand-Archive -Path msstore.zip -DestinationPath msstore-cli
           echo "$PWD\msstore-cli" >> $env:GITHUB_PATH
 
