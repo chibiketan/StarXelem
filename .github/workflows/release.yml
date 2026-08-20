@@ -48,12 +48,19 @@ jobs:
           $manifest.Save("$PWD/out/publish/AppxManifest.xml")
           Copy-Item -Recurse src/StarXelem/DeployAssets out/publish/Assets
 
+      - name: Generate resources.pri
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $makepri = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makepri.exe" | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          & $makepri new /pr out/publish /cf src/StarXelem//priconfig.xml /mn out/publish/AppxManifest.xml /of out/publish/resources.pri /o
+
       - name: Package MSIX
         shell: pwsh
         run: |
           $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
           & $makeappx pack /d out/publish /p out/StarXelem.msix
-  
+          
       - name: Sign MSIX (test cert)
         shell: pwsh
         run: |
