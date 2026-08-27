@@ -2171,16 +2171,6 @@ public class LocalDatabaseService : ILocalDatabaseService
                 }
             }
 
-            // MeetAndTalk also has travelObjectiveInfo but inherits directly from ObjectiveHandlerBase
-            if (string.IsNullOrEmpty(textKey) && handler is ObjectiveHandler_MeetAndTalk meetAndTalkHandler)
-            {
-                var meetInfo = meetAndTalkHandler.travelObjectiveInfo;
-                if (!string.IsNullOrEmpty(meetInfo.shortDescription))
-                {
-                    textKey = meetInfo.shortDescription;
-                }
-            }
-
             // Fallback to token displayInfo
             if (string.IsNullOrEmpty(textKey))
             {

@@ -96,9 +96,12 @@ public partial class ShipTabViewModel : PageViewModelBase
             ParentUrnList = spaceshipUrnList,
             useConnectedUserOwner = true,
             TypeList = [EItemType.NOITEM_Vehicle],
-            InventoryIdList = spaceships.Where(s => null != s.StowContext?.InventoryId).Select(s => s.StowContext!.InventoryId).ToList()
+            //InventoryIdList = spaceships.Where(s => null != s.StowContext?.InventoryId).Select(s => s.StowContext!.InventoryId).ToList()
         };
         
+        // TODO si l'inventoryId appartient à un joueur une erreur d'accès à une ressource apartenant à un autre joueur est levé.
+        // Dans ce cas la (inventoryId d'un autre joueur) alors l'ASOP affiche "captured", comment reproduire ce comportement ?
+        // Erreur : Unhandled exception. Grpc.Core.RpcException: Status(StatusCode="PermissionDenied", Detail="Cannot access inventories owned by another player")
         var spaceshipEntityList = await _clientService.QueryGraphBySearch(queryParameters);
 
         foreach (var spaceship in spaceships)
