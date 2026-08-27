@@ -64,7 +64,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     [ObservableProperty] private bool _useConnectedProfilAsOwner = true;
     [ObservableProperty] private bool _useUserInventoryList = true;
     [ObservableProperty] private bool _useTreeProjection = false;
-    [ObservableProperty] private bool _loadInventoryContent = true;
+    [ObservableProperty] private bool _loadInventoryContent = false;
     [ObservableProperty] private string _ownerId = "";
     [ObservableProperty] private string _id = "";
     [ObservableProperty] private bool _isInDebugMode = false;
