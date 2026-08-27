@@ -267,6 +267,7 @@ public class GrpcClientService : IGrpcClientService
         };
 
         var edgeDict = new Dictionary<ulong, EntityEdge>(500);
+        var snapshotDict = new Dictionary<ulong, EntitySnapshot>(500);
         var nodes = new List<Node>(800);
 
         // Exécution paginée générique
@@ -290,6 +291,14 @@ public class GrpcClientService : IGrpcClientService
                             edgeDict.TryAdd(edge.Start.EntityId, edge);
                         else
                             _logger.LogInformation("Edge start pas de type Entity : {Type}", edge.Start.Type);
+                    }
+
+                    foreach (var entitySnapshot in response.Body.Snapshots)
+                    {
+                        if (!snapshotDict.TryAdd(entitySnapshot.EntityId, entitySnapshot))
+                        {
+                            _logger.LogInformation("Le snapshot existe déjà pour l'entité avec l'id {id}", entitySnapshot.EntityId);
+                        } 
                     }
 
                     nodes.AddRange(response.Body.Results.Nodes);
@@ -399,6 +408,7 @@ public class GrpcClientService : IGrpcClientService
         {
             EntityNodeProperties = n.Properties.EntityProperties,
             EntityEdge = GetFromDict(edgeDict, n.Properties.EntityProperties.Geid),
+            EntitySnapshot = GetFromDict(snapshotDict, n.Properties.EntityProperties.Geid),
             EntityClassProperties = null
         }).ToList();
     }

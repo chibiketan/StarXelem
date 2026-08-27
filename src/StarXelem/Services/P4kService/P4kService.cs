@@ -470,6 +470,114 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Comme <see cref="GetAllEntityClassDefinition"/>, mais évite d'étendre TOUS les EntityClassDefinition
+    /// du jeu jusqu'à <paramref name="finalDepth"/> : le prédicat est d'abord évalué à une profondeur plus
+    /// légère (<paramref name="filterDepth"/>), et seuls les enregistrements retenus sont ensuite étendus
+    /// jusqu'à <paramref name="finalDepth"/>. Réduit fortement le nombre d'objets lourdement matérialisés
+    /// quand seule une fraction des entités du jeu est réellement utile à l'appelant (ex: SCItems parmi
+    /// vaisseaux/PNJ/props).
+    /// </summary>
+    public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinitionFiltered(
+        int filterDepth,
+        int finalDepth,
+        Func<EntityClassDefinition, bool> predicate)
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+
+        var records = _EntityClassDict.Values
+            .AsParallel()
+            .Where(r => r.Record.Data is EntityClassDefinition)
+            .ToList();
+
+        await Task.WhenAll(records.AsParallel().Select(async r =>
+        {
+            if (r.depth < filterDepth)
+                await UpdateCacheRecordWithDepth(r, filterDepth);
+        })).ConfigureAwait(false);
+
+        var matching = records
+            .Where(r => r.Record.Data is EntityClassDefinition ec && predicate(ec))
+            .ToList();
+
+        await Task.WhenAll(matching.AsParallel().Select(async r =>
+        {
+            if (r.depth < finalDepth)
+                await UpdateCacheRecordWithDepth(r, finalDepth);
+        })).ConfigureAwait(false);
+
+        foreach (var record in matching)
+        {
+            yield return record.Record;
+        }
+    }
+
+    /// <summary>
+    /// Comme <see cref="GetAllEntityClassDefinitionFiltered"/>, mais n'étend le sous-ensemble retenu
+    /// jusqu'à <paramref name="finalDepth"/> QUE par lots de <paramref name="batchSize"/> éléments, au
+    /// lieu de tous les étendre d'un coup avant de rien céder au consommateur. Ne conserve entre deux lots
+    /// que les identifiants (légers) des enregistrements retenus, jamais les objets matérialisés
+    /// eux-mêmes : si l'appelant vide le cache lourd (<see cref="ReleaseHeavyCache"/>) entre deux
+    /// itérations de la boucle de consommation, la mémoire du lot précédent devient effectivement
+    /// récupérable par le GC, et le pic mémoire reste borné à la taille d'un lot plutôt qu'à l'ensemble
+    /// filtré complet.
+    /// </summary>
+    public async IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinitionFilteredBatched(
+        int filterDepth,
+        int finalDepth,
+        Func<EntityClassDefinition, bool> predicate,
+        int batchSize)
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+
+        var candidates = _EntityClassDict.Values
+            .AsParallel()
+            .Where(r => r.Record.Data is EntityClassDefinition)
+            .ToList();
+
+        await Task.WhenAll(candidates.AsParallel().Select(async r =>
+        {
+            if (r.depth < filterDepth)
+                await UpdateCacheRecordWithDepth(r, filterDepth);
+        })).ConfigureAwait(false);
+
+        // On ne garde que les identifiants (légers) des enregistrements retenus : aucune référence vers
+        // les CacheEntry/DataCoreTypedRecord (potentiellement volumineux) ne doit survivre au-delà du lot
+        // en cours de traitement.
+        var matchingIds = candidates
+            .Where(r => r.Record.Data is EntityClassDefinition ec && predicate(ec))
+            .Select(r => r.Record.RecordId)
+            .ToList();
+        candidates = null!;
+
+        for (var offset = 0; offset < matchingIds.Count; offset += batchSize)
+        {
+            // Le cache peut avoir été vidé par l'appelant depuis le lot précédent (entre deux
+            // MoveNextAsync) : LoadDatabaseIfNeeded() est un no-op si le cache est toujours chaud, et
+            // reconstruit sinon (peu coûteux : uniquement des enregistrements "vides", profondeur -1).
+            await LoadDatabaseIfNeeded().ConfigureAwait(false);
+
+            var batchIds = matchingIds.GetRange(offset, Math.Min(batchSize, matchingIds.Count - offset));
+            var batchEntries = new List<CacheEntry>(batchIds.Count);
+            foreach (var id in batchIds)
+            {
+                if (_entityClassGuidDict.TryGetValue(id, out var entry))
+                    batchEntries.Add(entry);
+            }
+
+            await Task.WhenAll(batchEntries.AsParallel().Select(async r =>
+            {
+                if (r.depth < finalDepth)
+                    await UpdateCacheRecordWithDepth(r, finalDepth);
+            })).ConfigureAwait(false);
+
+            foreach (var entry in batchEntries)
+            {
+                yield return entry.Record;
+            }
+        }
+    }
+
     public async Task FillDataCache()
     {
         UpdateState(P4kFileLoadState.CacheLoading);
@@ -552,6 +660,17 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<TagDatabase> GetTagDatabase()
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+        var cacheEntry = _EntityClassDict.Values.First(r => r.Record.Data is TagDatabase);
+        
+        // TODO Crash à 10, comment augmenter cette limite ???
+        await UpdateCacheRecordWithDepth(cacheEntry, 15).ConfigureAwait(false);
+        return (TagDatabase)cacheEntry.Record.Data;
+    }
+
     public async Task<DataCoreTypedRecord?> GetRecordWithSpecificDepth(CigGuid recordId, int depth)
     {
         await LoadDatabaseIfNeeded().ConfigureAwait(false);
@@ -586,6 +705,76 @@ public class P4kService : IP4kService, INotifyPropertyChanged
             }));
 
         return results.Select(r => r.Record).ToList();
+    }
+
+    public async Task<List<DataCoreTypedRecord>> GetAllCraftingBlueprintRecord()
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+
+        var result = new List<DataCoreTypedRecord>(500);
+
+        foreach (var record in _EntityClassDict.Values)
+        {
+            if (record.Record.Data is CraftingBlueprintRecord)
+            {
+                result.Add(record.Record);
+            }
+        }
+
+        return result;
+    }
+
+    public async Task<List<DataCoreTypedRecord>> GetAllStarMapObjects()
+    {
+        await LoadDatabaseIfNeeded().ConfigureAwait(false);
+
+        var records = _EntityClassDict.Values
+            .AsParallel()
+            .Where(r => r.Record.Data is StarMapObject)
+            .ToList();
+
+        // StarMapObject properties (name, type, parent, etc.) are at depth 1
+        await Task.WhenAll(records.AsParallel().Select(async r =>
+        {
+            if (r.depth < 1)
+                await UpdateCacheRecordWithDepth(r, 1);
+        })).ConfigureAwait(false);
+
+        return records.Select(r => r.Record).ToList();
+    }
+
+    /// <summary>
+    /// Récupère un enregistrement arbitraire par son CigGuid via le DataForge.
+    /// Utile pour charger des records qui ne sont pas des EntityClassDefinition (ResourceType, MineableComposition, etc.)
+    /// </summary>
+    public void ReleaseHeavyCache()
+    {
+        var count = _EntityClassDict.Count;
+        _EntityClassDict.Clear();
+        _entityClassGuidDict.Clear();
+        // Permet à LoadDatabaseIfNeeded() de reconstruire le cache (à profondeur minimale, donc bon marché)
+        // la prochaine fois qu'il sera nécessaire, au lieu de le considérer comme déjà chargé.
+        _loadingDatabaseTask = null;
+        _logger.LogInformation("Cache lourd P4kService libéré ({Count} enregistrements).", count);
+    }
+
+    public async Task<object?> GetRecordById(CigGuid recordId)
+    {
+        await OpenP4k(SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
+
+        return await LargeStackThreadPool.Shared.EnqueueAsync(() =>
+        {
+            var oldval = DataCoreBinaryGenerated.s_maxRecursiveLoad;
+            try
+            {
+                DataCoreBinaryGenerated.s_maxRecursiveLoad = 5;
+                return df.GetFromRecord(recordId)?.Data;
+            }
+            finally
+            {
+                DataCoreBinaryGenerated.s_maxRecursiveLoad = oldval;
+            }
+        }).ConfigureAwait(false);
     }
 
     private void ResetSelectedFile()
@@ -633,6 +822,25 @@ public class P4kService : IP4kService, INotifyPropertyChanged
         {
             UpdateState(P4kFileLoadState.CacheLoaded);
         }
+    }
+
+    public async Task<List<DataCoreTypedRecord>> EnsureRecordsDepthAsync(IEnumerable<DataCoreTypedRecord> records, int depth)
+    {
+        var tasks = records.AsParallel().Select(async record =>
+        {
+            if (_entityClassGuidDict.TryGetValue(record.RecordId, out var cacheEntry))
+            {
+                await UpdateCacheRecordWithDepth(cacheEntry, depth).ConfigureAwait(false);
+
+                return cacheEntry.Record;
+            }
+
+            return record;
+        })
+        .ToList();
+
+        await Task.WhenAll(tasks).ConfigureAwait(false);
+        return tasks.Select(t => t.Result).ToList();
     }
 
     private async Task UpdateCacheRecordWithDepth(CacheEntry cacheEntry, int newDepth)

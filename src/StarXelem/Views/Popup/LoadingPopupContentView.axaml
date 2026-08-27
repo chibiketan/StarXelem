@@ -6,8 +6,22 @@
              x:DataType="vm:LoadingPopupContentViewModel"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="StarXelem.Views.Popup.LoadingPopupContentView">
-    <StackPanel Margin="10 10 10 10">
-        <ProgressBar IsIndeterminate="True" IsVisible="{Binding ShowLoading}" Margin="10 0 10 10" MinWidth="100" />
-        <TextBlock VerticalAlignment="Top" HorizontalAlignment="Center" Text="{Binding Message}" />
+    <StackPanel Margin="20">
+        <TextBlock HorizontalAlignment="Center"
+                   Text="{Binding PhaseLabel}"
+                   FontSize="13"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextBrush}"
+                   Margin="0 0 0 8" />
+        <ProgressBar x:Name="ProgressBar"
+                     Value="{Binding Progress}"
+                     IsIndeterminate="True"
+                     Margin="10 0 10 10"
+                     MinWidth="200" />
+        <TextBlock HorizontalAlignment="Center"
+                   Text="{Binding Message}"
+                   FontSize="11"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   Margin="0 4 0 0" />
     </StackPanel>
 </UserControl>

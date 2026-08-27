@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FluentAvalonia.UI.Controls;
 using StarBreaker.DataCoreGenerated;
+using StarXelem.Data;
 using StarXelem.Models;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
@@ -51,7 +52,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
     }
     
     private readonly IGrpcClientService  _clientService;
-    private readonly IP4kService _p4KService;
+    private readonly IScItemRepository _scItemRepository;
+    private readonly ILocaleEntryRepository _localeEntryRepository;
     private readonly ILocationService _locationService;
     public override string Name => "Objets";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.PersonAccounts);
@@ -62,7 +64,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     [ObservableProperty] private bool _useConnectedProfilAsOwner = true;
     [ObservableProperty] private bool _useUserInventoryList = true;
     [ObservableProperty] private bool _useTreeProjection = false;
-    [ObservableProperty] private bool _loadInventoryContent = true;
+    [ObservableProperty] private bool _loadInventoryContent = false;
     [ObservableProperty] private string _ownerId = "";
     [ObservableProperty] private string _id = "";
     [ObservableProperty] private bool _isInDebugMode = false;
@@ -88,10 +90,11 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     private Task<IList<ItemViewModel>>? _unfilteredItemList;
 
-    public ItemsTabViewModel(IGrpcClientService clientService, IP4kService p4kService, ILocationService locationService)
+    public ItemsTabViewModel(IGrpcClientService clientService, IScItemRepository scItemRepository, ILocaleEntryRepository localeEntryRepository, ILocationService locationService)
     {
         _clientService = clientService;
-        _p4KService = p4kService;
+        _scItemRepository = scItemRepository;
+        _localeEntryRepository = localeEntryRepository;
         _locationService = locationService;
 
         _clientService.OnStatusChanged += (sender, status) => { OnConnectedStatusChanged(status); };
@@ -222,8 +225,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
         var result = new List<ItemViewModel>();
         foreach (var item in itemList)
         {
-            var claddType = await _p4KService.GetEntityType(item.EntityNodeProperties.ClassGuidCrc);
-            result.Add(new ItemViewModel(_p4KService, _locationService, _clientService, this, item, claddType));
+            var scItem = await _scItemRepository.GetByCrc32Async(item.EntityNodeProperties.ClassGuidCrc);
+            result.Add(new ItemViewModel(_localeEntryRepository, _locationService, _clientService, this, item, scItem));
         }
 
         _unfilteredItemList = Task.FromResult<IList<ItemViewModel>>(result);

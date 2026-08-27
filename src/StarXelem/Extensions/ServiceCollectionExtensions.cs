@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using StarXelem.Data;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
 using StarXelem.ViewModels;
@@ -14,7 +15,7 @@ public static class ServiceCollectionExtensions
         services.AddLogging(b =>
         {
 #if DEBUG
-            b.SetMinimumLevel(LogLevel.Warning);
+            b.SetMinimumLevel(LogLevel.Information);
             b.AddDebug();
 #else
             b.SetMinimumLevel(LogLevel.Warning);
@@ -45,6 +46,8 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<ILocationService, DesignLocationService>();
             services.AddSingleton<IEntityClassDefinitionService, EntityClassDefinitionService>();
             services.AddSingleton<BlueprintListTabViewModel>();
+            services.AddSingleton<ILocalDatabaseService, DesignLocalDatabaseService>();
+            services.AddSingleton<ISettingsService, DesignSettingsService>();
         }
         else
         {
@@ -53,13 +56,24 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<ILocationService, LocationService>();
             services.AddSingleton<IEntityClassDefinitionService, EntityClassDefinitionService>();
             services.AddTransient<BlueprintListTabViewModel>();
+            services.AddSingleton<ILocalDatabaseService>(sp =>
+                new LocalDatabaseService(
+                    sp.GetRequiredService<IP4kService>(),
+                    sp.GetRequiredService<ILogger<LocalDatabaseService>>(),
+                    sp.GetRequiredService<ISettingsService>(),
+                    sp.GetRequiredService<IDbContextFactory>(),
+                    autoRebuild: false));
+            services.AddSingleton<ISettingsService, RegistrySettingsService>();
         }
 
         // Les services indépendants du mode design
         services.AddSingleton<IBlueprintMappingService, BlueprintMappingService>();
         services.AddSingleton<IMissionMappingService, MissionMappingService>();
-        services.AddSingleton<ISettingsService, RegistrySettingsService>();
         services.AddSingleton<IReputationService, ReputationService>();
+        services.AddSingleton<IDbContextFactory, DbContextFactory>();
+        services.AddSingleton<ILocationRepository, LocationRepository>();
+        services.AddSingleton<IScItemRepository, ScItemRepository>();
+        services.AddSingleton<ILocaleEntryRepository, LocaleEntryRepository>();
 
         // Service API externe pour la communication avec Alliance Orbital (profil utilisateur)
         services.AddSingleton<IAllianceOrbitalService, AllianceOrbitalService>();

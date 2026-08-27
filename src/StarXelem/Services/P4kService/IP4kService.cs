@@ -38,12 +38,29 @@ public interface IP4kService : INotifyPropertyChanged
     /// <returns>La valeur trouvée qui correspond à la clé, sinon null</returns>
     Task<string?> GetLocaleValue(string? key);
     Task<DataCoreTypedRecord?> GetEntityType(uint guidCrc);
+    Task<DataCoreTypedRecord?> GetEntityType(uint guidCrc, int depth);
 
     /// <summary>
     /// Retourne l'ensemble des enregistrements de type EntityClassDefinition
     /// </summary>
     /// <returns>UUne énumération asynchronie des enregistrements</returns>
     IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinition(int depth);
+
+    /// <summary>
+    /// Comme <see cref="GetAllEntityClassDefinition"/>, mais évalue d'abord <paramref name="predicate"/> à
+    /// une profondeur légère (<paramref name="filterDepth"/>) et n'étend jusqu'à <paramref name="finalDepth"/>
+    /// que les enregistrements retenus, pour éviter de matérialiser en profondeur des entités non pertinentes.
+    /// </summary>
+    IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinitionFiltered(
+        int filterDepth, int finalDepth, Func<EntityClassDefinition, bool> predicate);
+
+    /// <summary>
+    /// Comme <see cref="GetAllEntityClassDefinitionFiltered"/>, mais n'étend le sous-ensemble retenu que
+    /// par lots de <paramref name="batchSize"/> éléments, sans jamais retenir plus d'un lot en mémoire à
+    /// la fois — permet à l'appelant de vider le cache lourd entre deux lots pour borner le pic mémoire.
+    /// </summary>
+    IAsyncEnumerable<DataCoreTypedRecord> GetAllEntityClassDefinitionFilteredBatched(
+        int filterDepth, int finalDepth, Func<EntityClassDefinition, bool> predicate, int batchSize);
 
     /// <summary>
     /// Provoque le lancement de l'alimentation des différents cache ce qui permet d'avoir des données prêtes et une requête rapide
@@ -56,6 +73,12 @@ public interface IP4kService : INotifyPropertyChanged
     Task<DataCoreTypedRecord> GetRecordWithFullHistory(CigGuid recordId);
     
     /// <summary>
+    /// Retourne la base de données des tags
+    /// </summary>
+    /// <returns></returns>
+    Task<TagDatabase> GetTagDatabase();
+    
+    /// <summary>
     /// Récupère un enregistrement avec un minimum une profondeur de données spécifique
     /// </summary>
     /// <param name="recordId">ID de l'enregistrement à récupérer</param>
@@ -64,4 +87,20 @@ public interface IP4kService : INotifyPropertyChanged
     Task<DataCoreTypedRecord?> GetRecordWithSpecificDepth(CigGuid recordId, int depth);
 
     Task<List<DataCoreTypedRecord>> GetAllFactionReputations();
+    Task<List<DataCoreTypedRecord>> GetAllCraftingBlueprintRecord();
+    Task<List<DataCoreTypedRecord>> GetAllStarMapObjects();
+    Task<List<DataCoreTypedRecord>> EnsureRecordsDepthAsync(IEnumerable<DataCoreTypedRecord> records, int depth);
+
+    /// <summary>
+    /// Récupère un enregistrement arbitraire par son CigGuid (utile pour ResourceType, MineableComposition, etc.)
+    /// </summary>
+    Task<object?> GetRecordById(CigGuid recordId);
+
+    /// <summary>
+    /// Vide le cache lourd des enregistrements EntityClassDefinition (chargés en profondeur pour toutes les
+    /// entités du jeu). Ce cache sera reconstruit paresseusement (profondeur minimale) au prochain accès.
+    /// À utiliser après une opération massive (ex: reconstruction de la BDD locale) pour libérer la mémoire.
+    /// </summary>
+    void ReleaseHeavyCache();
 }
+

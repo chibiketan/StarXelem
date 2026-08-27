@@ -19,6 +19,8 @@ public partial class ExtractionTabViewModel : PageViewModelBase
 {
     private const string DataCorePath = @"Data\Game2.dcb";
     private readonly IP4kService _p4kService;
+    private readonly ILocalDatabaseService _localDatabaseService;
+    private readonly IGrpcClientService _grpcClientService;
     private readonly ILogger<ExtractionTabViewModel> _logger;
 
     public override string Name => "Extractions";
@@ -41,13 +43,38 @@ public partial class ExtractionTabViewModel : PageViewModelBase
     [ObservableProperty] private string _statusMessage = "";
     [ObservableProperty] private double _csvProgress = 0;
     [ObservableProperty] private double _langProgress = 0;
+    [ObservableProperty] private bool _includeBlueprints = true;
+    [ObservableProperty] private bool _includeObtainedBlueprints = false;
+    [ObservableProperty] private bool _isGrpcConnected = false;
 
-    public ExtractionTabViewModel(IP4kService p4kService, ILogger<ExtractionTabViewModel> logger)
+    public ExtractionTabViewModel(IP4kService p4kService, ILocalDatabaseService localDatabaseService, IGrpcClientService grpcClientService, ILogger<ExtractionTabViewModel> logger)
     {
         _p4kService = p4kService;
+        _localDatabaseService = localDatabaseService;
+        _grpcClientService = grpcClientService;
         _logger = logger;
         
         _p4kService.SelectedP4KFileChanged += (sender, model) => OnSelectedP4KFileChanged();
+        _grpcClientService.OnStatusChanged += OnGrpcStatusChanged;
+        UpdateGrpcConnectedState();
+    }
+
+    private void OnGrpcStatusChanged(object? sender, GrpcConnectionStatus status)
+    {
+        UpdateGrpcConnectedState();
+    }
+
+    private void UpdateGrpcConnectedState()
+    {
+        var connected = _grpcClientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame;
+        if (IsGrpcConnected != connected)
+        {
+            IsGrpcConnected = connected;
+            if (!connected)
+            {
+                IncludeObtainedBlueprints = false;
+            }
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanExtract))]
@@ -191,8 +218,103 @@ public partial class ExtractionTabViewModel : PageViewModelBase
                     _logger.LogWarning("Impossible d'ajouter la clé {0} dans le tableau car elle existe déjà. nouvelle valeur : '{1}', ancienne valeur : {2}", localisationKey.Substring(1), $"{className}{size}{grade}", replacementMap[localisationKey.Substring(1)]);
                 }
             }
-            
+
+            // Build mineral-to-signature maps from mineable entities
+            UpdateStatusMessage("Extraction des signatures radar des minéraux...");
+            var mineralSignatureMap = new Dictionary<string, int>(); // localized name -> signature
+            var mineralSignatureMapLower = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase); // lowercase name -> signature
+            var excludedWords = new []{"deposit", "ore", "raw", "items", "commodities", "r"};
+
+            await foreach (var entityDefinition in _p4kService.GetAllEntityClassDefinition(0).ConfigureAwait(false))
+            {
+                // Seuls les rochers minables "canoniques" (mineablerock_asteroid{rarete}_{mineral}, mineablerock_surface{rarete}_{mineral}, ...)
+                // portent la vraie signature radar du minéral. Les rochers génériques par classe spectrale d'astéroïde
+                // (AsteroidCTypeMineableRock, AsteroidSTypeMineableRock, ...) partagent tous une signature générique de
+                // type d'astéroïde (ex: 4720) pour un mix de minéraux, et polluent la map si on les laisse passer.
+                // Les entités de test (mineablerock_test_*) doivent aussi être ignorées.
+                // RecordName contient le nom complet de la balise racine du fichier XML, ex:
+                // "EntityClassDefinition.MineableRock_AsteroidCommon_Aluminum" et non juste le nom du rocher,
+                // d'où l'utilisation de Contains(".MineableRock_") plutôt que StartsWith.
+                var recordName = entityDefinition.RecordName;
+                if (string.IsNullOrEmpty(recordName)
+                    || !recordName.Contains(".MineableRock_", StringComparison.OrdinalIgnoreCase)
+                    || recordName.Contains("test", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var entityType = entityDefinition.Data as EntityClassDefinition;
+                if (!(entityType?.Components.OfType<MineableParams>().Any() ?? false) || !entityType.Components.OfType<SSCSignatureSystemParams>().Any())
+                    continue;
+
+                var entityDefinitionWithDepth = await _p4kService.EnsureRecordsDepthAsync([entityDefinition], 3);
+                entityType = (EntityClassDefinition)entityDefinitionWithDepth[0].Data;
+                var mineableParams = entityType.Components.OfType<MineableParams>().First();
+                var signatureParams = entityType.Components.OfType<SSCSignatureSystemParams>().First();
+                // Extract radar signature (index 4 = mineral channel)
+                // baseSignatureParams is typed as SSCSignatureParamsBase but the actual runtime type is SSCSignatureSystemBaseSignatureParams
+                var baseSigParams = signatureParams.radarProperties?.baseSignatureParams as SSCSignatureSystemBaseSignatureParams;
+                if (baseSigParams?.signatures == null || baseSigParams.signatures.Length < 5)
+                    continue;
+
+                var signatureValue = (int)Math.Round(baseSigParams.signatures[4]);
+
+                // Skip generic signatures (FPS=3000, GroundVehicle=4000)
+                if (signatureValue is 3000 or 4000)
+                    continue;
+
+                // Extract the primary mineral name from the composition.
+                // compositionArray peut contenir plusieurs minéraux (le minéral principal du rocher,
+                // répété sur plusieurs paliers de qualité, suivi de minéraux secondaires/traces qui ont
+                // leur propre rocher dédié ailleurs). Seul le premier élément correspond au minéral
+                // principal désigné par le nom du rocher ; les suivants ne doivent pas hériter de cette
+                // signature (ex: le rocher "Bexalite" contient aussi de l'or et du borase en traces).
+                var primaryPart = mineableParams.composition?.compositionArray?.FirstOrDefault();
+                if (primaryPart?.mineableElement?.resourceType == null)
+                    continue;
+
+                var displayName = primaryPart.mineableElement.resourceType.displayName;
+                if (string.IsNullOrEmpty(displayName))
+                    continue;
+
+                // Get localized mineral name
+                var localizedName = await _p4kService.GetLocaleValue(displayName).ConfigureAwait(false);
+                if (string.IsNullOrEmpty(localizedName))
+                    continue;
+
+                // Add to maps if not already present (keep first/unique signature)
+                if (!mineralSignatureMap.ContainsKey(localizedName))
+                {
+                    mineralSignatureMap[localizedName] = signatureValue;
+                    var mineralKeyName = String.Concat(localizedName
+                        .Split(" ", StringSplitOptions.RemoveEmptyEntries)
+                        .Select(w => w.Trim('@', '(', ')').ToLowerInvariant())
+                        .Where(w => !excludedWords.Contains(w)));
+
+                    mineralSignatureMapLower[mineralKeyName.ToLowerInvariant()] = signatureValue;
+                }
+            }
+
+            _logger.LogInformation("Found {Count} minerals with unique radar signatures", mineralSignatureMap.Count);
+
             await Dispatcher.UIThread.InvokeAsync(() => LangProgress = 60);
+
+            // Query DB for missions with blueprint pools to build BP suffix maps
+            Dictionary<string, string> titleSuffixMap = new();
+            Dictionary<string, Dictionary<string, HashSet<string>>> descAppendMap = new();
+
+            if (IncludeBlueprints)
+            {
+                UpdateStatusMessage("Chargement des récompenses BP depuis la base de données...");
+                HashSet<string>? obtainedIds = null;
+
+                if (IncludeObtainedBlueprints && IsGrpcConnected)
+                {
+                    UpdateStatusMessage("Chargement des BP obtenus depuis le jeu...");
+                    var grpcBps = await _grpcClientService.GetBlueprintList().ConfigureAwait(false);
+                    obtainedIds = grpcBps.Select(e => e.BlueprintId).ToHashSet();
+                }
+
+                (titleSuffixMap, descAppendMap) = await _localDatabaseService.GetBlueprintRewardMapsAsync(obtainedIds);
+            }
 
             // extract localisation file, check each line then write the final file
             UpdateStatusMessage("Ecriture du fichier de localisation en cours...");
@@ -204,8 +326,6 @@ public partial class ExtractionTabViewModel : PageViewModelBase
 
             if (!file.Exists)
             {
-                // Le fichier n'existe pas déjà
-                // Ensure directory exists
                 file.Directory!.Create();
             }
 
@@ -216,13 +336,63 @@ public partial class ExtractionTabViewModel : PageViewModelBase
             while (null != (line = await textReader.ReadLineAsync()))
             {
                 var split = line.Split('=', 2);
+                var key = split[0];
 
-                if (replacementMap.TryGetValue(split[0], out var prefix))
+                if (replacementMap.TryGetValue(key, out var prefix))
                 {
                     split[1] = $"{prefix} {split[1]}";
                 }
-                
-                // On écrit dans le fichier final
+
+                if (titleSuffixMap.TryGetValue(key, out var suffix))
+                {
+                    split[1] = $"{split[1]} {suffix}";
+                }
+
+                if (descAppendMap.TryGetValue(key, out var poolMap))
+                {
+                    var sb = new StringBuilder(split[1]);
+                    foreach (var (poolName, bpSet) in poolMap.OrderBy(p => p.Key))
+                    {
+                        sb.Append($"\\n\\n<EM3>**{poolName}**</EM3>");
+                        foreach (var bpName in bpSet.OrderBy(n => n))
+                        {
+                            sb.Append($"\\n- {bpName}");
+                        }
+                    }
+                    split[1] = sb.ToString();
+                }
+
+                if (key == "Journal_General_Mining_Compendium_Content")
+                {
+                    var val = "";
+                    for (var i = 0; i <= 20; ++i)
+                    {
+                        val += $"<EM{i}>Un texte d'essai avec la balise EM{i}</EM{i}>\\n";
+                    }
+                    var content = split[1];
+                    // Append radar signatures to mineral names in the compendium
+                    foreach (var (mineralName, signature) in mineralSignatureMap)
+                    {
+                        // Use word boundary regex to match the mineral name and append signature
+                        var escapedName = Regex.Escape(mineralName);
+                        content = Regex.Replace(content, escapedName, $"{mineralName} (RS {signature})");
+                    }
+                    split[1] = $"Test des couleurs EM\\n\\n{val}\\n\\n\\n\\n{content}";
+                }
+
+                // Handle mineabletype_primary_* keys for mission objectives
+                if (key.StartsWith("mineabletype_primary_"))
+                {
+                    var mineralKey = key["mineabletype_primary_".Length..].ToLowerInvariant();
+
+                    if (mineralKey == "aluminium") mineralKey = "aluminum"; // why CIG, why ?
+                    if (mineralKey == "savrillium") mineralKey = "savrilium"; // why CIG, why ?
+                    if (mineralSignatureMapLower.TryGetValue(mineralKey, out var rsSignature))
+                    {
+                        split[1] = $"{split[1]} (RS {rsSignature})";
+                    }
+                }
+
                 fileWriter.WriteLine(string.Join('=', split));
             }
 

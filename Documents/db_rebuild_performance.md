@@ -1,0 +1,549 @@
+# Optimisation de la reconstruction de la BDD locale (`LocalDatabaseService.RebuildDbAsync`)
+
+Date : 2026-07-24
+Contexte : `RebuildDbCoreAsync` (déclenché par `RebuildDbAsync` / `EnsureDbAsync`) reconstruit entièrement la base
+SQLite locale à partir du `Data.p4k`. Deux problèmes signalés :
+- Temps d'exécution élevé (≥ 3 minutes constatées par l'utilisateur).
+- Empreinte mémoire finale énorme (~22 Go) après la reconstruction, problématique sur une machine
+  moins puissante ou avec le jeu lancé en parallèle.
+
+Mesures faites avec le projet `StarXelem.cli.testdb` (rebuild forcé + requêtes de contrôle), sur le même
+`Data.p4k` (~23 371 SCItems, 2 499 missions, 1 105 vaisseaux, 1 597 blueprints).
+
+## État des lieux initial
+
+- Reconstruction séquentielle en 10 phases dans un unique `DbContext` gardé ouvert du début à la fin.
+- `SaveChangesAsync` déjà relativement bien groupé par phase (pas de save par ligne), mais les entités
+  restent **trackées** dans le `ChangeTracker` pendant tout le rebuild : rien n'est jamais détaché avant
+  la fin (`using var db` scope complet), donc la mémoire du `ChangeTracker` croît de façon monotone
+  sur les 10 phases.
+- `P4kService` construit et garde en cache **tous les enregistrements `EntityClassDefinition` du jeu**,
+  chargés en profondeur 1 (`_EntityClassDict`) puis re-matérialisés en profondeur 3 pour les besoins des
+  phases SCItems/Missions/Loadouts (`GetAllEntityClassDefinition(3)`, `EnsureRecordsDepthAsync(..., 3)`).
+  Ce cache (`_EntityClassDict` / `_entityClassGuidDict`) n'est **jamais vidé** : il vit pour toute la durée
+  de vie du service, y compris après la fin du rebuild.
+- SQLite ouvert avec les réglages par défaut (`journal_mode=DELETE`, `synchronous=FULL`) : chaque batch de
+  write attend une synchronisation disque complète.
+- Aucune mesure/logging de mémoire n'existait : impossible de vérifier objectivement une amélioration.
+
+Reproduit en base de référence : `WorkingSet` mesuré à **~23 Go** juste après la fin de la phase 7
+(Blueprints), sans jamais redescendre ensuite (le process CLI ne fait rien d'autre qu'un `SaveChangesAsync`
+supplémentaire et quelques requêtes SQL après ça).
+
+## Pistes appliquées
+
+### 1. `db.ChangeTracker.Clear()` après chaque `SaveChangesAsync` de phase — ✅ Appliqué
+**Gain attendu** : réduire l'empreinte du `ChangeTracker` en détachant les entités déjà persistées, phase
+après phase, au lieu de les garder trackées jusqu'à la fin du rebuild.
+**Piège rencontré** : deux caches internes (`_contractorCache`/`_categoryCache` pour les missions,
+`_blueprintCache` pour les blueprints) conservent des **références directes** vers des entités EF
+(`ActorEntity`, `MissionCategoryEntity`, `BlueprintEntity`) réutilisées comme propriétés de navigation par
+plusieurs entités *avant* le `SaveChanges` correspondant. Un premier essai de vidage de `_blueprintCache`
+juste après la phase 7 a cassé la phase 8 : les récompenses de mission de type "pool de blueprints"
+(`ProcessBlueprintPoolsAsync`, appelé depuis `ProcessSingleReward` pendant la phase Missions) réutilisent
+ce cache pour éviter de ré-insérer un blueprint déjà en base → sans le cache, le blueprint était recréé et
+ré-ajouté, provoquant une violation de contrainte unique (`UNIQUE constraint failed: Blueprints.SelfId`) au
+moment du `SaveChangesAsync` de la phase Missions.
+**Correctif** : `_blueprintCache` n'est vidé qu'après la phase Missions (comme `_contractorCache` et
+`_categoryCache`), pas après la phase Blueprints. `ChangeTracker.Clear()` n'est ajouté qu'aux points où
+aucune méthode ultérieure ne référence encore une entité déjà trackée par identité d'objet (vérifié
+manuellement phase par phase).
+**Résultat** : rebuild stable, aucune duplication, mémoire gérée réduite phase après phase (voir mesures).
+
+### 2. Libération du cache lourd de `P4kService` en fin de rebuild — ✅ Appliqué
+Nouvelle méthode `IP4kService.ReleaseHeavyCache()` : vide `_EntityClassDict` / `_entityClassGuidDict` et
+réarme `_loadingDatabaseTask` à `null` pour que le cache soit reconstruit paresseusement (et à moindre
+coût, profondeur -1 uniquement) si un autre appelant en a de nouveau besoin après le rebuild.
+Appelée à la fin de `RebuildDbCoreAsync`, une fois toutes les phases terminées.
+**Gain attendu** : c'est le plus gros contributeur mémoire identifié (tous les `EntityClassDefinition` du
+jeu, chargés en profondeur 3 pour beaucoup d'entre eux). Le fichier `.p4k` et son index de fichiers restent
+ouverts (utilisés par d'autres fonctionnalités de l'appli — extraction, réputation, missions…) : on ne
+ferme volontairement **pas** le p4k lui-même pour ne pas casser ces usages, seulement le cache de records
+pré-matérialisés.
+
+### 3. Pragmas SQLite pendant le rebuild — ✅ Appliqué
+`PRAGMA journal_mode = WAL`, `PRAGMA synchronous = OFF`, `PRAGMA temp_store = MEMORY` appliqués juste après
+`EnsureCreatedAsync`. Comme la base est de toute façon entièrement droppée puis recréée à chaque rebuild,
+sacrifier la durabilité pendant cette phase (si crash → on relance juste un rebuild) est un compromis sûr
+qui accélère fortement les écritures par lot.
+**Gain observé** : c'est la piste qui a le plus contribué à la réduction du temps total (voir mesures).
+
+### 4. GC agressif + `ConserveMemory` en fin de rebuild — ✅ Appliqué
+- `LocalDatabaseService` appelle `GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true)`
+  (x2, avec `WaitForPendingFinalizers` entre les deux) juste après la libération des caches, et logge la
+  mémoire avant/après.
+- `StarXelem.csproj` : ajout de `<ConserveMemory>9</ConserveMemory>` (+ `ServerGarbageCollection=false`,
+  `ConcurrentGarbageCollection=true` explicites). Sans ce réglage, un simple `GC.Collect()` réduit bien le
+  *tas managé* mais **ne rend pas les segments à l'OS** (comportement par défaut du GC .NET, qui garde les
+  segments pour de futures allocations) : le `WorkingSet` du process ne bougeait quasiment pas malgré une
+  mémoire managée redescendue à ~2 Go. `ConserveMemory=9` indique au GC de décommiter agressivement les
+  segments inutilisés, ce qui rend l'amélioration visible côté OS (et donc côté Gestionnaire des tâches /
+  RAM disponible pour le reste du système, y compris le jeu).
+**Gain observé** : décisif — voir mesures ci-dessous (WorkingSet post-rebuild divisé par ~10).
+
+### 5. Logging de mémoire (WorkingSet + tas managé) à chaque étape clé — ✅ Appliqué
+Ajout de `LogMemoryUsage(string label)` (via `Environment.WorkingSet` et `GC.GetTotalMemory(false)`),
+appelé avant le rebuild, après les phases 7 et 9, et avant/après le GC forcé final. Permet de suivre
+objectivement l'empreinte mémoire dans les logs du CLI de test (et en prod si besoin de diagnostiquer).
+
+## Pistes envisagées mais non retenues
+
+- **Fermer le fichier `.p4k` en fin de rebuild** : abandonné. `P4kService` est un singleton réutilisé par
+  d'autres fonctionnalités de l'application après le rebuild (onglet Extraction, Réputation, Missions,
+  gRPC…). Le fermer forcerait une réouverture complète (et coûteuse) au premier accès suivant. Seul le
+  cache de records pré-matérialisés est vidé (piste 2), ce qui couvre l'essentiel du gain mémoire sans
+  casser ces fonctionnalités.
+- **Réduire le nombre de `SaveChangesAsync`** : déjà correctement fait dans le code existant (batchs de
+  10 000 pour les SCItems, un seul save en fin de phase pour les autres) — pas de gain supplémentaire
+  identifié sans risquer de casser la logique de dédup par cache (voir piste 1).
+- **Paralléliser les phases** : non exploré. Plusieurs phases dépendent de résultats de phases précédentes
+  (FK ScItems→Loadouts, Blueprints→Missions) et partagent le même `DbContext` (non thread-safe). Le
+  gain potentiel ne justifiait pas le risque dans le temps imparti à cette tâche.
+
+## Résultats mesurés (CLI `StarXelem.cli.testdb`, build Release)
+
+| Mesure | Avant (baseline utilisateur) | Après optimisations |
+|---|---|---|
+| Temps total du rebuild (`Database rebuild completed`) | ≥ 180 s (constaté) | **~76 s** |
+| Temps process CLI complet (build → rebuild → requêtes de contrôle) | — | **~88 s** |
+| WorkingSet pendant le rebuild (fin phase 7, pic) | ~22-23 Go (rapporté par l'utilisateur) | ~23 Go *(inchangé, transitoire — voir note)* |
+| WorkingSet **après** le rebuild (avant tout GC) | ~22 Go (persistant) | ~23 Go (idem, avant nettoyage) |
+| WorkingSet après nettoyage des caches + GC agressif | *(jamais nettoyé auparavant)* | **~2,3 Go** |
+| Tas managé (`GC.GetTotalMemory`) après nettoyage | — | **~2,1 Go** |
+
+Note importante : le **pic transitoire** pendant le rebuild (toutes les entités EntityClassDefinition du
+jeu chargées en profondeur, plus les entités EF en cours de traitement) reste élevé (~23 Go) — c'est
+attendu, il correspond au volume réel de données du jeu chargées simultanément pendant le traitement le
+plus lourd (phase Blueprints/SCItems). Le vrai problème signalé par l'utilisateur était que ce pic
+**restait figé indéfiniment après la fin du rebuild** : c'est ce point précis qui est corrigé — la mémoire
+retombe maintenant à ~2,3 Go dès la fin du `RebuildDbAsync`, contre ~22 Go qui persistaient auparavant tant
+que l'application restait ouverte.
+
+## Fichiers modifiés
+
+- `src/StarXelem/Services/LocalDatabaseService.cs` : `ChangeTracker.Clear()` ciblés, pragmas SQLite,
+  libération du cache P4K, GC agressif, logging mémoire.
+- `src/StarXelem/Services/P4kService/P4kService.cs` : nouvelle méthode `ReleaseHeavyCache()`.
+- `src/StarXelem/Services/P4kService/IP4kService.cs` : ajout de `ReleaseHeavyCache()` à l'interface.
+- `src/StarXelem/Services/P4kService/DesignP4kService.cs` : implémentation no-op pour le design-time.
+- `src/StarXelem/StarXelem.csproj` : réglages GC (`ConserveMemory`, `ServerGarbageCollection`,
+  `ConcurrentGarbageCollection`).
+
+## Suites possibles (non traitées ici)
+
+- `ConserveMemory=9` s'applique à toute l'application (pas seulement au rebuild) : à surveiller si cela a
+  un impact sur la fluidité générale de l'UI (compromis mémoire/débit du GC) — aucun souci constaté en
+  usage CLI, à confirmer en usage interactif normal de l'application.
+
+## Itération 2 (2026-07-24, suite) : tentative de réduction du pic transitoire (~23 Go)
+
+Objectif demandé : faire baisser le **pic mémoire pendant le rebuild** (pas seulement le résiduel après),
+idéalement sous les 5 Go.
+
+### Piste testée : libérer le cache lourd de `P4kService` dès la fin de la phase 4 (SCItems) — ❌ Abandonnée
+
+Constat de départ : `PopulateScItemsAsync` (phase 4) appelle `_p4kService.GetAllEntityClassDefinition(3)`,
+qui matérialise en profondeur 3 (résolution récursive complète des références imbriquées) **tous les
+`EntityClassDefinition` du jeu** — pas seulement les objets retenus comme SCItems, mais aussi tous les
+vaisseaux, PNJ, props, etc., puisque `GetAllEntityClassDefinition` filtre par type de record mais applique
+l'upgrade de profondeur à l'ensemble des résultats *avant* que l'appelant ne filtre lui-même (dans
+`PopulateScItemsAsync`, le filtre item/vaisseau n'intervient qu'*après* l'upgrade de profondeur). C'est
+identifié comme le plus gros contributeur au pic.
+
+**Essai 1** : appeler `_p4kService.ReleaseHeavyCache()` juste après la phase 4, en plus de l'appel déjà en
+place en fin de rebuild, en misant sur le fait que les phases suivantes (Loadouts, Contract Generators,
+Blueprints, Missions) ne consomment que des sous-ensembles ciblés et peuvent se recharger paresseusement.
+Résultat mesuré : **aucune réduction visible** de la mémoire juste après le `Clear()` — attendu, puisque
+`Dictionary.Clear()` ne fait que retirer les références, la mémoire managée n'est récupérée qu'à la
+prochaine collecte du GC. Pire : sans collecte forcée, la mémoire déjà "morte" (non collectée) s'additionne
+aux nouvelles allocations des phases suivantes (qui doivent re-matérialiser certains records à la demande) :
+pic final mesuré à **28,3 Go** (au lieu de ~23 Go) et temps total de **101,6 s** (au lieu de ~76 s) —
+régression sur les deux axes.
+
+**Essai 2** : ajouter un `GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true,
+compacting: true)` (x2, comme en fin de rebuild) immédiatement après le `ReleaseHeavyCache()` de la phase 4,
+pour forcer la récupération réelle avant que les phases suivantes ne réallouent. Résultat mesuré :
+- Mémoire juste après phase 4 : 21,5 Go → seulement **19,3 Go** après vidage + GC forcé (116 512
+  enregistrements pourtant libérés du cache). Gain très inférieur à l'attendu.
+- Pic final : **29,3 Go** (encore pire que l'essai 1).
+- Temps total : **115 s** (encore pire).
+
+### Analyse : pourquoi ça ne marche pas
+
+Deux effets combinés expliquent l'échec de cette piste :
+
+1. **Le GC forcé lui-même a un coût réel** sur un tas de ~20 Go (compaction bloquante) — de l'ordre de
+   plusieurs secondes à chaque appel, répété deux fois pour un gain mémoire modeste.
+2. **Le gain mémoire du vidage est décevant** (21,5 Go → 19,3 Go, alors que 116 512 enregistrements sont
+   supprimés du cache) : l'hypothèse la plus probable est que le pic ne vient pas majoritairement du
+   dictionnaire `_EntityClassDict`/`_entityClassGuidDict` lui-même, mais de structures internes à
+   `DataForge`/`DataCoreDatabase` (le champ `df` de `P4kService`, jamais touché par `ReleaseHeavyCache`) :
+   tables de chaînes, index de définitions de records, buffers de désérialisation partagés par tous les
+   enregistrements du `.dcb`. Ces structures sont chargées une fois à l'ouverture du `.p4k`
+   (`OpenP4k`/`LoadDatabaseIfNeeded`) et alimentent *toute* résolution de record, y compris celles faites
+   "à la demande" par les phases suivantes après un vidage — ce qui expliquerait aussi pourquoi les phases
+   suivantes doivent re-payer un coût de re-résolution (d'où le ralentissement) sans que le pic ne baisse
+   en proportion (la donnée volumineuse partagée reste chargée quoi qu'il arrive).
+   C'est une hypothèse basée sur le comportement observé — `StarBreaker.*` est une DLL externe sans code
+   source consulté ici, donc non vérifiée en profondeur.
+
+**Décision : piste abandonnée, code reverté.** Le rapport coût (temps + complexité + risque de régression)
+/ bénéfice (gain mémoire marginal, voire négatif sans GC forcé) n'est pas favorable. Confirmé par un rebuild
+de contrôle après revert : retour à ~90 s / pic ~23 Go / résiduel ~2,3 Go, cohérent avec l'itération 1.
+
+### Pistes plus profondes pour une future itération (non explorées ici)
+
+- **Filtrer avant d'étendre en profondeur**, plutôt que d'étendre tout puis nettoyer après coup : modifier
+  `GetAllEntityClassDefinition` (ou ajouter une variante) pour n'upgrader en profondeur 3 que les records
+  qui passent déjà le filtre "objet équipable" (`SAttachableComponentParams`/`SItemDefinition`) à une
+  profondeur plus faible, au lieu d'étendre en profondeur 3 l'intégralité des `EntityClassDefinition` du
+  jeu (vaisseaux, PNJ, props compris) avant tout filtrage. Nécessite de vérifier que le critère de filtrage
+  reste déterminable à faible profondeur (à confirmer empiriquement, pas garanti par la doc StarBreaker).
+- **Étudier si `StarBreaker.DataCore`/`DataForge` expose un mode de résolution "à la volée" sans cache
+  interne global**, pour éviter que `df` lui-même retienne des structures volumineuses en permanence.
+  Nécessiterait de lire le code source de `StarBreaker.DataCore`/`StarBreaker.DataCore.Generated` (DLL
+  externes, non explorées dans cette itération) pour évaluer la faisabilité.
+- Ces deux pistes touchent à des mécanismes plus profonds et plus risqués (comportement d'une lib externe,
+  risque de régression fonctionnelle sur l'extraction de données) : à traiter comme un chantier à part,
+  avec plus de temps de validation, si la réduction du pic transitoire reste un objectif prioritaire.
+
+## Itération 3 (2026-07-24, suite) : test de fermeture/réouverture du fichier p4k sans vider le cache — ❌ Abandonnée
+
+Hypothèse testée par l'utilisateur : et si l'état interne du fichier `.p4k` lui-même (pas le cache de
+records) contribuait significativement au pic ? Test : fermer/rouvrir le fichier après la phase 4 (SCItems),
+**sans** vider `_EntityClassDict`/`_entityClassGuidDict`.
+
+Résultat mesuré : gain marginal (WorkingSet 21 514 → 19 834 Mo, soit ~1,7 Go ; tas managé quasi inchangé,
+19 531 → 19 455 Mo) pour un coût de +24 s sur le temps total (100 s au lieu de 76 s) et aucune réduction du
+pic final (~22,6 Go, identique à la baseline). Confirme que le cache de records domine bien la mémoire, pas
+l'état interne du fichier p4k. **Code reverté** (`CloseAndReopenP4kFileForTestAsync` retiré).
+
+## Itération 4 (2026-07-24, suite) : filtrage à profondeur légère avant expansion profonde — ✅ Appliqué
+
+### Constat
+
+`PopulateScItemsAsync` (phase 4) appelait `_p4kService.GetAllEntityClassDefinition(3)`, qui matérialise en
+profondeur 3 (résolution récursive complète) **tous les `EntityClassDefinition` du jeu** — vaisseaux, PNJ,
+props compris — puisque le filtre "est-ce un objet équipable ?" (`SAttachableComponentParams`/
+`SItemDefinition`, non invisible, non véhicule) n'était appliqué qu'*après* cette matérialisation coûteuse,
+sur le flux déjà entièrement résolu.
+
+### Piste appliquée
+
+Nouvelle méthode `IP4kService.GetAllEntityClassDefinitionFiltered(filterDepth, finalDepth, predicate)` :
+évalue le prédicat à une profondeur légère (`filterDepth`) d'abord, puis n'étend jusqu'à `finalDepth` que
+les enregistrements retenus. Le filtre de `PopulateScItemsAsync` (invisibilité, type d'objet, exclusion des
+véhicules) est déplacé dans ce prédicat, évalué à `filterDepth: 1` (profondeur déjà atteinte gratuitement
+pour tous les `EntityClassDefinition` par la phase Ships qui précède), avant d'étendre à `finalDepth: 3`
+uniquement les ~23 371 objets retenus (au lieu des ~100 000+ `EntityClassDefinition` du jeu entier).
+
+**Validation de correction** : le filtre à profondeur 1 (`AttachDef` résolu en `SItemDefinition`, `Type`,
+`Invisible`, `Components`) donne exactement le même résultat qu'un filtre à profondeur 3 — vérifié par
+comparaison stricte avant/après : même nombre de SCItems (**23 371**), mêmes statistiques de dégâts
+(**402/23 371** items avec dégâts), aucune exception.
+
+### Résultats mesurés
+
+| Mesure | Avant (baseline) | Après filtrage |
+|---|---|---|
+| Phase SCItems (isolée) | 39,3 s | **21,5 s** (-45 %) |
+| Pic mémoire (fin phase 9) | 23 116 Mo | **22 174 Mo** (-940 Mo) |
+| Temps total du rebuild | ~76-90 s | ~80-90 s (dans la même fourchette, bruit de mesure) |
+| Résiduel final après GC | ~2,3 Go | ~2,3 Go (inchangé) |
+
+**Décision : conservé.** Gain net positif et sans risque (données strictement identiques, phase la plus
+lourde 2× plus rapide) même si le gain sur le pic mémoire global reste modeste par rapport à l'objectif de
+5 Go — la majorité du pic vient donc d'ailleurs (voir pistes de généralisation ci-dessous, en cours
+d'investigation).
+
+### Pistes de suite en cours d'investigation
+
+- Généraliser le même principe (filtrer à profondeur légère avant d'étendre) aux autres phases qui
+  matérialisent des `EntityClassDefinition` en profondeur — à date, les autres consommateurs
+  (`GetAllContractGenerator`, `GetAllCraftingBlueprintRecord`, loadouts par vaisseau) opèrent déjà sur des
+  sous-ensembles ciblés et ne semblent pas bénéficier du même effet de levier, mais reste à vérifier
+  empiriquement combien de `EntityClassDefinition` distincts sont réellement promus à profondeur 3 au total
+  et où ils sont utilisés.
+- Retester la libération du cache + GC entre phases (Itération 2, précédemment abandonnée) maintenant que
+  la phase SCItems ne pousse plus l'intégralité du jeu à profondeur 3 : le volume à recycler est plus
+  faible, le ratio coût (GC)/bénéfice (mémoire récupérée) pourrait être meilleur qu'avant.
+
+## Itération 5 (2026-07-24, suite) : vidage du cache p4k + GC léger entre phases — ✅ Appliqué
+
+### Ce qui a changé par rapport à l'Itération 2
+
+L'Itération 2 avait conclu à l'abandon de la libération de cache en cours de rebuild : sans le filtrage de
+l'Itération 4, le cache était énorme (~20 Go), le `GC.Collect` agressif+compactant nécessaire pour vraiment
+récupérer la mémoire coûtait plusieurs secondes à chaque appel, et les phases suivantes redemandaient
+souvent les MÊMES enregistrements (déjà résolus en profondeur 3) — d'où une régression nette (temps ET pic
+en hausse).
+
+Deux choses ont changé :
+1. **Le cache est désormais bien plus petit** après l'Itération 4 (seuls les objets équipables, pas
+   l'intégralité du jeu, atteignent la profondeur 3).
+2. **Vérification explicite des dépendances croisées entre phases** avant de choisir les points de vidage :
+   - Après la phase 4 (SCItems) : la phase 5 (Loadouts) rappelle bien `_p4kService.GetEntityType(crc, 3)`
+     pour les MÊMES objets équipables montés sur les vaisseaux (`ResolveLoadoutEntry`, ligne ~662 de
+     `LocalDatabaseService.cs`) — donc vidage à ce point coûte une ré-expansion partielle en phase 5, mais
+     limitée aux composants réellement montés (pas tout le catalogue), donc peu coûteuse en pratique.
+   - Après la phase 5 (Loadouts) : plus aucune phase suivante ne référence les `EntityClassDefinition` de
+     vaisseaux/composants — vidage sans coût de ré-expansion.
+   - Après la phase 7 (Blueprints) : les phases suivantes (Missions, Spawn rules, Locations) travaillent sur
+     d'autres types d'enregistrements (`ContractGenerator`, résolution DB) — vidage sans coût de
+     ré-expansion (hormis quelques blueprints referencés depuis des pools de récompense de mission, résolus
+     à la demande via `_blueprintCache`, un cache distinct non affecté).
+3. **GC "léger" au lieu d'"agressif+compactant"** : `GC.Collect(GC.MaxGeneration, GCCollectionMode.Default,
+   blocking: true, compacting: false)`. Une collecte Gen2 simple récupère déjà l'essentiel de la mémoire
+   managée libérée par le vidage du cache, sans payer le coût de la compaction (déplacement physique des
+   objets vivants) — coût jugé disproportionné pour un nettoyage effectué plusieurs fois par rebuild
+   (contrairement au nettoyage final, fait une seule fois, où la compaction + `ConserveMemory=9` reste
+   justifiée pour rendre la mémoire à l'OS).
+
+### Implémentation
+
+Nouvelle méthode privée `LocalDatabaseService.ReleaseP4kCacheAndCollect(string phaseLabel)` : logge la
+mémoire, appelle `_p4kService.ReleaseHeavyCache()`, puis le GC léger, puis logge de nouveau. Appelée après
+les phases 4, 5 et 7.
+
+### Résultats mesurés (comparaison à 3 niveaux)
+
+| Mesure | Baseline (commit 838c4e4) | + libération après phase 4 seule | **+ libération après phases 4, 5, 7** |
+|---|---|---|---|
+| Managed après phase 5 | — | — | 2 116 Mo (depuis 18 378 Mo) |
+| Managed après phase 7 | 21 895 Mo | — | **2 099 Mo** (depuis 4 440 Mo) |
+| Pic WorkingSet (phase 9) | 22 174 Mo | 17 315 Mo | **14 807 Mo** |
+| Temps total | ~80-90 s | 82,6 s | 93,5 s |
+| Résiduel final après GC | ~2,3 Go | ~2,3 Go | ~2,3 Go |
+
+**Validation de correction** (identique sur les 3 runs) : 23 371 SCItems, 402/23 371 items avec dégâts,
+1 597 blueprints, 2 499 missions, 271 générateurs de contrats, 1 105 vaisseaux — aucune exception.
+
+### Décision
+
+**Conservé.** Pic mémoire ramené de **22,2 Go à 14,8 Go** (-33 % par rapport à la baseline post-Itération 4,
+-67 % par rapport aux ~22 Go initiaux rapportés par l'utilisateur), pour un coût de +11 s sur le temps total
+(93,5 s au lieu de 82,6 s) — compromis jugé acceptable.
+
+**Objectif des 5 Go non atteint à ce stade.** Le `WorkingSet` (14,8 Go) reste nettement au-dessus du tas
+managé après nettoyage (3,3 Go après phase 9) : sans compaction en cours de rebuild, les segments libérés
+par le GC léger restent réservés par le process (pas rendus à l'OS) pour être réutilisés par les allocations
+de la phase suivante — cohérent avec le comportement standard du GC .NET. Voir Itération 6 pour la suite.
+
+## Itération 6 (2026-07-24, suite) : purge périodique DANS la phase Loadouts — ✅ Appliqué — objectif < 5 Go atteint
+
+### Constat
+
+En creusant pourquoi le pic restait à 14,8 Go malgré les 3 points de libération inter-phases, les logs de
+l'Itération 5 montraient que la phase 5 (Loadouts) **à elle seule** faisait grimper la mémoire de 11,1 Go
+(sortie de phase 4) à 18,4 Go de tas managé (19,7 Go de WorkingSet) — soit ~7 Go accumulés rien que pendant
+cette phase, avant même son propre point de libération de fin de phase.
+
+Cause : `PopulateShipLoadoutsAsync` boucle sur les 1 105 vaisseaux **séquentiellement**, et pour chacun :
+étend son `EntityClassDefinition` complet (arbre de composants/points d'ancrage) en profondeur 3, puis
+résout chaque composant monté (`ResolveLoadoutEntry` → `GetEntityType(crc, 3)`). Ces objets restent résidents
+dans le cache partagé de `P4kService` jusqu'à la fin de la phase — les 1 105 vaisseaux (structures riches,
+plus volumineuses en moyenne qu'un simple SCItem) s'accumulent donc **tous simultanément** en mémoire.
+
+### Piste appliquée
+
+Purge périodique DANS la boucle elle-même : tous les 100 vaisseaux, appel à
+`_p4kService.ReleaseHeavyCache()` + `GC.Collect` léger (même pattern que `ReleaseP4kCacheAndCollect`, inliné
+directement dans `PopulateShipLoadoutsAsync`). Comme les vaisseaux sont traités indépendamment les uns des
+autres (les entrées de loadout déjà extraites sont stockées dans une liste locale, pas dans le cache), rien
+n'est perdu : le vaisseau suivant re-matérialise à la demande, à coût unitaire, au lieu de laisser les 1 000+
+précédents s'empiler.
+
+### Résultats mesurés (2 runs de confirmation, résultats stables)
+
+| Mesure | Avant (Itération 5) | **Avec purge tous les 100 vaisseaux** (run 1 / run 2) |
+|---|---|---|
+| Pic mémoire phase 5 (avant son propre vidage) | 19 675 Mo | **8 958 Mo / 8 933 Mo** |
+| Pic mémoire (phase 9, fin de rebuild) | 14 807 Mo | **4 436 Mo / 4 174 Mo** ✅ (< 5 Go) |
+| Temps total | 93,5 s | 100,5 s / 100,9 s |
+| Résiduel final après GC | ~2,3 Go | ~2,3 Go |
+
+**Validation de correction** (identique sur les 2 runs, et identique à tous les runs précédents) :
+23 371 SCItems, 402/23 371 items avec dégâts, **27 754 ship loadout entries** (nombre exact identique à la
+baseline — aucune entrée perdue à cause de la purge périodique), 1 597 blueprints, 2 499 missions, aucune
+exception.
+
+### Décision
+
+**Conservé — objectif utilisateur atteint.** Pic mémoire ramené de **22,2 Go (baseline) à ~4,3 Go**
+(-80 %), sous la barre des 5 Go demandée, pour un coût total de +17-18 s sur le temps de rebuild par rapport
+à la toute première baseline (~80 s → ~100 s). Stabilité confirmée sur 2 runs consécutifs avec des chiffres
+cohérents (écart < 6 % entre les deux).
+
+### Récapitulatif de toute la série d'optimisations
+
+| Étape | Pic mémoire (WorkingSet, fin de rebuild) | Résiduel final | Temps total |
+|---|---|---|---|
+| État initial (rapporté par l'utilisateur) | ~22 Go, **persistant** après le rebuild | ~22 Go | ≥ 180 s |
+| Itération 1 (ChangeTracker.Clear, pragmas SQLite, GC final + ConserveMemory) | ~23 Go (transitoire) | **~2,3 Go** | ~76-90 s |
+| Itération 4 (filtrage avant expansion en profondeur, SCItems) | ~22,2 Go | ~2,3 Go | ~80-90 s |
+| Itération 5 (libération inter-phases 4/5/7) | 14,8 Go | ~2,3 Go | ~93,5 s |
+| Itération 6 (purge intra-phase Loadouts) | ~4,3 Go | ~2,3 Go | ~100 s |
+| **Itération 7 (généralisation : purge intra-phase SCItems)** | **~4,0 Go** | ~2,3 Go | ~99-107 s |
+
+## Itération 7 (2026-07-24, suite) : généralisation du principe de purge intra-boucle à la phase SCItems — ✅ Appliqué
+
+### Analyse en profondeur avant généralisation
+
+Avant de reproduire le pattern de l'Itération 6 (purge intra-boucle) sur d'autres phases, analyse de
+`GetAllEntityClassDefinitionFiltered` (Itération 4) : cette méthode filtre bien à profondeur légère
+d'abord, mais étend ENSUITE **tous** les enregistrements retenus (23 371) à la profondeur finale en un seul
+`Task.WhenAll`, **avant de céder le moindre élément au consommateur** (`await foreach` dans
+`PopulateScItemsAsync`). Contrairement à la boucle des Loadouts (où chaque vaisseau est étendu et consommé
+un par un), toute la mémoire de la phase SCItems est donc allouée d'un bloc, en amont de toute itération —
+une purge périodique dans la boucle *consommatrice* n'aurait eu aucun effet, puisque le travail est déjà
+fait avant que la boucle ne démarre.
+
+Cartographie des autres points d'appel à profondeur dans `LocalDatabaseService.cs` pour identifier d'autres
+cibles de généralisation :
+- Phase 3 (Ships) : `GetAllEntityClassDefinition(1)` — blanket sur tout le jeu mais à profondeur 1 (déjà
+  la plus légère), coût mesuré modeste (~7 s) ; faible valeur à retravailler.
+- Phase 6 (Contract generators, ~271 éléments) et phase 8 (Missions, ré-résout les mêmes ~271 contrats) :
+  `EnsureRecordsDepthAsync(contracts, 3)` — déjà ciblé sur un petit ensemble propre (pas de gaspillage sur
+  des entités non pertinentes), donc pas candidat au filtrage. Effet de bord identifié : le vidage ajouté en
+  Itération 5 après la phase 7 force la phase 8 à ré-étendre ces 271 contrats depuis zéro (coût mesuré :
+  phase Missions passée de ~750 ms à ~3 s) — négligeable en absolu, documenté ici par souci de complétude.
+- Phase 7 (Blueprints, 1 597 éléments) : `GetRecordWithSpecificDepth(blueprintId, 4)` par blueprint —
+  profondeur 4 (plus profonde que SCItems/Loadouts), mais la croissance mémoire mesurée sur cette phase
+  reste modeste (~2,3 Go sur les logs de l'Itération 5) comparée à SCItems (~11,7 Go) ou Loadouts
+  (~7,3 Go) : gain potentiel jugé trop faible pour justifier l'effort de restructuration à ce stade.
+
+**Conclusion de l'analyse : SCItems est la seule cible restante à fort potentiel.**
+
+### Piste appliquée
+
+Nouvelle méthode `IP4kService.GetAllEntityClassDefinitionFilteredBatched(filterDepth, finalDepth,
+predicate, batchSize)` : découpe l'étape d'extension en profondeur finale par lots de `batchSize` éléments
+au lieu de tout étendre d'un coup. Point d'attention technique critique : la méthode d'origine
+(`GetAllEntityClassDefinitionFiltered`) conservait une liste `matching` de `CacheEntry` (objets lourds)
+pendant toute la durée de l'énumération — même après avoir cédé un élément au consommateur, la liste locale
+du producteur continuait à le référencer, empêchant tout GC même si l'appelant vidait le cache. Corrigé en
+ne conservant, entre deux lots, que les **identifiants légers** (`CigGuid`) des enregistrements retenus : la
+liste des objets lourds réels (`batchEntries`) est reconstruite à chaque lot et redevient collectible dès
+que le lot suivant commence. `LoadDatabaseIfNeeded()` est réappelé à chaque lot pour gérer le cas où
+l'appelant a vidé le cache entre deux lots (repeuplement à profondeur -1, peu coûteux).
+
+`PopulateScItemsAsync` utilise cette variante avec `batchSize: 2000` et purge (`ReleaseHeavyCache` + GC
+léger) tous les 2 000 items traités — indépendamment du seuil de sauvegarde SQL existant (10 000).
+
+### Résultats mesurés
+
+| Mesure | Avant (Itération 6) | **Avec purge intra-phase SCItems** |
+|---|---|---|
+| Mémoire après phase 4 (avant son propre vidage) | 13 355 Mo | **4 193 Mo** |
+| Mémoire après phase 5 (avant son propre vidage) | 8 958 Mo | **3 376 Mo** (repart d'une base plus basse) |
+| Pic mémoire (phase 9, fin de rebuild) | ~4 300 Mo | **~3 950-4 000 Mo** |
+| Temps total | ~100 s | ~99-107 s |
+| Résiduel final | ~2,3 Go | ~2,3 Go |
+
+**Validation de correction (critique)** : **23 371 SCItems exactement** (identique à tous les runs
+précédents — le découpage en lots n'a fait perdre ni dupliqué aucun enregistrement), 402/23 371 items avec
+dégâts, 27 754 ship loadout entries, 1 597 blueprints, 2 499 missions, aucune exception.
+
+### Décision
+
+**Conservé.** Le gain le plus spectaculaire porte sur la phase SCItems elle-même (13,4 Go → 4,2 Go, soit
+-69 %), avec un effet d'entraînement sur la phase Loadouts qui repart d'une base bien plus basse. Le pic
+mémoire global de fin de rebuild ne baisse que marginalement par rapport à l'Itération 6 (~4,3 Go → ~4,0 Go)
+car il était déjà dominé par d'autres phases (Blueprints ~5 Go, résiduel de fin de rebuild) une fois
+Loadouts corrigé — mais l'empreinte mémoire est maintenant beaucoup plus **stable et basse tout au long du
+rebuild**, pas seulement à la toute fin, ce qui est également bénéfique pour une machine qui ferait tourner
+le jeu en parallèle pendant toute la durée du rebuild.
+
+### Pistes de suite non explorées
+
+- Le même principe (purge périodique intra-boucle, via une variante "Batched" du producteur si nécessaire)
+  pourrait s'appliquer à Blueprints (profondeur 4, 1 597 éléments) si un besoin de réduction supplémentaire
+  apparaît — non fait ici, gain estimé trop faible au vu de la croissance mémoire mesurée sur cette phase.
+- Le `WorkingSet` reste un peu au-dessus du tas managé à chaque point de purge (pas de compaction
+  intermédiaire) : un ajustement des seuils de lot ou une compaction ponctuelle pourrait encore affiner le
+  pic, mais le gain marginal ne semble plus justifier le risque/coût au vu de l'objectif déjà largement
+  dépassé (~4 Go, contre les 5 Go visés).
+- Voir aussi la section suivante (test de réduction des profondeurs demandées) pour une autre piste de
+  réduction du pic, indépendante de la purge.
+
+## Itération 8 (2026-07-24, suite) : test de réduction des profondeurs de résolution — ❌ Abandonnée (bug découvert, non résolu)
+
+### Objectif
+
+Vérifier si les profondeurs de résolution demandées (3 pour SCItems/Loadouts/ContractGenerators/Missions,
+4 pour Blueprints) sont réellement nécessaires, en les réduisant d'un cran et en comparant l'intégralité des
+données restituées en base (pas un échantillon) avant/après.
+
+### Méthode
+
+Pour chaque profondeur testée : export CSV trié de la/les table(s) concernée(s) à la profondeur d'origine
+(référence), réduction de la profondeur d'un cran dans le code, rebuild, export CSV de nouveau, `diff` strict
+(et vérification par somme de contrôle MD5) entre les deux exports. Les colonnes techniques non stables
+d'un run à l'autre (clés auto-incrémentées) sont exclues de la comparaison ou remplacées par des clés
+stables via jointure SQL.
+
+### Résultats des tests **isolés** (une seule profondeur réduite à la fois)
+
+| Profondeur | Réduite de → à | Table(s) comparée(s) | Résultat |
+|---|---|---|---|
+| SCItems | 3 → 2 | ScItems (23 371 lignes × 65 colonnes) | **Diff vide**, checksum identique |
+| Loadouts (vaisseau + composants) | 3 → 2 | ShipLoadoutEntries (27 754 lignes) | **Diff vide**, checksum identique |
+| Blueprints | 4 → 3 | Blueprints, BlueprintRecipeCosts, BlueprintModifiers (12 395 lignes) | **Diff vide** sur les 3 tables |
+| ContractGenerators / Missions | 3 → 2 | ContractGenerators, Missions (2 770 lignes) + comptages MissionRewards/Spawns/RequiredTags | **Diff vide**, comptages identiques |
+
+Chaque réduction, **testée isolément**, ne montre donc aucune perte de donnée détectable.
+
+### Découverte lors du test **combiné** : un bug d'interaction rare
+
+En combinant les 4 réductions ensemble, un run a montré **1 ligne manquante sur 27 754** dans
+`ShipLoadoutEntries` (un composant PowerPlant "Fierell Cascade" sur un vaisseau spécifique). Hypothèse
+initiale : interaction avec la réduction de profondeur Loadouts elle-même. **Invalidée** : en refaisant le
+test avec Loadouts remis à sa profondeur d'origine (3) mais SCItems/Blueprints/ContractGenerators toujours
+réduits, **la même ligne manque à nouveau** (2 runs consécutifs, résultat identique et reproductible).
+
+Ceci démontre que le problème n'est pas la profondeur de Loadouts en tant que telle, mais un **effet de bord
+inter-phases** : réduire la profondeur d'AUTRES phases (SCItems/Blueprints/ContractGenerators) modifie,
+d'une façon qui reste à élucider, la résolution d'UN composant précis pendant la phase Loadouts —
+probablement lié à l'état du cache partagé `P4kService` (timing des purges périodiques, ordre
+d'énumération d'un dictionnaire, ou state affecté par les cycles de vidage/rechargement) au moment où
+`ResolveLoadoutEntry` résout ce composant particulier via `_componentGuidMap`.
+
+Éléments d'investigation déjà écartés :
+- Le composant manquant est bien présent et correctement résolu dans la table `ScItems` (donc pas un
+  problème de résolution P4K en amont).
+- Aucune autre entité du jeu ne partage le même nom court (`TechnicalName` après `Split(".", 2).Last()`)
+  dans `ScItems` — pas de collision de clé évidente dans `_componentGuidMap` provenant du sous-ensemble
+  d'objets équipables (reste à vérifier côté entités NON retenues comme SCItems, non fait par manque de
+  temps).
+- La phase où `_componentGuidMap` est construite (Phase 3, Ships) n'est touchée par aucune des réductions
+  testées — son enrichissement devrait être strictement identique entre les runs.
+- Aucune exception ni avertissement n'est loggé pour ce vaisseau/composant : `ResolveLoadoutEntry` retourne
+  silencieusement `null` (comportement normal pour un port non pertinent), ce qui suggère que la résolution
+  de l'entité échoue silencieusement dans ce cas précis plutôt que de planter.
+
+### Décision
+
+**Abandonnée — aucune des réductions de profondeur n'a été appliquée.** Bien que chaque réduction testée
+isolément soit propre, la découverte d'un effet de bord inter-phases reproductible (même à très faible
+fréquence, 1 ligne sur 27 754) lors de la combinaison est un signal qu'il existe une dépendance cachée non
+comprise entre l'état du cache P4kService et la résolution de certains composants de loadout. Committer ces
+changements sans comprendre la cause exposerait le projet à un risque de perte de données silencieuse
+(aucune exception, aucun log d'erreur) pour un nombre indéterminé d'autres composants potentiellement
+affectés dans des conditions similaires non testées ici. Le code est revenu à l'état du dernier commit
+validé (`54eaeb0`).
+
+### Pistes pour une future investigation
+
+- Ajouter un logging détaillé (ou un breakpoint conditionnel) dans `ResolveLoadoutEntry` et
+  `UpdateCacheRecordWithDepth` spécifiquement pour le composant `50e95028-4764-416c-9380-7d9d52d8d82b`
+  (Fierell Cascade, vaisseau `0045b223-9bea-4ef5-a873-d1316830fe43`, port `hardpoint_power_plant`) pour
+  observer précisément à quel moment et pourquoi sa résolution échoue quand SCItems/Blueprints/
+  ContractGenerators tournent à profondeur réduite.
+- Vérifier si `_componentGuidMap` contient une collision de clé provenant d'une entité NON retenue comme
+  SCItem (donc invisible dans la comparaison faite ici, qui ne portait que sur la table `ScItems`) —
+  nécessiterait une requête directe sur `_EntityClassDict`/`_entityClassGuidDict` en cours d'exécution, pas
+  simplement sur la BDD finale.
+- Envisager de réexécuter le test combiné plusieurs fois supplémentaires (5-10 runs) pour caractériser la
+  fréquence exacte du problème et voir s'il touche systématiquement le même composant ou des composants
+  différents à chaque run (ce qui orienterait vers une vraie race condition plutôt qu'un biais déterministe
+  lié à la profondeur elle-même).

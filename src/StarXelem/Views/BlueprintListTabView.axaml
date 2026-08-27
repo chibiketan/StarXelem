@@ -10,7 +10,21 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:DataType="vm:BlueprintListTabViewModel"
              d:DataContext="{x:Static local:DesignData.BlueprintListTabViewModel}"
-             x:Class="StarXelem.Views.BlueprintListTabView">
+              x:Class="StarXelem.Views.BlueprintListTabView">
+    <UserControl.Styles>
+        <Style Selector="ic|SymbolIcon.loading">
+            <Style.Animations>
+                <Animation Duration="0:0:1" IterationCount="Infinite">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="RotateTransform.Angle" Value="90" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="RotateTransform.Angle" Value="450" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+    </UserControl.Styles>
     <UserControl.Resources>
         <ResourceDictionary>
             <conv:HumanScuConverter x:Key="ScuConverter" />
@@ -26,7 +40,7 @@
             <TextBlock Grid.Column="0" Classes="title">BLUEPRINT</TextBlock>
             <Button Grid.Row="0" Grid.Column="1" Classes="btn principal" Command="{Binding LoadItemListCommand}">
                 <Grid ColumnDefinitions="Auto,*,Auto">
-                    <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync">
+                    <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync" Classes.loading="{Binding IsLoading}">
                         <ic:SymbolIcon.RenderTransform>
                             <RotateTransform Angle="90"/>
                         </ic:SymbolIcon.RenderTransform>
@@ -34,6 +48,13 @@
                     <TextBlock Grid.Column="1">Charger</TextBlock>
                 </Grid>
             </Button>
+            <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Vertical" Spacing="6" Margin="7 4 0 0">
+                <CheckBox Content="Afficher uniquement les BP obtenus"
+                          IsChecked="{Binding ShowOnlyObtained}"
+                          IsEnabled="{Binding IsGrpcConnected}" />
+                <CheckBox Content="Afficher uniquement les BP de mission"
+                          IsChecked="{Binding ShowOnlyWithMissions}" />
+            </StackPanel>
         </Grid>
         <RelativePanel Grid.Row="1" >
             <TextBox Name="Search" RelativePanel.AlignLeftWithPanel="True" RelativePanel.AlignRightWithPanel="True" Padding="28 0 28 0" VerticalContentAlignment="Center" HorizontalAlignment="Stretch" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" />
@@ -76,8 +97,8 @@
 
     </Grid>
     <Separator Grid.Row="0" Grid.Column="2" Classes="vertical" />
-    <StackPanel Grid.Row="0" Grid.Column="3" Classes="detail" Margin="0" IsVisible="{Binding SelectedBluePrint, Converter={x:Static ObjectConverters.IsNotNull}}" >
-        <Border Classes="header">
+    <Grid Grid.Row="0" Grid.Column="3" Classes="detail" Margin="0" IsVisible="{Binding SelectedBluePrint, Converter={x:Static ObjectConverters.IsNotNull}}" RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Classes="header">
             <Grid ColumnDefinitions="Auto,*" RowDefinitions="20,Auto,*" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" >
                 <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Classes="equipment-icon">
                     <!-- TODO comment choisir le bon item ? Binding ? -->
@@ -100,8 +121,9 @@
                 </WrapPanel>
             </Grid>
         </Border>
-        <Separator Classes="horizontal" />
-        <ItemsControl Classes="content" ItemsSource="{Binding SelectedBluePrint.CategoryList}">
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+            <ItemsControl Classes="content" ItemsSource="{Binding SelectedBluePrint.CategoryList}">
             <ItemsControl.DataTemplates>
                 <DataTemplate DataType="{x:Type vm:BlueprintCategoryModel}">
                     <Border Classes="card">
@@ -169,11 +191,11 @@
                                                     </ItemsControl.ItemsPanel>
                                                     <ItemsControl.DataTemplates>
                                                         <DataTemplate DataType="{x:Type vm:BlueprintStatBandModel}">
-                                                            <StackPanel Orientation="Vertical" Spacing="1">
-                                                                <TextBlock Classes="demi-dimming quality-label demi-bold" Text="{Binding QualityLabel}" HorizontalAlignment="Center" />
-                                                                <TextBlock Classes="demi-bold" Text="{Binding FormattedValue}" HorizontalAlignment="Center" />
-                                                            </StackPanel>
-                                                        </DataTemplate>
+                                                             <StackPanel Orientation="Vertical" Spacing="1">
+                                                                 <TextBlock Classes="demi-dimming quality-label demi-bold" Text="{Binding QualityLabel}" HorizontalAlignment="Center" />
+                                                                 <TextBlock Classes="demi-bold" Text="{Binding FormattedValue}" HorizontalAlignment="Center" />
+                                                             </StackPanel>
+                                                         </DataTemplate>
                                                     </ItemsControl.DataTemplates>
                                                 </ItemsControl>
                                             </Grid>
@@ -186,8 +208,35 @@
                     </Border>
                 </DataTemplate>
             </ItemsControl.DataTemplates>
-        </ItemsControl>
-    </StackPanel>
+            </ItemsControl>
+            <Separator Classes="horizontal" />
+                <ItemsControl Classes="content" ItemsSource="{Binding SelectedBluePrint.MissionPools}">
+                    <ItemsControl.DataTemplates>
+                        <DataTemplate DataType="vm:MissionPoolGroup">
+                            <Border Classes="card">
+                                <Grid RowDefinitions="Auto,Auto,*">
+                                    <TextBlock Grid.Row="0" Classes="h1 demi-bold" Text="{Binding PoolName}" />
+                                    <Separator Grid.Row="1" Classes="horizontal" />
+                                    <ItemsControl Grid.Row="2" ItemsSource="{Binding Missions}">
+                                        <ItemsControl.DataTemplates>
+                                            <DataTemplate DataType="vm:MissionInfo">
+                                                <Grid ColumnDefinitions="Auto,*">
+                                                    <Border Grid.Column="0" Classes="bulletpoint" />
+                                                    <TextBlock Grid.Column="1" Classes="demi-dimming"
+                                                               Text="{Binding MissionTitle}"
+                                                               TextWrapping="Wrap" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.DataTemplates>
+                                    </ItemsControl>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.DataTemplates>
+                </ItemsControl>
+            </StackPanel>
+            </ScrollViewer>
+    </Grid>
 </Grid>
 
 </UserControl>

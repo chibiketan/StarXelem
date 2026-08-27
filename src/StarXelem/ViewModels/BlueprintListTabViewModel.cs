@@ -7,7 +7,6 @@ using CommunityToolkit.Mvvm.Messaging;
 using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Services;
 
@@ -18,14 +17,17 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     private readonly ILogger<BlueprintListTabViewModel> _logger;
 
     private readonly IGrpcClientService _clientService;
-    private readonly IBlueprintMappingService _mappingService;
+    private readonly ILocalDatabaseService _localDatabaseService;
     public override string Name => "Blueprints";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Copy);
     [ObservableProperty] public IList<BlueprintViewModel>? _blueprintList;
     [ObservableProperty] public BlueprintViewModel? _selectedBluePrint;
-    [ObservableProperty] private bool _isLoading = false;
+    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(LoadItemListCommand))] private bool _isLoading = false;
     [ObservableProperty] private string _treatmentStatus = "";
     [ObservableProperty] private string _search = "";
+    [ObservableProperty] private bool _showOnlyObtained;
+    [ObservableProperty] private bool _showOnlyWithMissions;
+    [ObservableProperty] private bool _isGrpcConnected;
 
     // Stocke la liste complète pour le filtrage
     private List<BlueprintViewModel>? _allBlueprints;
@@ -33,44 +35,177 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     public BlueprintListTabViewModel(
         ILogger<BlueprintListTabViewModel> logger,
         IGrpcClientService clientService,
-        IBlueprintMappingService mappingService)
+        ILocalDatabaseService localDatabaseService)
     {
         _logger = logger;
         _clientService = clientService;
-        _mappingService = mappingService;
+        _localDatabaseService = localDatabaseService;
 
         _clientService.OnStatusChanged += (sender, status) => { OnConnectedStatusChanged(status); };
     }
 
     private void OnConnectedStatusChanged(GrpcConnectionStatus status)
     {
+        IsGrpcConnected = status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame;
+        if (!IsGrpcConnected)
+        {
+            ShowOnlyObtained = false;
+        }
         LoadItemListCommand.NotifyCanExecuteChanged();
+        SendToOrbitalAllianceCommand.NotifyCanExecuteChanged();
+    }
+
+    protected override async Task OnFirstShowAsync()
+    {
+        await LoadItemList().ConfigureAwait(false);
     }
 
     public bool CanLoadItemList()
     {
-        return _clientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame && !IsLoading;
+        return !IsLoading;
     }
 
     [RelayCommand(CanExecute = nameof(CanLoadItemList))]
     public async Task LoadItemList()
     {
-        IsLoading = true;
-
-        await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Appel RSI");
-
-        var bpDbList = await _clientService.GetBlueprintList().ConfigureAwait(false);
-        await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement de la liste des objets");
-
-        var result = await _mappingService.TransformBlueprintsAsync(bpDbList);
-
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        try
         {
-            TreatmentStatus = "Terminé";
-            IsLoading = false;
-            _allBlueprints = result;
-            ApplyFilter();
-        });
+            await Dispatcher.UIThread.InvokeAsync(() => // Set IsLoading BEFORE any await so the button disables synchronously
+            {
+                IsLoading = true;
+                TreatmentStatus = "Chargement de la base de données...";
+                _allBlueprints = new List<BlueprintViewModel>();
+                BlueprintList = new List<BlueprintViewModel>();
+            }).GetTask().ConfigureAwait(false);
+
+            HashSet<string>? obtainedIds = null;
+            if (IsGrpcConnected)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement des BP obtenus...");
+                var grpcBps = await _clientService.GetBlueprintList().ConfigureAwait(false);
+                obtainedIds = grpcBps.Select(e => e.BlueprintId).ToHashSet();
+            }
+
+            const int BatchSize = 200;
+            int totalLoaded = 0;
+
+            await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement des blueprints...").GetTask().ConfigureAwait(false);
+
+            await foreach (var row in _localDatabaseService.GetBlueprintsBatchedAsync(BatchSize).ConfigureAwait(false))
+            {
+                totalLoaded++;
+
+                var vm = await MapRowToViewModelAsync(row, obtainedIds).ConfigureAwait(false);
+                _allBlueprints!.Add(vm);
+
+                if (totalLoaded % BatchSize == 0)
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        TreatmentStatus = $"Chargement des blueprints… {totalLoaded} traités";
+                        ApplyFilter();
+                    });
+                }
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                TreatmentStatus = $"Terminé — {totalLoaded} blueprints chargés";
+                IsLoading = false;
+                ApplyFilter();
+            }).GetTask().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erreur lors du chargement des blueprints");
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                TreatmentStatus = $"Erreur : {ex.Message}";
+                IsLoading = false;
+            }).GetTask().ConfigureAwait(false);
+        }
+    }
+
+    private async Task<BlueprintViewModel> MapRowToViewModelAsync(
+        DbBlueprintRow row,
+        HashSet<string>? obtainedIds)
+    {
+        var categories = await Task.WhenAll(row.Costs.Select(async cost =>
+        {
+            var materials = new List<BlueprintMaterialModel>();
+            var modifiers = new List<BlueprintStatModelBase>();
+
+            if (cost.CostType == "Resource" && !string.IsNullOrEmpty(cost.ResourceRef))
+            {
+                materials.Add(new BlueprintResourceModel
+                {
+                    Name = cost.ResourceName ?? cost.ResourceRef,
+                    QuantityInScu = (float)(cost.ResourceAmount ?? 0m)
+                });
+            }
+            else if (cost.CostType == "Item" && !string.IsNullOrEmpty(cost.ItemEntityClassRef))
+            {
+                materials.Add(new BlueprintItemModel
+                {
+                    Name = cost.ItemName ?? cost.ItemEntityClassRef,
+                    QuantityCount = cost.ItemCount ?? 1
+                });
+            }
+
+            foreach (var mod in cost.Modifiers)
+            {
+                if (mod.RangeType == "Linear")
+                {
+                    modifiers.Add(new BlueprintStatLinearModel
+                    {
+                        Name = mod.PropertyName,
+                        Min = (float)mod.ModifierStart,
+                        Max = (float)mod.ModifierEnd
+                    });
+                }
+                else if (mod.RangeType == "Additive")
+                {
+                    modifiers.Add(new BlueprintStatAdditiveModel
+                    {
+                        Name = mod.PropertyName,
+                        Bands = new List<BlueprintStatBandModel>
+                        {
+                            new BlueprintStatBandModel
+                            {
+                                StartQuality = mod.StartQuality,
+                                EndQuality = mod.EndQuality,
+                                Value = (int)mod.ModifierStart
+                            }
+                        }
+                    });
+                }
+            }
+
+            return new BlueprintCategoryModel
+            {
+                Name = cost.CostName,
+                MaterialList = materials,
+                StatModifierList = modifiers
+            };
+        }));
+
+        var missionPools = row.MissionPools
+            .GroupBy(mp => mp.PoolName)
+            .Select(g => new MissionPoolGroup(g.Key,
+                g.Select(mp => new MissionInfo(mp.MissionTitle, mp.MissionDebugName)).ToList()))
+            .ToList();
+
+        return new BlueprintViewModel
+        {
+            BlueprintId = row.SelfId,
+            Name = row.BlueprintName,
+            TierLevel = null,
+            RemainingUse = null,
+            CraftDuration = row.CraftDuration,
+            CategoryList = categories.ToList(),
+            IsObtained = obtainedIds != null && obtainedIds.Contains(row.SelfId),
+            MissionPools = missionPools
+        };
     }
 
     [RelayCommand(CanExecute = nameof(CanClearSearch))]
@@ -93,7 +228,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
 
     private bool CanSendToOrbitalAlliance()
     {
-        return _allBlueprints is { Count: > 0 };
+        return IsGrpcConnected && _allBlueprints is { Count: > 0 };
     }
 
     partial void OnSearchChanged(string value)
@@ -102,18 +237,39 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         ApplyFilter();
     }
 
+    partial void OnShowOnlyObtainedChanged(bool value)
+    {
+        ApplyFilter();
+    }
+
+    partial void OnShowOnlyWithMissionsChanged(bool value)
+    {
+        ApplyFilter();
+    }
+
     private void ApplyFilter()
     {
         var source = _allBlueprints ?? new List<BlueprintViewModel>();
 
+        var filtered = source;
+        if (ShowOnlyObtained)
+        {
+            filtered = filtered.Where(b => b.IsObtained).ToList();
+        }
+
+        if (ShowOnlyWithMissions)
+        {
+            filtered = filtered.Where(b => b.MissionPools.Count > 0).ToList();
+        }
+
         if (string.IsNullOrWhiteSpace(Search))
         {
-            BlueprintList = source.ToList();
+            BlueprintList = filtered.ToList();
         }
         else
         {
             var term = Search.Trim();
-            BlueprintList = source
+            BlueprintList = filtered
                 .Where(b => b.Name?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
                 .ToList();
         }
@@ -130,12 +286,36 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     {
         var vm = App.Current.Services.GetRequiredService<Popup.SendToOrbitalAlliancePopupContentViewModel>();
 
-        vm.BlueprintsToSend = _allBlueprints;
+        vm.BlueprintsToSend = _allBlueprints?.Where(b => b.IsObtained).ToList();
         WeakReferenceMessenger.Default.Send(new Popup.ShowPopupMessage(
             showCloseButton: true,
             onClose: null,
             viewModel: vm
         ));
+    }
+}
+
+public class MissionPoolGroup
+{
+    public string PoolName { get; }
+    public List<MissionInfo> Missions { get; }
+
+    public MissionPoolGroup(string poolName, List<MissionInfo> missions)
+    {
+        PoolName = poolName;
+        Missions = missions;
+    }
+}
+
+public class MissionInfo
+{
+    public string MissionTitle { get; }
+    public string MissionDebugName { get; }
+
+    public MissionInfo(string missionTitle, string missionDebugName)
+    {
+        MissionTitle = missionTitle;
+        MissionDebugName = missionDebugName;
     }
 }
 
@@ -192,15 +372,21 @@ public class BlueprintStatAdditiveModel : BlueprintStatModelBase
 
 public partial class BlueprintViewModel : ViewModelBase
 {
-    /// <summary>Identifiant unique du blueprint (CUID RSI). Utilisé pour la synchronisation API.</summary>
+    /// <summary>Identifiant unique du blueprint (CUID RSI / P4K SelfId). Utilisé pour la synchronisation API.</summary>
     public required string BlueprintId { get; set; } = "";
     public required string Name { get; set; }
-    public required uint TierLevel { get; set; }
-    public required int RemainingUse { get; set; }
-    public required TimeSpan CraftDuration { get; set; }
+    public uint? TierLevel { get; set; }
+    public int? RemainingUse { get; set; }
+    public TimeSpan? CraftDuration { get; set; }
     public required List<BlueprintCategoryModel> CategoryList { get; set; }
     public EItemType Type { get; set; }
     public EItemSubType Subtype { get; set; }
+
+    /// <summary>True si le joueur possède déjà ce Blueprint (via gRPC).</summary>
+    public bool IsObtained { get; set; }
+
+    /// <summary>Liste des pools de mission qui récompensent ce Blueprint.</summary>
+    public List<MissionPoolGroup> MissionPools { get; set; } = new();
 
     public string ItemIconKey => (Type, Subtype) switch
     {

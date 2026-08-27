@@ -21,6 +21,9 @@ public sealed class MicroScuConverter : IValueConverter
             decimal micro;
             switch (value)
             {
+                case ushort us:
+                    micro = us;
+                    break;
                 case uint u:
                     micro = u;
                     break;
@@ -105,6 +108,12 @@ public sealed class MicroScuConverter : IValueConverter
                     if (micro < 0) micro = 0;
                     if (micro > uint.MaxValue) micro = uint.MaxValue;
                     return (uint)decimal.Truncate(micro);
+                }
+                if (targetType == typeof(ushort) || targetType == typeof(ushort?))
+                {
+                    if (micro < 0) micro = 0;
+                    if (micro > ushort.MaxValue) micro = ushort.MaxValue;
+                    return (ushort)decimal.Truncate(micro);
                 }
                 return micro;
             }

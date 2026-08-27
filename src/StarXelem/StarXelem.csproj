@@ -7,10 +7,15 @@
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
         <ApplicationIcon>Assets\xelem-logo.ico</ApplicationIcon>
+        <!-- Incite le GC à rendre la mémoire à l'OS de façon plus agressive (au prix d'un peu de débit) :
+             important pour une appli censée cohabiter avec le jeu, dont l'empreinte mémoire doit rester sobre. -->
+        <ConserveMemory>9</ConserveMemory>
+        <ServerGarbageCollection>false</ServerGarbageCollection>
+        <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     </PropertyGroup>
 
     <ItemGroup>
-        <AvaloniaResource Include="Assets\**"/>
+        <AvaloniaResource Include="Assets\**" />
     </ItemGroup>
 
     <ItemGroup>
@@ -29,8 +34,9 @@
         <PackageReference Include="FluentAvaloniaUI" Version="2.4.1" />
         <PackageReference Include="FluentIcons.Avalonia.Fluent" Version="2.0.321" />
         <PackageReference Include="Humanizer.Core.fr" Version="3.0.10" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.5" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.5" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.5" />
         <PackageReference Include="OneOf" Version="3.0.271" />
@@ -83,6 +89,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Folder Include="DeployAssets\" />
       <Folder Include="maquettes\" />
     </ItemGroup>
 </Project>

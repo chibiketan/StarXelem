@@ -142,7 +142,9 @@
                 </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Nombre élément" Binding="{Binding StackSize}"  />
                 <DataGridTextColumn Header="Taille occupée" Binding="{Binding EdgeOccupancy, Converter={StaticResource MicroScuConverter}}"  />
-                <DataGridTextColumn Header="Possède une entrée Edge" Binding="{Binding Edge, Converter={x:Static ObjectConverters.IsNotNull }}"  />
+                <DataGridTextColumn Header="Qualité contenu" Binding="{Binding ContentQuality}"  />
+                <DataGridTextColumn Header="Quantité contenu" Binding="{Binding ContentQuantity, Converter={StaticResource MicroScuConverter}}"  />
+                <DataGridTextColumn Header="Possède une entrée Edge" Binding="{Binding Edge, Converter={x:Static ObjectConverters.IsNotNull }}" IsVisible="{Binding IsInDebugMode}"  />
                 <!-- <DataGridTextColumn Header="classe" Binding="{Binding TypeGuid}"  IsVisible="{Binding IsInDebugMode}" /> -->
                 <DataGridTextColumn Header="type" Binding="{Binding ItemType}" />
                 <DataGridTextColumn Header="sous-type" Binding="{Binding ItemSubType}" />

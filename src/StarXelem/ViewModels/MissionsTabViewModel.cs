@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.Logging;
 using StarBreaker.DataCoreGenerated;
+using StarXelem.Data;
 using StarXelem.Services;
 
 namespace StarXelem.ViewModels;
@@ -15,8 +16,7 @@ namespace StarXelem.ViewModels;
 public sealed partial class MissionsTabViewModel : PageViewModelBase
 {
     private readonly ILogger<MissionsTabViewModel> _logger;
-    private readonly IP4kService _p4kService;
-    private readonly IMissionMappingService _missionMappingService;
+    private readonly ILocalDatabaseService _localDatabaseService;
     public override string Name => "Missions";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Target);
 
@@ -27,16 +27,15 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
     [ObservableProperty] private List<MissionContractorItemViewModel> _contractorList = [];
     [ObservableProperty] private MissionContractorItemViewModel selectedContractor;
     [ObservableProperty] private MissionItemViewModel selectedMission;
+    [ObservableProperty] private ObservableCollection<ShipEntity> _shipsForSelectedMission = new();
     [ObservableProperty] private List<MissionCategoryItemViewModel> _categoryList = [];
     [ObservableProperty] private MissionCategoryItemViewModel selectedCategory;
 
 
-    public MissionsTabViewModel(IP4kService p4KService, ILogger<MissionsTabViewModel> logger, IMissionMappingService missionMappingService)
+    public MissionsTabViewModel(ILogger<MissionsTabViewModel> logger, ILocalDatabaseService localDatabaseService)
     {
-        _p4kService = p4KService;
         _logger = logger;
-        // Service responsable de la transformation des données Contrat -> ViewModel (injecté)
-        _missionMappingService = missionMappingService;
+        _localDatabaseService = localDatabaseService;
     }
 
     protected override Task OnFirstShowAsync()
@@ -45,12 +44,30 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
         return Task.CompletedTask;
     }
 
+    partial void OnSelectedMissionChanged(MissionItemViewModel? value)
+    {
+        ShipsForSelectedMission.Clear();
+        if (value == null) return;
+
+        _ = Task.Run(async () =>
+        {
+            var ships = await _localDatabaseService.GetShipsForMissionAsync(value.DebugName).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                ShipsForSelectedMission.Clear();
+                foreach (var ship in ships)
+                {
+                    ShipsForSelectedMission.Add(ship);
+                }
+            });
+        });
+    }
+
     [RelayCommand]
     private Task RefreshAsync()
     {
         return Task.Run(async () =>
         {
-
             if (IsLoading)
                 return;
 
@@ -61,71 +78,70 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
 
             try
             {
-                // Placeholder: vider/remplir avec quelques éléments factices pour l'instant
-                await _p4kService.OpenP4k(_p4kService.SelectedP4KFile.Path, new Progress<double>(), new Progress<double>()).ConfigureAwait(false);
+                var sw = Stopwatch.StartNew();
+                var categoriesWithMissions = await _localDatabaseService.GetAllMissionCategoriesWithMissionsAsync().ConfigureAwait(false);
+                sw.Stop();
+                _logger.LogTrace("Missions loaded from DB in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
+
                 var contractorMap = new Dictionary<string, MissionContractorItemViewModel>(20);
                 var categoryMap = new Dictionary<string, MissionCategoryItemViewModel>(20);
 
-                var contractGeneratorListTmp = await _p4kService.GetAllContractGenerator().ConfigureAwait(false);
-                var sw = Stopwatch.StartNew();
-                
-                
-                var contractGeneratorList = contractGeneratorListTmp.AsParallel().Select(s => _p4kService.GetRecordWithSpecificDepth(s.RecordId, 3).Result);
-                
-                
-                sw.Stop();
-                _logger.LogTrace("All contract records loaded in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
-                foreach (var dataRecordTemp in contractGeneratorList)
+                foreach (var kvp in categoriesWithMissions)
                 {
-                    if (dataRecordTemp.Data is not ContractGenerator)
-                    {
-                        // Normalement impossible
-                        continue;
-                    }
+                    var categoryKey = kvp.Key;
+                    var missions = kvp.Value;
+                    var categoryName = missions.FirstOrDefault()?.Category?.Name ?? categoryKey;
+                    var categoryVm = new MissionCategoryItemViewModel { Name = categoryName };
 
-                    // TODO Load data record with full history
-                    // var dataRecord = await _p4kService.GetRecordWithFullHistory(dataRecordTemp.RecordId).ConfigureAwait(false);
-                    var contractGenerator = dataRecordTemp.Data as ContractGenerator;
-
-                    // Pour chaque generateur de contrat
-                    foreach (var contractGeneratorBase in contractGenerator.generators)
+                    foreach (var mission in missions)
                     {
-                        if (contractGeneratorBase is null || contractGeneratorBase.notForRelease || contractGeneratorBase.workInProgress)
+                        var missionVm = MapMissionEntity(mission);
+
+                        // Add to contractor map
+                        if (mission.Contractor != null)
                         {
-                            // Si le générateur n'est pas prêt, on passe à la suite
-                            continue;
+                            if (!contractorMap.TryGetValue(mission.Contractor.Id, out var contractorVm))
+                            {
+                                contractorVm = new MissionContractorItemViewModel
+                                {
+                                    Name = mission.Contractor.Name,
+                                    NameKey = mission.Contractor.Id,
+                                    MissionList = new List<MissionItemViewModel>()
+                                };
+                                contractorMap[mission.Contractor.Id] = contractorVm;
+                            }
+                            contractorVm.MissionList.Add(missionVm);
                         }
 
-                        await _missionMappingService.ProcessContractGeneratorAsync(contractGeneratorBase, contractorMap, categoryMap).ConfigureAwait(false);
+                        // Add to category map
+                        categoryVm.MissionList.Add(missionVm);
                     }
+
+                    categoryMap[categoryKey] = categoryVm;
                 }
 
-                // On trie les contrats par nom de contrat
-                foreach (var missionContractorItemViewModel in contractorMap.Values)
+                // Sort missions within each contractor by title
+                foreach (var contractorVm in contractorMap.Values)
                 {
-                    // On trie toutes les fonctions par titre
-                    missionContractorItemViewModel.MissionList.Sort((a, b) => String.Compare(a.Title, b.Title, CultureInfo.CurrentUICulture, CompareOptions.IgnoreCase));
+                    contractorVm.MissionList.Sort((a, b) =>
+                        String.Compare(a.Title, b.Title, CultureInfo.CurrentUICulture, CompareOptions.IgnoreCase));
                 }
 
-                foreach (var missionContractorItemViewModel in categoryMap.Values)
+                // Sort missions within each category by contractor then title
+                foreach (var categoryVm in categoryMap.Values)
                 {
-                    // On trie toutes les fonctions par titre
-                    missionContractorItemViewModel.MissionList.Sort((a, b) =>
+                    categoryVm.MissionList.Sort((a, b) =>
                     {
-                        var contractorCompare = String.Compare(a.Contractor.Name, b.Contractor.Name, CultureInfo.CurrentUICulture, CompareOptions.IgnoreCase);
-
-                        if (0 != contractorCompare)
-                        {
-                            return contractorCompare;
-                        }
-                        
+                        var contractorCompare = String.Compare(
+                            a.Contractor?.Name ?? "", b.Contractor?.Name ?? "",
+                            CultureInfo.CurrentUICulture, CompareOptions.IgnoreCase);
+                        if (contractorCompare != 0) return contractorCompare;
                         return String.Compare(a.Title, b.Title, CultureInfo.CurrentUICulture, CompareOptions.IgnoreCase);
                     });
                 }
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    // On affecte pour l'affichage
                     ContractorList = contractorMap.Values.OrderBy(c => c.Name).ToList();
                     CategoryList = categoryMap.Values.OrderBy(c => c.Name).ToList();
                 });
@@ -138,6 +154,120 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
                 });
             }
         });
+    }
+
+    /// <summary>
+    /// Map a MissionEntity from the database to a MissionItemViewModel for display.
+    /// </summary>
+    private MissionItemViewModel MapMissionEntity(MissionEntity mission)
+    {
+        return new MissionItemViewModel
+        {
+            Title = mission.Title,
+            Description = mission.Description,
+            DebugName = mission.DebugName,
+            Contractor = new MissionContractorItemViewModel
+            {
+                Name = mission.Contractor?.Name ?? "Unknown",
+                NameKey = mission.Contractor?.Id ?? "",
+                MissionList = new List<MissionItemViewModel>()
+            },
+            RewardList = mission.Rewards?.Select(r => new MissionRewardItemViewModel
+            {
+                Name = r.DisplayValue,
+                Count = r.Count ?? 0,
+                OnlyToMissionOwner = r.OnlyToMissionOwner,
+                SendToHomeLocation = r.SendToHomeLocation
+            }).ToList() ?? new List<MissionRewardItemViewModel>(),
+            ObjectiveList = MapObjectives(mission.Objectives, mission.Tokens),
+            PrerequisiteList = mission.Prerequisites?.Select(p => new MissionPrerequisiteViewModel
+            {
+                Label = FormatPrerequisiteLabel(p)
+            }).ToList() ?? new List<MissionPrerequisiteViewModel>(),
+            MinStanding = null, // TODO: resolve from tokens
+            MaxStanding = mission.MaxStanding?.ToString()
+        };
+    }
+
+    /// <summary>
+    /// Build hierarchical objective list from flat objective entities.
+    /// </summary>
+    private List<MissionObjectiveViewModel> MapObjectives(ICollection<MissionObjectiveEntity>? objectives, ICollection<MissionTokenEntity>? tokens)
+    {
+        if (objectives == null || objectives.Count == 0)
+            return new List<MissionObjectiveViewModel>();
+
+        // Build dictionary from objective ID to VM for ID-based matching
+        var vmById = new Dictionary<int, MissionObjectiveViewModel>();
+        foreach (var o in objectives)
+        {
+            var vm = new MissionObjectiveViewModel
+            {
+                Title = ResolveMissionTokens(o.Text, tokens),
+                ObjectiveList = new List<MissionObjectiveViewModel>()
+            };
+            vmById[o.Id] = vm;
+        }
+
+        // Build hierarchy: link children to parents using IDs
+        foreach (var o in objectives)
+        {
+            var childVm = vmById[o.Id];
+            if (o.ParentId != null && vmById.TryGetValue(o.ParentId.Value, out var parentVm))
+            {
+                parentVm.ObjectiveList.Add(childVm);
+            }
+        }
+
+        // Return only root objectives (no parent)
+        return objectives.Where(o => o.ParentId == null)
+            .Select(o => vmById[o.Id])
+            .ToList();
+    }
+
+    /// <summary>
+    /// Format a prerequisite for display.
+    /// </summary>
+    private string FormatPrerequisiteLabel(MissionPrerequisiteEntity prereq)
+    {
+        return prereq.PrerequisiteType switch
+        {
+            "Reputation" => $"Standing: {prereq.FactionNameKey ?? "Unknown"} >= {prereq.MinReputation}",
+            "AreaTags" => $"Area tags: {prereq.RequiredTagNames ?? "None"}",
+            "CompletedContractTags" => $"Completed contracts: {prereq.RequiredTagNames ?? "None"}",
+            "CrimeStat" => $"Crime stat: {prereq.MinCrimeStat} - {prereq.MaxCrimeStat}",
+            "JournalEntries" => $"Journal: {prereq.RequiredJournalTitles ?? "None"}",
+            "Locality" => $"Locality: {prereq.LocationNameKey ?? "Unknown"}",
+            "Location" => $"Location: {prereq.LocationNameKey ?? "Unknown"}",
+            "LocationProperty" => $"Location property: {prereq.DisplayLabel ?? "Unknown"}",
+            _ => $"{prereq.PrerequisiteType}: {prereq.DisplayLabel ?? "Unknown"}"
+        };
+    }
+
+    /// <summary>
+    /// Resolve ~mission(TokenName) tokens in text to display values from the mission's token collection.
+    /// </summary>
+    private string ResolveMissionTokens(string text, ICollection<MissionTokenEntity>? tokens)
+    {
+        if (string.IsNullOrEmpty(text) || tokens == null || tokens.Count == 0)
+            return text ?? string.Empty;
+
+        // Replace ~mission(TokenName) with the token's resolved value
+        var result = System.Text.RegularExpressions.Regex.Replace(text, "~mission\\(([^)]+)\\)", match =>
+        {
+            var tokenName = match.Groups[1].Value;
+            var token = tokens.FirstOrDefault(t => t.TokenName == tokenName);
+            if (token != null)
+            {
+                // Try locale resolution first, fall back to raw value
+                return !string.IsNullOrEmpty(token.ResolvedValue)
+                    ? token.ResolvedValue
+                    : token.TokenName;
+            }
+            return match.Value; // Keep original token if not found
+        });
+
+        return result;
     }
 
 }
