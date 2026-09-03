@@ -22,7 +22,7 @@ public partial class ItemViewModel : ViewModelBase
     private readonly System.Lazy<Task<string?>> _location;
     public readonly Lazy<Task<string>> _owner;
     private ushort? _contentQuality;
-    private ushort? _contentQuantity;
+    private ulong? _contentQuantity;
 
     public ulong Id => _entityNodeProperties.EntityNodeProperties.Geid;
     public ulong OwnerId => _entityNodeProperties.EntityNodeProperties.OwnerId;
@@ -50,7 +50,7 @@ public partial class ItemViewModel : ViewModelBase
 
     public ushort? ContentQuality => _contentQuality;
 
-    public ushort? ContentQuantity => _contentQuantity;
+    public ulong? ContentQuantity => _contentQuantity;
     public AttachmentType? EdgeAttachmentType => _entityNodeProperties.EntityEdge?.Properties?.AttachmentType;
 
 //    public string? TypeGuid => _entityClassProperties?.Guid;
@@ -149,7 +149,7 @@ public partial class ItemViewModel : ViewModelBase
 
                     if (snapshotVariable.Snapshot.Length >= 9)
                     {
-                        _contentQuantity = BinaryPrimitives.ReadUInt16LittleEndian(snapshotVariable.Snapshot.Span[(1 + 6)..]);
+                        _contentQuantity = BinaryPrimitives.ReadUInt32LittleEndian(snapshotVariable.Snapshot.Span[(1 + 6)..]);
                     }
                     else
                     {

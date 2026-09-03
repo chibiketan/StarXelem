@@ -46,18 +46,24 @@ public sealed class MicroScuConverter : IValueConverter
                     return value?.ToString();
             }
 
-            const decimal Thousand = 1000m;
-            const decimal Million = 1_000_000m;
+            const decimal MicroToMilli = 1000m;
+            const decimal MicroToCScu = 10_000m;
+            const decimal MicroToScu = 1_000_000m;
 
-            if (micro >= Million)
+            if (micro >= MicroToScu)
             {
-                var scu = micro / Million;
+                var scu = micro / MicroToScu;
                 return FormatNumber(scu, culture) + " SCU";
             }
-            if (micro >= Thousand)
+            if (micro >= MicroToCScu)
             {
-                var cscu = micro / Thousand;
-                return FormatNumber(cscu, culture) + " cSCU";
+                var scu = micro / MicroToCScu;
+                return FormatNumber(scu, culture) + " cSCU";
+            }
+            if (micro >= MicroToMilli)
+            {
+                var cscu = micro / MicroToMilli;
+                return FormatNumber(cscu, culture) + " mSCU";
             }
 
             // microSCU
