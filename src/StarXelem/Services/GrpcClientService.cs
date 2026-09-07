@@ -909,10 +909,10 @@ public class GrpcClientService : IGrpcClientService
             }
             
             response = await service.QueryBlueprintEntriesAsync(request, _authHeaders).ConfigureAwait(false);
+            result.AddRange(response.Results);
         } while (response.PageInfo.HasNextPage);
 
 
-        result.AddRange(response.Results);
         return result;
     }
 
