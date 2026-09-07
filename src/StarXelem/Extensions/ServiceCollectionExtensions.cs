@@ -54,6 +54,7 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<ISignatureOcrService, DesignSignatureOcrService>();
             services.AddSingleton<IOverlayNotificationService, DesignOverlayNotificationService>();
             services.AddSingleton<IGlobalHotkeyService, DesignGlobalHotkeyService>();
+            services.AddSingleton<IJoystickTriggerService, DesignJoystickTriggerService>();
             services.AddSingleton<IScanSignatureOrchestrator, DesignScanSignatureOrchestrator>();
         }
         else
@@ -76,6 +77,7 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<ISignatureOcrService, WindowsSignatureOcrService>();
             services.AddSingleton<IOverlayNotificationService, OverlayNotificationService>();
             services.AddSingleton<IGlobalHotkeyService, Win32GlobalHotkeyService>();
+            services.AddSingleton<IJoystickTriggerService, DirectInputJoystickService>();
             services.AddSingleton<IScanSignatureOrchestrator, ScanSignatureOrchestrator>();
         }
 

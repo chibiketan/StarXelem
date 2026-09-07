@@ -170,15 +170,27 @@
                         </Grid>
 
                         <StackPanel Spacing="6">
-                            <TextBlock Classes="action-desc" Text="Raccourci (cliquez puis appuyez sur la combinaison, au moins un modificateur requis) :" />
-                            <comp:HotkeyBox Key="{Binding ScanKey}"
-                                             Modifiers="{Binding ScanModifiers}"
-                                             Classes="txt-api-key"
-                                             Width="220"
-                                             HorizontalAlignment="Left" />
+                            <TextBlock Classes="action-desc" Text="Déclencheur (cliquez, puis appuyez sur une combinaison clavier ou sur un bouton de votre joystick) :" />
+                            <comp:TriggerCaptureBox Trigger="{Binding ScanTrigger}"
+                                                    JoystickCaptureProvider="{Binding JoystickCaptureProvider}"
+                                                    Classes="txt-api-key"
+                                                    Width="360"
+                                                    HorizontalAlignment="Left" />
                             <TextBlock Classes="action-desc"
-                                       Text="Le raccourci est actif même si StarXelem n'a pas le focus ; il n'est pas transmis au jeu. Le jeu doit être en mode fenêtré sans bordure pour que la capture et l'overlay fonctionnent correctement." />
+                                       Text="Le déclencheur est actif même si StarXelem n'a pas le focus. Une combinaison clavier n'est pas transmise au jeu ; un bouton de joystick l'est aussi : choisissez un bouton non assigné dans Star Citizen. Le jeu doit être en mode fenêtré sans bordure pour que la capture et l'overlay fonctionnent correctement." />
                         </StackPanel>
+
+                        <Border IsVisible="{Binding IsTriggerDeviceMissing}"
+                                Background="{DynamicResource CardBackgroundBrush}"
+                                BorderBrush="#E0B44C"
+                                BorderThickness="1"
+                                CornerRadius="7"
+                                Padding="12,8">
+                            <TextBlock Text="Joystick non connecté — le déclencheur sera actif dès son branchement."
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Foreground="#E0B44C" />
+                        </Border>
 
                         <Border IsVisible="{Binding !IsOcrAvailable}"
                                 Background="{DynamicResource CardBackgroundBrush}"

@@ -1,11 +1,11 @@
 using Avalonia.Input;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.Logging;
 using StarXelem.Services;
 using StarXelem.Services.Scan;
-using StarXelem.ViewModels.Overlay;
 using StarXelem.ViewModels.Popup;
 using FluentAvalonia.UI.Controls;
 
@@ -21,6 +21,7 @@ public partial class SettingsTabViewModel : PageViewModelBase
     private readonly IScanSignatureOrchestrator _scanOrchestrator;
     private readonly ISignatureOcrService _ocrService;
     private readonly IOverlayNotificationService _overlayService;
+    private readonly IJoystickTriggerService _joystickService;
     private readonly ILogger<SettingsTabViewModel> _logger;
 
     [ObservableProperty]
@@ -32,11 +33,9 @@ public partial class SettingsTabViewModel : PageViewModelBase
     [ObservableProperty]
     private bool _scanEnabled = true;
 
+    /// <summary>Déclencheur en cours d'édition (clavier ou joystick). <c>Enabled</c> est porté séparément par <see cref="ScanEnabled"/>.</summary>
     [ObservableProperty]
-    private Key _scanKey = Key.F9;
-
-    [ObservableProperty]
-    private KeyModifiers _scanModifiers = KeyModifiers.Control;
+    private ScanTriggerSettings _scanTrigger = ScanTriggerSettings.Default;
 
     [ObservableProperty]
     private string? _scanError;
@@ -44,8 +43,14 @@ public partial class SettingsTabViewModel : PageViewModelBase
     [ObservableProperty]
     private bool _scanSaved;
 
+    [ObservableProperty]
+    private bool _isTriggerDeviceMissing;
+
     public bool IsOcrAvailable => _ocrService.IsAvailable;
     public string? OcrUnavailableReason => _ocrService.UnavailableReason;
+
+    /// <summary>Fourni au contrôle de saisie pour capturer le prochain bouton de joystick pressé.</summary>
+    public Func<CancellationToken, Task<JoystickBinding?>> JoystickCaptureProvider { get; }
 
     public override string Name => "Paramètres";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Settings);
@@ -55,13 +60,23 @@ public partial class SettingsTabViewModel : PageViewModelBase
         IScanSignatureOrchestrator scanOrchestrator,
         ISignatureOcrService ocrService,
         IOverlayNotificationService overlayService,
+        IJoystickTriggerService joystickService,
         ILogger<SettingsTabViewModel> logger)
     {
         _settingsService = settingsService;
         _scanOrchestrator = scanOrchestrator;
         _ocrService = ocrService;
         _overlayService = overlayService;
+        _joystickService = joystickService;
         _logger = logger;
+
+        JoystickCaptureProvider = ct => _joystickService.CaptureNextButtonAsync(ct);
+        _scanOrchestrator.TriggerStatusChanged += (_, _) => Dispatcher.UIThread.Post(UpdateTriggerStatus);
+    }
+
+    private void UpdateTriggerStatus()
+    {
+        IsTriggerDeviceMissing = _scanOrchestrator.TriggerStatus == ScanTriggerStatus.DeviceNotConnected;
     }
 
     protected override async Task OnShowAsync()
@@ -78,14 +93,14 @@ public partial class SettingsTabViewModel : PageViewModelBase
 
         try
         {
-            var scanSettings = await ScanHotkeySettings.LoadAsync(_settingsService).ConfigureAwait(false);
+            var scanSettings = await ScanTriggerSettings.LoadAsync(_settingsService).ConfigureAwait(false);
             ScanEnabled = scanSettings.Enabled;
-            ScanKey = scanSettings.Key;
-            ScanModifiers = scanSettings.Modifiers;
+            ScanTrigger = scanSettings;
+            await Dispatcher.UIThread.InvokeAsync(UpdateTriggerStatus);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Impossible de charger les paramètres du raccourci de scan");
+            _logger.LogWarning(ex, "Impossible de charger les paramètres du déclencheur de scan");
         }
     }
 
@@ -118,14 +133,22 @@ public partial class SettingsTabViewModel : PageViewModelBase
     {
         ScanError = null;
 
-        if (ScanModifiers == KeyModifiers.None)
+        var settings = ScanTrigger with { Enabled = ScanEnabled };
+
+        if (settings.Kind == ScanTriggerKind.Keyboard && settings.Modifiers == KeyModifiers.None)
         {
             ScanError = "Choisissez au moins un modificateur (Ctrl, Alt ou Shift).";
             return;
         }
 
-        var settings = new ScanHotkeySettings(ScanEnabled, ScanKey, ScanModifiers);
+        if (settings.Kind == ScanTriggerKind.Joystick && settings.Joystick == null)
+        {
+            ScanError = "Aucun bouton de joystick sélectionné.";
+            return;
+        }
+
         var (success, error) = await _scanOrchestrator.ApplySettingsAsync(settings).ConfigureAwait(false);
+        await Dispatcher.UIThread.InvokeAsync(UpdateTriggerStatus);
 
         if (!success)
         {

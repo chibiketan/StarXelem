@@ -9,6 +9,8 @@ namespace StarXelem.Services.Scan;
 public class ScanSignatureOrchestrator : IScanSignatureOrchestrator
 {
     private readonly IGlobalHotkeyService _hotkeyService;
+    private readonly IJoystickTriggerService _joystickService;
+    private ScanTriggerKind _currentKind = ScanTriggerKind.Keyboard;
     private readonly IScreenCaptureService _captureService;
     private readonly ISignatureOcrService _ocrService;
     private readonly IMineralSignatureRepository _signatureRepository;
@@ -20,8 +22,15 @@ public class ScanSignatureOrchestrator : IScanSignatureOrchestrator
 
     public string? LastError { get; private set; }
 
+    public event EventHandler? TriggerStatusChanged;
+
+    public ScanTriggerStatus TriggerStatus => ActiveTrigger.Status;
+
+    private IScanTriggerService ActiveTrigger => _currentKind == ScanTriggerKind.Joystick ? _joystickService : _hotkeyService;
+
     public ScanSignatureOrchestrator(
         IGlobalHotkeyService hotkeyService,
+        IJoystickTriggerService joystickService,
         IScreenCaptureService captureService,
         ISignatureOcrService ocrService,
         IMineralSignatureRepository signatureRepository,
@@ -30,6 +39,7 @@ public class ScanSignatureOrchestrator : IScanSignatureOrchestrator
         ILogger<ScanSignatureOrchestrator> logger)
     {
         _hotkeyService = hotkeyService;
+        _joystickService = joystickService;
         _captureService = captureService;
         _ocrService = ocrService;
         _signatureRepository = signatureRepository;
@@ -37,26 +47,56 @@ public class ScanSignatureOrchestrator : IScanSignatureOrchestrator
         _settingsService = settingsService;
         _logger = logger;
 
-        _hotkeyService.HotkeyPressed += (_, _) => _ = RunOnceAsync();
+        _hotkeyService.Triggered += (_, _) => _ = RunOnceAsync();
+        _joystickService.Triggered += (_, _) => _ = RunOnceAsync();
+        _hotkeyService.StatusChanged += OnTriggerStatusChanged;
+        _joystickService.StatusChanged += OnTriggerStatusChanged;
+    }
+
+    private void OnTriggerStatusChanged(object? sender, EventArgs e)
+    {
+        if (ReferenceEquals(sender, ActiveTrigger))
+        {
+            TriggerStatusChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     public async Task StartAsync()
     {
-        var settings = await ScanHotkeySettings.LoadAsync(_settingsService).ConfigureAwait(false);
-        var ok = _hotkeyService.TryApply(settings, out var error);
-        LastError = error;
+        var settings = await ScanTriggerSettings.LoadAsync(_settingsService).ConfigureAwait(false);
+        var ok = ApplyTriggers(settings, out var error);
         if (!ok)
         {
-            _logger.LogWarning("Impossible d'enregistrer le raccourci de scan au démarrage : {Error}", error);
+            _logger.LogWarning("Impossible d'installer le déclencheur de scan au démarrage : {Error}", error);
         }
     }
 
-    public async Task<(bool Success, string? Error)> ApplySettingsAsync(ScanHotkeySettings settings)
+    public async Task<(bool Success, string? Error)> ApplySettingsAsync(ScanTriggerSettings settings)
     {
         await settings.SaveAsync(_settingsService).ConfigureAwait(false);
-        var ok = _hotkeyService.TryApply(settings, out var error);
-        LastError = error;
+        var ok = ApplyTriggers(settings, out var error);
         return (ok, error);
+    }
+
+    /// <summary>
+    /// Applique les paramètres à tous les déclencheurs : chacun ne s'active que si le type le concerne
+    /// et se désactive sinon, ce qui garantit qu'un seul déclencheur est actif à la fois.
+    /// </summary>
+    private bool ApplyTriggers(ScanTriggerSettings settings, out string? error)
+    {
+        _currentKind = settings.Kind;
+        var hotkeyOk = _hotkeyService.TryApply(settings, out var hotkeyError);
+        var joystickOk = _joystickService.TryApply(settings, out var joystickError);
+        error = hotkeyError ?? joystickError;
+        LastError = error;
+        TriggerStatusChanged?.Invoke(this, EventArgs.Empty);
+        return hotkeyOk && joystickOk;
+    }
+
+    public void StopTriggers()
+    {
+        _hotkeyService.Stop();
+        _joystickService.Stop();
     }
 
     public async Task RunOnceAsync()

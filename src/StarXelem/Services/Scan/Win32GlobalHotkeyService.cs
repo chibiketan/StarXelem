@@ -21,20 +21,36 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService
     private bool _lastRegisterResult;
     private string? _lastRegisterError;
 
-    public event EventHandler? HotkeyPressed;
+    public event EventHandler? Triggered;
+    public event EventHandler? StatusChanged;
+
+    private ScanTriggerStatus _status = ScanTriggerStatus.Disabled;
+    public ScanTriggerStatus Status
+    {
+        get => _status;
+        private set
+        {
+            if (_status == value) return;
+            _status = value;
+            StatusChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
 
     public Win32GlobalHotkeyService(ILogger<Win32GlobalHotkeyService> logger)
     {
         _logger = logger;
     }
 
-    public bool TryApply(ScanHotkeySettings settings, out string? error)
+    public bool TryApply(ScanTriggerSettings settings, out string? error)
     {
         Stop();
         error = null;
 
-        if (!settings.Enabled)
+        if (!settings.Enabled || settings.Kind != ScanTriggerKind.Keyboard)
+        {
+            Status = ScanTriggerStatus.Disabled;
             return true;
+        }
 
         if (!HotkeyKeyMapping.TryGetVirtualKey(settings.Key, out var vk))
         {
@@ -57,10 +73,12 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService
         if (!_registered.Wait(TimeSpan.FromSeconds(5)))
         {
             error = "Le service de raccourci n'a pas répondu à temps.";
+            Status = ScanTriggerStatus.Error;
             return false;
         }
 
         error = _lastRegisterError;
+        Status = _lastRegisterResult ? ScanTriggerStatus.Active : ScanTriggerStatus.Error;
         return _lastRegisterResult;
     }
 
@@ -71,6 +89,7 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService
         NativeMethods.PostThreadMessage(_threadId, NativeMethods.WM_QUIT, UIntPtr.Zero, IntPtr.Zero);
         _thread.Join(TimeSpan.FromSeconds(2));
         _thread = null;
+        Status = ScanTriggerStatus.Disabled;
     }
 
     private void RunMessageLoop(uint mods, uint vk)
@@ -97,11 +116,11 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService
                 {
                     try
                     {
-                        HotkeyPressed?.Invoke(this, EventArgs.Empty);
+                        Triggered?.Invoke(this, EventArgs.Empty);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Erreur dans le gestionnaire HotkeyPressed.");
+                        _logger.LogError(ex, "Erreur dans le gestionnaire Triggered.");
                     }
                 }
             }

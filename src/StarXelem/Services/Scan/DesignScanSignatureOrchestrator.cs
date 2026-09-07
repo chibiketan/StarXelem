@@ -4,11 +4,15 @@ namespace StarXelem.Services.Scan;
 public class DesignScanSignatureOrchestrator : IScanSignatureOrchestrator
 {
     public string? LastError => null;
+    public ScanTriggerStatus TriggerStatus => ScanTriggerStatus.Active;
+    public event EventHandler? TriggerStatusChanged { add { } remove { } }
 
     public Task StartAsync() => Task.CompletedTask;
 
-    public Task<(bool Success, string? Error)> ApplySettingsAsync(ScanHotkeySettings settings)
+    public Task<(bool Success, string? Error)> ApplySettingsAsync(ScanTriggerSettings settings)
         => Task.FromResult<(bool, string?)>((true, null));
 
     public Task RunOnceAsync() => Task.CompletedTask;
+
+    public void StopTriggers() { }
 }

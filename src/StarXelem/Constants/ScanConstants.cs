@@ -23,6 +23,17 @@ public static class ScanConstants
     public const string SettingHotkeyEnabled = "ScanHotkeyEnabled";
     public const string SettingHotkeyKey = "ScanHotkeyKey";
     public const string SettingHotkeyModifiers = "ScanHotkeyModifiers";
+    public const string SettingTriggerKind = "ScanTriggerKind";
+    public const string SettingJoystickInstanceGuid = "ScanJoystickInstanceGuid";
+    public const string SettingJoystickProductName = "ScanJoystickProductName";
+    public const string SettingJoystickButton = "ScanJoystickButton";
+
+    /// <summary>Période de lecture de l'état du joystick (DirectInput) sur le thread de déclenchement.</summary>
+    public const int JoystickPollIntervalMs = 50;
+    /// <summary>Période de ré-énumération des joysticks tant que l'appareil configuré n'est pas branché.</summary>
+    public const int JoystickReenumerateIntervalMs = 5000;
+    /// <summary>Anti-rebond entre deux déclenchements par bouton de joystick.</summary>
+    public const int JoystickDebounceMs = 150;
 
     public const string DefaultHotkeyKey = "F9";
     public const string DefaultHotkeyModifiers = "Control";

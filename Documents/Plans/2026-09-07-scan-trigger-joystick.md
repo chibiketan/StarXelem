@@ -1,5 +1,21 @@
 # Étude : déclencher le scan de signature par une touche clavier **ou** un bouton de joystick
 
+## État d'exécution (2026-09-07)
+
+**Implémenté** selon la recommandation §5 (`dotnet build` → 0 erreur) :
+
+- `ScanTriggerSettings` (remplace `ScanHotkeySettings`) : `Kind` Keyboard/Joystick + `JoystickBinding` (InstanceGuid, ProductName, Button), clés registre rétrocompatibles.
+- `IScanTriggerService` commun (`Triggered`, `Status`, `TryApply`, `Stop`) ; `Win32GlobalHotkeyService` migré ; nouveau `DirectInputJoystickService` (Vortice.DirectInput 3.8.3, thread `StarXelem.Joystick`, polling 50 ms, ré-énumération 5 s, anti-rebond 150 ms, `CaptureNextButtonAsync` pour la saisie).
+- `ScanSignatureOrchestrator` applique les paramètres aux deux services (un seul actif selon `Kind`) et expose `TriggerStatus`.
+- `TriggerCaptureBox` (remplace `HotkeyBox`) : clic → capture simultanée clavier + joystick, la première entrée gagne.
+- Page Paramètres : bandeau « Joystick non connecté » piloté par le statut, texte d'aide sur la transmission au jeu.
+
+**Vérifié** : rendu de la page Paramètres (capture réelle) ; énumération DirectInput sur la machine de dev (3 appareils vJoy, type `FirstPerson` — d'où l'absence volontaire de filtre sur `DeviceType`) ; `SetCooperativeLevel(IntPtr.Zero, Background | NonExclusive)` + `Acquire` + `Poll` réussis (`Poll` renvoie `S_FALSE` sur vJoy, ce qui n'est pas un échec).
+
+**Non vérifié** (nécessite une action physique / le jeu) : pression réelle d'un bouton pendant la saisie et pendant le jeu (risque §4 « acquisition exclusive par SC »).
+
+---
+
 > Étude préalable (pas d'implémentation). Objectif : permettre à l'utilisateur de choisir, pour déclencher la capture/scan, soit une combinaison clavier (existant), soit un bouton de joystick/HOTAS, **avec le moins d'impact possible sur l'utilisateur** : même geste de configuration, aucun changement pour ceux qui n'ont pas de joystick, aucune régression sur l'existant.
 
 Contexte existant : `Documents/Plans/2026-09-07-scan-signature-overlay.md` — le déclenchement repose sur `IGlobalHotkeyService` (`RegisterHotKey` Win32 sur un thread dédié), configuré via le contrôle `HotkeyBox` de la page Paramètres et persisté par `ScanHotkeySettings` (registre).

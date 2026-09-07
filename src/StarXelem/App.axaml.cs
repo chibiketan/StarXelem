@@ -51,7 +51,7 @@ public partial class App : Application
 
             // Démarre le raccourci global de scan de signature (fonctionne même si StarXelem n'a pas le focus)
             _ = Services.GetRequiredService<Services.Scan.IScanSignatureOrchestrator>().StartAsync();
-            desktop.ShutdownRequested += (_, _) => Services.GetRequiredService<Services.Scan.IGlobalHotkeyService>().Stop();
+            desktop.ShutdownRequested += (_, _) => Services.GetRequiredService<Services.Scan.IScanSignatureOrchestrator>().StopTriggers();
         }
 
         if (Design.IsDesignMode)
