@@ -18,6 +18,12 @@ public interface IScanSignatureOrchestrator
     /// <summary>Arrête tous les déclencheurs (à la fermeture de l'application).</summary>
     void StopTriggers();
 
+    /// <summary>Suspend temporairement le déclencheur actif (pendant la saisie d'un nouveau déclencheur dans les Paramètres).</summary>
+    void PauseTriggers();
+
+    /// <summary>Réinstalle le dernier déclencheur appliqué après une pause.</summary>
+    void ResumeTriggers();
+
     /// <summary>État du déclencheur correspondant au type configuré.</summary>
     ScanTriggerStatus TriggerStatus { get; }
 

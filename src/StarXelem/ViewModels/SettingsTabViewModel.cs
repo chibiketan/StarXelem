@@ -52,6 +52,12 @@ public partial class SettingsTabViewModel : PageViewModelBase
     /// <summary>Fourni au contrôle de saisie pour capturer le prochain bouton de joystick pressé.</summary>
     public Func<CancellationToken, Task<JoystickBinding?>> JoystickCaptureProvider { get; }
 
+    /// <summary>Suspend le déclencheur actif pendant la saisie d'un nouveau déclencheur (cf. TriggerCaptureBox).</summary>
+    public Action PauseTriggerAction { get; }
+
+    /// <summary>Réinstalle le déclencheur suspendu par <see cref="PauseTriggerAction"/>.</summary>
+    public Action ResumeTriggerAction { get; }
+
     public override string Name => "Paramètres";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Settings);
 
@@ -71,6 +77,8 @@ public partial class SettingsTabViewModel : PageViewModelBase
         _logger = logger;
 
         JoystickCaptureProvider = ct => _joystickService.CaptureNextButtonAsync(ct);
+        PauseTriggerAction = _scanOrchestrator.PauseTriggers;
+        ResumeTriggerAction = _scanOrchestrator.ResumeTriggers;
         _scanOrchestrator.TriggerStatusChanged += (_, _) => Dispatcher.UIThread.Post(UpdateTriggerStatus);
     }
 

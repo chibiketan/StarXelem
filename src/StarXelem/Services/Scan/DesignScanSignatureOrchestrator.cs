@@ -15,4 +15,6 @@ public class DesignScanSignatureOrchestrator : IScanSignatureOrchestrator
     public Task RunOnceAsync() => Task.CompletedTask;
 
     public void StopTriggers() { }
+    public void PauseTriggers() { }
+    public void ResumeTriggers() { }
 }

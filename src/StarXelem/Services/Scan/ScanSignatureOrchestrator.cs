@@ -19,6 +19,7 @@ public class ScanSignatureOrchestrator : IScanSignatureOrchestrator
     private readonly ILogger<ScanSignatureOrchestrator> _logger;
 
     private int _running;
+    private ScanTriggerSettings? _lastAppliedSettings;
 
     public string? LastError { get; private set; }
 
@@ -85,6 +86,7 @@ public class ScanSignatureOrchestrator : IScanSignatureOrchestrator
     private bool ApplyTriggers(ScanTriggerSettings settings, out string? error)
     {
         _currentKind = settings.Kind;
+        _lastAppliedSettings = settings;
         var hotkeyOk = _hotkeyService.TryApply(settings, out var hotkeyError);
         var joystickOk = _joystickService.TryApply(settings, out var joystickError);
         error = hotkeyError ?? joystickError;
@@ -97,6 +99,22 @@ public class ScanSignatureOrchestrator : IScanSignatureOrchestrator
     {
         _hotkeyService.Stop();
         _joystickService.Stop();
+    }
+
+    /// <summary>
+    /// Suspend temporairement le déclencheur actif (ex. pendant la saisie d'un nouveau déclencheur dans les
+    /// Paramètres) : sans cela, la combinaison clavier ou le bouton joystick actuellement configurés
+    /// resteraient interceptés au niveau OS et ne parviendraient jamais au champ de saisie.
+    /// </summary>
+    public void PauseTriggers() => StopTriggers();
+
+    /// <summary>Réinstalle le dernier déclencheur appliqué (annule une pause), sans re-sauvegarder ni recharger depuis le registre.</summary>
+    public void ResumeTriggers()
+    {
+        if (_lastAppliedSettings != null)
+        {
+            ApplyTriggers(_lastAppliedSettings, out _);
+        }
     }
 
     public async Task RunOnceAsync()

@@ -73,7 +73,7 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
             return Array.Empty<SignatureCandidate>();
         }
 
-        using var processed = Preprocess(frame.Bitmap);
+        using var processed = Preprocess(frame.Bitmap, out var scale);
         SaveDebugImage(processed, "preprocessed.png");
 
         using var softwareBitmap = ToSoftwareBitmap(processed);
@@ -105,10 +105,10 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
 
                 var rect = word.BoundingRect; // coordonnées dans l'image agrandie/pré-traitée
                 var screenRect = new PixelRect(
-                    frame.ScreenX + (int)(rect.X / ScanConstants.OcrUpscaleFactor),
-                    frame.ScreenY + (int)(rect.Y / ScanConstants.OcrUpscaleFactor),
-                    (int)(rect.Width / ScanConstants.OcrUpscaleFactor),
-                    (int)(rect.Height / ScanConstants.OcrUpscaleFactor));
+                    frame.ScreenX + (int)(rect.X / scale),
+                    frame.ScreenY + (int)(rect.Y / scale),
+                    (int)(rect.Width / scale),
+                    (int)(rect.Height / scale));
 
                 candidates.Add(new SignatureCandidate(value, word.Text, screenRect));
             }
@@ -130,7 +130,7 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
         return (double)dx * dx + (double)dy * dy;
     }
 
-    private static SKBitmap Preprocess(SKBitmap src)
+    private SKBitmap Preprocess(SKBitmap src, out double scale)
     {
         using var binarized = new SKBitmap(src.Width, src.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
         for (var py = 0; py < src.Height; py++)
@@ -143,7 +143,24 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
             }
         }
 
-        var scaledInfo = new SKImageInfo(src.Width * ScanConstants.OcrUpscaleFactor, src.Height * ScanConstants.OcrUpscaleFactor, SKColorType.Bgra8888, SKAlphaType.Opaque);
+        // L'OCR Windows refuse toute image dont un côté dépasse OcrEngine.MaxImageDimension (10000px) :
+        // sans le jeu détecté, la capture peut retomber sur l'écran virtuel entier (plusieurs moniteurs),
+        // largement plus grand qu'un HUD — un upscale ×3 aveugle ferait alors planter RecognizeAsync.
+        var maxDim = (int)OcrEngine.MaxImageDimension;
+        var longestSide = Math.Max(src.Width, src.Height);
+        scale = longestSide > 0 && longestSide * (double)ScanConstants.OcrUpscaleFactor > maxDim
+            ? maxDim / (double)longestSide
+            : ScanConstants.OcrUpscaleFactor;
+
+        if (scale < 1)
+        {
+            _logger.LogWarning("Capture {Width}x{Height} trop grande pour l'agrandissement OCR habituel : facteur réduit à {Scale:F2} (max {Max}px).", src.Width, src.Height, scale, maxDim);
+        }
+
+        var scaledInfo = new SKImageInfo(
+            Math.Max(1, (int)(src.Width * scale)),
+            Math.Max(1, (int)(src.Height * scale)),
+            SKColorType.Bgra8888, SKAlphaType.Opaque);
         var scaled = binarized.Resize(scaledInfo, SKFilterQuality.High);
         return scaled ?? binarized.Copy();
     }

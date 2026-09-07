@@ -22,6 +22,27 @@ public class TriggerCaptureBox : TextBox
     public static readonly StyledProperty<Func<CancellationToken, Task<JoystickBinding?>>?> JoystickCaptureProviderProperty =
         AvaloniaProperty.Register<TriggerCaptureBox, Func<CancellationToken, Task<JoystickBinding?>>?>(nameof(JoystickCaptureProvider));
 
+    public static readonly StyledProperty<Action?> PauseTriggerActionProperty =
+        AvaloniaProperty.Register<TriggerCaptureBox, Action?>(nameof(PauseTriggerAction));
+
+    public static readonly StyledProperty<Action?> ResumeTriggerActionProperty =
+        AvaloniaProperty.Register<TriggerCaptureBox, Action?>(nameof(ResumeTriggerAction));
+
+    /// <summary>Appelé à l'entrée en capture : doit suspendre le déclencheur actif pour que la combinaison/le
+    /// bouton actuellement configurés puissent être ressaisis sans être interceptés au niveau OS.</summary>
+    public Action? PauseTriggerAction
+    {
+        get => GetValue(PauseTriggerActionProperty);
+        set => SetValue(PauseTriggerActionProperty, value);
+    }
+
+    /// <summary>Appelé à la sortie de capture (succès, Échap, ou perte de focus) : réinstalle le déclencheur suspendu.</summary>
+    public Action? ResumeTriggerAction
+    {
+        get => GetValue(ResumeTriggerActionProperty);
+        set => SetValue(ResumeTriggerActionProperty, value);
+    }
+
     public ScanTriggerSettings? Trigger
     {
         get => GetValue(TriggerProperty);
@@ -55,6 +76,9 @@ public class TriggerCaptureBox : TextBox
     protected override void OnGotFocus(GotFocusEventArgs e)
     {
         base.OnGotFocus(e);
+        // Suspend le déclencheur actif : sinon la combinaison/le bouton déjà configurés seraient interceptés
+        // au niveau OS (RegisterHotKey / DirectInput) et ne parviendraient jamais à ce contrôle.
+        PauseTriggerAction?.Invoke();
         Text = CapturePrompt;
         StartJoystickCapture();
     }
@@ -64,6 +88,7 @@ public class TriggerCaptureBox : TextBox
         base.OnLostFocus(e);
         CancelJoystickCapture();
         UpdateDisplayText();
+        ResumeTriggerAction?.Invoke();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)

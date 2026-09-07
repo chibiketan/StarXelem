@@ -173,6 +173,8 @@
                             <TextBlock Classes="action-desc" Text="Déclencheur (cliquez, puis appuyez sur une combinaison clavier ou sur un bouton de votre joystick) :" />
                             <comp:TriggerCaptureBox Trigger="{Binding ScanTrigger}"
                                                     JoystickCaptureProvider="{Binding JoystickCaptureProvider}"
+                                                    PauseTriggerAction="{Binding PauseTriggerAction}"
+                                                    ResumeTriggerAction="{Binding ResumeTriggerAction}"
                                                     Classes="txt-api-key"
                                                     Width="360"
                                                     HorizontalAlignment="Left" />
