@@ -248,3 +248,11 @@ signature 3570, Gold 3585).
 | Hephaestanite | Common | 4180 |
 | Tin | Common | 4195 |
 | Ice | Common | 4300 |
+
+## Signatures par taille de cluster (scan de signature)
+
+Ces signatures de base sont utilisées pour générer, à chaque reconstruction de la base locale
+(`IMineralSignatureExtractor` + `MineralSignatureGenerator`, table `MineralSignatures`), une signature
+attendue pour un cluster de 1 à 10 rochers (`signature(N) = N × signature(1)`). Voir
+`Documents/Datafiles/MineralSignatures.md` pour la table complète et l'hypothèse de calcul, et
+`Documents/Plans/2026-09-07-scan-signature-overlay.md` pour la fonctionnalité de scan à l'écran.

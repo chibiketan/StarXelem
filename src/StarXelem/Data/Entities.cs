@@ -705,3 +705,38 @@ public class LocationEntity
 
     public virtual ICollection<LocationEntity> Children { get; set; } = new List<LocationEntity>();
 }
+
+/// <summary>Signature radar attendue pour un cluster de <see cref="ClusterSize"/> rochers d'un même minéral.</summary>
+public class MineralSignatureEntity
+{
+    [Key]
+    public int Id { get; set; }
+
+    /// <summary>Clé technique normalisée du minéral (minuscules, sans espaces), ex. "iron".</summary>
+    [Required]
+    public string MineralKey { get; set; } = string.Empty;
+
+    /// <summary>Nom localisé affiché, ex. "Iron".</summary>
+    [Required]
+    public string MineralName { get; set; } = string.Empty;
+
+    /// <summary>Rareté déduite du nom du record (Legendary/Epic/Rare/Uncommon/Common), informatif. Vide pour les minéraux FPS/GroundVehicle.</summary>
+    public string Rarity { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Contexte de minage (<see cref="Services.Mining.MiningKind"/> sérialisé, ex. "ShipOrSurface", "Fps", "GroundVehicle").
+    /// Détermine la plage de <see cref="ClusterSize"/> générée : 1-10 pour ShipOrSurface (signature unique par minéral),
+    /// 20-30 pour Fps/GroundVehicle (signature générique par catégorie, partagée entre plusieurs minéraux).
+    /// </summary>
+    [Required]
+    public string MiningType { get; set; } = string.Empty;
+
+    /// <summary>Signature d'un rocher isolé, lue dans le p4k.</summary>
+    public int BaseSignature { get; set; }
+
+    /// <summary>Nombre de rochers du cluster.</summary>
+    public int ClusterSize { get; set; }
+
+    /// <summary>Signature du cluster = BaseSignature × ClusterSize (cf. Documents/Datafiles/MineralSignatures.md).</summary>
+    public int Signature { get; set; }
+}

@@ -9,6 +9,7 @@ using StarBreaker.Common;
 using StarBreaker.DataCore;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Services;
+using StarXelem.Services.Mining;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
@@ -21,6 +22,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
     private readonly IP4kService _p4kService;
     private readonly ILocalDatabaseService _localDatabaseService;
     private readonly IGrpcClientService _grpcClientService;
+    private readonly IMineralSignatureExtractor _mineralSignatureExtractor;
     private readonly ILogger<ExtractionTabViewModel> _logger;
 
     public override string Name => "Extractions";
@@ -47,11 +49,12 @@ public partial class ExtractionTabViewModel : PageViewModelBase
     [ObservableProperty] private bool _includeObtainedBlueprints = false;
     [ObservableProperty] private bool _isGrpcConnected = false;
 
-    public ExtractionTabViewModel(IP4kService p4kService, ILocalDatabaseService localDatabaseService, IGrpcClientService grpcClientService, ILogger<ExtractionTabViewModel> logger)
+    public ExtractionTabViewModel(IP4kService p4kService, ILocalDatabaseService localDatabaseService, IGrpcClientService grpcClientService, IMineralSignatureExtractor mineralSignatureExtractor, ILogger<ExtractionTabViewModel> logger)
     {
         _p4kService = p4kService;
         _localDatabaseService = localDatabaseService;
         _grpcClientService = grpcClientService;
+        _mineralSignatureExtractor = mineralSignatureExtractor;
         _logger = logger;
         
         _p4kService.SelectedP4KFileChanged += (sender, model) => OnSelectedP4KFileChanged();
@@ -221,76 +224,14 @@ public partial class ExtractionTabViewModel : PageViewModelBase
 
             // Build mineral-to-signature maps from mineable entities
             UpdateStatusMessage("Extraction des signatures radar des minéraux...");
+            var mineralBaseSignatures = await _mineralSignatureExtractor.ExtractAsync().ConfigureAwait(false);
             var mineralSignatureMap = new Dictionary<string, int>(); // localized name -> signature
             var mineralSignatureMapLower = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase); // lowercase name -> signature
-            var excludedWords = new []{"deposit", "ore", "raw", "items", "commodities", "r"};
 
-            await foreach (var entityDefinition in _p4kService.GetAllEntityClassDefinition(0).ConfigureAwait(false))
+            foreach (var mineral in mineralBaseSignatures)
             {
-                // Seuls les rochers minables "canoniques" (mineablerock_asteroid{rarete}_{mineral}, mineablerock_surface{rarete}_{mineral}, ...)
-                // portent la vraie signature radar du minéral. Les rochers génériques par classe spectrale d'astéroïde
-                // (AsteroidCTypeMineableRock, AsteroidSTypeMineableRock, ...) partagent tous une signature générique de
-                // type d'astéroïde (ex: 4720) pour un mix de minéraux, et polluent la map si on les laisse passer.
-                // Les entités de test (mineablerock_test_*) doivent aussi être ignorées.
-                // RecordName contient le nom complet de la balise racine du fichier XML, ex:
-                // "EntityClassDefinition.MineableRock_AsteroidCommon_Aluminum" et non juste le nom du rocher,
-                // d'où l'utilisation de Contains(".MineableRock_") plutôt que StartsWith.
-                var recordName = entityDefinition.RecordName;
-                if (string.IsNullOrEmpty(recordName)
-                    || !recordName.Contains(".MineableRock_", StringComparison.OrdinalIgnoreCase)
-                    || recordName.Contains("test", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var entityType = entityDefinition.Data as EntityClassDefinition;
-                if (!(entityType?.Components.OfType<MineableParams>().Any() ?? false) || !entityType.Components.OfType<SSCSignatureSystemParams>().Any())
-                    continue;
-
-                var entityDefinitionWithDepth = await _p4kService.EnsureRecordsDepthAsync([entityDefinition], 3);
-                entityType = (EntityClassDefinition)entityDefinitionWithDepth[0].Data;
-                var mineableParams = entityType.Components.OfType<MineableParams>().First();
-                var signatureParams = entityType.Components.OfType<SSCSignatureSystemParams>().First();
-                // Extract radar signature (index 4 = mineral channel)
-                // baseSignatureParams is typed as SSCSignatureParamsBase but the actual runtime type is SSCSignatureSystemBaseSignatureParams
-                var baseSigParams = signatureParams.radarProperties?.baseSignatureParams as SSCSignatureSystemBaseSignatureParams;
-                if (baseSigParams?.signatures == null || baseSigParams.signatures.Length < 5)
-                    continue;
-
-                var signatureValue = (int)Math.Round(baseSigParams.signatures[4]);
-
-                // Skip generic signatures (FPS=3000, GroundVehicle=4000)
-                if (signatureValue is 3000 or 4000)
-                    continue;
-
-                // Extract the primary mineral name from the composition.
-                // compositionArray peut contenir plusieurs minéraux (le minéral principal du rocher,
-                // répété sur plusieurs paliers de qualité, suivi de minéraux secondaires/traces qui ont
-                // leur propre rocher dédié ailleurs). Seul le premier élément correspond au minéral
-                // principal désigné par le nom du rocher ; les suivants ne doivent pas hériter de cette
-                // signature (ex: le rocher "Bexalite" contient aussi de l'or et du borase en traces).
-                var primaryPart = mineableParams.composition?.compositionArray?.FirstOrDefault();
-                if (primaryPart?.mineableElement?.resourceType == null)
-                    continue;
-
-                var displayName = primaryPart.mineableElement.resourceType.displayName;
-                if (string.IsNullOrEmpty(displayName))
-                    continue;
-
-                // Get localized mineral name
-                var localizedName = await _p4kService.GetLocaleValue(displayName).ConfigureAwait(false);
-                if (string.IsNullOrEmpty(localizedName))
-                    continue;
-
-                // Add to maps if not already present (keep first/unique signature)
-                if (!mineralSignatureMap.ContainsKey(localizedName))
-                {
-                    mineralSignatureMap[localizedName] = signatureValue;
-                    var mineralKeyName = String.Concat(localizedName
-                        .Split(" ", StringSplitOptions.RemoveEmptyEntries)
-                        .Select(w => w.Trim('@', '(', ')').ToLowerInvariant())
-                        .Where(w => !excludedWords.Contains(w)));
-
-                    mineralSignatureMapLower[mineralKeyName.ToLowerInvariant()] = signatureValue;
-                }
+                mineralSignatureMap[mineral.MineralName] = mineral.BaseSignature;
+                mineralSignatureMapLower[mineral.MineralKey] = mineral.BaseSignature;
             }
 
             _logger.LogInformation("Found {Count} minerals with unique radar signatures", mineralSignatureMap.Count);

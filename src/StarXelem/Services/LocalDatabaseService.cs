@@ -7,6 +7,7 @@ using StarBreaker.DataCoreGenerated;
 using StarXelem.Constants;
 using StarXelem.Data;
 using StarXelem.Models;
+using StarXelem.Services.Mining;
 using System.Runtime.InteropServices;
 using System.Xml.Linq;
 
@@ -72,18 +73,20 @@ public class LocalDatabaseService : ILocalDatabaseService
     private readonly ILogger<LocalDatabaseService> _logger;
     private readonly ISettingsService _settingsService;
     private readonly IDbContextFactory _factory;
+    private readonly IMineralSignatureExtractor _mineralSignatureExtractor;
     private CancellationTokenSource _rebuildCts = new();
     private Task? _rebuildTask;
     private readonly Dictionary<string, ActorEntity> _contractorCache;
     private readonly Dictionary<string, MissionCategoryEntity> _categoryCache;
     private readonly SemaphoreSlim _dbLock = new(1, 1);
 
-    public LocalDatabaseService(IP4kService p4kService, ILogger<LocalDatabaseService> logger, ISettingsService settingsService, IDbContextFactory factory, bool autoRebuild = false)
+    public LocalDatabaseService(IP4kService p4kService, ILogger<LocalDatabaseService> logger, ISettingsService settingsService, IDbContextFactory factory, IMineralSignatureExtractor mineralSignatureExtractor, bool autoRebuild = false)
     {
         _p4kService = p4kService;
         _logger = logger;
         _settingsService = settingsService;
         _factory = factory;
+        _mineralSignatureExtractor = mineralSignatureExtractor;
         _contractorCache = new Dictionary<string, ActorEntity>(StringComparer.Ordinal);
         _categoryCache = new Dictionary<string, MissionCategoryEntity>(StringComparer.Ordinal);
 
@@ -167,7 +170,7 @@ public class LocalDatabaseService : ILocalDatabaseService
         try
         {
             var total = Stopwatch.StartNew();
-            const int TotalPhases = 10;
+            const int TotalPhases = 11;
             _logger.LogInformation("Rebuilding local database at {Path}", _factory.DbPath);
             _entityClassToGuid.Clear();
             _contractorCache.Clear();
@@ -284,6 +287,14 @@ public class LocalDatabaseService : ILocalDatabaseService
         await PopulateLocationsAsync(db, cancellationToken).ConfigureAwait(false);
         phase.Stop();
         _logger.LogInformation("[Phase 10/{Total}] Locations completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 11: Mineral signatures (scan de signature radar)
+        progress?.Report(new RebuildProgress(11, TotalPhases, "Chargement des signatures minérales…"));
+        phase.Restart();
+        await PopulateMineralSignaturesAsync(db, cancellationToken).ConfigureAwait(false);
+        phase.Stop();
+        _logger.LogInformation("[Phase 11/{Total}] Mineral signatures completed in {Elapsed}ms.", phase.ElapsedMilliseconds, TotalPhases);
         cancellationToken.ThrowIfCancellationRequested();
 
         // Libère les caches lourds du P4kService (records EntityClassDefinition chargés en profondeur 1 et 3
@@ -3074,6 +3085,16 @@ public class LocalDatabaseService : ILocalDatabaseService
         start.Stop();
         _logger.LogInformation("Inserted {Count} locations into the database.", locations.Count);
         _logger.LogInformation("Locations processing completed in {Elapsed}ms.", start.ElapsedMilliseconds);
+    }
+
+
+    private async Task PopulateMineralSignaturesAsync(StarXelemDbContext db, CancellationToken ct)
+    {
+        var bases = await _mineralSignatureExtractor.ExtractAsync(ct).ConfigureAwait(false);
+        db.MineralSignatures.AddRange(MineralSignatureGenerator.Generate(bases));
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        db.ChangeTracker.Clear();
+        _logger.LogInformation("{Minerals} minéraux → {Rows} lignes de signatures.", bases.Count, bases.Count * ScanConstants.MaxClusterSize);
     }
 
     /* ========================================================================

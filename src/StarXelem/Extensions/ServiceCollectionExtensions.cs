@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using StarXelem.Data;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
+using StarXelem.Services.Mining;
+using StarXelem.Services.Scan;
 using StarXelem.ViewModels;
 using StarXelem.ViewModels.Popup;
 
@@ -48,6 +50,11 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<BlueprintListTabViewModel>();
             services.AddSingleton<ILocalDatabaseService, DesignLocalDatabaseService>();
             services.AddSingleton<ISettingsService, DesignSettingsService>();
+            services.AddSingleton<IScreenCaptureService, DesignScreenCaptureService>();
+            services.AddSingleton<ISignatureOcrService, DesignSignatureOcrService>();
+            services.AddSingleton<IOverlayNotificationService, DesignOverlayNotificationService>();
+            services.AddSingleton<IGlobalHotkeyService, DesignGlobalHotkeyService>();
+            services.AddSingleton<IScanSignatureOrchestrator, DesignScanSignatureOrchestrator>();
         }
         else
         {
@@ -62,8 +69,14 @@ public static class ServiceCollectionExtensions
                     sp.GetRequiredService<ILogger<LocalDatabaseService>>(),
                     sp.GetRequiredService<ISettingsService>(),
                     sp.GetRequiredService<IDbContextFactory>(),
+                    sp.GetRequiredService<IMineralSignatureExtractor>(),
                     autoRebuild: false));
             services.AddSingleton<ISettingsService, RegistrySettingsService>();
+            services.AddSingleton<IScreenCaptureService, GdiScreenCaptureService>();
+            services.AddSingleton<ISignatureOcrService, WindowsSignatureOcrService>();
+            services.AddSingleton<IOverlayNotificationService, OverlayNotificationService>();
+            services.AddSingleton<IGlobalHotkeyService, Win32GlobalHotkeyService>();
+            services.AddSingleton<IScanSignatureOrchestrator, ScanSignatureOrchestrator>();
         }
 
         // Les services indépendants du mode design
@@ -74,6 +87,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILocationRepository, LocationRepository>();
         services.AddSingleton<IScItemRepository, ScItemRepository>();
         services.AddSingleton<ILocaleEntryRepository, LocaleEntryRepository>();
+        services.AddSingleton<IMineralSignatureExtractor, MineralSignatureExtractor>();
+        services.AddSingleton<IMineralSignatureRepository, MineralSignatureRepository>();
 
         // Service API externe pour la communication avec Alliance Orbital (profil utilisateur)
         services.AddSingleton<IAllianceOrbitalService, AllianceOrbitalService>();

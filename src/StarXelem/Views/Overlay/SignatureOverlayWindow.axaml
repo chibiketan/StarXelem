@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:StarXelem.ViewModels.Overlay"
+        mc:Ignorable="d"
+        x:Class="StarXelem.Views.Overlay.SignatureOverlayWindow"
+        x:DataType="vm:SignatureOverlayViewModel"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        Topmost="True"
+        ShowActivated="False"
+        CanResize="False"
+        Focusable="False"
+        SizeToContent="WidthAndHeight"
+        Opacity="0.75">
+    <Border Background="#1E2328"
+            BorderBrush="#E0B44C"
+            BorderThickness="1"
+            CornerRadius="6"
+            Padding="10,6">
+        <ItemsControl ItemsSource="{Binding Lines}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                    <TextBlock Text="{Binding}"
+                               Foreground="#F2D77A"
+                               FontSize="18"
+                               FontWeight="SemiBold" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Border>
+</Window>

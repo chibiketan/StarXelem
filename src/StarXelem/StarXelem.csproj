@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+        <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
         <Nullable>enable</Nullable>
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
         <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -40,6 +41,7 @@
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.5" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.5" />
         <PackageReference Include="OneOf" Version="3.0.271" />
+        <PackageReference Include="SkiaSharp" Version="2.88.9" />
         <PackageReference Include="System.IO.Hashing" Version="10.0.5" />
     </ItemGroup>
 

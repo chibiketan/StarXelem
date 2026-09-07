@@ -38,6 +38,7 @@ public class StarXelemDbContext : DbContext
     public DbSet<MissionObjectiveEntity> MissionObjectives => Set<MissionObjectiveEntity>();
     public DbSet<MissionPrerequisiteEntity> MissionPrerequisites => Set<MissionPrerequisiteEntity>();
     public DbSet<MissionTokenEntity> MissionTokens => Set<MissionTokenEntity>();
+    public DbSet<MineralSignatureEntity> MineralSignatures => Set<MineralSignatureEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -310,5 +311,15 @@ public class StarXelemDbContext : DbContext
 
         modelBuilder.Entity<MissionTokenEntity>()
             .HasIndex(mt => new { mt.ObjectiveId, mt.Order });
+
+        // MineralSignatureEntity
+        modelBuilder.Entity<MineralSignatureEntity>()
+            .HasIndex(m => m.Signature);
+
+        // Un même minéral peut apparaître sous plusieurs contextes de minage (ex. Carinite en FPS et en
+        // GroundVehicle), avec des signatures différentes : la clé unique doit donc inclure MiningType.
+        modelBuilder.Entity<MineralSignatureEntity>()
+            .HasIndex(m => new { m.MineralKey, m.MiningType, m.ClusterSize })
+            .IsUnique();
     }
 }

@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:StarXelem.ViewModels"
              xmlns:ic="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
+             xmlns:comp="clr-namespace:StarXelem.Components"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="580"
              x:Class="StarXelem.Views.SettingsTabView"
              x:DataType="vm:SettingsTabViewModel">
@@ -127,6 +128,102 @@
                                        FontSize="14"
                                        VerticalAlignment="Center" />
                         <TextBlock Text="Paramètres sauvegardés avec succès."
+                                   FontSize="11"
+                                   Foreground="{DynamicResource DimmingBrush}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Section : Scan de signature -->
+                <TextBlock Classes="section-label" Text="SCAN DE SIGNATURE" Margin="0,10,0,0" />
+
+                <Border Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource CardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="18,16">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Border Grid.Column="0"
+                                    Width="38" Height="38"
+                                    CornerRadius="9"
+                                    Background="{DynamicResource ButtonPrimaryBackgroundBrush}"
+                                    BorderBrush="{DynamicResource ButtonPrimaryBorderBrush}"
+                                    BorderThickness="1"
+                                    VerticalAlignment="Center">
+                                <ic:SymbolIcon Symbol="Scan"
+                                               Foreground="{DynamicResource ButtonPrimaryForegroundBrush}"
+                                               FontSize="17"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                            </Border>
+
+                            <StackPanel Grid.Column="1" Margin="16,0" Spacing="4" VerticalAlignment="Center">
+                                <TextBlock Classes="action-title" Text="Reconnaissance de signature radar" />
+                                <TextBlock Classes="action-desc"
+                                           Text="Capture l'écran du jeu, lit la signature radar affichée et affiche à l'écran à quoi elle correspond (ex. « 5× Iron »)." />
+                            </StackPanel>
+
+                            <ToggleSwitch Grid.Column="2"
+                                          IsChecked="{Binding ScanEnabled}"
+                                          VerticalAlignment="Center" />
+                        </Grid>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="action-desc" Text="Raccourci (cliquez puis appuyez sur la combinaison, au moins un modificateur requis) :" />
+                            <comp:HotkeyBox Key="{Binding ScanKey}"
+                                             Modifiers="{Binding ScanModifiers}"
+                                             Classes="txt-api-key"
+                                             Width="220"
+                                             HorizontalAlignment="Left" />
+                            <TextBlock Classes="action-desc"
+                                       Text="Le raccourci est actif même si StarXelem n'a pas le focus ; il n'est pas transmis au jeu. Le jeu doit être en mode fenêtré sans bordure pour que la capture et l'overlay fonctionnent correctement." />
+                        </StackPanel>
+
+                        <Border IsVisible="{Binding !IsOcrAvailable}"
+                                Background="{DynamicResource CardBackgroundBrush}"
+                                BorderBrush="#E0B44C"
+                                BorderThickness="1"
+                                CornerRadius="7"
+                                Padding="12,8">
+                            <TextBlock Text="{Binding OcrUnavailableReason}"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Foreground="#E0B44C" />
+                        </Border>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Classes="btn-save"
+                                    Command="{Binding SaveScanHotkeyCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="Save" FontSize="11" />
+                                    <TextBlock Text="Sauvegarder" />
+                                </StackPanel>
+                            </Button>
+                            <Button Content="Tester maintenant" Command="{Binding TestScanCommand}" />
+                            <Button Content="Tester l'overlay" Command="{Binding TestOverlayCommand}" />
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding ScanError}"
+                                   IsVisible="{Binding ScanError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Foreground="#D9534F" />
+                    </StackPanel>
+                </Border>
+
+                <Border IsVisible="{Binding ScanSaved}"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource CardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="7"
+                        Padding="12,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:SymbolIcon Symbol="CheckmarkCircle"
+                                       Foreground="{DynamicResource ButtonPrimaryForegroundBrush}"
+                                       FontSize="14"
+                                       VerticalAlignment="Center" />
+                        <TextBlock Text="Raccourci de scan sauvegardé avec succès."
                                    FontSize="11"
                                    Foreground="{DynamicResource DimmingBrush}"
                                    VerticalAlignment="Center" />

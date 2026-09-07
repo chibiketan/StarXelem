@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using StarXelem.Data;
 using StarXelem.Models;
 using StarXelem.Services;
+using StarXelem.Services.Mining;
 
 await RunAsync();
 
@@ -20,7 +21,8 @@ async Task RunAsync()
     var p4kService = new P4kService(p4kLogger);
     var settingsLogger = loggerFactory.CreateLogger<RegistrySettingsService>();
     var factory = new DbContextFactory();
-    var dbService = new LocalDatabaseService(p4kService, dbLogger, new RegistrySettingsService(settingsLogger), factory, autoRebuild: false);
+    var mineralSignatureExtractor = new MineralSignatureExtractor(p4kService, loggerFactory.CreateLogger<MineralSignatureExtractor>());
+    var dbService = new LocalDatabaseService(p4kService, dbLogger, new RegistrySettingsService(settingsLogger), factory, mineralSignatureExtractor, autoRebuild: false);
 
     string p4kPath;
 

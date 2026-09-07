@@ -201,3 +201,6 @@ src/StarXelem/datafiles
 research/*
 scripts/dump
 /src/.claude/settings.local.json
+
+# Fichiers de travail personnels (ex: échantillons de capture d'écran pour le scan de signature)
+private/
