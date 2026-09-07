@@ -74,6 +74,7 @@ public class TriggerCaptureBox : TextBox
         {
             CancelJoystickCapture();
             UpdateDisplayText();
+            ClearFocus();
             return;
         }
 
@@ -96,6 +97,17 @@ public class TriggerCaptureBox : TextBox
         CancelJoystickCapture();
         ToolTip.SetTip(this, null);
         Trigger = Current with { Kind = ScanTriggerKind.Keyboard, Key = e.Key, Modifiers = e.KeyModifiers };
+        UpdateDisplayText();
+        ClearFocus();
+    }
+
+    /// <summary>
+    /// Retire le focus du champ une fois la saisie terminée (touche choisie, bouton capturé, ou Échap) :
+    /// permet de recliquer immédiatement pour recommencer une capture avec un autre déclencheur.
+    /// </summary>
+    private void ClearFocus()
+    {
+        TopLevel.GetTopLevel(this)?.FocusManager?.ClearFocus();
     }
 
     private async void StartJoystickCapture()
@@ -118,6 +130,7 @@ public class TriggerCaptureBox : TextBox
             Trigger = Current with { Kind = ScanTriggerKind.Joystick, Joystick = binding };
             UpdateDisplayText();
             ToolTip.SetTip(this, null);
+            ClearFocus();
         }
         catch (OperationCanceledException)
         {
