@@ -131,18 +131,26 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
         // très bien le texte du HUD directement en couleur (police avec anti-aliasing), y compris à
         // résolution native — "80,000" est reconnu tel quel, sans aucun traitement. Binariser par
         // teinte/luminosité (approche précédente) s'est avéré CONTRE-PRODUCTIF : le seuillage fige des
-        // contours nets mais grossiers, moins lisibles par l'OCR que l'anti-aliasing d'origine. On se
-        // contente donc d'un agrandissement optionnel (utile si le jeu tourne dans une petite fenêtre),
-        // en respectant la limite de taille de l'OCR Windows.
+        // contours nets mais grossiers, moins lisibles par l'OCR que l'anti-aliasing d'origine.
         var maxDim = (int)OcrEngine.MaxImageDimension;
         var longestSide = Math.Max(src.Width, src.Height);
-        scale = longestSide > 0 && longestSide * (double)ScanConstants.OcrUpscaleFactor > maxDim
-            ? maxDim / (double)longestSide
-            : ScanConstants.OcrUpscaleFactor;
+
+        if (longestSide > 0 && longestSide < ScanConstants.OcrUpscaleThreshold)
+        {
+            // Petite fenêtre de jeu (résolution réduite) : un agrandissement aide la lisibilité du texte HUD.
+            scale = Math.Min(ScanConstants.OcrUpscaleFactor, maxDim / (double)longestSide);
+        }
+        else
+        {
+            // Résolution déjà suffisante : agrandir coûterait cher (temps OCR + encodage de l'image de debug,
+            // mesuré à plusieurs secondes sur une capture 4K agrandie ×3) sans gain de lisibilité. On ne
+            // redimensionne que pour respecter OcrEngine.MaxImageDimension (fallback multi-écrans sans le jeu détecté).
+            scale = longestSide > maxDim ? maxDim / (double)longestSide : 1.0;
+        }
 
         if (scale < 1)
         {
-            _logger.LogWarning("Capture {Width}x{Height} trop grande pour l'agrandissement OCR habituel : facteur réduit à {Scale:F2} (max {Max}px).", src.Width, src.Height, scale, maxDim);
+            _logger.LogWarning("Capture {Width}x{Height} trop grande pour l'OCR : réduite d'un facteur {Scale:F2} (max {Max}px).", src.Width, src.Height, scale, maxDim);
         }
 
         if (Math.Abs(scale - 1.0) < 0.001)

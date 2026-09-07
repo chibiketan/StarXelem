@@ -19,6 +19,10 @@ public static class ScanConstants
 
     public const int OverlayDurationMs = 5000;
     public const int OcrUpscaleFactor = 3;
+    /// <summary>Sous ce seuil (côté le plus long de la capture), l'image est agrandie avant OCR (petite
+    /// fenêtre de jeu). Au-dessus, la résolution est déjà suffisante pour une lecture fiable et agrandir
+    /// coûterait cher en temps de traitement sans gain de lisibilité (vérifié sur une capture 4K).</summary>
+    public const int OcrUpscaleThreshold = 2560;
 
     public const string SettingHotkeyEnabled = "ScanHotkeyEnabled";
     public const string SettingHotkeyKey = "ScanHotkeyKey";
