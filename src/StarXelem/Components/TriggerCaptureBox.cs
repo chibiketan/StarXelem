@@ -112,7 +112,11 @@ public class TriggerCaptureBox : TextBox
             var binding = await provider(cts.Token);
             if (binding == null || cts.IsCancellationRequested || !ReferenceEquals(_captureCts, cts)) return;
 
+            // La session de capture doit être terminée AVANT d'affecter le déclencheur : le rafraîchissement
+            // du texte est ignoré tant qu'une capture est en cours (le champ garde le focus à ce moment-là).
+            _captureCts = null;
             Trigger = Current with { Kind = ScanTriggerKind.Joystick, Joystick = binding };
+            UpdateDisplayText();
             ToolTip.SetTip(this, null);
         }
         catch (OperationCanceledException)
