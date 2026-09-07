@@ -13,21 +13,12 @@ namespace StarXelem.Services.Scan;
 
 /// <summary>
 /// Reconnaissance de la signature radar affichée sur le HUD via le moteur OCR intégré à Windows
-/// (<see cref="OcrEngine"/>). Un pré-traitement SkiaSharp agrandit l'image (lissée) puis isole les pixels
-/// HUD (texte ambré ou blanc avec frange chromatique) et les binarise, pour fiabiliser la lecture d'un
-/// texte de petite taille.
+/// (<see cref="OcrEngine"/>). Un léger agrandissement SkiaSharp est appliqué si nécessaire, mais le texte
+/// HUD (anti-aliasé) est transmis directement en couleur à l'OCR : un banc de test dédié a montré que la
+/// binarisation par teinte/luminosité dégradait la lisibilité au lieu de l'améliorer.
 /// </summary>
 public partial class WindowsSignatureOcrService : ISignatureOcrService
 {
-    // Teinte HSL du HUD jaune/ambre de Star Citizen (35°-60°), seuils de saturation/luminosité ajustables.
-    private const float HueMin = 30f;
-    private const float HueMax = 65f;
-    private const float SaturationMin = 0.30f;
-    private const float LightnessMin = 0.35f;
-
-    /// <summary>Seuil de luminosité (indépendant de la teinte) pour capturer le texte HUD blanc avec frange chromatique.</summary>
-    private const float BrightTextLightnessMin = 0.55f;
-
     private const int MinPlausibleSignature = 2500;
     // Doit couvrir le pire cas des clusters larges FPS/GroundVehicle (ScanConstants.MaxLargeClusterSize
     // × signature générique 4000 = 120 000), en plus des clusters vaisseau/surface (max 43 000).
@@ -136,10 +127,13 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
 
     private SKBitmap Preprocess(SKBitmap src, out double scale)
     {
-        // L'OCR Windows refuse toute image dont un côté dépasse OcrEngine.MaxImageDimension (10000px) :
-        // sans le jeu détecté, la capture peut retomber sur le moniteur sous le curseur voire l'écran
-        // virtuel entier (plusieurs moniteurs), plus grand qu'un HUD — un upscale ×3 aveugle ferait alors
-        // planter RecognizeAsync.
+        // Vérifié via un banc de test dédié (ocrprobe) sur une vraie capture : le moteur OCR Windows lit
+        // très bien le texte du HUD directement en couleur (police avec anti-aliasing), y compris à
+        // résolution native — "80,000" est reconnu tel quel, sans aucun traitement. Binariser par
+        // teinte/luminosité (approche précédente) s'est avéré CONTRE-PRODUCTIF : le seuillage fige des
+        // contours nets mais grossiers, moins lisibles par l'OCR que l'anti-aliasing d'origine. On se
+        // contente donc d'un agrandissement optionnel (utile si le jeu tourne dans une petite fenêtre),
+        // en respectant la limite de taille de l'OCR Windows.
         var maxDim = (int)OcrEngine.MaxImageDimension;
         var longestSide = Math.Max(src.Width, src.Height);
         scale = longestSide > 0 && longestSide * (double)ScanConstants.OcrUpscaleFactor > maxDim
@@ -151,93 +145,16 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
             _logger.LogWarning("Capture {Width}x{Height} trop grande pour l'agrandissement OCR habituel : facteur réduit à {Scale:F2} (max {Max}px).", src.Width, src.Height, scale, maxDim);
         }
 
-        // Agrandir l'image COULEUR (lissée, filtre bicubique) AVANT de binariser : le texte HUD ne fait
-        // souvent que 1-2px de trait à la résolution native. Binariser d'abord (contours nets mais à très
-        // basse résolution) puis agrandir en plus-proche-voisin fige ces contours en blocs grossiers et
-        // rend les glyphes illisibles pour l'OCR. Agrandir l'anti-aliasing d'origine préserve la forme
-        // réelle du glyphe, que le seuillage capture ensuite bien plus fidèlement.
+        if (Math.Abs(scale - 1.0) < 0.001)
+        {
+            return src.Copy();
+        }
+
         var scaledInfo = new SKImageInfo(
             Math.Max(1, (int)(src.Width * scale)),
             Math.Max(1, (int)(src.Height * scale)),
             SKColorType.Bgra8888, SKAlphaType.Opaque);
-        using var scaledColor = src.Resize(scaledInfo, SKFilterQuality.High) ?? src.Copy();
-
-        // Binarisation via le buffer de pixels brut (GetPixelSpan + tableau managé) plutôt que
-        // GetPixel/SetPixel : chaque appel GetPixel/SetPixel fait un aller-retour natif par pixel, ce qui
-        // rend le traitement très lent sur une grande image.
-        var width = scaledColor.Width;
-        var height = scaledColor.Height;
-        var rowBytes = scaledColor.RowBytes;
-        var span = scaledColor.GetPixelSpan(); // Bgra8888
-
-        var dstRowBytes = width * 4;
-        var dst = new byte[dstRowBytes * height];
-
-        for (var y = 0; y < height; y++)
-        {
-            var row = y * rowBytes;
-            var dstRow = y * dstRowBytes;
-            for (var x = 0; x < width; x++)
-            {
-                var si = row + x * 4;
-                var b = span[si];
-                var g = span[si + 1];
-                var r = span[si + 2];
-                var isHud = IsHudPixel(new SKColor(r, g, b));
-
-                var di = dstRow + x * 4;
-                var v = isHud ? (byte)0 : (byte)255;
-                dst[di] = v;
-                dst[di + 1] = v;
-                dst[di + 2] = v;
-                dst[di + 3] = 255;
-            }
-        }
-
-        var handle = System.Runtime.InteropServices.GCHandle.Alloc(dst, System.Runtime.InteropServices.GCHandleType.Pinned);
-        var binarized = new SKBitmap();
-        var installed = binarized.InstallPixels(
-            new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque),
-            handle.AddrOfPinnedObject(),
-            dstRowBytes,
-            (_, ctx) => ((System.Runtime.InteropServices.GCHandle)ctx!).Free(),
-            handle);
-        if (!installed) handle.Free();
-
-        return binarized;
-    }
-
-    private static bool IsHudPixel(SKColor c)
-    {
-        var r = c.Red / 255f;
-        var g = c.Green / 255f;
-        var b = c.Blue / 255f;
-
-        var max = Math.Max(r, Math.Max(g, b));
-        var min = Math.Min(r, Math.Min(g, b));
-        var lightness = (max + min) / 2f;
-
-        // Beaucoup de texte HUD (lectures de distance/signature, repères de boussole) est en fait blanc,
-        // avec une frange chromatique (aberration rouge/cyan) plutôt qu'une vraie teinte ambrée : un simple
-        // filtre de teinte les manque entièrement. On les capture via un seuil de luminosité indépendant de
-        // la teinte, en plus du filtre ambré ci-dessous (qui reste utile pour les libellés de boutons ambrés :
-        // PWR, WPN, COOL...).
-        if (lightness >= BrightTextLightnessMin)
-            return true;
-
-        if (max == min)
-            return false; // gris pur, jamais du HUD ambre
-
-        var delta = max - min;
-        var saturation = lightness > 0.5f ? delta / (2f - max - min) : delta / (max + min);
-
-        float hue;
-        if (max == r) hue = 60f * (((g - b) / delta) % 6f);
-        else if (max == g) hue = 60f * ((b - r) / delta + 2f);
-        else hue = 60f * ((r - g) / delta + 4f);
-        if (hue < 0) hue += 360f;
-
-        return hue is >= HueMin and <= HueMax && saturation >= SaturationMin && lightness >= LightnessMin;
+        return src.Resize(scaledInfo, SKFilterQuality.High) ?? src.Copy();
     }
 
     private static SoftwareBitmap ToSoftwareBitmap(SKBitmap bitmap)

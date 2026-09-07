@@ -62,6 +62,7 @@ Pour absorber une éventuelle légère différence, la recherche en base se fait
   - passer le `TargetFramework` de `StarXelem.csproj` à `net10.0-windows10.0.19041.0` (les projections WinRT sont fournies par le SDK .NET, pas de package supplémentaire) ;
   - le pack de langue **anglais** installé sur la machine (vérifier `OcrEngine.AvailableRecognizerLanguages` au démarrage et afficher un message clair sinon).
 - Pré-traitement de l'image avant OCR (SkiaSharp) pour fiabiliser la lecture : isolement des pixels **jaune/orange HUD** (teinte ~40–55°, saturation > 0.4, luminosité > 0.5), binarisation (texte noir sur fond blanc), agrandissement ×3.
+  - **Post-mortem (2026-09-07)** : approche abandonnée. Un banc de test dédié (OCR Windows exécuté directement sur une vraie capture) a montré que binariser dégradait la lisibilité au lieu de l'améliorer — le texte HUD anti-aliasé, transmis tel quel en couleur (avec un agrandissement optionnel si besoin), est lu correctement par `Windows.Media.Ocr` sans aucun filtre de teinte/luminosité.
 - Alternative si la qualité est insuffisante : NuGet `Tesseract` (charlesw) + `eng.traineddata` embarqué — à ne considérer qu'après échec constaté de l'OCR Windows.
 - Le texte HUD à reconnaître a la forme `80,000` (séparateur de milliers). L'OCR renvoie des mots avec leurs boîtes englobantes ; on ne retient que les mots matchant `^\d{1,3}(,\d{3})+$|^\d{4,6}$` et dont la valeur est dans la plage plausible (≥ min(base) et ≤ 10 × max(base), soit env. 3 000 – 45 000 ; élargir si l'hypothèse 0.1 change).
 
