@@ -54,24 +54,62 @@ public class GdiScreenCaptureService : IScreenCaptureService
 
     private (IntPtr Hwnd, int X, int Y, int Width, int Height) FindCaptureTarget()
     {
-        var process = Process.GetProcessesByName(ScanConstants.StarCitizenProcessName)
-            .FirstOrDefault(p => p.MainWindowHandle != IntPtr.Zero);
-
-        if (process != null && !NativeMethods.IsIconic(process.MainWindowHandle))
+        var hwnd = FindGameWindow();
+        if (hwnd != IntPtr.Zero && !NativeMethods.IsIconic(hwnd) && NativeMethods.GetClientRect(hwnd, out var clientRect) && clientRect.Width > 0 && clientRect.Height > 0)
         {
-            var hwnd = process.MainWindowHandle;
-            if (NativeMethods.GetClientRect(hwnd, out var clientRect))
+            var topLeft = new POINT { X = 0, Y = 0 };
+            NativeMethods.ClientToScreen(hwnd, ref topLeft);
+            return (hwnd, topLeft.X, topLeft.Y, clientRect.Width, clientRect.Height);
+        }
+
+        // Fallback : pas de fenêtre Star Citizen trouvée. On capture le moniteur sous le curseur (nettement
+        // plus petit et plus rapide/lisible qu'un fallback sur l'espace virtuel multi-écrans entier).
+        if (NativeMethods.GetCursorPos(out var cursor))
+        {
+            var hMonitor = NativeMethods.MonitorFromPoint(cursor, NativeMethods.MONITOR_DEFAULTTONEAREST);
+            var monitorInfo = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
+            if (hMonitor != IntPtr.Zero && NativeMethods.GetMonitorInfo(hMonitor, ref monitorInfo))
             {
-                var topLeft = new POINT { X = 0, Y = 0 };
-                NativeMethods.ClientToScreen(hwnd, ref topLeft);
-                return (hwnd, topLeft.X, topLeft.Y, clientRect.Width, clientRect.Height);
+                _logger.LogWarning("Fenêtre Star Citizen introuvable : capture du moniteur sous le curseur à la place.");
+                return (IntPtr.Zero, monitorInfo.rcMonitor.Left, monitorInfo.rcMonitor.Top, monitorInfo.rcMonitor.Width, monitorInfo.rcMonitor.Height);
             }
         }
 
-        // Fallback : pas de fenêtre Star Citizen trouvée. On capture l'espace virtuel multi-écrans entier
-        // (pas d'accès simple aux moniteurs hors du thread UI depuis ce service).
+        // Dernier recours : écran virtuel multi-écrans entier.
+        _logger.LogWarning("Fenêtre Star Citizen introuvable et aucun moniteur détecté sous le curseur : capture de l'espace virtuel entier.");
         return (IntPtr.Zero, NativeMethods.GetSystemMetrics(76 /* SM_XVIRTUALSCREEN */), NativeMethods.GetSystemMetrics(77 /* SM_YVIRTUALSCREEN */),
             NativeMethods.GetSystemMetrics(78 /* SM_CXVIRTUALSCREEN */), NativeMethods.GetSystemMetrics(79 /* SM_CYVIRTUALSCREEN */));
+    }
+
+    /// <summary>
+    /// Trouve la plus grande fenêtre visible appartenant à un process Star Citizen, en énumérant toutes les
+    /// fenêtres de premier niveau plutôt qu'en se fiant à <see cref="Process.MainWindowHandle"/> (peu fiable
+    /// pour les jeux plein écran/bordure zéro, qui ne satisfont pas toujours l'heuristique de .NET).
+    /// </summary>
+    private IntPtr FindGameWindow()
+    {
+        var pids = new HashSet<uint>(Process.GetProcessesByName(ScanConstants.StarCitizenProcessName).Select(p => (uint)p.Id));
+        if (pids.Count == 0) return IntPtr.Zero;
+
+        var best = IntPtr.Zero;
+        var bestArea = 0L;
+
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            NativeMethods.GetWindowThreadProcessId(hWnd, out var pid);
+            if (!pids.Contains(pid) || !NativeMethods.IsWindowVisible(hWnd) || !NativeMethods.GetWindowRect(hWnd, out var rect))
+                return true; // continue l'énumération
+
+            var area = (long)rect.Width * rect.Height;
+            if (area > bestArea)
+            {
+                bestArea = area;
+                best = hWnd;
+            }
+            return true;
+        }, IntPtr.Zero);
+
+        return best;
     }
 
     private CapturedFrame? Capture(int x, int y, int width, int height)

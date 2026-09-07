@@ -55,6 +55,17 @@ internal struct MSG
     public POINT pt;
 }
 
+[StructLayout(LayoutKind.Sequential)]
+internal struct MONITORINFO
+{
+    public uint cbSize;
+    public RECT rcMonitor;
+    public RECT rcWork;
+    public uint dwFlags;
+}
+
+internal delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
 internal static class NativeMethods
 {
     public const uint WM_HOTKEY = 0x0312;
@@ -124,6 +135,23 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern int GetSystemMetrics(int nIndex);
+
+    public const uint MONITOR_DEFAULTTONEAREST = 2;
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
 
     /// <summary>Wrapper 32/64 bits sûr pour SetWindowLongPtr (n'existe qu'en 64 bits).</summary>
     public static IntPtr SetWindowExStyle(IntPtr hWnd, IntPtr newStyle)

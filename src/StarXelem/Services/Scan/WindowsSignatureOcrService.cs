@@ -132,36 +132,72 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
 
     private SKBitmap Preprocess(SKBitmap src, out double scale)
     {
-        using var binarized = new SKBitmap(src.Width, src.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
-        for (var py = 0; py < src.Height; py++)
+        // Binarisation via le buffer de pixels brut (GetPixelSpan + tableau managé) plutôt que
+        // GetPixel/SetPixel : chaque appel GetPixel/SetPixel fait un aller-retour natif par pixel, ce qui
+        // rend le traitement très lent sur une grande capture (plusieurs secondes sur un écran 4K/multi-écrans).
+        var width = src.Width;
+        var height = src.Height;
+        var srcRowBytes = src.RowBytes;
+        var srcSpan = src.GetPixelSpan(); // Bgra8888
+
+        var dstRowBytes = width * 4;
+        var dst = new byte[dstRowBytes * height];
+
+        for (var y = 0; y < height; y++)
         {
-            for (var px = 0; px < src.Width; px++)
+            var srcRow = y * srcRowBytes;
+            var dstRow = y * dstRowBytes;
+            for (var x = 0; x < width; x++)
             {
-                var color = src.GetPixel(px, py);
-                var isHud = IsHudYellow(color);
-                binarized.SetPixel(px, py, isHud ? SKColors.Black : SKColors.White);
+                var si = srcRow + x * 4;
+                var b = srcSpan[si];
+                var g = srcSpan[si + 1];
+                var r = srcSpan[si + 2];
+                var isHud = IsHudYellow(new SKColor(r, g, b));
+
+                var di = dstRow + x * 4;
+                var v = isHud ? (byte)0 : (byte)255;
+                dst[di] = v;
+                dst[di + 1] = v;
+                dst[di + 2] = v;
+                dst[di + 3] = 255;
             }
         }
 
+        var handle = System.Runtime.InteropServices.GCHandle.Alloc(dst, System.Runtime.InteropServices.GCHandleType.Pinned);
+        using var binarized = new SKBitmap();
+        var installed = binarized.InstallPixels(
+            new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque),
+            handle.AddrOfPinnedObject(),
+            dstRowBytes,
+            (_, ctx) => ((System.Runtime.InteropServices.GCHandle)ctx!).Free(),
+            handle);
+        if (!installed) handle.Free();
+
         // L'OCR Windows refuse toute image dont un côté dépasse OcrEngine.MaxImageDimension (10000px) :
-        // sans le jeu détecté, la capture peut retomber sur l'écran virtuel entier (plusieurs moniteurs),
-        // largement plus grand qu'un HUD — un upscale ×3 aveugle ferait alors planter RecognizeAsync.
+        // sans le jeu détecté, la capture peut retomber sur le moniteur sous le curseur voire l'écran
+        // virtuel entier (plusieurs moniteurs), plus grand qu'un HUD — un upscale ×3 aveugle ferait alors
+        // planter RecognizeAsync.
         var maxDim = (int)OcrEngine.MaxImageDimension;
-        var longestSide = Math.Max(src.Width, src.Height);
+        var longestSide = Math.Max(width, height);
         scale = longestSide > 0 && longestSide * (double)ScanConstants.OcrUpscaleFactor > maxDim
             ? maxDim / (double)longestSide
             : ScanConstants.OcrUpscaleFactor;
 
         if (scale < 1)
         {
-            _logger.LogWarning("Capture {Width}x{Height} trop grande pour l'agrandissement OCR habituel : facteur réduit à {Scale:F2} (max {Max}px).", src.Width, src.Height, scale, maxDim);
+            _logger.LogWarning("Capture {Width}x{Height} trop grande pour l'agrandissement OCR habituel : facteur réduit à {Scale:F2} (max {Max}px).", width, height, scale, maxDim);
         }
 
         var scaledInfo = new SKImageInfo(
-            Math.Max(1, (int)(src.Width * scale)),
-            Math.Max(1, (int)(src.Height * scale)),
+            Math.Max(1, (int)(width * scale)),
+            Math.Max(1, (int)(height * scale)),
             SKColorType.Bgra8888, SKAlphaType.Opaque);
-        var scaled = binarized.Resize(scaledInfo, SKFilterQuality.High);
+
+        // SKFilterQuality.None (plus proche voisin) conserve des contours nets noir/blanc après binarisation :
+        // un filtre "High" (bicubique) ré-introduit du flou gris sur une image déjà binaire, ce qui rend le
+        // texte illisible pour l'OCR au lieu de l'agrandir proprement.
+        var scaled = binarized.Resize(scaledInfo, SKFilterQuality.None);
         return scaled ?? binarized.Copy();
     }
 
