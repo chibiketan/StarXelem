@@ -7,5 +7,5 @@ namespace StarXelem.Services.Scan;
 public class DesignOverlayNotificationService : IOverlayNotificationService
 {
     public Task ShowAsync(SignatureMatch match) => Task.CompletedTask;
-    public Task ShowMessageAsync(string message, PixelPoint at) => Task.CompletedTask;
+    public Task ShowMessageAsync(IReadOnlyList<string> lines, PixelPoint at) => Task.CompletedTask;
 }

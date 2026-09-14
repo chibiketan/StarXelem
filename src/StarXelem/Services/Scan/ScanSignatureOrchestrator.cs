@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Avalonia;
 using Microsoft.Extensions.Logging;
 using StarXelem.Constants;
 using StarXelem.Data;
@@ -139,6 +140,8 @@ public class ScanSignatureOrchestrator : IScanSignatureOrchestrator
             if (candidates.Count == 0)
             {
                 _logger.LogInformation("Scan : aucune signature détectée à l'écran ({Elapsed}ms).", sw.ElapsedMilliseconds);
+                var center = new PixelPoint(frame.ScreenX + frame.Bitmap.Width / 2, frame.ScreenY + frame.Bitmap.Height / 2);
+                await _overlayService.ShowMessageAsync(["Aucune signature lisible"], center).ConfigureAwait(false);
                 return;
             }
 
@@ -152,7 +155,14 @@ public class ScanSignatureOrchestrator : IScanSignatureOrchestrator
                 return;
             }
 
-            _logger.LogInformation("Scan : aucune signature reconnue en base parmi {Count} candidat(s) ({Elapsed}ms).", candidates.Count, sw.ElapsedMilliseconds);
+            // Valeur lue mais absente de la base : on l'affiche quand même, avec les voisins les plus proches.
+            // C'est ce qui permet de collecter en jeu les cas qui contredisent la formule "N × signature de base".
+            var best = candidates[0];
+            var neighbours = await _signatureRepository.FindNearestAsync(best.Value, ScanConstants.UnknownSignatureNeighbours).ConfigureAwait(false);
+            var lines = new List<string> { $"{best.Value:N0} : signature inconnue" };
+            lines.AddRange(neighbours.Select(n => $"≈ {n.ClusterSize}× {n.MineralName} ({n.Signature:N0})"));
+            await _overlayService.ShowMessageAsync(lines, new PixelPoint(best.ScreenBounds.X, best.ScreenBounds.Bottom + 4)).ConfigureAwait(false);
+            _logger.LogInformation("Scan : signature {Value} inconnue en base ({Count} candidat(s), {Elapsed}ms).", best.Value, candidates.Count, sw.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {

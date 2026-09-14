@@ -28,6 +28,20 @@ public class MineralSignatureRepository : IMineralSignatureRepository
             .ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<MineralSignatureEntity>> FindNearestAsync(int value, int count, CancellationToken ct = default)
+    {
+        if (!File.Exists(_factory.DbPath)) return Array.Empty<MineralSignatureEntity>();
+
+        await using var db = await _factory.CreateDbContextAsync();
+        return await db.MineralSignatures
+            .AsNoTracking()
+            .OrderBy(m => m.Signature > value ? m.Signature - value : value - m.Signature)
+            .ThenBy(m => m.ClusterSize)
+            .Take(count)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<MineralSignatureEntity>> GetAllAsync(CancellationToken ct = default)
     {
         if (!File.Exists(_factory.DbPath)) return Array.Empty<MineralSignatureEntity>();

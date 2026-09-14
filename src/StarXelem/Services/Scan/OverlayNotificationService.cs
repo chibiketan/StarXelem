@@ -31,9 +31,9 @@ public class OverlayNotificationService : IOverlayNotificationService
         return ShowInternalAsync(new SignatureOverlayViewModel(signatureText, lines), position);
     }
 
-    public Task ShowMessageAsync(string message, PixelPoint at)
+    public Task ShowMessageAsync(IReadOnlyList<string> lines, PixelPoint at)
     {
-        return ShowInternalAsync(new SignatureOverlayViewModel(string.Empty, new[] { message }), at);
+        return ShowInternalAsync(new SignatureOverlayViewModel(string.Empty, lines), at);
     }
 
     private async Task ShowInternalAsync(SignatureOverlayViewModel viewModel, PixelPoint position)
