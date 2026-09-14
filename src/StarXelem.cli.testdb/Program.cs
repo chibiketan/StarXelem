@@ -16,6 +16,16 @@ if (args.Length > 0 && args[0] == "scan-image")
     return await ScanImageCommand.RunAsync(args[1..], scanLoggerFactory);
 }
 
+if (args.Length > 0 && args[0] == "scan-template")
+{
+    var scanLoggerFactory = LoggerFactory.Create(b =>
+    {
+        b.SetMinimumLevel(Environment.GetEnvironmentVariable("STARXELEM_SCAN_VERBOSE") == "1" ? LogLevel.Debug : LogLevel.Warning);
+        b.AddConsole();
+    });
+    return await ScanTemplateCommand.RunAsync(args[1..], scanLoggerFactory);
+}
+
 await RunAsync();
 return 0;
 

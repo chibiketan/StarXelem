@@ -65,6 +65,39 @@ variante), et un `16,960` lu `18,960` à l'unanimité (confusion `6`/`8` propre 
 reconnaissance des chiffres par gabarits (la police HUD est fixe) plutôt que par OCR générique ; ou, pour la
 confusion 6/8, proposer dans l'overlay les substitutions à un chiffre qui existent en base.
 
+## Itération 3 — expérimentation : reconnaissance des chiffres par gabarits
+
+Code : `Services/Scan/DigitTemplateReader.cs` (non branché dans le pipeline), helpers image extraits dans
+`Services/Scan/ScanImageOps.cs`, `WindowsSignatureOcrService.LocalizeBoxesAsync` (localisation seule), commande
+`scan-template <dossier>…` du CLI de test (validation croisée leave-one-out sur les dossiers munis d'un `expected.txt`).
+
+Principe : la localisation reste celle de l'OCR ; autour de la boîte du nombre, recadrage → ×4 → canal vert
+normalisé → binarisation → segmentation par projection de colonnes (hauteur médiane des segments → largeur
+attendue d'un chiffre ≈ 0,65 × h, découpe des segments trop larges, rejet des segments touchant un bord) → chaque
+glyphe ramené à 16×24 en conservant son rapport largeur/hauteur → plus proche voisin (k = 3) par corrélation
+normalisée parmi tous les glyphes d'apprentissage.
+
+Résultat sur 22 captures (18 Lyria + 4 espace), gabarits appris sur les 21 autres à chaque fois : **13/22**, en
+~1 s pour l'ensemble (apprentissage + 22 lectures, soit ≈ 5 ms par lecture). Comparaison OCR : 19/22.
+
+| Type d'échec | Cas | Cause |
+|---|---|---|
+| Badge non localisé | `64,000`, `16,900` | Commun avec l'OCR (localisation OCR) |
+| Segmentation | `19,425`→`1995`, `16,960`→`1005`, `15,300`→`15109` | Glyphes fusionnés / découpe inégale ; le « 1 » et le « 4 » collés |
+| Mauvaise boîte | `17,080`→`74000` (altimètre `7400m`) | Le score de corrélation ne distingue pas le badge des autres nombres du HUD |
+| Classification | `48,000`→`40000`, `78,000`→`76000`, `13,212`→`13717` | Trop peu d'exemples par chiffre (le « 2 » n'existe que dans 2 captures) |
+
+Observations utiles : les 4 `16,960` sont lus juste (dont celui que l'OCR lit `18,960` à l'unanimité) — la
+confusion 6/8 de l'OCR est bien résolue par les gabarits ; un gabarit *moyen* par chiffre est nettement moins bon
+que le plus proche voisin (10/22 → 13/22) ; conserver le rapport largeur/hauteur des glyphes est indispensable (`1`/`7`).
+
+**Conclusion** : pas un remplaçant de l'OCR en l'état (13/22 contre 19/22), mais un complément crédible car ses
+erreurs ne sont pas les mêmes. Pour aller plus loin, dans l'ordre : (1) **plus de données** — chaque scan validé
+en jeu devrait alimenter la base de glyphes (auto-apprentissage à partir des votes OCR unanimes, ex. ≥ 10/12) ;
+(2) segmentation : découpe des segments larges par les minima de la projection de colonnes plutôt qu'en parts
+égales ; (3) intégration comme votant supplémentaire dans `ReadByVoteAsync` (poids à calibrer) plutôt qu'en lecteur
+autonome, et comme arbitre quand l'OCR hésite entre deux valeurs à un chiffre près.
+
 ---
 
 ## 1. Diagnostic (4 captures 4K du 2026-09-08, `private/debug/`)
