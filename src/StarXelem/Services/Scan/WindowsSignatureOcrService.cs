@@ -24,18 +24,15 @@ namespace StarXelem.Services.Scan;
 /// </summary>
 public partial class WindowsSignatureOcrService : ISignatureOcrService
 {
-    private const int MinPlausibleSignature = 2500;
+    // Plus petite signature de base connue : 3000 (FPS) / 3170 (Quantainium). En dessous, ce sont des lectures
+    // parasites du HUD (cap « 258° » lu 2582, etc.).
+    private const int MinPlausibleSignature = 3000;
     // Doit couvrir le pire cas des clusters larges FPS/GroundVehicle (ScanConstants.MaxLargeClusterSize
     // × signature générique 4000 = 120 000), en plus des clusters vaisseau/surface (max 43 000).
     private const int MaxPlausibleSignature = 120000;
 
     [GeneratedRegex(@"^\d{1,3}(,\d{3})+$|^\d{4,6}$")]
     private static partial Regex SignatureNumberRegex();
-
-    // Passe de localisation : on cherche un mot qui "ressemble" à un nombre bruité (19/05, 16*00, 19A25…),
-    // le but étant de trouver où est le badge, pas de le lire.
-    [GeneratedRegex(@"^[\dOolIA,./*]{4,7}$")]
-    private static partial Regex NoisyNumberRegex();
 
     private readonly ILogger<WindowsSignatureOcrService> _logger;
     private readonly OcrEngine? _engine;
@@ -88,8 +85,10 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
         // chaque étage supplémentaire coûte surtout le redimensionnement de la zone.
         var roi = CenterRoi(source);
         var full = new SKRectI(0, 0, source.Width, source.Height);
-        var stages = ScanConstants.OcrLocalizationScales.Select(s => (Zone: roi, Scale: s, Name: "roi"))
-            .Concat(ScanConstants.OcrLocalizationScales.Select(s => (Zone: full, Scale: s, Name: "full")));
+        var stages = new List<(SKRectI Zone, double Scale, string Name)> { (roi, ScanConstants.OcrLocalizationScales[0], "roi") };
+        stages.Add((PriorZone(source), ScanConstants.OcrPriorZoneScale, "prior"));
+        stages.AddRange(ScanConstants.OcrLocalizationScales.Skip(1).Select(s => (roi, s, "roi")));
+        stages.AddRange(ScanConstants.OcrFullFrameLocalizationScales.Select(s => (full, s, "full")));
 
         var candidates = new List<SignatureCandidate>();
         var readBoxes = new List<SKRectI>();
@@ -144,22 +143,59 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
         return new SKRectI(x, y, x + w, y + h);
     }
 
+    private static SKRectI PriorZone(SKBitmap source)
+    {
+        var w = (int)(source.Width * ScanConstants.OcrPriorZoneWidthRatio);
+        var h = (int)(source.Height * ScanConstants.OcrPriorZoneHeightRatio);
+        var x = (source.Width - w) / 2;
+        var y = Math.Max(0, (int)(source.Height * ScanConstants.OcrPriorZoneCenterYRatio) - h / 2);
+        return new SKRectI(x, y, x + w, Math.Min(source.Height, y + h));
+    }
+
+    /// <summary>Un mot « ressemble » à un nombre s'il contient au moins OcrLocalizationMinDigits caractères
+    /// chiffre-ou-confondus (0/O, 1/l/I, 4/A) et au plus un séparateur (virgule ou lecture bruitée . / *).</summary>
+    // Ponctuation parasite que l'OCR colle parfois en bordure du nombre ("15,300!", "'19,425").
+    private static readonly char[] EdgeNoise = [' ', '!', '\'', '"', '`', '.', ',', ':', ';', '(', ')', '[', ']', '{', '}', '-', '_', '—', '*', '/', '\\', '|', '°', 'º'];
+
+    private static string TrimEdgeNoise(string text) => text.Trim(EdgeNoise);
+
+    private static bool LooksLikeNumber(string text)
+    {
+        var digits = 0;
+        var separators = 0;
+        foreach (var c in TrimEdgeNoise(text))
+        {
+            if (char.IsDigit(c) || c is 'O' or 'o' or 'l' or 'I' or 'A') digits++;
+            else if (c is ',' or '.' or '/' or '*') separators++;
+            else return false;
+        }
+        return digits >= ScanConstants.OcrLocalizationMinDigits && digits <= 6 && separators <= 1;
+    }
+
     /// <summary>Retourne les boîtes (coordonnées de la capture) des mots ressemblant à un nombre dans la zone donnée.</summary>
     private async Task<List<SKRectI>> LocalizeAsync(SKBitmap source, SKRectI roi, double scale, string debugName, CancellationToken ct)
     {
         using var region = Crop(source, roi);
-        using var green = GreenChannel(region);
+        using var scaled = Scale(region, scale);
+        using var green = GreenChannel(scaled);
+        using var normalized = NormalizeContrast(green, (int)(ScanConstants.OcrNormalizeTileSize * scale));
         SaveDebugImage(region, $"{debugName}.png");
+        SaveDebugImage(normalized, $"{debugName}_norm.png");
 
-        // Couleur ET canal vert : selon la capture, l'une ou l'autre seule manque le badge (mesuré).
+        // Couleur, canal vert et vert normalisé par tuiles : dans l'espace (fond sombre) la couleur ou le vert
+        // suffisent, au sol (fond clair) seule la normalisation locale fait ressortir le badge (mesuré 1/18 → 14/18).
         var boxes = new List<SKRectI>();
-        foreach (var image in new[] { region, green })
+        foreach (var (image, kind) in new[] { (scaled, "color"), (green, "green"), (normalized, "norm") })
         {
             ct.ThrowIfCancellationRequested();
-            var result = await RecognizeAsync(image, scale, ct).ConfigureAwait(false);
+            var result = await RecognizeAsync(image, ct).ConfigureAwait(false);
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("OCR localisation {Name} [{Kind}] : {Words}", debugName, kind, string.Join(" | ", result.Lines.Select(l => l.Text)));
+            }
             foreach (var word in result.Lines.SelectMany(l => l.Words))
             {
-                if (!NoisyNumberRegex().IsMatch(word.Text.Trim())) continue;
+                if (!LooksLikeNumber(word.Text)) continue;
 
                 var r = word.BoundingRect;
                 var box = new SKRectI(
@@ -168,7 +204,7 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
                     roi.Left + (int)((r.X + r.Width) / scale),
                     roi.Top + (int)((r.Y + r.Height) / scale));
 
-                // Le même mot est en général retrouvé en couleur et en vert : on fusionne les boîtes qui se recouvrent.
+                // Le même mot est en général retrouvé dans plusieurs variantes : on fusionne les boîtes qui se recouvrent.
                 var overlapping = boxes.FindIndex(b => b.IntersectsWith(box));
                 if (overlapping >= 0)
                 {
@@ -195,16 +231,26 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
             Math.Min(source.Height, box.Bottom + marginY));
 
         using var color = Crop(source, crop);
-        using var green = GreenChannel(color);
         SaveDebugImage(color, $"badge_{index}.png");
 
         var readings = new List<(int Value, string Raw, Windows.Foundation.Rect Rect, double Scale)>();
-        foreach (var (image, kind) in new[] { (color, "color"), (green, "green") })
+        foreach (var scale in ScanConstants.OcrReadingScales)
         {
-            foreach (var scale in ScanConstants.OcrReadingScales)
+            // Agrandir AVANT de normaliser : mesuré nettement plus lisible que l'inverse (×3 : 15/18 contre 9/18),
+            // l'anti-aliasing du texte agrandi survit mieux au gamma.
+            using var scaled = Scale(color, scale);
+            using var green = GreenChannel(scaled);
+            using var normalized = NormalizeContrast(green, tileSize: 0);
+            // Deuxième filtre d'agrandissement : bicubique et Lanczos ne se trompent pas sur les mêmes captures
+            // (confusions 6/8), leurs lectures se complètent dans le vote. Le bilinéaire, lui, est nettement pire.
+            using var lanczos = ScaleLanczos(color, scale);
+            using var lanczosNormalized = NormalizeContrast(GreenChannel(lanczos), tileSize: 0);
+            if (Math.Abs(scale - ScanConstants.OcrReadingScales[^1]) < 0.001) SaveDebugImage(normalized, $"badge_{index}_norm.png");
+
+            foreach (var (image, kind) in new[] { (scaled, "color"), (green, "green"), (normalized, "norm"), (lanczosNormalized, "lanczos-norm") })
             {
                 ct.ThrowIfCancellationRequested();
-                var result = await RecognizeAsync(image, scale, ct).ConfigureAwait(false);
+                var result = await RecognizeAsync(image, ct).ConfigureAwait(false);
                 foreach (var word in result.Lines.SelectMany(l => l.Words))
                 {
                     if (TryParseSignature(word.Text, out var value))
@@ -245,7 +291,7 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
     private static bool TryParseSignature(string text, out int value)
     {
         value = 0;
-        var cleaned = text.Trim()
+        var cleaned = TrimEdgeNoise(text)
             .Replace("O", "0", StringComparison.Ordinal)
             .Replace("o", "0", StringComparison.Ordinal)
             .Replace("l", "1", StringComparison.Ordinal)
@@ -258,44 +304,50 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
         return value >= MinPlausibleSignature && value <= MaxPlausibleSignature;
     }
 
-    private async Task<OcrResult> RecognizeAsync(SKBitmap image, double scale, CancellationToken ct)
+    private async Task<OcrResult> RecognizeAsync(SKBitmap image, CancellationToken ct)
     {
-        SKBitmap? scaled = null;
         var sw = Stopwatch.StartNew();
+        SKBitmap? fitted = null;
         try
         {
             var target = image;
-            if (Math.Abs(scale - 1.0) > 0.001)
-            {
-                // High (bicubique) : mesuré 2,5× plus rapide côté reconnaissance qu'un bilinéaire (image plus nette), pour +15 ms de resize.
-                var info = new SKImageInfo(Math.Max(1, (int)(image.Width * scale)), Math.Max(1, (int)(image.Height * scale)), SKColorType.Bgra8888, SKAlphaType.Opaque);
-                scaled = image.Resize(info, SKFilterQuality.High);
-                target = scaled ?? image;
-            }
-            var resizeMs = sw.ElapsedMilliseconds;
-
             var maxDim = (int)OcrEngine.MaxImageDimension;
             if (target.Width > maxDim || target.Height > maxDim)
             {
                 var fit = Math.Min(maxDim / (double)target.Width, maxDim / (double)target.Height);
                 var info = new SKImageInfo(Math.Max(1, (int)(target.Width * fit)), Math.Max(1, (int)(target.Height * fit)), SKColorType.Bgra8888, SKAlphaType.Opaque);
-                var fitted = target.Resize(info, SKFilterQuality.High);
-                scaled?.Dispose();
-                scaled = fitted;
+                fitted = target.Resize(info, SKFilterQuality.High);
                 target = fitted ?? image;
             }
 
             using var softwareBitmap = ToSoftwareBitmap(target);
-            var convertMs = sw.ElapsedMilliseconds - resizeMs;
+            var convertMs = sw.ElapsedMilliseconds;
             var result = await _engine!.RecognizeAsync(softwareBitmap).AsTask(ct).ConfigureAwait(false);
-            _logger.LogDebug("OCR pass {Width}x{Height} x{Scale}: resize {ResizeMs}ms, conversion {ConvertMs}ms, reconnaissance {RecognizeMs}ms.",
-                target.Width, target.Height, scale, resizeMs, convertMs, sw.ElapsedMilliseconds - resizeMs - convertMs);
+            _logger.LogDebug("OCR pass {Width}x{Height}: conversion {ConvertMs}ms, reconnaissance {RecognizeMs}ms.",
+                target.Width, target.Height, convertMs, sw.ElapsedMilliseconds - convertMs);
             return result;
         }
         finally
         {
-            scaled?.Dispose();
+            fitted?.Dispose();
         }
+    }
+
+#pragma warning disable CS0618 // SKBitmapResizeMethod est obsolète mais reste le seul accès à Lanczos3 en SkiaSharp 2.88.
+    private static SKBitmap ScaleLanczos(SKBitmap image, double scale)
+    {
+        if (Math.Abs(scale - 1.0) < 0.001) return image.Copy();
+        var info = new SKImageInfo(Math.Max(1, (int)(image.Width * scale)), Math.Max(1, (int)(image.Height * scale)), SKColorType.Bgra8888, SKAlphaType.Opaque);
+        return image.Resize(info, SKBitmapResizeMethod.Lanczos3) ?? image.Copy();
+    }
+#pragma warning restore CS0618
+
+    /// <summary>Agrandissement bicubique (High) : mesuré 2,5× plus rapide côté reconnaissance qu'un bilinéaire (image plus nette), pour +15 ms de resize.</summary>
+    private static SKBitmap Scale(SKBitmap image, double scale)
+    {
+        if (Math.Abs(scale - 1.0) < 0.001) return image.Copy();
+        var info = new SKImageInfo(Math.Max(1, (int)(image.Width * scale)), Math.Max(1, (int)(image.Height * scale)), SKColorType.Bgra8888, SKAlphaType.Opaque);
+        return image.Resize(info, SKFilterQuality.High) ?? image.Copy();
     }
 
     private static SKBitmap Crop(SKBitmap source, SKRectI rect)
@@ -328,6 +380,84 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
         }
         Marshal.Copy(pixels, 0, dst.GetPixels(), pixels.Length);
         return dst;
+    }
+
+    /// <summary>
+    /// Étire le contraste (percentiles 1–99 %) puis applique un gamma sombre (<see cref="ScanConstants.OcrGamma"/>),
+    /// par tuiles de <paramref name="tileSize"/> px (0 = toute l'image). Attend une image en niveaux de gris
+    /// (les trois canaux égaux) ; renvoie de même.
+    /// </summary>
+    private static SKBitmap NormalizeContrast(SKBitmap gray, int tileSize)
+    {
+        var width = gray.Width;
+        var height = gray.Height;
+        var src = gray.Bytes;
+        var dst = new byte[src.Length];
+        var tile = tileSize <= 0 ? Math.Max(width, height) : tileSize;
+        var histogram = new int[256];
+        var lut = new byte[256];
+
+        for (var ty = 0; ty < height; ty += tile)
+        {
+            for (var tx = 0; tx < width; tx += tile)
+            {
+                var x2 = Math.Min(width, tx + tile);
+                var y2 = Math.Min(height, ty + tile);
+                Array.Clear(histogram);
+                for (var y = ty; y < y2; y++)
+                {
+                    var row = y * width * 4;
+                    for (var x = tx; x < x2; x++) histogram[src[row + x * 4 + 1]]++;
+                }
+
+                var total = (x2 - tx) * (y2 - ty);
+                var lo = Percentile(histogram, total, 0.01);
+                var hi = Percentile(histogram, total, 0.99);
+                var range = hi - lo;
+                if (range < ScanConstants.OcrNormalizeMinRange)
+                {
+                    Array.Clear(lut);
+                }
+                else
+                {
+                    for (var v = 0; v < 256; v++)
+                    {
+                        var n = Math.Clamp((v - lo) / (double)range, 0, 1);
+                        lut[v] = (byte)(Math.Pow(n, ScanConstants.OcrGamma) * 255);
+                    }
+                }
+
+                for (var y = ty; y < y2; y++)
+                {
+                    var row = y * width * 4;
+                    for (var x = tx; x < x2; x++)
+                    {
+                        var i = row + x * 4;
+                        var g = lut[src[i + 1]];
+                        dst[i] = g;
+                        dst[i + 1] = g;
+                        dst[i + 2] = g;
+                        dst[i + 3] = 255;
+                    }
+                }
+            }
+        }
+
+        var result = new SKBitmap(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque);
+        Marshal.Copy(dst, 0, result.GetPixels(), dst.Length);
+        return result;
+    }
+
+    private static int Percentile(int[] histogram, int total, double p)
+    {
+        var target = (int)(total * p);
+        var cumulative = 0;
+        for (var v = 0; v < 256; v++)
+        {
+            cumulative += histogram[v];
+            if (cumulative > target) return v;
+        }
+        return 255;
     }
 
     private static double DistanceSquared(SKRectI box, int centerX, int centerY)

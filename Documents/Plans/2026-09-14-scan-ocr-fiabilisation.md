@@ -32,6 +32,39 @@ base → overlay « 7 195 : signature inconnue » + les 2 voisins les plus proch
 **Non vérifié en jeu** : l'overlay réel (texte, position) et le comportement sur capture GDI (le banc tourne sur
 des JPG du jeu ; la capture GDI est sans compression, donc a priori plus favorable).
 
+## Itération 2 — surface de planète (Lyria), 18 captures du 2026-09-14
+
+Retour en jeu : espace OK, **< 10 % au sol** (et la boussole lue comme signature). Sur les 18 captures fournies
+(`private/debug/`, vérité terrain dans `expected.txt`), le pipeline de l'itération 1 lisait **3/18**. Causes :
+
+1. **Contraste** : texte blanc sur sol de planète gris clair — le moteur ne segmente plus le badge. Aucune passe
+   couleur/vert ne le trouve, même en localisation.
+2. **Boîtes monopolisées** : l'altimètre (`7.44`, `7.39`…) et la boussole (`260`, `280`) passaient la regex
+   « nombre bruité » et occupaient les 3 boîtes les plus proches du centre.
+3. **Ponctuation collée** : l'OCR renvoie `15,300!` ou `'19,425` — rejetés par le parseur strict.
+4. L'escalade allait jusqu'à la capture entière ×2 : 3 s pour ne rien trouver.
+
+Corrections, toutes mesurées au banc (valeurs = fichiers lus / 18) :
+
+| Étape | Résultat |
+|---|---|
+| Point de départ | 3/18 |
+| Normalisation de contraste (percentiles 1–99 % + **gamma 3**) sur le canal vert, par tuiles de 256 px pour la localisation, globale pour la lecture | 14/18 |
+| Localisation : ≥ 4 chiffres, ≤ 1 séparateur ; étage « zone a priori » (30 % × 30 % centré sur y = 39 %) à ×2 avant la zone centrale ×2 ; marges de lecture ±12× h horizontal | 15/18 |
+| Normalisation **après** agrandissement (et non avant) ; variante Lanczos3 en plus du bicubique ; nettoyage de la ponctuation en bordure | 15/18, votes 2–3× plus nombreux (ex. 15/15) |
+
+Autres mesures : max(RGB) comme luminance est catastrophique (frange chromatique) → canal vert uniquement ;
+filtre passe-haut (texte − flou) inutilisable ; bilinéaire/Hamming/plus-proche-voisin bien pires que
+bicubique/Lanczos pour l'agrandissement ; gamma 3 > 2 > 4 > 6. Plancher de plausibilité relevé à 3 000
+(le cap « 258° » était lu 2582).
+
+Durées : 320–940 ms en lecture directe, 1,8–3 s quand l'escalade va jusqu'au bout (cas non lus).
+
+**Restent 3 échecs** : `64,000` sur ciel clair et un `16,960` sur relief (jamais reconnus, quelle que soit la
+variante), et un `16,960` lu `18,960` à l'unanimité (confusion `6`/`8` propre à cette police). Pistes si besoin :
+reconnaissance des chiffres par gabarits (la police HUD est fixe) plutôt que par OCR générique ; ou, pour la
+confusion 6/8, proposer dans l'overlay les substitutions à un chiffre qui existent en base.
+
 ---
 
 ## 1. Diagnostic (4 captures 4K du 2026-09-08, `private/debug/`)

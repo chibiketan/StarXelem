@@ -10,7 +10,7 @@ namespace StarXelem.Cli.TestDb;
 /// Banc de test OCR : exécute le pipeline <see cref="ISignatureOcrService"/> sur des fichiers image (captures du jeu)
 /// et affiche les candidats lus. Sert de jeu de non-régression : chaque capture ratée est à ajouter à
 /// <c>private/debug/</c> et à repasser ici après tout ajustement du pré-traitement ou des seuils.
-/// Usage : <c>scan-image &lt;image|dossier&gt;… [--expect 19425,16900,…]</c>
+/// Usage : <c>scan-image &lt;image|dossier&gt;… [--expect 19425,16900,…]</c> (ou un <c>expected.txt</c> dans le dossier).
 /// </summary>
 public static class ScanImageCommand
 {
@@ -36,6 +36,17 @@ public static class ScanImageCommand
                 : [p])
             .OrderBy(f => f)
             .ToList();
+
+        // Sans --expect, un fichier expected.txt (valeurs séparées par des virgules, dans l'ordre alphabétique
+        // des captures) placé dans le dossier sert de vérité terrain.
+        if (expected.Count == 0 && paths.Count == 1 && Directory.Exists(paths[0]))
+        {
+            var expectedFile = Path.Combine(paths[0], "expected.txt");
+            if (File.Exists(expectedFile))
+            {
+                expected.AddRange(File.ReadAllText(expectedFile).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(int.Parse));
+            }
+        }
 
         if (files.Count == 0)
         {

@@ -24,21 +24,47 @@ public static class ScanConstants
     public const double OcrRoiWidthRatio = 0.6;
     public const double OcrRoiHeightRatio = 0.5;
 
-    /// <summary>Échelles successives de la passe de localisation (trouver OÙ est le nombre, pas le lire).
-    /// L'étage suivant n'est tenté que si le précédent n'a produit aucune valeur : ×2 coûte ~600 ms de plus
-    /// (redimensionnement + reconnaissance d'une zone 4K agrandie) mais est nécessaire sur certaines captures.</summary>
+    /// <summary>Échelles successives de la passe de localisation sur la zone centrale (trouver OÙ est le nombre,
+    /// pas le lire). L'étage suivant n'est tenté que si le précédent n'a produit aucune valeur : ×2 coûte ~600 ms
+    /// de plus (redimensionnement + reconnaissance d'une zone 4K agrandie) mais est nécessaire sur certaines captures.</summary>
     public static readonly double[] OcrLocalizationScales = [1.0, 2.0];
+
+    /// <summary>Échelles de la localisation de repli sur la capture entière (×2 sur une capture 4K coûte ~3 s : exclu).</summary>
+    public static readonly double[] OcrFullFrameLocalizationScales = [1.0];
+
+    /// <summary>Zone « a priori » du badge : sur 22 captures (espace et sol, head tracking compris), le badge est
+    /// toujours à x ≈ 50 % et y ≈ 37–42 % de la capture. Étage intermédiaire lu à ×2 : 4× moins cher que la zone
+    /// centrale ×2, tenté avant elle.</summary>
+    public const double OcrPriorZoneCenterYRatio = 0.39;
+    public const double OcrPriorZoneWidthRatio = 0.30;
+    public const double OcrPriorZoneHeightRatio = 0.30;
+    public const double OcrPriorZoneScale = 2.0;
+
+    /// <summary>Nombre minimal de caractères « chiffre » d'un mot pour être une boîte candidate en localisation
+    /// (élimine l'altimètre « 7.44 » et la boussole « 260 » qui monopolisaient les boîtes les plus proches du centre).</summary>
+    public const int OcrLocalizationMinDigits = 4;
 
     /// <summary>Échelles de la passe de lecture sur le recadrage serré du badge. Le texte HUD fait ~15 px de
     /// haut en 4K, à la limite du moteur : aucune échelle seule n'est fiable, mais un vote sur l'ensemble
     /// (en couleur et sur le canal vert) l'est. Mesuré sur 4 captures réelles : 4/4 corrects, &lt; 80 ms.</summary>
     public static readonly double[] OcrReadingScales = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0];
 
-    /// <summary>Nombre maximal de boîtes candidates issues de la localisation à lire finement.</summary>
-    public const int OcrMaxLocalizationBoxes = 3;
+    /// <summary>Normalisation de contraste avant OCR : étirement des percentiles 1–99 % puis gamma. Le gamma
+    /// écrase les gris moyens (sol de planète clair, fond de badge) et ne garde que le texte blanc. Mesuré sur
+    /// 18 captures au sol : lecture 3/18 → 15/18. Par tuiles pour la localisation (la zone mélange cockpit sombre
+    /// et planète claire), globale sur le recadrage de lecture.</summary>
+    public const double OcrGamma = 3.0;
+    public const int OcrNormalizeTileSize = 256;
+    /// <summary>En dessous de cet écart min–max, une tuile est considérée uniforme et mise à noir.</summary>
+    public const int OcrNormalizeMinRange = 16;
 
-    /// <summary>Marge autour de la boîte localisée, en multiples de sa hauteur (horizontal / vertical).</summary>
-    public const double OcrCropMarginHorizontal = 4.0;
+    /// <summary>Nombre maximal de boîtes candidates issues de la localisation à lire finement.</summary>
+    public const int OcrMaxLocalizationBoxes = 4;
+
+    /// <summary>Marge autour de la boîte localisée, en multiples de sa hauteur (horizontal / vertical). Large :
+    /// l'OCR lit nettement mieux le nombre avec du contexte autour (mesuré 59 → 69 passes correctes / 108 en
+    /// passant de ±4× à ±12× horizontalement).</summary>
+    public const double OcrCropMarginHorizontal = 12.0;
     public const double OcrCropMarginVertical = 3.0;
 
     /// <summary>Nombre de voisins en base proposés quand la signature lue est inconnue.</summary>
