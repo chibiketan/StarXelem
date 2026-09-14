@@ -22,7 +22,13 @@ public sealed class CapturedFrame : IDisposable
 }
 
 /// <summary>Nombre lu par l'OCR et sa boîte en coordonnées écran.</summary>
-public sealed record SignatureCandidate(int Value, string RawText, PixelRect ScreenBounds);
+/// <param name="Votes">Nombre de passes OCR ayant lu exactement cette valeur.</param>
+/// <param name="ValidPasses">Nombre de passes OCR ayant produit une valeur plausible (toutes valeurs confondues).</param>
+public sealed record SignatureCandidate(int Value, string RawText, PixelRect ScreenBounds, int Votes = 1, int ValidPasses = 1)
+{
+    /// <summary>Part des passes valides concordantes, 0..1.</summary>
+    public double Confidence => ValidPasses == 0 ? 0 : (double)Votes / ValidPasses;
+}
 
 /// <summary>Un candidat de signature détecté à l'écran et les lignes de la base qui lui correspondent.</summary>
 public sealed record SignatureMatch(SignatureCandidate Candidate, IReadOnlyList<MineralSignatureEntity> Rows);

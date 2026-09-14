@@ -4,8 +4,20 @@ using StarXelem.Data;
 using StarXelem.Models;
 using StarXelem.Services;
 using StarXelem.Services.Mining;
+using StarXelem.Cli.TestDb;
+
+if (args.Length > 0 && args[0] == "scan-image")
+{
+    var scanLoggerFactory = LoggerFactory.Create(b =>
+    {
+        b.SetMinimumLevel(Environment.GetEnvironmentVariable("STARXELEM_SCAN_VERBOSE") == "1" ? LogLevel.Debug : LogLevel.Warning);
+        b.AddConsole();
+    });
+    return await ScanImageCommand.RunAsync(args[1..], scanLoggerFactory);
+}
 
 await RunAsync();
+return 0;
 
 async Task RunAsync()
 {
