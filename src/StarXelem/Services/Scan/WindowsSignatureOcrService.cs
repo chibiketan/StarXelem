@@ -314,7 +314,7 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
 
             var ocrCandidate = new SignatureCandidate(winner.Value, winner.First.Raw, screenRect, winner.Votes, readings.Count);
             candidates.Add(ocrCandidate);
-            TryLearn(source, box, ocrCandidate);
+            TryLearn(source, box, ocrCandidate, templateReading);
         }
         else
         {
@@ -364,11 +364,20 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
         }
     }
 
-    /// <summary>Auto-apprentissage : un vote OCR fort étiquette les glyphes du badge pour la reconnaissance par gabarits.</summary>
-    private void TryLearn(SKBitmap source, SKRectI box, SignatureCandidate ocr)
+    /// <summary>
+    /// Auto-apprentissage : un vote OCR fort étiquette les glyphes du badge pour la reconnaissance par gabarits.
+    /// Pas d'apprentissage si une lecture par gabarits de qualité contredit l'OCR : c'est le signe d'une confusion
+    /// OCR (18,960 unanime pour 16,960) et apprendre ici empoisonnerait la base avec la mauvaise étiquette.
+    /// </summary>
+    private void TryLearn(SKBitmap source, SKRectI box, SignatureCandidate ocr, DigitTemplateReader.Reading? templateReading)
     {
         if (!_glyphStore.AutoLearnEnabled) return;
         if (ocr.Votes < ScanConstants.AutoLearnMinVotes || ocr.Confidence < ScanConstants.AutoLearnMinConfidence) return;
+        if (templateReading != null && templateReading.Value != ocr.Value)
+        {
+            _logger.LogInformation("Auto-apprentissage : OCR {Ocr} contredit par les gabarits {Template}, glyphes non appris.", ocr.Value, templateReading.Value);
+            return;
+        }
 
         try
         {
@@ -379,8 +388,16 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
                 _logger.LogDebug("Auto-apprentissage : segmentation incompatible avec {Value}, glyphes ignorés.", ocr.Value);
                 return;
             }
-            _glyphStore.Learn(labeled);
-            _logger.LogInformation("Auto-apprentissage : {Count} glyphes ajoutés pour {Value} (vote {Votes}/{Passes}).", labeled.Count, ocr.Value, ocr.Votes, ocr.ValidPasses);
+            var result = _glyphStore.Learn(labeled);
+            if (result.Conflict != null)
+            {
+                _logger.LogWarning("Auto-apprentissage : {Value} refusé, {Conflict} — l'étiquetage OCR contredit la base de glyphes.", ocr.Value, result.Conflict);
+            }
+            else
+            {
+                _logger.LogInformation("Auto-apprentissage : {Added} glyphes ajoutés ({Duplicates} doublons) pour {Value} (vote {Votes}/{Passes}).",
+                    result.Added, result.Duplicates, ocr.Value, ocr.Votes, ocr.ValidPasses);
+            }
         }
         catch (Exception ex)
         {

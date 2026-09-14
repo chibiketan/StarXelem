@@ -114,6 +114,16 @@ autonome, et comme arbitre quand l'OCR hésite entre deux valeurs à un chiffre 
   à la base, sauvegardée en tâche de fond. Désactivé dans les bancs (`autoLearnEnabled: false`) pour rester reproductible ;
   `STARXELEM_SCAN_GLYPHS` permet de pointer le banc sur une base utilisateur.
 
+**Auto-empoisonnement constaté en jeu** : en rejouant les captures de test dans l'application, l'OCR unanime
+`18,960` a étiqueté le `6` du badge comme `8` ; les gabarits lisaient ensuite `16980` et l'arbitrage était perdu
+(15/18). Deux garde-fous ajoutés, vérifiés en rejouant le scénario avec `scan-image … --learn` sur une copie de
+la graine (base inchangée à 118 glyphes, 16/18 + 4/4 conservés) :
+1. pas d'apprentissage quand une lecture par gabarits de qualité **contredit** l'OCR (c'est précisément le signe
+   d'une confusion OCR) ;
+2. `DigitGlyphStore.Learn` refuse tout le badge si un glyphe corrèle ≥ 0,97 avec un glyphe connu sous une autre
+   étiquette, et ignore les doublons (≥ 0,995, même étiquette) — les rejouages n'enflent plus la base.
+Une base déjà polluée se répare en supprimant `%LOCALAPPDATA%\StarXelem\scan-glyphs.json` (la graine est rechargée).
+
 Banc `scan-image` après intégration : **16/18 Lyria + 4/4 espace** (contre 15/18 + 4/4), plus le cas `18,960`
 arbitré en jeu par la base → 21/22 effectifs. Réserve : la graine contient ces mêmes captures (pas de validation
 croisée pour la part gabarits de ce chiffre) ; la mesure honnête des gabarits seuls reste le 13/22 en LOO, qui

@@ -10,7 +10,7 @@ namespace StarXelem.Cli.TestDb;
 /// Banc de test OCR : exécute le pipeline <see cref="ISignatureOcrService"/> sur des fichiers image (captures du jeu)
 /// et affiche les candidats lus. Sert de jeu de non-régression : chaque capture ratée est à ajouter à
 /// <c>private/debug/</c> et à repasser ici après tout ajustement du pré-traitement ou des seuils.
-/// Usage : <c>scan-image &lt;image|dossier&gt;… [--expect 19425,16900,…]</c> (ou un <c>expected.txt</c> dans le dossier).
+/// Usage : <c>scan-image &lt;image|dossier&gt;… [--expect 19425,16900,…] [--learn]</c> (ou un <c>expected.txt</c> dans le dossier).
 /// </summary>
 public static class ScanImageCommand
 {
@@ -54,8 +54,10 @@ public static class ScanImageCommand
             return 2;
         }
 
-        // Base de glyphes figée (graine embarquée, ou STARXELEM_SCAN_GLYPHS) : le banc doit rester reproductible.
-        var glyphStore = new DigitGlyphStore(Environment.GetEnvironmentVariable("STARXELEM_SCAN_GLYPHS"), autoLearnEnabled: false, loggerFactory.CreateLogger<DigitGlyphStore>());
+        // Base de glyphes figée (graine embarquée, ou STARXELEM_SCAN_GLYPHS) : le banc doit rester reproductible,
+        // sauf avec --learn qui rejoue l'auto-apprentissage de l'application dans le fichier STARXELEM_SCAN_GLYPHS.
+        var learn = paths.Remove("--learn");
+        var glyphStore = new DigitGlyphStore(Environment.GetEnvironmentVariable("STARXELEM_SCAN_GLYPHS"), autoLearnEnabled: learn, loggerFactory.CreateLogger<DigitGlyphStore>());
         var ocr = new WindowsSignatureOcrService(glyphStore, loggerFactory.CreateLogger<WindowsSignatureOcrService>());
         Console.WriteLine($"Base de glyphes : {glyphStore.Glyphs.Count} glyphes.");
         if (!ocr.IsAvailable)
@@ -98,6 +100,9 @@ public static class ScanImageCommand
                 Console.WriteLine($"    autre : {other.Value} ({other.Votes}/{other.ValidPasses}, '{other.RawText}'){mark}");
             }
         }
+
+        await glyphStore.FlushAsync();
+        if (learn) Console.WriteLine($"Base de glyphes après apprentissage : {glyphStore.Glyphs.Count} glyphes.");
 
         if (expected.Count > 0)
         {

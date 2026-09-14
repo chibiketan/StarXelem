@@ -12,6 +12,13 @@ public interface IDigitGlyphStore
     /// <summary>false pour figer la base (bancs de test reproductibles).</summary>
     bool AutoLearnEnabled { get; }
 
-    /// <summary>Ajoute des glyphes appris et planifie la sauvegarde. Sans effet si <see cref="AutoLearnEnabled"/> est false.</summary>
-    void Learn(IEnumerable<DigitTemplateReader.LabeledGlyph> glyphs);
+    /// <summary>
+    /// Ajoute les glyphes d'un badge lu et planifie la sauvegarde. Sans effet si <see cref="AutoLearnEnabled"/> est
+    /// false. Le lot entier est refusé si un glyphe est quasi identique à un glyphe connu sous une autre étiquette
+    /// (étiquetage OCR contredit par la base) ; les doublons d'un glyphe déjà connu sous la même étiquette sont ignorés.
+    /// </summary>
+    LearnResult Learn(IReadOnlyList<DigitTemplateReader.LabeledGlyph> glyphs);
 }
+
+/// <summary>Bilan d'un apprentissage : glyphes ajoutés, doublons ignorés, et chiffre en conflit s'il y en a un (lot refusé).</summary>
+public sealed record LearnResult(int Added, int Duplicates, string? Conflict);

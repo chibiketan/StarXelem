@@ -84,6 +84,10 @@ public static class ScanConstants
     public const int AutoLearnMinVotes = 8;
     public const double AutoLearnMinConfidence = 0.8;
     public const int GlyphStoreMaxPerDigit = 300;
+    /// <summary>Corrélation (−1..1) au-delà de laquelle un glyphe à apprendre est un doublon d'un glyphe connu de même
+    /// étiquette (ignoré), ou contredit un glyphe connu d'une autre étiquette (badge refusé : l'OCR s'est trompé).</summary>
+    public const double GlyphDuplicateCorrelation = 0.995;
+    public const double GlyphConflictCorrelation = 0.97;
     public const string GlyphStoreFileName = "scan-glyphs.json";
 
     /// <summary>Nombre de voisins en base proposés quand la signature lue est inconnue.</summary>

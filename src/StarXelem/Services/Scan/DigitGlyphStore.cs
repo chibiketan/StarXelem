@@ -45,14 +45,40 @@ public sealed class DigitGlyphStore : IDigitGlyphStore
         }
     }
 
-    public void Learn(IEnumerable<DigitTemplateReader.LabeledGlyph> glyphs)
+    public LearnResult Learn(IReadOnlyList<DigitTemplateReader.LabeledGlyph> glyphs)
     {
-        if (!AutoLearnEnabled) return;
+        if (!AutoLearnEnabled) return new LearnResult(0, 0, null);
 
         lock (_gate)
         {
             var list = _glyphs.Value;
-            list.AddRange(glyphs);
+
+            // Garde-fou contre l'auto-empoisonnement : un vote OCR unanime peut être faux (18,960 pour 16,960).
+            // Si un glyphe à apprendre ressemble fortement à un glyphe connu sous une autre étiquette, c'est
+            // l'étiquette OCR qui est suspecte : tout le badge est refusé.
+            var toAdd = new List<DigitTemplateReader.LabeledGlyph>();
+            var duplicates = 0;
+            foreach (var glyph in glyphs)
+            {
+                var isDuplicate = false;
+                foreach (var known in list)
+                {
+                    var score = Correlation(glyph.Pixels, known.Pixels);
+                    if (known.Digit != glyph.Digit && score >= ScanConstants.GlyphConflictCorrelation)
+                    {
+                        return new LearnResult(0, 0, $"{glyph.Digit} ressemble à {known.Digit} ({score:F3})");
+                    }
+                    if (known.Digit == glyph.Digit && score >= ScanConstants.GlyphDuplicateCorrelation)
+                    {
+                        isDuplicate = true;
+                    }
+                }
+                if (isDuplicate) duplicates++;
+                else toAdd.Add(glyph);
+            }
+            if (toAdd.Count == 0) return new LearnResult(0, duplicates, null);
+
+            list.AddRange(toAdd);
             foreach (var group in list.GroupBy(g => g.Digit).Where(g => g.Count() > ScanConstants.GlyphStoreMaxPerDigit).ToList())
             {
                 foreach (var old in group.Take(group.Count() - ScanConstants.GlyphStoreMaxPerDigit)) list.Remove(old);
@@ -60,7 +86,24 @@ public sealed class DigitGlyphStore : IDigitGlyphStore
             _snapshot = null;
             var toSave = list.ToList();
             _pendingSave = _pendingSave.ContinueWith(_ => Save(toSave), TaskScheduler.Default);
+            return new LearnResult(toAdd.Count, duplicates, null);
         }
+    }
+
+    /// <summary>Attend la fin des sauvegardes planifiées (utile avant la sortie d'un processus court, ex. banc de test).</summary>
+    public Task FlushAsync()
+    {
+        lock (_gate)
+        {
+            return _pendingSave;
+        }
+    }
+
+    private static double Correlation(float[] a, float[] b)
+    {
+        double sum = 0;
+        for (var i = 0; i < a.Length; i++) sum += a[i] * b[i];
+        return sum;
     }
 
     private List<DigitTemplateReader.LabeledGlyph> Load()
