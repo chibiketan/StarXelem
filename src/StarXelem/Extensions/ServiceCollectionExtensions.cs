@@ -1,5 +1,7 @@
+using Avalonia.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using StarXelem.Constants;
 using StarXelem.Data;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
@@ -91,6 +93,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILocaleEntryRepository, LocaleEntryRepository>();
         services.AddSingleton<IMineralSignatureExtractor, MineralSignatureExtractor>();
         services.AddSingleton<IMineralSignatureRepository, MineralSignatureRepository>();
+        services.AddSingleton<IDigitGlyphStore>(sp => new DigitGlyphStore(
+            Path.Combine(Path.GetDirectoryName(sp.GetRequiredService<IDbContextFactory>().DbPath)!, ScanConstants.GlyphStoreFileName),
+            autoLearnEnabled: !Design.IsDesignMode,
+            sp.GetRequiredService<ILogger<DigitGlyphStore>>()));
 
         // Service API externe pour la communication avec Alliance Orbital (profil utilisateur)
         services.AddSingleton<IAllianceOrbitalService, AllianceOrbitalService>();

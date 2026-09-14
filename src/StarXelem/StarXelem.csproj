@@ -17,6 +17,7 @@
 
     <ItemGroup>
         <AvaloniaResource Include="Assets\**" />
+        <EmbeddedResource Include="Resources\scan-glyphs.json" />
     </ItemGroup>
 
     <ItemGroup>

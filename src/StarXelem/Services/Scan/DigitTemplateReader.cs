@@ -26,14 +26,17 @@ public sealed class DigitTemplateReader
     /// <summary>En dessous de cette fraction de la largeur attendue, un segment est un résidu (le « 1 » fait ~0,4).</summary>
     private const double MinWidthRatio = 0.2;
 
-    /// <summary>Glyphe segmenté : boîte dans l'image agrandie et vecteur de pixels normalisé (moyenne 0, norme 1).</summary>
-    public sealed record Glyph(SKRectI Bounds, float[] Pixels);
+    /// <summary>Glyphe segmenté : boîte dans l'image agrandie, pixels bruts (16×24, 0..255) et vecteur normalisé (moyenne 0, norme 1).</summary>
+    public sealed record Glyph(SKRectI Bounds, byte[] Raw, float[] Pixels);
 
     /// <summary>Résultat de lecture : chiffres, valeur, score moyen et minimal de corrélation (−1..1).</summary>
     public sealed record Reading(string Digits, int Value, double MeanScore, double MinScore, IReadOnlyList<Glyph> Glyphs);
 
-    /// <summary>Glyphe d'apprentissage étiqueté.</summary>
-    public sealed record LabeledGlyph(char Digit, float[] Pixels);
+    /// <summary>Glyphe d'apprentissage étiqueté ; <see cref="Raw"/> est la forme persistée, <see cref="Pixels"/> la forme comparée.</summary>
+    public sealed record LabeledGlyph(char Digit, byte[] Raw, float[] Pixels)
+    {
+        public static LabeledGlyph FromRaw(char digit, byte[] raw) => new(digit, raw, NormalizeRaw(raw));
+    }
 
     private readonly IReadOnlyList<LabeledGlyph> _samples;
 
@@ -105,21 +108,28 @@ public sealed class DigitTemplateReader
 
         foreach (var (crop, digits) in samples)
         {
-            var glyphs = SegmentCrop(crop);
-            if (glyphs.Count != digits.Length)
+            var glyphs = Label(crop, digits);
+            if (glyphs == null)
             {
                 skipped++;
                 continue;
             }
-
             used++;
-            for (var i = 0; i < digits.Length; i++)
-            {
-                labeled.Add(new LabeledGlyph(digits[i], glyphs[i].Pixels));
-            }
+            labeled.AddRange(glyphs);
         }
 
         return (new DigitTemplateReader(labeled), used, skipped);
+    }
+
+    /// <summary>
+    /// Étiquette les glyphes d'un recadrage dont la valeur est connue (auto-apprentissage) ; null si la
+    /// segmentation ne donne pas exactement un glyphe par chiffre.
+    /// </summary>
+    public static IReadOnlyList<LabeledGlyph>? Label(SKBitmap crop, string digits)
+    {
+        var glyphs = SegmentCrop(crop);
+        if (glyphs.Count != digits.Length) return null;
+        return glyphs.Select((g, i) => new LabeledGlyph(digits[i], g.Raw, g.Pixels)).ToList();
     }
 
     /// <summary>Segmente une image en niveaux de gris déjà normalisée (texte clair sur fond sombre).</summary>
@@ -188,7 +198,7 @@ public sealed class DigitTemplateReader
                 var px0 = run.Left + run.Width * p / parts;
                 var px1 = run.Left + run.Width * (p + 1) / parts;
                 var bounds = TightBounds(px0, px1, bandTop, bandBottom, On);
-                glyphs.Add(new Glyph(bounds, ExtractGlyph(normalized, bounds)));
+                glyphs.Add(ExtractGlyph(normalized, bounds));
             }
         }
         return glyphs;
@@ -233,22 +243,29 @@ public sealed class DigitTemplateReader
     /// Ramène le glyphe à la hauteur <see cref="GlyphHeight"/> en conservant son rapport largeur/hauteur, centré
     /// dans une case <see cref="GlyphWidth"/>×<see cref="GlyphHeight"/> (un « 1 » étroit ne doit pas devenir un « 7 » large).
     /// </summary>
-    private static float[] ExtractGlyph(SKBitmap image, SKRectI bounds)
+    private static Glyph ExtractGlyph(SKBitmap image, SKRectI bounds)
     {
         using var glyph = ScanImageOps.Crop(image, bounds);
         var width = Math.Clamp((int)Math.Round(bounds.Width * (double)GlyphHeight / bounds.Height), 1, GlyphWidth);
         using var resized = glyph.Resize(new SKImageInfo(width, GlyphHeight, SKColorType.Bgra8888, SKAlphaType.Opaque), SKFilterQuality.High)
                             ?? glyph.Copy();
         var bytes = resized.Bytes;
-        var pixels = new float[GlyphWidth * GlyphHeight];
+        var raw = new byte[GlyphWidth * GlyphHeight];
         var offset = (GlyphWidth - width) / 2;
         for (var y = 0; y < GlyphHeight; y++)
         {
             for (var x = 0; x < width; x++)
             {
-                pixels[y * GlyphWidth + offset + x] = bytes[(y * width + x) * 4 + 1];
+                raw[y * GlyphWidth + offset + x] = bytes[(y * width + x) * 4 + 1];
             }
         }
+        return new Glyph(bounds, raw, NormalizeRaw(raw));
+    }
+
+    public static float[] NormalizeRaw(byte[] raw)
+    {
+        var pixels = new float[raw.Length];
+        for (var i = 0; i < raw.Length; i++) pixels[i] = raw[i];
         return Normalize(pixels);
     }
 

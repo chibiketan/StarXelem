@@ -26,6 +26,9 @@ public sealed class CapturedFrame : IDisposable
 /// <param name="ValidPasses">Nombre de passes OCR ayant produit une valeur plausible (toutes valeurs confondues).</param>
 public sealed record SignatureCandidate(int Value, string RawText, PixelRect ScreenBounds, int Votes = 1, int ValidPasses = 1)
 {
+    /// <summary>true si la valeur vient de la reconnaissance par gabarits (candidat d'arbitrage, jamais prioritaire sur l'OCR).</summary>
+    public bool FromTemplates { get; init; }
+
     /// <summary>Part des passes valides concordantes, 0..1.</summary>
     public double Confidence => ValidPasses == 0 ? 0 : (double)Votes / ValidPasses;
 }

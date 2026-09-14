@@ -98,6 +98,27 @@ en jeu devrait alimenter la base de glyphes (auto-apprentissage à partir des vo
 égales ; (3) intégration comme votant supplémentaire dans `ReadByVoteAsync` (poids à calibrer) plutôt qu'en lecteur
 autonome, et comme arbitre quand l'OCR hésite entre deux valeurs à un chiffre près.
 
+## Itération 4 — gabarits intégrés en arbitre + auto-apprentissage
+
+- `Services/Scan/IDigitGlyphStore` / `DigitGlyphStore` : base de glyphes étiquetés, JSON (`%LOCALAPPDATA%\StarXelem\scan-glyphs.json`),
+  initialisée depuis la graine embarquée `Resources/scan-glyphs.json` (118 glyphes exportés des 22 captures via
+  `scan-template … --export`), plafonnée à 300 glyphes par chiffre (les plus anciens évincés).
+- `WindowsSignatureOcrService.ReadByVoteAsync` : après le vote OCR, lecture par gabarits sur un recadrage serré de la
+  boîte ; si elle est de qualité (corrélation min ≥ 0,7, moyenne ≥ 0,85) et diffère de l'OCR, elle devient un
+  **candidat supplémentaire marqué `FromTemplates`**, toujours classé après les candidats OCR et n'arrêtant jamais
+  l'escalade (sinon un `7400m` d'altimètre lu par gabarits masquait le vrai badge). L'orchestrateur affichant le
+  premier candidat connu en base, ce candidat sert d'arbitre : `18,960` (OCR unanime, inconnu) → `16,960` (gabarits,
+  4× Copper). Si l'OCR ne lit rien, le candidat gabarits est affiché seul (`16,960` sur relief, gagné).
+- **Auto-apprentissage** : un vote OCR ≥ 8 lectures et ≥ 80 % de concordance étiquette les glyphes du badge
+  (`DigitTemplateReader.Label`, seulement si la segmentation donne exactement un glyphe par chiffre) et les ajoute
+  à la base, sauvegardée en tâche de fond. Désactivé dans les bancs (`autoLearnEnabled: false`) pour rester reproductible ;
+  `STARXELEM_SCAN_GLYPHS` permet de pointer le banc sur une base utilisateur.
+
+Banc `scan-image` après intégration : **16/18 Lyria + 4/4 espace** (contre 15/18 + 4/4), plus le cas `18,960`
+arbitré en jeu par la base → 21/22 effectifs. Réserve : la graine contient ces mêmes captures (pas de validation
+croisée pour la part gabarits de ce chiffre) ; la mesure honnête des gabarits seuls reste le 13/22 en LOO, qui
+doit monter avec l'auto-apprentissage en jeu. Reste `64,000` sur ciel clair (jamais localisé).
+
 ---
 
 ## 1. Diagnostic (4 captures 4K du 2026-09-08, `private/debug/`)

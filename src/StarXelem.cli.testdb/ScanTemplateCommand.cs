@@ -10,7 +10,7 @@ namespace StarXelem.Cli.TestDb;
 /// Expérimentation : reconnaissance des chiffres du badge par gabarits (<see cref="DigitTemplateReader"/>),
 /// évaluée en validation croisée « leave-one-out » sur des dossiers de captures munis d'un <c>expected.txt</c>.
 /// La localisation du badge reste celle de l'OCR (<see cref="WindowsSignatureOcrService.LocalizeBoxesAsync"/>).
-/// Usage : <c>scan-template &lt;dossier&gt;…</c>
+/// Usage : <c>scan-template &lt;dossier&gt;… [--export &lt;scan-glyphs.json&gt;]</c>
 /// </summary>
 public static class ScanTemplateCommand
 {
@@ -26,11 +26,19 @@ public static class ScanTemplateCommand
 
     public static async Task<int> RunAsync(string[] args, ILoggerFactory loggerFactory)
     {
-        var ocr = new WindowsSignatureOcrService(loggerFactory.CreateLogger<WindowsSignatureOcrService>());
+        var emptyStore = new DigitGlyphStore(null, autoLearnEnabled: false, loggerFactory.CreateLogger<DigitGlyphStore>());
+        var ocr = new WindowsSignatureOcrService(emptyStore, loggerFactory.CreateLogger<WindowsSignatureOcrService>());
         if (!ocr.IsAvailable)
         {
             Console.Error.WriteLine($"OCR indisponible : {ocr.UnavailableReason}");
             return 3;
+        }
+
+        string? exportPath = null;
+        var exportIndex = Array.IndexOf(args, "--export");
+        if (exportIndex >= 0 && exportIndex + 1 < args.Length)
+        {
+            exportPath = args[exportIndex + 1];
         }
 
         // 1. Localisation + recadrages pour chaque capture.
@@ -90,6 +98,15 @@ public static class ScanTemplateCommand
                               $"  [gabarits : {used} échantillons, {skipped} ignorés, chiffres {string.Concat(reader.KnownDigits.OrderBy(k => k))}]");
         }
         Console.WriteLine($"\n{correct}/{samples.Count} corrects ({sw.ElapsedMilliseconds}ms pour l'apprentissage + lecture LOO).");
+
+        // 3. Export de la graine : gabarits appris sur TOUTES les captures (pas de LOO), à copier dans
+        //    src/StarXelem/Resources/scan-glyphs.json.
+        if (exportPath != null)
+        {
+            var (full, used, skipped) = DigitTemplateReader.Train(samples.SelectMany(s => s.Crops.Select(c => (Crop: c, Digits: s.Expected.ToString()))));
+            File.WriteAllText(exportPath, DigitGlyphStore.Serialize(full.Samples));
+            Console.WriteLine($"Graine exportée : {full.Samples.Count} glyphes ({used} échantillons, {skipped} ignorés) → {exportPath}");
+        }
 
         foreach (var s in samples) foreach (var c in s.Crops) c.Dispose();
         return correct == samples.Count ? 0 : 1;

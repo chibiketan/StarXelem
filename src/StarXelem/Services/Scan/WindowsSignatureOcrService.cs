@@ -34,14 +34,16 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
     private static partial Regex SignatureNumberRegex();
 
     private readonly ILogger<WindowsSignatureOcrService> _logger;
+    private readonly IDigitGlyphStore _glyphStore;
     private readonly OcrEngine? _engine;
 
     public bool IsAvailable => _engine != null;
     public string? UnavailableReason { get; }
 
-    public WindowsSignatureOcrService(ILogger<WindowsSignatureOcrService> logger)
+    public WindowsSignatureOcrService(IDigitGlyphStore glyphStore, ILogger<WindowsSignatureOcrService> logger)
     {
         _logger = logger;
+        _glyphStore = glyphStore;
 
         try
         {
@@ -108,20 +110,21 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
             {
                 ct.ThrowIfCancellationRequested();
                 readBoxes.Add(box);
-                var candidate = await ReadByVoteAsync(source, box, frame, readBoxes.Count - 1, ct).ConfigureAwait(false);
-                if (candidate != null)
-                {
-                    candidates.Add(candidate);
-                }
+                candidates.AddRange(await ReadByVoteAsync(source, box, frame, readBoxes.Count - 1, ct).ConfigureAwait(false));
             }
 
             _logger.LogDebug("OCR étage {Stage} ({Name} x{Scale}) : {Boxes} boîte(s) en {LocMs}ms, {Found} candidat(s), {StageMs}ms.",
                 stageIndex++, stage.Name, stage.Scale, boxes.Count, localizationMs, candidates.Count, stageSw.ElapsedMilliseconds);
-            if (candidates.Count > 0) break;
+            // Seule une lecture OCR arrête l'escalade : un candidat « gabarits » seul peut venir d'un autre nombre du HUD.
+            if (candidates.Any(c => !c.FromTemplates)) break;
         }
 
+        // OCR d'abord (par votes puis proximité du centre), gabarits ensuite : ces derniers ne servent que d'arbitre
+        // quand l'orchestrateur ne trouve pas la valeur OCR en base.
         candidates.Sort((a, b) =>
         {
+            var bySource = a.FromTemplates.CompareTo(b.FromTemplates);
+            if (bySource != 0) return bySource;
             var byVotes = b.Votes.CompareTo(a.Votes);
             if (byVotes != 0) return byVotes;
             return DistanceSquared(a, frame, centerX, centerY).CompareTo(DistanceSquared(b, frame, centerX, centerY));
@@ -241,7 +244,7 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
     }
 
     /// <summary>Recadre serré autour de la boîte, lit à plusieurs échelles (couleur et canal vert) et retient la valeur majoritaire.</summary>
-    private async Task<SignatureCandidate?> ReadByVoteAsync(SKBitmap source, SKRectI box, CapturedFrame frame, int index, CancellationToken ct)
+    private async Task<IReadOnlyList<SignatureCandidate>> ReadByVoteAsync(SKBitmap source, SKRectI box, CapturedFrame frame, int index, CancellationToken ct)
     {
         var marginX = (int)(box.Height * ScanConstants.OcrCropMarginHorizontal);
         var marginY = (int)(box.Height * ScanConstants.OcrCropMarginVertical);
@@ -283,30 +286,106 @@ public partial class WindowsSignatureOcrService : ISignatureOcrService
             }
         }
 
-        if (readings.Count == 0)
+        var candidates = new List<SignatureCandidate>();
+        var boxScreenRect = new PixelRect(frame.ScreenX + box.Left, frame.ScreenY + box.Top, box.Width, box.Height);
+
+        // Lecture par gabarits sur un recadrage serré du nombre : candidat supplémentaire (poids faible) qui sert
+        // d'arbitre quand la valeur OCR n'existe pas en base (l'orchestrateur affiche le premier candidat connu).
+        var templateReading = ReadByTemplates(source, box, index);
+
+        if (readings.Count > 0)
+        {
+            // Vote : valeur la plus fréquente ; à égalité, celle lue le plus souvent avec séparateur de milliers
+            // (la virgule est un indice que les chiffres ont été correctement segmentés).
+            var winner = readings
+                .GroupBy(r => r.Value)
+                .Select(g => new { Value = g.Key, Votes = g.Count(), WithComma = g.Count(r => r.Raw.Contains(',')), First = g.First() })
+                .OrderByDescending(g => g.Votes)
+                .ThenByDescending(g => g.WithComma)
+                .First();
+
+            var rect = winner.First.Rect;
+            var scaleUsed = winner.First.Scale;
+            var screenRect = new PixelRect(
+                frame.ScreenX + crop.Left + (int)(rect.X / scaleUsed),
+                frame.ScreenY + crop.Top + (int)(rect.Y / scaleUsed),
+                (int)(rect.Width / scaleUsed),
+                (int)(rect.Height / scaleUsed));
+
+            var ocrCandidate = new SignatureCandidate(winner.Value, winner.First.Raw, screenRect, winner.Votes, readings.Count);
+            candidates.Add(ocrCandidate);
+            TryLearn(source, box, ocrCandidate);
+        }
+        else
         {
             _logger.LogDebug("OCR : aucune lecture plausible pour la boîte {Index} ({Box}).", index, box);
-            return null;
         }
 
-        // Vote : valeur la plus fréquente ; à égalité, celle lue le plus souvent avec séparateur de milliers
-        // (la virgule est un indice que les chiffres ont été correctement segmentés).
-        var winner = readings
-            .GroupBy(r => r.Value)
-            .Select(g => new { Value = g.Key, Votes = g.Count(), WithComma = g.Count(r => r.Raw.Contains(',')), First = g.First() })
-            .OrderByDescending(g => g.Votes)
-            .ThenByDescending(g => g.WithComma)
-            .First();
+        if (templateReading != null && candidates.All(c => c.Value != templateReading.Value))
+        {
+            candidates.Add(new SignatureCandidate(templateReading.Value, $"gabarits {templateReading.Digits}", boxScreenRect,
+                ScanConstants.TemplateVoteWeight, Math.Max(readings.Count, ScanConstants.TemplateVoteWeight)) { FromTemplates = true });
+        }
+        return candidates;
+    }
 
-        var rect = winner.First.Rect;
-        var scaleUsed = winner.First.Scale;
-        var screenRect = new PixelRect(
-            frame.ScreenX + crop.Left + (int)(rect.X / scaleUsed),
-            frame.ScreenY + crop.Top + (int)(rect.Y / scaleUsed),
-            (int)(rect.Width / scaleUsed),
-            (int)(rect.Height / scaleUsed));
+    private static SKRectI TemplateCrop(SKBitmap source, SKRectI box)
+    {
+        var mx = (int)(box.Height * ScanConstants.TemplateCropMarginX);
+        var my = (int)(box.Height * ScanConstants.TemplateCropMarginY);
+        return new SKRectI(
+            Math.Max(0, box.Left - mx),
+            Math.Max(0, box.Top - my),
+            Math.Min(source.Width, box.Right + mx),
+            Math.Min(source.Height, box.Bottom + my));
+    }
 
-        return new SignatureCandidate(winner.Value, winner.First.Raw, screenRect, winner.Votes, readings.Count);
+    private DigitTemplateReader.Reading? ReadByTemplates(SKBitmap source, SKRectI box, int index)
+    {
+        var glyphs = _glyphStore.Glyphs;
+        if (glyphs.Count == 0) return null;
+
+        try
+        {
+            using var crop = ScanImageOps.Crop(source, TemplateCrop(source, box));
+            var reading = new DigitTemplateReader(glyphs).Read(crop);
+            if (reading == null) return null;
+
+            _logger.LogDebug("Gabarits [boîte {Index}] : {Digits} (score moyen {Mean:F3}, min {Min:F3}, base {Count} glyphes).",
+                index, reading.Digits, reading.MeanScore, reading.MinScore, glyphs.Count);
+            var good = reading.MinScore >= ScanConstants.TemplateGoodMinScore && reading.MeanScore >= ScanConstants.TemplateGoodMeanScore
+                       && reading.Value >= MinPlausibleSignature && reading.Value <= MaxPlausibleSignature;
+            return good ? reading : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Lecture par gabarits impossible sur la boîte {Index}.", index);
+            return null;
+        }
+    }
+
+    /// <summary>Auto-apprentissage : un vote OCR fort étiquette les glyphes du badge pour la reconnaissance par gabarits.</summary>
+    private void TryLearn(SKBitmap source, SKRectI box, SignatureCandidate ocr)
+    {
+        if (!_glyphStore.AutoLearnEnabled) return;
+        if (ocr.Votes < ScanConstants.AutoLearnMinVotes || ocr.Confidence < ScanConstants.AutoLearnMinConfidence) return;
+
+        try
+        {
+            using var crop = ScanImageOps.Crop(source, TemplateCrop(source, box));
+            var labeled = DigitTemplateReader.Label(crop, ocr.Value.ToString());
+            if (labeled == null)
+            {
+                _logger.LogDebug("Auto-apprentissage : segmentation incompatible avec {Value}, glyphes ignorés.", ocr.Value);
+                return;
+            }
+            _glyphStore.Learn(labeled);
+            _logger.LogInformation("Auto-apprentissage : {Count} glyphes ajoutés pour {Value} (vote {Votes}/{Passes}).", labeled.Count, ocr.Value, ocr.Votes, ocr.ValidPasses);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Auto-apprentissage impossible pour {Value}.", ocr.Value);
+        }
     }
 
     private static bool TryParseSignature(string text, out int value)

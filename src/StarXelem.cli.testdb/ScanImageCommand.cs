@@ -54,7 +54,10 @@ public static class ScanImageCommand
             return 2;
         }
 
-        var ocr = new WindowsSignatureOcrService(loggerFactory.CreateLogger<WindowsSignatureOcrService>());
+        // Base de glyphes figée (graine embarquée, ou STARXELEM_SCAN_GLYPHS) : le banc doit rester reproductible.
+        var glyphStore = new DigitGlyphStore(Environment.GetEnvironmentVariable("STARXELEM_SCAN_GLYPHS"), autoLearnEnabled: false, loggerFactory.CreateLogger<DigitGlyphStore>());
+        var ocr = new WindowsSignatureOcrService(glyphStore, loggerFactory.CreateLogger<WindowsSignatureOcrService>());
+        Console.WriteLine($"Base de glyphes : {glyphStore.Glyphs.Count} glyphes.");
         if (!ocr.IsAvailable)
         {
             Console.Error.WriteLine($"OCR indisponible : {ocr.UnavailableReason}");
@@ -91,7 +94,8 @@ public static class ScanImageCommand
                               (best == null ? "aucune lecture" : $"{best.Value} ({best.Votes}/{best.ValidPasses} votes, '{best.RawText}' à {best.ScreenBounds})") + verdict);
             foreach (var other in candidates.Skip(1))
             {
-                Console.WriteLine($"    autre : {other.Value} ({other.Votes}/{other.ValidPasses})");
+                var mark = expect != null && other.Value == expect ? "  ✓ (arbitrage possible)" : "";
+                Console.WriteLine($"    autre : {other.Value} ({other.Votes}/{other.ValidPasses}, '{other.RawText}'){mark}");
             }
         }
 

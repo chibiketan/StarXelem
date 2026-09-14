@@ -67,6 +67,25 @@ public static class ScanConstants
     public const double OcrCropMarginHorizontal = 12.0;
     public const double OcrCropMarginVertical = 3.0;
 
+    /// <summary>Reconnaissance par gabarits (<see cref="Services.Scan.DigitTemplateReader"/>) en complément de l'OCR :
+    /// sa lecture entre dans les candidats avec ce poids de votes (l'orchestrateur affiche le premier candidat
+    /// connu en base, donc elle sert d'arbitre quand l'OCR lit une valeur inconnue, ex. confusion 6/8).</summary>
+    public const int TemplateVoteWeight = 3;
+    /// <summary>Seuils de corrélation (−1..1) en dessous desquels une lecture par gabarits est ignorée.</summary>
+    public const double TemplateGoodMinScore = 0.7;
+    public const double TemplateGoodMeanScore = 0.85;
+    /// <summary>Marges du recadrage de lecture par gabarits autour de la boîte du nombre, en fraction de sa hauteur.</summary>
+    public const double TemplateCropMarginX = 0.6;
+    public const double TemplateCropMarginY = 0.5;
+
+    /// <summary>Auto-apprentissage : un vote OCR au moins aussi fort que ceci étiquette les glyphes du badge et les
+    /// ajoute à la base. Un vote unanime mais faux (ex. 18,960 pour 16,960) pollue la base d'un glyphe sur 300, ce
+    /// que le plus proche voisin tolère.</summary>
+    public const int AutoLearnMinVotes = 8;
+    public const double AutoLearnMinConfidence = 0.8;
+    public const int GlyphStoreMaxPerDigit = 300;
+    public const string GlyphStoreFileName = "scan-glyphs.json";
+
     /// <summary>Nombre de voisins en base proposés quand la signature lue est inconnue.</summary>
     public const int UnknownSignatureNeighbours = 2;
 
