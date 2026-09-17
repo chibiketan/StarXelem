@@ -81,6 +81,38 @@ jobs:
         run: |
           msstore reconfigure --tenantId ${{ secrets.AZURE_AD_TENANT_ID }} --sellerId ${{ secrets.SELLER_ID }} --clientId ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }} --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
 
+      - name: Extract changelog section
+        id: changelog
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = "${{ github.event.inputs.ref || github.ref_name }}"
+          $version = $tag.TrimStart('v') -replace '-beta.*',''
+          $content = Get-Content CHANGELOG.md -Raw
+          if ($content -match "(?ms)^## \[$([regex]::Escape($version))\].*?(?=^## \[|\z)") {
+            $section = $matches[0].Trim()
+          } else {
+            $section = "Voir CHANGELOG.md sur GitHub pour le detail des changements."
+          }
+          "notes<<EOF" >> $env:GITHUB_OUTPUT
+          $section >> $env:GITHUB_OUTPUT
+          "EOF" >> $env:GITHUB_OUTPUT
+
+      - name: Update release notes (stable only)
+        if: steps.version.outputs.is_beta == 'False'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $lines = msstore submission get ${{ secrets.MSSTORE_PRODUCT_ID }}
+          $startIndex = ($lines | Select-String -Pattern '^\{$' | Select-Object -First 1).LineNumber - 1
+          $jsonText = ($lines[$startIndex..($lines.Count - 1)]) -join "`n"
+          $submission = $jsonText | ConvertFrom-Json
+          $submission.Listings.'fr-fr'.BaseListing.ReleaseNotes = @"
+          ${{ steps.changelog.outputs.notes }}
+          "@
+          $updated = $submission | ConvertTo-Json -Depth 20
+          msstore submission updateMetadata ${{ secrets.MSSTORE_PRODUCT_ID }} $updated
+
       - name: Publish stable submission
         if: steps.version.outputs.is_beta == 'False'
         run: msstore publish out/StarXelem.msix --appId ${{ secrets.MSSTORE_PRODUCT_ID }}
@@ -88,7 +120,7 @@ jobs:
       - name: Publish beta flight
         if: steps.version.outputs.is_beta == 'True'
         run: msstore publish out/StarXelem.msix --appId ${{ secrets.MSSTORE_PRODUCT_ID }} --flightId ${{ secrets.MSSTORE_FLIGHT_ID_BETA }}
-        
+
       - name: Publish win-x64
         run: >
           dotnet publish src/StarXelem/StarXelem.csproj
