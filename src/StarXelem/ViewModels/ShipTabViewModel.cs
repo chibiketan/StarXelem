@@ -95,8 +95,11 @@ public partial class ShipTabViewModel : PageViewModelBase
         {
             ParentUrnList = spaceshipUrnList,
             useConnectedUserOwner = true,
+            UseProjection = true,
             TypeList = [EItemType.NOITEM_Vehicle],
-            //InventoryIdList = spaceships.Where(s => null != s.StowContext?.InventoryId).Select(s => s.StowContext!.InventoryId).ToList()
+            InventoryIdList = spaceships.Where(s => null != s.StowContext?.InventoryId).Select(s => s.StowContext!.InventoryId)
+                .Where(l => l.Contains("Player", StringComparison.InvariantCulture) || (l.Contains("Location", StringComparison.InvariantCulture) && l.StartsWith(_clientService.CurrentPlayerGeid?.ToString() ?? "0")))
+                .ToList()
         };
         
         // TODO si l'inventoryId appartient à un joueur une erreur d'accès à une ressource apartenant à un autre joueur est levé.

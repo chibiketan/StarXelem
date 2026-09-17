@@ -11,6 +11,8 @@ namespace StarXelem.Services;
 public interface IGrpcClientService
 {
     event EventHandler<GrpcConnectionStatus> OnStatusChanged;
+    
+    ulong? CurrentPlayerGeid { get; }
 
     Task InitClient(P4kFileModel p4kFile);
     Task<IList<SpaceshipModel>> GetSpaceships();

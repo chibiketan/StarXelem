@@ -13,6 +13,9 @@ namespace StarXelem;
 public class DesignGrpcClientService : IGrpcClientService
 {
     public event EventHandler<GrpcConnectionStatus>? OnStatusChanged;
+
+    public ulong? CurrentPlayerGeid => null;
+
     public Task InitClient(P4kFileModel p4kFile)
     {
         return Task.CompletedTask;

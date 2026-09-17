@@ -6,6 +6,7 @@
 - Correction de la lecture de la quantité de ressource présent dans un cargo (int16 au lieu de int64)
 - Correction de l'affichage de la conversion microSCU → SCU
 - Correction de la récupération des Blueprint possédés qui ne conserve que la dernière page de données reçues de l'API
+- Correction de l'affichage des lieux pour les vaisseaux stockés dans des hangars sur l'écran mon hangar
 
 
 ## [0.2.3]

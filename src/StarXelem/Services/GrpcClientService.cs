@@ -37,6 +37,14 @@ public class GrpcClientService : IGrpcClientService
     public string? ErrorMessage { get; private set; }
     public string? CurrentShard { get; private set; }
 
+    public ulong? CurrentPlayerGeid
+    {
+        get
+        {
+            return _playerInfo?.Player?.Geid;
+        }
+    }
+
     public GrpcClientService(ILogger<GrpcClientService> logger, IP4kService p4kService)
     {
         _watcher = null;
