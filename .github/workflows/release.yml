@@ -98,7 +98,13 @@ jobs:
           $section >> $env:GITHUB_OUTPUT
           "EOF" >> $env:GITHUB_OUTPUT
 
-      - name: Update release notes (stable only)
+
+
+      - name: Publish stable submission (draft only)
+        if: steps.version.outputs.is_beta == 'False'
+        run: msstore publish out/StarXelem.msix --appId ${{ secrets.MSSTORE_PRODUCT_ID }} --noCommit
+
+      - name: Inject release notes (stable only)
         if: steps.version.outputs.is_beta == 'False'
         shell: pwsh
         run: |
@@ -113,9 +119,11 @@ jobs:
           $updated = $submission | ConvertTo-Json -Depth 20
           msstore submission updateMetadata ${{ secrets.MSSTORE_PRODUCT_ID }} $updated
 
-      - name: Publish stable submission
+      - name: Commit and publish
         if: steps.version.outputs.is_beta == 'False'
-        run: msstore publish out/StarXelem.msix --appId ${{ secrets.MSSTORE_PRODUCT_ID }}
+        run: msstore submission publish ${{ secrets.MSSTORE_PRODUCT_ID }}
+
+
 
       - name: Publish beta flight
         if: steps.version.outputs.is_beta == 'True'
