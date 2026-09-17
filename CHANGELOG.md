@@ -1,4 +1,7 @@
 ﻿## [0.2.4]
+### Ajouté
+- Support de la version 4.10.1 de Star Citizen
+
 ### Corrigé
 - Correction de la lecture de la quantité de ressource présent dans un cargo (int16 au lieu de int64)
 - Correction de l'affichage de la conversion microSCU → SCU
