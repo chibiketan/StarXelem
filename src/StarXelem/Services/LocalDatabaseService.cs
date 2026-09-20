@@ -3084,6 +3084,10 @@ public class LocalDatabaseService : ILocalDatabaseService
     {
         var start = Stopwatch.StartNew();
         var items = new List<ScItemEntity>();
+        // Les armes FPS sont collectées au passage : l'énumération du P4K est le coût dominant
+        // du rebuild, et cette boucle matérialise déjà tout ce dont l'écran dédié a besoin
+        // (la chaîne arme → chargeur → munition est entièrement résolue à finalDepth 3).
+        var fpsWeaponVariants = new List<FpsWeaponEntity>();
         var itemTags = new HashSet<(string ScItemRecordId, string TagSelfId)>();
         var itemTagEntities = new List<ScItemTagEntity>();
         var manufacturerCache = new Dictionary<string, ManufacturerEntity>();
@@ -3141,6 +3145,10 @@ public class LocalDatabaseService : ILocalDatabaseService
             var scItem = BuildScItemEntity(record, entityClass, itemDef, manufacturerCache);
             items.Add(scItem);
             totalProcessed++;
+
+            var fpsWeapon = TryBuildFpsWeaponVariant(record, entityClass, itemDef, scItem.LocalizedName, scItem.ManufacturerId);
+            if (fpsWeapon is not null)
+                fpsWeaponVariants.Add(fpsWeapon);
 
             if (entityClass.tags != null)
             {
@@ -3223,6 +3231,9 @@ public class LocalDatabaseService : ILocalDatabaseService
             _logger.LogInformation("[SCItems {BatchesSaved}/~{EstimatedBatches}] Final batch saved: {Processed} total items, {InBatch} in batch",
                 batchesSaved, (totalProcessed / 10_000) + 2, totalProcessed, items.Count);
         }
+
+        // Après le dernier lot d'objets : les fabricants référencés par les armes sont tous insérés.
+        await SaveFpsWeaponsAsync(db, fpsWeaponVariants, cancellationToken).ConfigureAwait(false);
 
         start.Stop();
         _logger.LogInformation("Inserted {Count} SCItems and {TagCount} SCItem tags into the database.", totalProcessed, itemTagEntities.Count);
@@ -3505,6 +3516,501 @@ public class LocalDatabaseService : ILocalDatabaseService
             damageInfo.DamageBiochemical,
             damageInfo.DamageStun
         );
+    }
+
+    /* ---------------------------------------------------------------------------------
+     * Armes FPS (écran dédié)
+     * ------------------------------------------------------------------------------- */
+
+    /// <summary>
+    /// Classes d'armes à feu FPS retenues, déduites du 2ᵉ segment du nom technique
+    /// (motif « fabricant_classe_munition_index[_variante] »).
+    /// Les tags &lt;Tags&gt; ne sont PAS utilisables comme source : plusieurs armes réelles n'en
+    /// portent aucun (gmni_sniper_ballistic_01 n'a pas le tag « sniper », behr_glauncher_ballistic_01
+    /// aucun tag de classe). Exclut les outils qui partagent le type WeaponPersonal :
+    /// multitool, medgun, binoculars, tractor, salvage, cutter, fire.
+    /// </summary>
+    private static readonly HashSet<string> s_fpsFirearmClasses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "rifle", "pistol", "smg", "shotgun", "sniper", "lmg", "hmg", "glauncher", "crossbow", "special"
+    };
+
+    /// <summary>
+    /// Construit l'entrée « arme FPS » d'une variante d'arme, ou null si l'objet n'est pas
+    /// une arme à feu FPS. Une ligne par variante de livrée à ce stade : le regroupement par
+    /// modèle est fait ensuite par <see cref="SaveFpsWeaponsAsync"/>.
+    /// </summary>
+    private static FpsWeaponEntity? TryBuildFpsWeaponVariant(
+        DataCoreTypedRecord record,
+        EntityClassDefinition entityClass,
+        SItemDefinition itemDef,
+        string localizedName,
+        string? manufacturerId)
+    {
+        if (itemDef.Type != EItemType.WeaponPersonal)
+            return null;
+
+        var technicalName = StripRecordPrefix(record.RecordName) ?? record.RecordName;
+        if (string.IsNullOrEmpty(technicalName))
+            return null;
+
+        // Les « _prop » sont des accessoires décoratifs non fonctionnels.
+        if (technicalName.EndsWith("_prop", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var segments = technicalName.Split('_', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length < 3)
+            return null;
+
+        var weaponClass = segments[1];
+        if (!s_fpsFirearmClasses.Contains(weaponClass))
+            return null;
+
+        var groupKey = itemDef.mannequinTags?.mannequinClassTag;
+        if (string.IsNullOrWhiteSpace(groupKey))
+            groupKey = ResolveFpsGroupKeyFromTags(itemDef.Tags, technicalName) ?? technicalName;
+
+        var weapon = entityClass.Components.OfType<SCItemWeaponComponentParams>().FirstOrDefault();
+        if (weapon is null)
+            return null;
+
+        var ammoContainer = weapon.ammoContainerRecord?.Components
+            .OfType<SAmmoContainerComponentParams>()
+            .FirstOrDefault();
+
+        var entity = new FpsWeaponEntity
+        {
+            Id = groupKey,
+            RecordId = record.RecordId.ToString(),
+            TechnicalName = technicalName,
+            LocalizedName = localizedName,
+            LocaleNameKey = itemDef.Localization?.Name,
+            WeaponClass = weaponClass.ToLowerInvariant(),
+            AmmoFamily = NormalizeAmmoFamily(segments[2]),
+            SubTypeName = itemDef.SubType.ToString(),
+            Size = itemDef.Size,
+            Grade = itemDef.Grade,
+            ManufacturerId = manufacturerId,
+            VariantCount = 1,
+            VariantNames = localizedName,
+            MagazineSize = ResolveFpsMagazineSize(weapon.ammoContainerRecord, ammoContainer),
+            RepoolUnstowDuration = weapon.ammoRepoolParams?.unstowMagDuration,
+            RepoolBulletsPerSecond = weapon.ammoRepoolParams?.bulletsPerSecond,
+            RepoolFullMagMergeDuration = weapon.ammoRepoolParams?.fullMagMergeDuration,
+            ModifiersJson = ExtractFpsModifiers(weapon.weaponDegradationModifier?.weaponStats)
+        };
+
+        ApplyFpsFireMode(entity, weapon, ammoContainer?.ammoParamsRecord, EProjectileType.Primary);
+        ApplyFpsFireMode(entity, weapon, ammoContainer?.secondaryAmmoParamsRecord, EProjectileType.Secondary);
+
+        return entity;
+    }
+
+    /// <summary>
+    /// Renseigne le jeu de colonnes primaire ou secondaire à partir du mode de tir
+    /// correspondant et de sa munition. Le lien entre un mode de tir et sa munition est donné
+    /// par <c>launchParams.projectileType</c> : Primary → ammoParamsRecord,
+    /// Secondary → secondaryAmmoParamsRecord.
+    /// </summary>
+    private static void ApplyFpsFireMode(
+        FpsWeaponEntity entity,
+        SCItemWeaponComponentParams weapon,
+        AmmoParams? ammo,
+        EProjectileType projectileType)
+    {
+        SProjectileLauncher? launcher = null;
+        string? modeName = null;
+        int? fireRate = null;
+
+        foreach (var action in EnumerateFireActions(weapon.fireActions))
+        {
+            var candidate = action switch
+            {
+                SWeaponActionFireSingleParams s => s.launchParams as SProjectileLauncher,
+                SWeaponActionFireRapidParams r => r.launchParams as SProjectileLauncher,
+                SWeaponActionFireBurstParams b => b.launchParams as SProjectileLauncher,
+                _ => null
+            };
+
+            if (candidate?.projectileType != projectileType)
+                continue;
+
+            launcher = candidate;
+            modeName = action.name;
+            fireRate = action switch
+            {
+                SWeaponActionFireSingleParams s => s.fireRate,
+                SWeaponActionFireRapidParams r => r.fireRate,
+                SWeaponActionFireBurstParams b => b.fireRate,
+                _ => null
+            };
+            break;
+        }
+
+        // Pas de mode de tir pour ce canal : rien à renseigner (une arme à un seul mode
+        // n'a pas de tir secondaire, et sa munition secondaire éventuelle est inexploitable).
+        if (launcher is null && projectileType == EProjectileType.Secondary)
+            return;
+
+        if (ammo is null && launcher is null)
+            return;
+
+        var (damageType, damagePerProjectile) = ExtractFpsDamage(ammo);
+        var pellets = launcher?.pelletCount ?? 1;
+        var damageMultiplier = launcher?.damageMultiplier ?? 1f;
+        var effectiveMultiplier = Math.Max(pellets, 1) * (damageMultiplier <= 0f ? 1f : damageMultiplier);
+
+        float? damagePerShot = damagePerProjectile is null
+            ? null
+            : damagePerProjectile * effectiveMultiplier;
+
+        // Les dégâts d'explosion suivent la même règle : une gerbe de N projectiles explosifs
+        // produit N explosions.
+        var explosivePerProjectile = ExtractFpsExplosiveDamage(ammo);
+        float? explosiveDamage = explosivePerProjectile is null
+            ? null
+            : explosivePerProjectile * effectiveMultiplier;
+
+        var maxRange = ammo is not null && ammo.speed > 0f && ammo.lifetime > 0f
+            ? ammo.speed * ammo.lifetime
+            : (float?)null;
+
+        var (effectiveRange, floorRange) = ExtractFpsRanges(ammo, damagePerProjectile);
+
+        if (projectileType == EProjectileType.Primary)
+        {
+            entity.PrimaryModeName = modeName;
+            entity.PrimaryDamageType = damageType;
+            entity.PrimaryDamagePerProjectile = damagePerProjectile;
+            entity.PrimaryDamagePerShot = damagePerShot;
+            entity.PrimaryExplosiveDamage = explosiveDamage;
+            entity.PrimaryPelletCount = launcher?.pelletCount;
+            entity.PrimaryFireRate = fireRate;
+            entity.PrimaryProjectileSpeed = ammo?.speed;
+            entity.PrimaryProjectileLifetime = ammo?.lifetime;
+            entity.PrimaryMaxRange = maxRange;
+            entity.PrimaryEffectiveRange = effectiveRange;
+            entity.PrimaryDamageFloorRange = floorRange;
+        }
+        else
+        {
+            entity.HasSecondaryFire = true;
+            entity.SecondaryModeName = modeName;
+            entity.SecondaryDamageType = damageType;
+            entity.SecondaryDamagePerProjectile = damagePerProjectile;
+            entity.SecondaryDamagePerShot = damagePerShot;
+            entity.SecondaryExplosiveDamage = explosiveDamage;
+            entity.SecondaryPelletCount = launcher?.pelletCount;
+            entity.SecondaryFireRate = fireRate;
+            entity.SecondaryProjectileSpeed = ammo?.speed;
+            entity.SecondaryProjectileLifetime = ammo?.lifetime;
+            entity.SecondaryMaxRange = maxRange;
+            entity.SecondaryEffectiveRange = effectiveRange;
+            entity.SecondaryDamageFloorRange = floorRange;
+        }
+    }
+
+    /// <summary>
+    /// Retourne le type de dégâts dominant et la valeur de dégâts par projectile.
+    /// Les six canaux sont sommés : dans les données FPS ils sont mutuellement exclusifs.
+    /// </summary>
+    /// <summary>
+    /// Aplatit les modes de tir : plusieurs armes imbriquent leurs vrais modes dans une action
+    /// conteneur — séquence pour le Lumin Rifle (`SWeaponActionSequenceParams`), condition
+    /// dynamique pour le Voltage (`SWeaponActionDynamicConditionParams`). Sans ce parcours,
+    /// ces armes remonteraient sans aucune statistique de tir.
+    /// </summary>
+    /// <summary>
+    /// Clé de regroupement de repli pour les armes dont <c>mannequinClassTag</c> est vide —
+    /// les six variantes du P8-AR (`behr_rifle_ballistic_02_civilian*`) sont dans ce cas et
+    /// formeraient sinon six lignes distinctes. Retient le plus long jeton de <c>Tags</c> qui
+    /// préfixe le nom technique : les livrées du P8-AR portent toutes
+    /// « behr_rifle_ballistic_02_civilian », qui est exactement l'identité du modèle.
+    /// </summary>
+    private static string? ResolveFpsGroupKeyFromTags(string? tags, string technicalName)
+    {
+        if (string.IsNullOrWhiteSpace(tags))
+            return null;
+
+        string? best = null;
+
+        foreach (var token in tags.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!technicalName.StartsWith(token, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (best is null || token.Length > best.Length)
+                best = token;
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Capacité du chargeur. Un lance-roquettes ne compte pas des balles : ses projectiles sont
+    /// des objets attachés à des ports (l'Animus a trois ports missile_01..03 et un
+    /// <c>maxAmmoCount</c> à 0). Le nombre de ports donne alors la capacité réelle.
+    /// </summary>
+    private static int? ResolveFpsMagazineSize(EntityClassDefinition? magazine, SAmmoContainerComponentParams? ammoContainer)
+    {
+        if (ammoContainer is null)
+            return null;
+
+        if (ammoContainer.maxAmmoCount > 0)
+            return ammoContainer.maxAmmoCount;
+
+        var ports = magazine?.Components
+            .OfType<SItemPortContainerComponentParams>()
+            .FirstOrDefault()?.Ports;
+
+        return ports is { Length: > 0 } ? ports.Length : null;
+    }
+
+    private static IEnumerable<SWeaponActionParams> EnumerateFireActions(IEnumerable<SWeaponActionParams?>? actions, int depth = 0)
+    {
+        if (actions is null || depth > 4)
+            yield break;
+
+        foreach (var action in actions)
+        {
+            if (action is null)
+                continue;
+
+            switch (action)
+            {
+                case SWeaponActionSequenceParams sequence:
+                    foreach (var nested in EnumerateFireActions(
+                                 sequence.sequenceEntries?.Select(e => e?.weaponAction), depth + 1))
+                    {
+                        yield return nested;
+                    }
+
+                    break;
+
+                case SWeaponActionConditionParams condition:
+                    foreach (var nested in EnumerateFireActions(
+                                 ConditionalActions(condition.conditionalWeaponActions, condition.defaultWeaponAction), depth + 1))
+                    {
+                        yield return nested;
+                    }
+
+                    break;
+
+                case SWeaponActionDynamicConditionParams dynamicCondition:
+                    foreach (var nested in EnumerateFireActions(
+                                 ConditionalActions(dynamicCondition.conditionalWeaponActions, dynamicCondition.defaultWeaponAction), depth + 1))
+                    {
+                        yield return nested;
+                    }
+
+                    break;
+
+                case SWeaponActionParallelParams parallel:
+                    foreach (var nested in EnumerateFireActions(parallel.weaponActions, depth + 1))
+                    {
+                        yield return nested;
+                    }
+
+                    break;
+
+                case SWeaponActionToggleParams toggle:
+                    foreach (var nested in EnumerateFireActions([toggle.weaponAction], depth + 1))
+                    {
+                        yield return nested;
+                    }
+
+                    break;
+
+                default:
+                    yield return action;
+                    break;
+            }
+        }
+    }
+
+    private static IEnumerable<SWeaponActionParams?> ConditionalActions(
+        IEnumerable<SConditionalWeaponAction?>? conditionalActions,
+        SWeaponActionParams? defaultAction)
+    {
+        foreach (var conditional in conditionalActions ?? [])
+        {
+            if (conditional?.weaponAction is not null)
+            {
+                yield return conditional.weaponAction;
+            }
+        }
+
+        if (defaultAction is not null)
+        {
+            yield return defaultAction;
+        }
+    }
+
+    private static (string? DamageType, float? Damage) ExtractFpsDamage(AmmoParams? ammo)
+    {
+        var damage = ammo?.projectileParams switch
+        {
+            BulletProjectileParams bullet => bullet.damage as DamageInfo,
+            TachyonProjectileParams tachyon => tachyon.damage as DamageInfo,
+            _ => null
+        };
+
+        if (damage is null)
+            return (null, null);
+
+        var channels = new (string Name, float Value)[]
+        {
+            ("Physical", damage.DamagePhysical),
+            ("Energy", damage.DamageEnergy),
+            ("Distortion", damage.DamageDistortion),
+            ("Thermal", damage.DamageThermal),
+            ("Biochemical", damage.DamageBiochemical),
+            ("Stun", damage.DamageStun)
+        };
+
+        var total = channels.Sum(c => c.Value);
+
+        // Bloc de dégâts présent mais entièrement nul : la munition inflige réellement 0 en direct
+        // (ordonnance purement explosive, pistolet-jouet). On renvoie 0, et non null, pour que
+        // l'écran affiche « 0 » plutôt que « — » — l'absence de donnée reste distincte.
+        if (total <= 0f)
+            return (null, 0f);
+
+        var dominant = channels.MaxBy(c => c.Value);
+        return (dominant.Name, total);
+    }
+
+    /// <summary>
+    /// Dégâts d'explosion de la munition, indépendants des dégâts directs : une ordonnance
+    /// explosive inflige les deux. Le Boomtube touche à 20 à l'impact et explose à 41 000 ;
+    /// l'Animus ne fait aucun dégât direct et 150 à l'explosion. Retourne null quand la munition
+    /// n'a pas de détonation ou que son explosion ne fait aucun dégât.
+    /// </summary>
+    private static float? ExtractFpsExplosiveDamage(AmmoParams? ammo)
+    {
+        if (ammo?.projectileParams?.detonationParams?.explosionParams?.damage is not DamageInfo damage)
+            return null;
+
+        var total = damage.DamagePhysical + damage.DamageEnergy + damage.DamageDistortion
+            + damage.DamageThermal + damage.DamageBiochemical + damage.DamageStun;
+
+        return total > 0f ? total : null;
+    }
+
+    /// <summary>
+    /// Calcule la portée d'efficacité (distance de dégâts pleins) et la distance de plancher.
+    /// Les distances sont portées par le canal <c>DamagePhysical</c> de <c>damageDropParams</c>,
+    /// y compris pour les munitions énergétiques : CIG l'utilise comme créneau générique
+    /// (vérifié sur none_rifle_energy_01_ammo_laser, dégâts d'énergie mais distance sur Physical).
+    /// Une munition dont les trois valeurs de chute valent 0 n'a pas de chute de dégâts : on
+    /// retourne null, et non 0, pour que l'UI puisse afficher « — ».
+    /// </summary>
+    private static (float? EffectiveRange, float? FloorRange) ExtractFpsRanges(AmmoParams? ammo, float? damagePerProjectile)
+    {
+        if (ammo?.projectileParams is not BulletProjectileParams bullet || bullet.damageDropParams is null)
+            return (null, null);
+
+        var drop = bullet.damageDropParams;
+        var minDistance = (drop.damageDropMinDistance as DamageInfo)?.DamagePhysical;
+        var perMeter = (drop.damageDropPerMeter as DamageInfo)?.DamagePhysical;
+        var minDamage = (drop.damageDropMinDamage as DamageInfo)?.DamagePhysical;
+
+        if (minDistance is null or <= 0f)
+            return (null, null);
+
+        float? floorRange = null;
+        if (perMeter is > 0f && minDamage is > 0f && damagePerProjectile is > 0f && damagePerProjectile > minDamage)
+            floorRange = minDistance + (damagePerProjectile - minDamage) / perMeter;
+
+        return (minDistance, floorRange);
+    }
+
+    /// <summary>
+    /// Sérialise les modificateurs qui s'écartent de la valeur neutre (multiplicateurs à 1,
+    /// entiers à 0). Retourne null quand l'arme n'a aucun modificateur actif, ce qui est le cas
+    /// général — évite de stocker un JSON inutile sur chaque ligne.
+    /// </summary>
+    private static string? ExtractFpsModifiers(SWeaponStats? stats)
+    {
+        if (stats is null)
+            return null;
+
+        var modifiers = new Dictionary<string, float>();
+
+        void AddIfNot(string name, float value, float neutral)
+        {
+            if (Math.Abs(value - neutral) > 0.0001f)
+                modifiers[name] = value;
+        }
+
+        AddIfNot("fireRate", stats.fireRate, 0f);
+        AddIfNot("fireRateMultiplier", stats.fireRateMultiplier, 1f);
+        AddIfNot("damageMultiplier", stats.damageMultiplier, 1f);
+        AddIfNot("damageOverTimeMultiplier", stats.damageOverTimeMultiplier, 1f);
+        AddIfNot("projectileSpeedMultiplier", stats.projectileSpeedMultiplier, 1f);
+        AddIfNot("pellets", stats.pellets, 0f);
+        AddIfNot("burstShots", stats.burstShots, 0f);
+        AddIfNot("ammoCost", stats.ammoCost, 0f);
+        AddIfNot("ammoCostMultiplier", stats.ammoCostMultiplier, 1f);
+        AddIfNot("heatGenerationMultiplier", stats.heatGenerationMultiplier, 1f);
+        AddIfNot("soundRadiusMultiplier", stats.soundRadiusMultiplier, 1f);
+        AddIfNot("chargeTimeMultiplier", stats.chargeTimeMultiplier, 1f);
+
+        return modifiers.Count == 0
+            ? null
+            : System.Text.Json.JsonSerializer.Serialize(modifiers);
+    }
+
+    /// <summary>
+    /// Normalise le segment de munition du nom technique en famille affichable.
+    /// </summary>
+    private static string? NormalizeAmmoFamily(string segment) => segment.ToLowerInvariant() switch
+    {
+        "ballistic" => "Ballistic",
+        "energy" => "Energy",
+        _ => null
+    };
+
+    /// <summary>
+    /// Regroupe les variantes de livrée par modèle d'arme et insère une ligne par modèle.
+    /// Le représentant retenu est la variante au nom technique le plus court (le modèle de base,
+    /// sans suffixe de livrée), à égalité le premier par ordre alphabétique.
+    /// </summary>
+    private async Task SaveFpsWeaponsAsync(StarXelemDbContext db, List<FpsWeaponEntity> variants, CancellationToken cancellationToken)
+    {
+        if (variants.Count == 0)
+        {
+            _logger.LogWarning("Aucune arme FPS collectée : la classification a probablement régressé.");
+            return;
+        }
+
+        var weapons = new List<FpsWeaponEntity>();
+
+        foreach (var group in variants.GroupBy(v => v.Id, StringComparer.OrdinalIgnoreCase))
+        {
+            var ordered = group
+                .OrderBy(v => v.TechnicalName.Length)
+                .ThenBy(v => v.TechnicalName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var representative = ordered[0];
+            representative.VariantCount = ordered.Count;
+            representative.VariantNames = string.Join(
+                Environment.NewLine,
+                ordered.Select(v => v.LocalizedName).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCulture));
+
+            weapons.Add(representative);
+        }
+
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
+        db.FpsWeapons.AddRange(weapons);
+        db.ChangeTracker.AutoDetectChangesEnabled = true;
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        db.ChangeTracker.Clear();
+
+        _logger.LogInformation(
+            "Inserted {Count} FPS weapons (grouped from {VariantCount} variants) into the database.",
+            weapons.Count, variants.Count);
     }
 
     private string ResolveScItemManufacturerId(

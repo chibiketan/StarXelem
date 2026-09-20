@@ -1,4 +1,13 @@
-﻿## [0.2.4]
+﻿## [0.2.5]
+Version SC : 4.10.1
+
+### Ajouté
+- Ajout d'un écran pour voir les armes FPS
+
+
+## [0.2.4]
+Version SC : 4.10.1
+
 ### Ajouté
 - Support de la version 4.10.1 de Star Citizen
 
@@ -10,6 +19,7 @@
 
 
 ## [0.2.3]
+Version SC : 4.10.0
 ### Ajouté
 - Ajout de l'information de qualité pour les cargos
 - Utilisation d'une base de données locale à la place du fichier P4K

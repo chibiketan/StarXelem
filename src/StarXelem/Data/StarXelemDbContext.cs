@@ -31,6 +31,7 @@ public class StarXelemDbContext : DbContext
 
     public DbSet<ScItemEntity> ScItems => Set<ScItemEntity>();
     public DbSet<ScItemTagEntity> ScItemTags => Set<ScItemTagEntity>();
+    public DbSet<FpsWeaponEntity> FpsWeapons => Set<FpsWeaponEntity>();
     public DbSet<LocationEntity> Locations => Set<LocationEntity>();
     public DbSet<LocaleEntry> LocaleEntries => Set<LocaleEntry>();
     public DbSet<ResourceEntity> Resources => Set<ResourceEntity>();
@@ -207,6 +208,15 @@ public class StarXelemDbContext : DbContext
             .WithMany(m => m.ScItems)
             .HasForeignKey(si => si.ManufacturerId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // FpsWeapon -> Manufacturer
+        modelBuilder.Entity<FpsWeaponEntity>()
+            .HasOne(fw => fw.Manufacturer)
+            .WithMany()
+            .HasForeignKey(fw => fw.ManufacturerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<FpsWeaponEntity>().HasIndex(fw => fw.WeaponClass);
 
         // ScItemTag junction
         modelBuilder.Entity<ScItemTagEntity>()

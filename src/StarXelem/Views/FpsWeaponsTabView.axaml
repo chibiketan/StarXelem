@@ -1,0 +1,283 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels"
+             xmlns:local="clr-namespace:StarXelem"
+             xmlns:models="clr-namespace:StarXelem.Models"
+             mc:Ignorable="d" d:DesignWidth="1300" d:DesignHeight="700"
+             x:DataType="vm:FpsWeaponsTabViewModel"
+             d:DataContext="{x:Static local:DesignData.FpsWeaponsTabViewModel}"
+             x:Class="StarXelem.Views.FpsWeaponsTabView">
+    <UserControl.Styles>
+        <!-- Tableau : séparateurs horizontaux uniquement, pas de bordure verticale entre colonnes -->
+        <Style Selector="DataGrid.weapons DataGridColumnHeader">
+            <Setter Property="AreSeparatorsVisible" Value="False" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}" />
+        </Style>
+        <Style Selector="DataGrid.weapons DataGridRow">
+            <Setter Property="MinHeight" Value="52" />
+        </Style>
+        <!-- Convention : padding de cellule 0 vertical, 14 px horizontal -->
+        <Style Selector="DataGrid.weapons DataGridCell">
+            <Setter Property="Padding" Value="14,0" />
+        </Style>
+        <Style Selector="TextBlock.value">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.secondary-value">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource DemiDimmingBrush}" />
+        </Style>
+        <Style Selector="TextBlock.meta">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource DemiDimmingBrush}" />
+        </Style>
+        <Style Selector="TextBlock.filter-label">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="12" Margin="14">
+
+        <!-- En-tête -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="Armes FPS" FontSize="16" FontWeight="Medium" VerticalAlignment="Center" />
+            <TextBlock Classes="meta" VerticalAlignment="Center"
+                       Text="{Binding Weapons.Count, StringFormat='{}{0} modèle(s)'}" />
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}"
+                         Width="140" Height="6" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- Filtres -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource CardBackgroundBrush}"
+                BorderBrush="{DynamicResource CardBorderBrush}"
+                BorderThickness="0.5"
+                CornerRadius="8"
+                Padding="16">
+            <Grid ColumnDefinitions="260,190,*,*" ColumnSpacing="18">
+
+                <!-- Recherche par nom -->
+                <StackPanel Grid.Column="0" Spacing="4">
+                    <TextBlock Classes="filter-label" Text="RECHERCHE" />
+                    <TextBox Text="{Binding NameFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             Watermark="Nom de l'arme…"
+                             FontSize="12"
+                             VerticalContentAlignment="Center" />
+                </StackPanel>
+
+                <!-- Classe -->
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Classes="filter-label" Text="CLASSE" />
+                    <ComboBox ItemsSource="{Binding WeaponClassList}"
+                              SelectedItem="{Binding SelectedWeaponClass, Mode=TwoWay}"
+                              FontSize="12"
+                              HorizontalAlignment="Stretch" />
+                </StackPanel>
+
+                <!-- Dégâts min / max -->
+                <StackPanel Grid.Column="2" Spacing="2">
+                    <TextBlock Classes="filter-label" Text="DÉGÂTS PAR TIR" />
+                    <Grid ColumnDefinitions="Auto,*">
+                        <TextBlock Grid.Column="0" Classes="meta" VerticalAlignment="Center" Width="34"
+                                   Text="{Binding DamageMin, StringFormat='{}{0:0}'}" />
+                        <Slider Grid.Column="1"
+                                Minimum="{Binding DamageLowerBound}"
+                                Maximum="{Binding DamageUpperBound}"
+                                Value="{Binding DamageMin, Mode=TwoWay}"
+                                TickFrequency="1" IsSnapToTickEnabled="True" />
+                    </Grid>
+                    <Grid ColumnDefinitions="Auto,*">
+                        <TextBlock Grid.Column="0" Classes="meta" VerticalAlignment="Center" Width="34"
+                                   Text="{Binding DamageMax, StringFormat='{}{0:0}'}" />
+                        <Slider Grid.Column="1"
+                                Minimum="{Binding DamageLowerBound}"
+                                Maximum="{Binding DamageUpperBound}"
+                                Value="{Binding DamageMax, Mode=TwoWay}"
+                                TickFrequency="1" IsSnapToTickEnabled="True" />
+                    </Grid>
+                </StackPanel>
+
+                <!-- Portée d'efficacité min / max -->
+                <StackPanel Grid.Column="3" Spacing="2">
+                    <TextBlock Classes="filter-label" Text="PORTÉE DE DÉGÂTS PLEINS (m)" />
+                    <Grid ColumnDefinitions="Auto,*">
+                        <TextBlock Grid.Column="0" Classes="meta" VerticalAlignment="Center" Width="42"
+                                   Text="{Binding EffectiveRangeMin, StringFormat='{}{0:0}'}" />
+                        <Slider Grid.Column="1"
+                                Minimum="{Binding EffectiveRangeLowerBound}"
+                                Maximum="{Binding EffectiveRangeUpperBound}"
+                                Value="{Binding EffectiveRangeMin, Mode=TwoWay}"
+                                TickFrequency="1" IsSnapToTickEnabled="True" />
+                    </Grid>
+                    <Grid ColumnDefinitions="Auto,*">
+                        <TextBlock Grid.Column="0" Classes="meta" VerticalAlignment="Center" Width="42"
+                                   Text="{Binding EffectiveRangeMax, StringFormat='{}{0:0}'}" />
+                        <Slider Grid.Column="1"
+                                Minimum="{Binding EffectiveRangeLowerBound}"
+                                Maximum="{Binding EffectiveRangeUpperBound}"
+                                Value="{Binding EffectiveRangeMax, Mode=TwoWay}"
+                                TickFrequency="1" IsSnapToTickEnabled="True" />
+                    </Grid>
+                    <CheckBox Content="Inclure les armes sans portée connue"
+                              FontSize="11"
+                              IsChecked="{Binding IncludeWeaponsWithoutEffectiveRange, Mode=TwoWay}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Tableau -->
+        <DockPanel Grid.Row="2">
+            <TextBlock DockPanel.Dock="Top" Classes="meta" Margin="0,0,0,6"
+                       Text="Chaque ligne regroupe les livrées d'un même modèle. La seconde valeur d'une cellule, en gris, correspond au tir secondaire." />
+            <DataGrid ItemsSource="{Binding Weapons}"
+                      SelectedItem="{Binding SelectedWeapon, Mode=TwoWay}"
+                      Classes="weapons"
+                      IsReadOnly="True"
+                      CanUserReorderColumns="False"
+                      CanUserResizeColumns="True"
+                      CanUserSortColumns="True"
+                      GridLinesVisibility="Horizontal"
+                      HeadersVisibility="Column">
+                <DataGrid.Columns>
+
+                    <!-- Nom + indicateur de variantes -->
+                    <DataGridTemplateColumn Header="Nom" Width="230" SortMemberPath="Name">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="models:FpsWeaponModel">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Classes="value" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Classes="meta" Text="{Binding TechnicalName}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <!-- Badge du nombre de livrées : la liste complète est en infobulle -->
+                                    <Border Grid.Column="1"
+                                            IsVisible="{Binding HasMultipleVariants}"
+                                            Background="{DynamicResource BadgeTiers1BackgroundColor}"
+                                            BorderBrush="{DynamicResource BadgeTiers1BorderColor}"
+                                            BorderThickness="0.5"
+                                            CornerRadius="4"
+                                            Padding="5,1"
+                                            VerticalAlignment="Center"
+                                            ToolTip.Tip="{Binding VariantTooltip}">
+                                        <TextBlock FontSize="10" FontWeight="Medium"
+                                                   Foreground="{DynamicResource BadgeTiers1ForegroundColor}"
+                                                   Text="{Binding VariantCountDisplay}" />
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Header="Classe" Width="150" Binding="{Binding WeaponClassLabel}" />
+                    <DataGridTextColumn Header="Fabricant" Width="160" Binding="{Binding Manufacturer}" />
+                    <DataGridTextColumn Header="Chargeur" Width="95" Binding="{Binding MagazineSizeDisplay}" />
+
+                    <!-- Mode de tir : principal puis secondaire -->
+                    <DataGridTemplateColumn Header="Mode" Width="105" SortMemberPath="PrimaryModeName">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="models:FpsWeaponModel">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Classes="value" Text="{Binding PrimaryModeDisplay}" />
+                                    <TextBlock Classes="secondary-value" Text="{Binding SecondaryModeDisplay}"
+                                               IsVisible="{Binding HasSecondaryFire}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Dégâts par tir -->
+                    <DataGridTemplateColumn Header="Dégâts / tir" Width="140" SortMemberPath="PrimaryDamagePerShot">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="models:FpsWeaponModel">
+                                <StackPanel VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Classes="value" Text="{Binding PrimaryDamageDisplay}" />
+                                        <TextBlock Classes="meta" VerticalAlignment="Center" Text="{Binding PrimaryPelletDisplay}" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasSecondaryFire}">
+                                        <TextBlock Classes="secondary-value" Text="{Binding SecondaryDamageDisplay}" />
+                                        <TextBlock Classes="secondary-value" Text="{Binding SecondaryPelletDisplay}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Type de dégâts -->
+                    <DataGridTemplateColumn Header="Type de dégâts" Width="110" SortMemberPath="PrimaryDamageType">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="models:FpsWeaponModel">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Classes="value" Text="{Binding PrimaryDamageTypeLabel}" />
+                                    <TextBlock Classes="secondary-value" Text="{Binding SecondaryDamageTypeLabel}"
+                                               IsVisible="{Binding HasSecondaryFire}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Cadence -->
+                    <DataGridTemplateColumn Header="Cadence" Width="90" SortMemberPath="PrimaryFireRate">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="models:FpsWeaponModel">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Classes="value" Text="{Binding PrimaryFireRateDisplay}" />
+                                    <TextBlock Classes="secondary-value" Text="{Binding SecondaryFireRateDisplay}"
+                                               IsVisible="{Binding HasSecondaryFire}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Vitesse du projectile -->
+                    <DataGridTemplateColumn Header="Vitesse projectile" Width="125" SortMemberPath="PrimaryProjectileSpeed">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="models:FpsWeaponModel">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Classes="value" Text="{Binding PrimaryProjectileSpeedDisplay}" />
+                                    <TextBlock Classes="secondary-value" Text="{Binding SecondaryProjectileSpeedDisplay}"
+                                               IsVisible="{Binding HasSecondaryFire}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Portée de dégâts pleins -->
+                    <DataGridTemplateColumn Header="Portée dégâts pleins" Width="140" SortMemberPath="PrimaryEffectiveRange">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="models:FpsWeaponModel">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Classes="value" Text="{Binding PrimaryEffectiveRangeDisplay}" />
+                                    <TextBlock Classes="secondary-value" Text="{Binding SecondaryEffectiveRangeDisplay}"
+                                               IsVisible="{Binding HasSecondaryFire}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Portée maximale -->
+                    <DataGridTemplateColumn Header="Portée max" Width="110" SortMemberPath="PrimaryMaxRange">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="models:FpsWeaponModel">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Classes="value" Text="{Binding PrimaryMaxRangeDisplay}" />
+                                    <TextBlock Classes="secondary-value" Text="{Binding SecondaryMaxRangeDisplay}"
+                                               IsVisible="{Binding HasSecondaryFire}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Header="Extraction sac à dos" Width="150" Binding="{Binding RepoolDisplay}" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </DockPanel>
+    </Grid>
+</UserControl>

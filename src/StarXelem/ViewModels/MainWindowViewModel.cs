@@ -160,6 +160,7 @@ public partial class MainWindowViewModel : ViewModelBase
             App.Current.Services.GetRequiredService<BlueprintListTabViewModel>(),
             App.Current.Services.GetRequiredService<FriendListTabViewModel>(),
             App.Current.Services.GetRequiredService<P4kShipTabViewModel>(),
+            App.Current.Services.GetRequiredService<FpsWeaponsTabViewModel>(),
             App.Current.Services.GetRequiredService<MissionsTabViewModel>(),
             App.Current.Services.GetRequiredService<ExtractionTabViewModel>(),
             App.Current.Services.GetRequiredService<ReputationTabViewModel>(),
@@ -673,6 +674,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             "ship" => _pages.FirstOrDefault(p => p is ShipTabViewModel),
             "p4kship" => _pages.FirstOrDefault(p => p is P4kShipTabViewModel),
+            "fpsweapons" => _pages.FirstOrDefault(p => p is FpsWeaponsTabViewModel),
             "items" => _pages.FirstOrDefault(p => p is ItemsTabViewModel),
             "blueprints" => _pages.FirstOrDefault(p => p is BlueprintListTabViewModel),
             "friends" => _pages.FirstOrDefault(p => p is FriendListTabViewModel),

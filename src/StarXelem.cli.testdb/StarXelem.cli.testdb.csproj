@@ -11,6 +11,24 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Reference Include="StarBreaker.Common">
+            <HintPath>..\..\libs\StarBreaker.Common.dll</HintPath>
+        </Reference>
+        <Reference Include="StarBreaker.DataCore">
+            <HintPath>..\..\libs\StarBreaker.DataCore.dll</HintPath>
+        </Reference>
+        <Reference Include="StarBreaker.DataCore.Generated">
+            <HintPath>..\..\libs\StarBreaker.DataCore.Generated.dll</HintPath>
+        </Reference>
+        <Reference Include="StarBreaker.Extraction">
+            <HintPath>..\..\libs\StarBreaker.Extraction.dll</HintPath>
+        </Reference>
+        <Reference Include="StarBreaker.P4k">
+            <HintPath>..\..\libs\StarBreaker.P4k.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+
+    <ItemGroup>
         <Content Include="..\..\libs\Google.Protobuf.dll" CopyToOutputDirectory="PreserveNewest" />
         <Content Include="..\..\libs\Grpc.Core.Api.dll" CopyToOutputDirectory="PreserveNewest" />
         <Content Include="..\..\libs\Grpc.Net.Client.dll" CopyToOutputDirectory="PreserveNewest" />
