@@ -55,7 +55,10 @@ public partial class ItemViewModel : ViewModelBase
 
 //    public string? TypeGuid => _entityClassProperties?.Guid;
 //    public string? TypeName => _entityClassProperties?.ClassName;
-    public Task<string?> Name => GetLocaleValue();
+    // Mise en cache : le nom est lu à chaque affichage de cellule, tri et filtrage. Sans cela, chaque accès lançait
+    // une nouvelle requête sur la base de locales.
+    private readonly Lazy<Task<string?>> _name;
+    public Task<string?> Name => _name.Value;
     
     public ItemViewModel(ILocaleEntryRepository localeRepository, ILocationService locationService, IGrpcClientService grpcClientService, ItemsTabViewModel parent, EntityItemQueryResult entityItemResult, ScItemEntity? scItem = null)
     {
@@ -65,6 +68,7 @@ public partial class ItemViewModel : ViewModelBase
         _parent = parent;
         _entityNodeProperties = entityItemResult;
         _scItem = scItem;
+        _name = new Lazy<Task<string?>>(GetLocaleValue);
         _location = new Lazy<Task<string?>>(() => GetLocation().ContinueWith(t =>
         {
             OnPropertyChanged(nameof(Location));
