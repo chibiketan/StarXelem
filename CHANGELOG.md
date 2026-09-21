@@ -4,6 +4,12 @@ Version SC : 4.10.1
 ### Ajouté
 - Ajout d'un écran pour voir les armes FPS
 
+### Corrigé
+- Amélioration de la réactivité de l'écran des objets : le filtrage ne fige plus l'interface
+- Ajout d'un indicateur de chargement et de filtrage sur l'écran des objets
+- Correction de la récupération des objets lorsque plusieurs conteneurs sont interrogés, qui en omettait une partie
+- Correction de l'affichage du nom du vaisseau pour l'écran des objets
+
 
 ## [0.2.4]
 Version SC : 4.10.1
