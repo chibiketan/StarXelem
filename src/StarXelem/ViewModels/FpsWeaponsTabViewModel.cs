@@ -21,6 +21,13 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
     private readonly ILogger<FpsWeaponsTabViewModel> _logger;
     private List<FpsWeaponModel> _allWeapons = new();
     private bool _isApplyingBounds;
+    private CancellationTokenSource? _filterCts;
+
+    // Délai d'inactivité de la saisie avant de filtrer : assez court pour rester réactif,
+    // assez long pour qu'une frappe rapide ne déclenche qu'un seul filtrage.
+    private static readonly TimeSpan NameFilterDelay = TimeSpan.FromMilliseconds(300);
+    // Curseurs, classe et case à cocher : délai réduit, suffisant pour absorber le glissement d'un curseur.
+    private static readonly TimeSpan ControlFilterDelay = TimeSpan.FromMilliseconds(120);
 
     public override string Name => "Armes FPS";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Target);
@@ -205,6 +212,10 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
         }
     }
 
+    /// <summary>
+    /// Applique les filtres immédiatement, de façon synchrone. Réservé au chargement initial,
+    /// où la liste doit être remplie avant que l'indicateur de chargement ne disparaisse.
+    /// </summary>
     private void ApplyFilters()
     {
         if (_isApplyingBounds)
@@ -212,48 +223,133 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
             return;
         }
 
-        IEnumerable<FpsWeaponModel> filtered = _allWeapons;
+        _filterCts?.Cancel();
+        Weapons = new ObservableCollection<FpsWeaponModel>(FilterWeapons(_allWeapons, CaptureCriteria()));
+    }
 
-        if (!string.IsNullOrWhiteSpace(NameFilter))
+    /// <summary>
+    /// Planifie un filtrage différé : toute demande encore en attente ou en cours est annulée,
+    /// de sorte qu'une rafale de modifications ne produit qu'un seul recalcul, après la dernière.
+    /// Le calcul s'exécute hors du thread d'UI ; seule l'affectation du résultat y revient.
+    /// </summary>
+    private void ScheduleFilters(TimeSpan delay)
+    {
+        if (_isApplyingBounds)
         {
-            var needle = NameFilter.Trim();
+            return;
+        }
+
+        _filterCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _filterCts = cts;
+
+        _ = RunFilterAsync(_allWeapons, CaptureCriteria(), delay, cts.Token);
+    }
+
+    private async Task RunFilterAsync(List<FpsWeaponModel> source, FilterCriteria criteria, TimeSpan delay, CancellationToken token)
+    {
+        try
+        {
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, token);
+            }
+
+            var result = await Task.Run(() => FilterWeapons(source, criteria), token);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                // Une saisie plus récente a pu annuler cette demande pendant le calcul ou l'attente du thread d'UI.
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                // Reconstruire le tableau est l'opération coûteuse : on l'évite quand le résultat ne change pas.
+                if (!Weapons.SequenceEqual(result))
+                {
+                    Weapons = new ObservableCollection<FpsWeaponModel>(result);
+                }
+            }, DispatcherPriority.Background);
+        }
+        catch (OperationCanceledException)
+        {
+            // Remplacée par une demande plus récente : comportement normal.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erreur lors du filtrage des armes FPS");
+        }
+    }
+
+    /// <summary>
+    /// Copie l'état des filtres. À appeler depuis le thread d'UI : le calcul qui suit s'exécute
+    /// sur un autre thread et ne doit lire aucune propriété du ViewModel.
+    /// </summary>
+    private FilterCriteria CaptureCriteria() => new(
+        Needle: string.IsNullOrWhiteSpace(NameFilter) ? null : NameFilter.Trim(),
+        WeaponClass: !string.Equals(SelectedWeaponClass, AllClassesLabel, StringComparison.Ordinal)
+                     && !string.IsNullOrEmpty(SelectedWeaponClass)
+            ? SelectedWeaponClass
+            : null,
+        // Un filtre à pleine amplitude ne doit écarter personne, y compris les armes dont les dégâts sont inconnus.
+        DamageActive: DamageMin > DamageLowerBound || DamageMax < DamageUpperBound,
+        DamageMin: DamageMin,
+        DamageMax: DamageMax,
+        RangeActive: EffectiveRangeMin > EffectiveRangeLowerBound || EffectiveRangeMax < EffectiveRangeUpperBound,
+        RangeMin: EffectiveRangeMin,
+        RangeMax: EffectiveRangeMax,
+        IncludeWithoutRange: IncludeWeaponsWithoutEffectiveRange);
+
+    private static List<FpsWeaponModel> FilterWeapons(List<FpsWeaponModel> source, FilterCriteria criteria)
+    {
+        IEnumerable<FpsWeaponModel> filtered = source;
+
+        if (criteria.Needle is { } needle)
+        {
             filtered = filtered.Where(w =>
                 w.Name.Contains(needle, StringComparison.CurrentCultureIgnoreCase)
                 || w.TechnicalName.Contains(needle, StringComparison.OrdinalIgnoreCase)
                 || (w.VariantNames?.Contains(needle, StringComparison.CurrentCultureIgnoreCase) ?? false));
         }
 
-        if (!string.Equals(SelectedWeaponClass, AllClassesLabel, StringComparison.Ordinal)
-            && !string.IsNullOrEmpty(SelectedWeaponClass))
+        if (criteria.WeaponClass is { } weaponClass)
         {
             filtered = filtered.Where(w =>
-                string.Equals(w.WeaponClassLabel, SelectedWeaponClass, StringComparison.CurrentCultureIgnoreCase));
+                string.Equals(w.WeaponClassLabel, weaponClass, StringComparison.CurrentCultureIgnoreCase));
         }
 
-        // Un filtre à pleine amplitude ne doit écarter personne, y compris les armes
-        // dont les dégâts sont inconnus.
-        var damageFilterActive = DamageMin > DamageLowerBound || DamageMax < DamageUpperBound;
-        if (damageFilterActive)
+        if (criteria.DamageActive)
         {
-            filtered = filtered.Where(w => w.MatchesDamageRange(DamageMin, DamageMax));
+            filtered = filtered.Where(w => w.MatchesDamageRange(criteria.DamageMin, criteria.DamageMax));
         }
 
-        var rangeFilterActive = EffectiveRangeMin > EffectiveRangeLowerBound || EffectiveRangeMax < EffectiveRangeUpperBound;
-        if (rangeFilterActive)
+        if (criteria.RangeActive)
         {
             filtered = filtered.Where(w =>
-                w.MatchesEffectiveRange(EffectiveRangeMin, EffectiveRangeMax)
-                || (IncludeWeaponsWithoutEffectiveRange && w.HasNoKnownEffectiveRange));
+                w.MatchesEffectiveRange(criteria.RangeMin, criteria.RangeMax)
+                || (criteria.IncludeWithoutRange && w.HasNoKnownEffectiveRange));
         }
 
-        Weapons = new ObservableCollection<FpsWeaponModel>(filtered);
+        return filtered.ToList();
     }
 
-    partial void OnNameFilterChanged(string value) => ApplyFilters();
+    private sealed record FilterCriteria(
+        string? Needle,
+        string? WeaponClass,
+        bool DamageActive,
+        double DamageMin,
+        double DamageMax,
+        bool RangeActive,
+        double RangeMin,
+        double RangeMax,
+        bool IncludeWithoutRange);
 
-    partial void OnSelectedWeaponClassChanged(string value) => ApplyFilters();
+    partial void OnNameFilterChanged(string value) => ScheduleFilters(NameFilterDelay);
 
-    partial void OnIncludeWeaponsWithoutEffectiveRangeChanged(bool value) => ApplyFilters();
+    partial void OnSelectedWeaponClassChanged(string value) => ScheduleFilters(ControlFilterDelay);
+
+    partial void OnIncludeWeaponsWithoutEffectiveRangeChanged(bool value) => ScheduleFilters(ControlFilterDelay);
 
     partial void OnDamageMinChanged(double value)
     {
@@ -262,7 +358,7 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
             DamageMax = value;
         }
 
-        ApplyFilters();
+        ScheduleFilters(ControlFilterDelay);
     }
 
     partial void OnDamageMaxChanged(double value)
@@ -272,7 +368,7 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
             DamageMin = value;
         }
 
-        ApplyFilters();
+        ScheduleFilters(ControlFilterDelay);
     }
 
     partial void OnEffectiveRangeMinChanged(double value)
@@ -282,7 +378,7 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
             EffectiveRangeMax = value;
         }
 
-        ApplyFilters();
+        ScheduleFilters(ControlFilterDelay);
     }
 
     partial void OnEffectiveRangeMaxChanged(double value)
@@ -292,6 +388,6 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
             EffectiveRangeMin = value;
         }
 
-        ApplyFilters();
+        ScheduleFilters(ControlFilterDelay);
     }
 }
