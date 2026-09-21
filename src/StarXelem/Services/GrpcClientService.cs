@@ -284,6 +284,9 @@ public class GrpcClientService : IGrpcClientService
             EntityQueryResponse? response = null;
             await semaphoreSlim.WaitAsync().ConfigureAwait(false);
             request.Body.Query.InventoryId = inventoryId;
+            // La requête est partagée entre les conteneurs : sans cette remise à zéro, la première page du conteneur suivant
+            // reprend le curseur de fin du précédent et ignore tout objet dont le geid le précède.
+            request.Body.Query.Pagination.After = "";
             try
             {
                 do
