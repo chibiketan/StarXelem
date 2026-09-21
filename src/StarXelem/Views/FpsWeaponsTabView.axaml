@@ -5,6 +5,7 @@
              xmlns:vm="clr-namespace:StarXelem.ViewModels"
              xmlns:local="clr-namespace:StarXelem"
              xmlns:models="clr-namespace:StarXelem.Models"
+             xmlns:ui="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
              mc:Ignorable="d" d:DesignWidth="1300" d:DesignHeight="700"
              x:DataType="vm:FpsWeaponsTabViewModel"
              d:DataContext="{x:Static local:DesignData.FpsWeaponsTabViewModel}"
@@ -50,7 +51,7 @@
             <TextBlock Text="Armes FPS" FontSize="16" FontWeight="Medium" VerticalAlignment="Center" />
             <TextBlock Classes="meta" VerticalAlignment="Center"
                        Text="{Binding Weapons.Count, StringFormat='{}{0} modèle(s)'}" />
-            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}"
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}"
                          Width="140" Height="6" VerticalAlignment="Center" />
         </StackPanel>
 
@@ -136,148 +137,158 @@
         <DockPanel Grid.Row="2">
             <TextBlock DockPanel.Dock="Top" Classes="meta" Margin="0,0,0,6"
                        Text="Chaque ligne regroupe les livrées d'un même modèle. La seconde valeur d'une cellule, en gris, correspond au tir secondaire." />
-            <DataGrid ItemsSource="{Binding Weapons}"
-                      SelectedItem="{Binding SelectedWeapon, Mode=TwoWay}"
-                      Classes="weapons"
-                      IsReadOnly="True"
-                      CanUserReorderColumns="False"
-                      CanUserResizeColumns="True"
-                      CanUserSortColumns="True"
-                      GridLinesVisibility="Horizontal"
-                      HeadersVisibility="Column">
-                <DataGrid.Columns>
+            <Grid>
+                <DataGrid ItemsSource="{Binding Weapons}"
+                          SelectedItem="{Binding SelectedWeapon, Mode=TwoWay}"
+                          Classes="weapons"
+                          IsReadOnly="True"
+                          CanUserReorderColumns="False"
+                          CanUserResizeColumns="True"
+                          CanUserSortColumns="True"
+                          GridLinesVisibility="Horizontal"
+                          HeadersVisibility="Column">
+                    <DataGrid.Columns>
 
-                    <!-- Nom + indicateur de variantes -->
-                    <DataGridTemplateColumn Header="Nom" Width="230" SortMemberPath="Name">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="models:FpsWeaponModel">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Classes="value" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Classes="meta" Text="{Binding TechnicalName}" TextTrimming="CharacterEllipsis" />
+                        <!-- Nom + indicateur de variantes -->
+                        <DataGridTemplateColumn Header="Nom" Width="230" SortMemberPath="Name">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="models:FpsWeaponModel">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock Classes="value" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Classes="meta" Text="{Binding TechnicalName}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <!-- Badge du nombre de livrées : la liste complète est en infobulle -->
+                                        <Border Grid.Column="1"
+                                                IsVisible="{Binding HasMultipleVariants}"
+                                                Background="{DynamicResource BadgeTiers1BackgroundColor}"
+                                                BorderBrush="{DynamicResource BadgeTiers1BorderColor}"
+                                                BorderThickness="0.5"
+                                                CornerRadius="4"
+                                                Padding="5,1"
+                                                VerticalAlignment="Center"
+                                                ToolTip.Tip="{Binding VariantTooltip}">
+                                            <TextBlock FontSize="10" FontWeight="Medium"
+                                                       Foreground="{DynamicResource BadgeTiers1ForegroundColor}"
+                                                       Text="{Binding VariantCountDisplay}" />
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="Classe" Width="150" Binding="{Binding WeaponClassLabel}" />
+                        <DataGridTextColumn Header="Fabricant" Width="160" Binding="{Binding Manufacturer}" />
+                        <DataGridTextColumn Header="Chargeur" Width="95" Binding="{Binding MagazineSizeDisplay}" />
+
+                        <!-- Mode de tir : principal puis secondaire -->
+                        <DataGridTemplateColumn Header="Mode" Width="105" SortMemberPath="PrimaryModeName">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="models:FpsWeaponModel">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Classes="value" Text="{Binding PrimaryModeDisplay}" />
+                                        <TextBlock Classes="secondary-value" Text="{Binding SecondaryModeDisplay}"
+                                                   IsVisible="{Binding HasSecondaryFire}" />
                                     </StackPanel>
-                                    <!-- Badge du nombre de livrées : la liste complète est en infobulle -->
-                                    <Border Grid.Column="1"
-                                            IsVisible="{Binding HasMultipleVariants}"
-                                            Background="{DynamicResource BadgeTiers1BackgroundColor}"
-                                            BorderBrush="{DynamicResource BadgeTiers1BorderColor}"
-                                            BorderThickness="0.5"
-                                            CornerRadius="4"
-                                            Padding="5,1"
-                                            VerticalAlignment="Center"
-                                            ToolTip.Tip="{Binding VariantTooltip}">
-                                        <TextBlock FontSize="10" FontWeight="Medium"
-                                                   Foreground="{DynamicResource BadgeTiers1ForegroundColor}"
-                                                   Text="{Binding VariantCountDisplay}" />
-                                    </Border>
-                                </Grid>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
-                    <DataGridTextColumn Header="Classe" Width="150" Binding="{Binding WeaponClassLabel}" />
-                    <DataGridTextColumn Header="Fabricant" Width="160" Binding="{Binding Manufacturer}" />
-                    <DataGridTextColumn Header="Chargeur" Width="95" Binding="{Binding MagazineSizeDisplay}" />
-
-                    <!-- Mode de tir : principal puis secondaire -->
-                    <DataGridTemplateColumn Header="Mode" Width="105" SortMemberPath="PrimaryModeName">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="models:FpsWeaponModel">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Classes="value" Text="{Binding PrimaryModeDisplay}" />
-                                    <TextBlock Classes="secondary-value" Text="{Binding SecondaryModeDisplay}"
-                                               IsVisible="{Binding HasSecondaryFire}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <!-- Dégâts par tir -->
-                    <DataGridTemplateColumn Header="Dégâts / tir" Width="140" SortMemberPath="PrimaryDamagePerShot">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="models:FpsWeaponModel">
-                                <StackPanel VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal" Spacing="4">
-                                        <TextBlock Classes="value" Text="{Binding PrimaryDamageDisplay}" />
-                                        <TextBlock Classes="meta" VerticalAlignment="Center" Text="{Binding PrimaryPelletDisplay}" />
+                        <!-- Dégâts par tir -->
+                        <DataGridTemplateColumn Header="Dégâts / tir" Width="140" SortMemberPath="PrimaryDamagePerShot">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="models:FpsWeaponModel">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <TextBlock Classes="value" Text="{Binding PrimaryDamageDisplay}" />
+                                            <TextBlock Classes="meta" VerticalAlignment="Center" Text="{Binding PrimaryPelletDisplay}" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasSecondaryFire}">
+                                            <TextBlock Classes="secondary-value" Text="{Binding SecondaryDamageDisplay}" />
+                                            <TextBlock Classes="secondary-value" Text="{Binding SecondaryPelletDisplay}" />
+                                        </StackPanel>
                                     </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasSecondaryFire}">
-                                        <TextBlock Classes="secondary-value" Text="{Binding SecondaryDamageDisplay}" />
-                                        <TextBlock Classes="secondary-value" Text="{Binding SecondaryPelletDisplay}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- Type de dégâts -->
+                        <DataGridTemplateColumn Header="Type de dégâts" Width="110" SortMemberPath="PrimaryDamageType">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="models:FpsWeaponModel">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Classes="value" Text="{Binding PrimaryDamageTypeLabel}" />
+                                        <TextBlock Classes="secondary-value" Text="{Binding SecondaryDamageTypeLabel}"
+                                                   IsVisible="{Binding HasSecondaryFire}" />
                                     </StackPanel>
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
-                    <!-- Type de dégâts -->
-                    <DataGridTemplateColumn Header="Type de dégâts" Width="110" SortMemberPath="PrimaryDamageType">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="models:FpsWeaponModel">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Classes="value" Text="{Binding PrimaryDamageTypeLabel}" />
-                                    <TextBlock Classes="secondary-value" Text="{Binding SecondaryDamageTypeLabel}"
-                                               IsVisible="{Binding HasSecondaryFire}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                        <!-- Cadence -->
+                        <DataGridTemplateColumn Header="Cadence" Width="90" SortMemberPath="PrimaryFireRate">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="models:FpsWeaponModel">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Classes="value" Text="{Binding PrimaryFireRateDisplay}" />
+                                        <TextBlock Classes="secondary-value" Text="{Binding SecondaryFireRateDisplay}"
+                                                   IsVisible="{Binding HasSecondaryFire}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
-                    <!-- Cadence -->
-                    <DataGridTemplateColumn Header="Cadence" Width="90" SortMemberPath="PrimaryFireRate">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="models:FpsWeaponModel">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Classes="value" Text="{Binding PrimaryFireRateDisplay}" />
-                                    <TextBlock Classes="secondary-value" Text="{Binding SecondaryFireRateDisplay}"
-                                               IsVisible="{Binding HasSecondaryFire}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                        <!-- Vitesse du projectile -->
+                        <DataGridTemplateColumn Header="Vitesse projectile" Width="125" SortMemberPath="PrimaryProjectileSpeed">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="models:FpsWeaponModel">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Classes="value" Text="{Binding PrimaryProjectileSpeedDisplay}" />
+                                        <TextBlock Classes="secondary-value" Text="{Binding SecondaryProjectileSpeedDisplay}"
+                                                   IsVisible="{Binding HasSecondaryFire}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
-                    <!-- Vitesse du projectile -->
-                    <DataGridTemplateColumn Header="Vitesse projectile" Width="125" SortMemberPath="PrimaryProjectileSpeed">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="models:FpsWeaponModel">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Classes="value" Text="{Binding PrimaryProjectileSpeedDisplay}" />
-                                    <TextBlock Classes="secondary-value" Text="{Binding SecondaryProjectileSpeedDisplay}"
-                                               IsVisible="{Binding HasSecondaryFire}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                        <!-- Portée de dégâts pleins -->
+                        <DataGridTemplateColumn Header="Portée dégâts pleins" Width="140" SortMemberPath="PrimaryEffectiveRange">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="models:FpsWeaponModel">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Classes="value" Text="{Binding PrimaryEffectiveRangeDisplay}" />
+                                        <TextBlock Classes="secondary-value" Text="{Binding SecondaryEffectiveRangeDisplay}"
+                                                   IsVisible="{Binding HasSecondaryFire}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
-                    <!-- Portée de dégâts pleins -->
-                    <DataGridTemplateColumn Header="Portée dégâts pleins" Width="140" SortMemberPath="PrimaryEffectiveRange">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="models:FpsWeaponModel">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Classes="value" Text="{Binding PrimaryEffectiveRangeDisplay}" />
-                                    <TextBlock Classes="secondary-value" Text="{Binding SecondaryEffectiveRangeDisplay}"
-                                               IsVisible="{Binding HasSecondaryFire}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                        <!-- Portée maximale -->
+                        <DataGridTemplateColumn Header="Portée max" Width="110" SortMemberPath="PrimaryMaxRange">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="models:FpsWeaponModel">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Classes="value" Text="{Binding PrimaryMaxRangeDisplay}" />
+                                        <TextBlock Classes="secondary-value" Text="{Binding SecondaryMaxRangeDisplay}"
+                                                   IsVisible="{Binding HasSecondaryFire}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
-                    <!-- Portée maximale -->
-                    <DataGridTemplateColumn Header="Portée max" Width="110" SortMemberPath="PrimaryMaxRange">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="models:FpsWeaponModel">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Classes="value" Text="{Binding PrimaryMaxRangeDisplay}" />
-                                    <TextBlock Classes="secondary-value" Text="{Binding SecondaryMaxRangeDisplay}"
-                                               IsVisible="{Binding HasSecondaryFire}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTextColumn Header="Extraction sac à dos" Width="150" Binding="{Binding RepoolDisplay}" />
-                </DataGrid.Columns>
-            </DataGrid>
+                        <DataGridTextColumn Header="Extraction sac à dos" Width="150" Binding="{Binding RepoolDisplay}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+                <!-- Indicateur de chargement / filtrage, superposé au tableau -->
+                <Grid IsVisible="{Binding IsBusy}" IsHitTestVisible="False">
+                    <Border Background="{DynamicResource CardBackgroundBrush}" Opacity="0.75" CornerRadius="8" />
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                        <ui:ProgressRing IsIndeterminate="True" Width="40" Height="40" HorizontalAlignment="Center" />
+                        <TextBlock Classes="meta" HorizontalAlignment="Center" Text="{Binding BusyMessage}" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
         </DockPanel>
     </Grid>
 </UserControl>

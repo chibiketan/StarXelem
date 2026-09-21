@@ -28,13 +28,21 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
     private static readonly TimeSpan NameFilterDelay = TimeSpan.FromMilliseconds(300);
     // Curseurs, classe et case à cocher : délai réduit, suffisant pour absorber le glissement d'un curseur.
     private static readonly TimeSpan ControlFilterDelay = TimeSpan.FromMilliseconds(120);
+    // Le tableau est alimenté par paquets : entre deux paquets, le thread d'UI traite la saisie et le rendu,
+    // ce qui garde l'indicateur animé et la fenêtre réactive pendant la construction des lignes.
+    private const int DisplayBatchSize = 20;
 
     public override string Name => "Armes FPS";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Target);
 
     [ObservableProperty] private ObservableCollection<FpsWeaponModel> _weapons = new();
     [ObservableProperty] private FpsWeaponModel? _selectedWeapon;
-    [ObservableProperty] private bool _isLoading;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsBusy), nameof(BusyMessage))] private bool _isLoading;
+    /// <summary>Vrai du moment où un filtre est demandé jusqu'à ce que la liste correspondante soit entièrement affichée.</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsBusy), nameof(BusyMessage))] private bool _isFiltering;
+
+    public bool IsBusy => IsLoading || IsFiltering;
+    public string BusyMessage => IsLoading ? "Chargement des armes…" : "Filtrage en cours…";
     [ObservableProperty] private string _nameFilter = string.Empty;
     // Collection créée une fois pour toutes et complétée en place : remplacer l'instance ferait
     // perdre sa sélection au ComboBox, qui afficherait un champ vide.
@@ -82,7 +90,7 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
             var entities = await _fpsWeaponRepository.GetAllAsync().ConfigureAwait(false);
             var weapons = entities.Select(MapToModel).ToList();
 
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 _allWeapons = weapons;
 
@@ -92,7 +100,9 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
                 }
 
                 ResetBounds(weapons);
-                ApplyFilters();
+
+                // L'indicateur de chargement reste affiché jusqu'à ce que toutes les lignes soient à l'écran.
+                await ScheduleFilters(TimeSpan.Zero);
             }, DispatcherPriority.Default);
 
             _logger.LogInformation("Loaded {Count} FPS weapons from the local database.", weapons.Count);
@@ -213,37 +223,25 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
     }
 
     /// <summary>
-    /// Applique les filtres immédiatement, de façon synchrone. Réservé au chargement initial,
-    /// où la liste doit être remplie avant que l'indicateur de chargement ne disparaisse.
-    /// </summary>
-    private void ApplyFilters()
-    {
-        if (_isApplyingBounds)
-        {
-            return;
-        }
-
-        _filterCts?.Cancel();
-        Weapons = new ObservableCollection<FpsWeaponModel>(FilterWeapons(_allWeapons, CaptureCriteria()));
-    }
-
-    /// <summary>
     /// Planifie un filtrage différé : toute demande encore en attente ou en cours est annulée,
     /// de sorte qu'une rafale de modifications ne produit qu'un seul recalcul, après la dernière.
-    /// Le calcul s'exécute hors du thread d'UI ; seule l'affectation du résultat y revient.
+    /// Le calcul s'exécute hors du thread d'UI, et l'affichage du résultat se fait par paquets.
+    /// La tâche retournée se termine quand la liste est entièrement affichée, ou dès que la demande
+    /// est remplacée par une plus récente.
     /// </summary>
-    private void ScheduleFilters(TimeSpan delay)
+    private Task ScheduleFilters(TimeSpan delay)
     {
         if (_isApplyingBounds)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         _filterCts?.Cancel();
         var cts = new CancellationTokenSource();
         _filterCts = cts;
 
-        _ = RunFilterAsync(_allWeapons, CaptureCriteria(), delay, cts.Token);
+        UpdateIsFiltering(true);
+        return RunFilterAsync(_allWeapons, CaptureCriteria(), delay, cts.Token);
     }
 
     private async Task RunFilterAsync(List<FpsWeaponModel> source, FilterCriteria criteria, TimeSpan delay, CancellationToken token)
@@ -257,20 +255,7 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
 
             var result = await Task.Run(() => FilterWeapons(source, criteria), token);
 
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                // Une saisie plus récente a pu annuler cette demande pendant le calcul ou l'attente du thread d'UI.
-                if (token.IsCancellationRequested)
-                {
-                    return;
-                }
-
-                // Reconstruire le tableau est l'opération coûteuse : on l'évite quand le résultat ne change pas.
-                if (!Weapons.SequenceEqual(result))
-                {
-                    Weapons = new ObservableCollection<FpsWeaponModel>(result);
-                }
-            }, DispatcherPriority.Background);
+            await Dispatcher.UIThread.InvokeAsync(() => DisplayResultAsync(result, token), DispatcherPriority.Background);
         }
         catch (OperationCanceledException)
         {
@@ -279,6 +264,58 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erreur lors du filtrage des armes FPS");
+        }
+        finally
+        {
+            // Une demande annulée a forcément une remplaçante, qui reste propriétaire de l'indicateur.
+            if (!token.IsCancellationRequested)
+            {
+                UpdateIsFiltering(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Affiche le résultat en alimentant une nouvelle collection par paquets : construire toutes les lignes
+    /// d'un coup bloquerait le thread d'UI. S'interrompt dès que la demande est annulée.
+    /// </summary>
+    private async Task DisplayResultAsync(List<FpsWeaponModel> result, CancellationToken token)
+    {
+        // Reconstruire le tableau est l'opération coûteuse : on l'évite quand le résultat ne change pas.
+        if (token.IsCancellationRequested || Weapons.SequenceEqual(result))
+        {
+            return;
+        }
+
+        var target = new ObservableCollection<FpsWeaponModel>();
+        Weapons = target;
+
+        for (var index = 0; index < result.Count; index += DisplayBatchSize)
+        {
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            foreach (var weapon in result.Skip(index).Take(DisplayBatchSize))
+            {
+                target.Add(weapon);
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+        }
+    }
+
+    // Écrit depuis RunFilterAsync, qui peut reprendre hors du thread d'UI : IsFiltering ne doit y être écrit que là.
+    private void UpdateIsFiltering(bool value)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            IsFiltering = value;
+        }
+        else
+        {
+            Dispatcher.UIThread.Post(() => UpdateIsFiltering(value), DispatcherPriority.MaxValue);
         }
     }
 
