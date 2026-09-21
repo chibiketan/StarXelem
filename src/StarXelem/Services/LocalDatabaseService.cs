@@ -465,6 +465,9 @@ public class LocalDatabaseService : ILocalDatabaseService
         var manufacturers = new List<ManufacturerEntity>();
         var manufacturerCache = new Dictionary<string, ManufacturerEntity>();
         var shipTags = new List<ShipTagEntity>();
+        // Les vaisseaux sont exclus du peuplement principal des ScItems (voir PopulateScItemsAsync), mais l'écran des objets
+        // retrouve le nom d'un objet du jeu par le CRC32 de son enregistrement : sans ligne ScItems, un vaisseau n'est pas nommé.
+        var shipScItems = new List<ScItemEntity>();
         var componentGuidMap = new Dictionary<string, CigGuid>();
         var start = Stopwatch.StartNew();
 
@@ -493,12 +496,30 @@ public class LocalDatabaseService : ILocalDatabaseService
                 // Compute IsVisible from TechnicalName patterns
                 var isVisible = ComputeIsVisible(record.RecordName);
 
+                var resolvedName = await _p4kService.GetEntityClassName(entityClass);
+                var attachDef = entityClass.Components.OfType<SAttachableComponentParams>().FirstOrDefault()?.AttachDef as SItemDefinition;
+
+                shipScItems.Add(new ScItemEntity
+                {
+                    RecordId = guid,
+                    Crc32 = crc,
+                    TechnicalName = record.RecordName,
+                    LocalizedName = resolvedName ?? StripRecordPrefix(record.RecordName) ?? record.RecordName,
+                    TypeName = attachDef?.Type.ToString() ?? string.Empty,
+                    SubTypeName = attachDef?.SubType.ToString() ?? string.Empty,
+                    Size = attachDef?.Size,
+                    Grade = attachDef?.Grade,
+                    LocaleNameKey = attachDef?.Localization.Name,
+                    LocaleDescKey = attachDef?.Localization.Description,
+                    ManufacturerId = manufacturerId
+                });
+
                 ships.Add(new ShipEntity
                 {
                     EntityClassGuid = guid,
                     Crc32 = crc,
                     TechnicalName = record.RecordName,
-                    LocalizedName = await _p4kService.GetEntityClassName(entityClass) ?? "Unknown",
+                    LocalizedName = resolvedName ?? "Unknown",
                     ManufacturerId = manufacturerId,
                     IsVisible = isVisible
                 });
@@ -531,12 +552,14 @@ public class LocalDatabaseService : ILocalDatabaseService
         db.ChangeTracker.AutoDetectChangesEnabled = false;
         db.Manufacturers.AddRange(manufacturers);
         db.Ships.AddRange(ships);
+        db.ScItems.AddRange(shipScItems);
         db.ShipTags.AddRange(shipTags);
         db.ChangeTracker.AutoDetectChangesEnabled = true;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         db.ChangeTracker.Clear();
         _logger.LogInformation("Inserted {Count} manufacturer into the database.", manufacturers.Count);
         _logger.LogInformation("Inserted {Count} ship into the database.", ships.Count);
+        _logger.LogInformation("Inserted {Count} ship SCItems into the database.", shipScItems.Count);
         _logger.LogInformation("Inserted {Count} liaison ship <=> tag into the database.", shipTags.Count);
     }
 
