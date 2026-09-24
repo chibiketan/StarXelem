@@ -146,7 +146,7 @@ public class LocationService : ILocationService
                     //return Task.FromResult("[EDGE] attached to traiter")!;
                     if (entity.EntityEdge.End.HasEntityId)
                     {
-                        return ResolveEntityLocation(entity.EntityEdge.End.EntityId, allowedTypes);
+                        return ResolveEntityLocation(entity.EntityEdge.End.EntityId, entity.EntityNodeProperties?.UnstowedFromInventoryId, allowedTypes);
                     }
 
                     if (entity.EntityEdge.End.HasInventoryId)
@@ -182,12 +182,13 @@ public class LocationService : ILocationService
     /// Le résultat est mis en cache dans <see cref="_entityCache"/> pour éviter les requêtes répétées.
     /// </summary>
     /// <param name="guid">Identifiant unique de l'entité (GUID numérique).</param>
+    /// <param name="inventoryId">l'id de l'inventaire qui contient l'objet recherché</param>
     /// <param name="allowedTypes">
     /// Liste optionnelle des types d'items acceptés comme emplacement final.
     /// Si le type de l'entité ne figure pas dans cette liste, la résolution remonte la chaîne de possession.
     /// </param>
     /// <returns>Le nom localisé de l'emplacement, ou un message d'erreur si l'entité est introuvable.</returns>
-    public async Task<String?> ResolveEntityLocation(ulong guid, IList<EItemType>? allowedTypes = null)
+    public async Task<String?> ResolveEntityLocation(ulong guid, string? inventoryId, IList<EItemType>? allowedTypes = null)
     {
         // TODO remove
         var results = await _entityCache.GetOrAdd(guid, entityId =>
@@ -196,6 +197,11 @@ public class LocationService : ILocationService
             queryProp.Id = entityId.ToString();
             queryProp.useConnectedUserOwner = false;
             queryProp.UseProjection = false;
+            if (!string.IsNullOrEmpty(inventoryId))
+            {
+                queryProp.InventoryIdList = [inventoryId];
+            }
+
             return _grpcClientService.QueryGraphBySearch(queryProp);
         });
         // var queryProp = new ItemQueryModel();

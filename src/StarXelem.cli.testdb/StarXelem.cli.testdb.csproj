@@ -11,6 +11,18 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Reference Include="Google.Protobuf">
+            <HintPath>..\..\libs\Google.Protobuf.dll</HintPath>
+        </Reference>
+        <Reference Include="Grpc.Core.Api">
+            <HintPath>..\..\libs\Grpc.Core.Api.dll</HintPath>
+        </Reference>
+        <Reference Include="Grpc.Net.Client">
+            <HintPath>..\..\libs\Grpc.Net.Client.dll</HintPath>
+        </Reference>
+        <Reference Include="StarBreaker.Grpc">
+            <HintPath>..\..\libs\StarBreaker.Grpc.dll</HintPath>
+        </Reference>
         <Reference Include="StarBreaker.Common">
             <HintPath>..\..\libs\StarBreaker.Common.dll</HintPath>
         </Reference>

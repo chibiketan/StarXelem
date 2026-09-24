@@ -33,7 +33,14 @@ async Task RunAsync()
         p4kPath = positionalArgs[0];
         if (!File.Exists(p4kPath))
         {
-            p4kLogger.LogError("P4K file not found: {Path}", p4kPath);
+            // Console.Error plutôt que le logger : la sortie asynchrone du logger console est perdue quand le processus se termine aussitôt.
+            Console.Error.WriteLine($"Fichier P4K introuvable : {p4kPath}");
+            if (args.Contains("--probe-grpc"))
+            {
+                Console.Error.WriteLine("Les options de la sonde s'écrivent --cle=valeur (et non --cle valeur) : une valeur isolée est prise pour le chemin du P4K.");
+            }
+
+            Environment.ExitCode = 1;
             return;
         }
         p4kService.SelectedP4KFile = new P4kFileModel { ChannelName = "Custom", Path = p4kPath };
@@ -50,6 +57,13 @@ async Task RunAsync()
         p4kPath = locations[0].Path;
         p4kLogger.LogInformation("Using P4K: {Path}", p4kPath);
         p4kService.SelectedP4KFile = locations[0];
+    }
+
+    // Le P4K n'est pas ouvert : la sonde n'en utilise que le chemin, pour localiser loginData.json.
+    if (args.Contains("--probe-grpc"))
+    {
+        Environment.ExitCode = await EntityQueryProbe.RunAsync(p4kPath, args);
+        return;
     }
 
     var p4kProgress = new Progress<double>();

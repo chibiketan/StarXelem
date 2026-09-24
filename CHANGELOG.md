@@ -9,6 +9,8 @@ Version SC : 4.10.1
 - Ajout d'un indicateur de chargement et de filtrage sur l'écran des objets
 - Correction de la récupération des objets lorsque plusieurs conteneurs sont interrogés, qui en omettait une partie
 - Correction de l'affichage du nom du vaisseau pour l'écran des objets
+- Correction de la résolution du contenant de l'objet (pour la liste d'objets et pour le hangar)
+- Légère modification des recherches pour remonter mieux les objets
 
 
 ## [0.2.4]
