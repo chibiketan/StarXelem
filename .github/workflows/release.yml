@@ -27,9 +27,12 @@ jobs:
         run: |
           $tag = "${{ github.event.inputs.ref || github.ref_name }}"
           $isBeta = $tag -match '-beta'
-          $version = $tag.TrimStart('v') -replace '-beta.*',''
+          $semver = $tag.TrimStart('v')
+          $version = $semver -replace '-.*',''
           $fullVersion = "$version.0"
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
           echo "is_beta=$isBeta" >> $env:GITHUB_OUTPUT
+          echo "semver=$semver" >> $env:GITHUB_OUTPUT
           echo "full_version=$fullVersion" >> $env:GITHUB_OUTPUT
 
       - name: Setup .NET 10
@@ -37,8 +40,26 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Publish
-        run: dotnet publish src/StarXelem/StarXelem.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o out/publish
+      - name: Publish win-x64
+        run: >
+          dotnet publish src/StarXelem/StarXelem.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -p:DebugType=None
+          -p:DebugSymbols=false
+          -p:Version=${{ steps.version.outputs.semver }}
+          -p:AssemblyVersion=${{ steps.version.outputs.full_version }}
+          -p:FileVersion=${{ steps.version.outputs.full_version }}
+          -p:InformationalVersion=${{ steps.version.outputs.semver }}
+          -o out/publish
+
+      # Le ZIP est créé avant l'ajout des fichiers propres au MSIX (manifest, assets, resources.pri).
+      - name: Zip
+        run: Compress-Archive -Path out/publish/* -DestinationPath out/StarXelem-${{ steps.version.outputs.tag }}-win-x64.zip
 
       - name: Copy manifest and assets
         shell: pwsh
@@ -94,6 +115,7 @@ jobs:
           } else {
             $section = "Voir CHANGELOG.md sur GitHub pour le detail des changements."
           }
+          Set-Content -Path out/release-notes.md -Value $section -Encoding utf8
           "notes<<EOF" >> $env:GITHUB_OUTPUT
           $section >> $env:GITHUB_OUTPUT
           "EOF" >> $env:GITHUB_OUTPUT
@@ -129,31 +151,15 @@ jobs:
         if: steps.version.outputs.is_beta == 'True'
         run: msstore publish out/StarXelem.msix --appId ${{ secrets.MSSTORE_PRODUCT_ID }} --flightId ${{ secrets.MSSTORE_FLIGHT_ID_BETA }}
 
-      - name: Publish win-x64
-        run: >
-          dotnet publish src/StarXelem/StarXelem.csproj
-          -c Release
-          -r win-x64
-          --self-contained true
-          -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
-          -p:EnableCompressionInSingleFile=true
-          -p:DebugType=None
-          -p:DebugSymbols=false
-          -p:ApplicationVersion=${{ github.ref_name }}
-          -o publish/win-x64
-
-      - name: Zip
-        run: Compress-Archive -Path publish/win-x64/* -DestinationPath out/StarXelem-${{ github.ref_name }}-win-x64.zip
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: StarXelem ${{ github.ref_name }}
+          name: StarXelem ${{ steps.version.outputs.tag }}
           files: |
             out/StarXelem.msix
-            out/StarXelem-${{ github.ref_name }}-win-x64.zip
+            out/StarXelem-${{ steps.version.outputs.tag }}-win-x64.zip
+          body_path: out/release-notes.md
           generate_release_notes: true
           draft: false
-          tag_name: ${{ github.event.inputs.ref || github.ref_name }}
-          prerelease: ${{ steps.version.outputs.isBeta == 'True' }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          prerelease: ${{ steps.version.outputs.is_beta == 'True' }}

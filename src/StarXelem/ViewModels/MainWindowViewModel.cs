@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -74,6 +75,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
             return statusText;
         }
+    }
+
+    public string WindowTitle { get; } = BuildWindowTitle();
+
+    private static string BuildWindowTitle()
+    {
+        var version = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        return string.IsNullOrEmpty(version) ? "StarXelem" : $"StarXelem v{version}";
     }
 
     private void OnGrpcConnectionStatusChanged(object? sender, GrpcConnectionStatus status)
@@ -160,6 +169,7 @@ public partial class MainWindowViewModel : ViewModelBase
             App.Current.Services.GetRequiredService<BlueprintListTabViewModel>(),
             App.Current.Services.GetRequiredService<FriendListTabViewModel>(),
             App.Current.Services.GetRequiredService<P4kShipTabViewModel>(),
+            App.Current.Services.GetRequiredService<FpsWeaponsTabViewModel>(),
             App.Current.Services.GetRequiredService<MissionsTabViewModel>(),
             App.Current.Services.GetRequiredService<ExtractionTabViewModel>(),
             App.Current.Services.GetRequiredService<ReputationTabViewModel>(),
@@ -673,6 +683,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             "ship" => _pages.FirstOrDefault(p => p is ShipTabViewModel),
             "p4kship" => _pages.FirstOrDefault(p => p is P4kShipTabViewModel),
+            "fpsweapons" => _pages.FirstOrDefault(p => p is FpsWeaponsTabViewModel),
             "items" => _pages.FirstOrDefault(p => p is ItemsTabViewModel),
             "blueprints" => _pages.FirstOrDefault(p => p is BlueprintListTabViewModel),
             "friends" => _pages.FirstOrDefault(p => p is FriendListTabViewModel),

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Data.Sqlite;
+using StarXelem.Cli.TestDb;
 using StarXelem.Data;
 using StarXelem.Models;
 using StarXelem.Services;
@@ -22,14 +23,24 @@ async Task RunAsync()
     var factory = new DbContextFactory();
     var dbService = new LocalDatabaseService(p4kService, dbLogger, new RegistrySettingsService(settingsLogger), factory, autoRebuild: false);
 
+    var probeFps = args.Contains("--probe-fps");
+    var positionalArgs = args.Where(a => !a.StartsWith("--", StringComparison.Ordinal)).ToArray();
+
     string p4kPath;
 
-    if (args.Length > 0)
+    if (positionalArgs.Length > 0)
     {
-        p4kPath = args[0];
+        p4kPath = positionalArgs[0];
         if (!File.Exists(p4kPath))
         {
-            p4kLogger.LogError("P4K file not found: {Path}", p4kPath);
+            // Console.Error plutôt que le logger : la sortie asynchrone du logger console est perdue quand le processus se termine aussitôt.
+            Console.Error.WriteLine($"Fichier P4K introuvable : {p4kPath}");
+            if (args.Contains("--probe-grpc"))
+            {
+                Console.Error.WriteLine("Les options de la sonde s'écrivent --cle=valeur (et non --cle valeur) : une valeur isolée est prise pour le chemin du P4K.");
+            }
+
+            Environment.ExitCode = 1;
             return;
         }
         p4kService.SelectedP4KFile = new P4kFileModel { ChannelName = "Custom", Path = p4kPath };
@@ -48,10 +59,24 @@ async Task RunAsync()
         p4kService.SelectedP4KFile = locations[0];
     }
 
+    // Le P4K n'est pas ouvert : la sonde n'en utilise que le chemin, pour localiser loginData.json.
+    if (args.Contains("--probe-grpc"))
+    {
+        Environment.ExitCode = await EntityQueryProbe.RunAsync(p4kPath, args);
+        return;
+    }
+
     var p4kProgress = new Progress<double>();
     var fsProgress = new Progress<double>();
 
     await p4kService.OpenP4k(p4kPath, p4kProgress, fsProgress);
+
+    if (probeFps)
+    {
+        var probeTag = positionalArgs.Length > 1 ? positionalArgs[1] : "hdgw_rifle_ballistic_01";
+        await FpsWeaponProbe.RunAsync(p4kService, probeTag, finalDepth: 3);
+        return;
+    }
 
     await dbService.RebuildDbAsync();
 
@@ -98,6 +123,79 @@ async Task RunAsync()
     while (reader.Read())
     {
         Console.WriteLine($"  {reader.GetString(0)} | {reader.GetString(1)} | alpha:{(reader.IsDBNull(2) ? "?" : reader.GetFloat(2))}");
+    }
+    reader.Dispose();
+
+    // Armes FPS : contrôle du regroupement et des valeurs de l'Arlington
+    Console.WriteLine("\n=== Armes FPS ===");
+    cmd.CommandText = "SELECT COUNT(*), SUM(VariantCount), SUM(HasSecondaryFire) FROM FpsWeapons";
+    reader = cmd.ExecuteReader();
+    if (reader.Read())
+    {
+        Console.WriteLine($"  {reader.GetInt32(0)} modèles regroupés depuis {reader.GetInt32(1)} variantes, dont {reader.GetInt32(2)} avec tir secondaire");
+    }
+    reader.Dispose();
+
+    cmd.CommandText = @"SELECT LocalizedName, WeaponClass, AmmoFamily, VariantCount, MagazineSize,
+            PrimaryDamagePerShot, PrimaryDamageType, PrimaryPelletCount, PrimaryFireRate,
+            PrimaryMaxRange, PrimaryEffectiveRange, PrimaryDamageFloorRange,
+            SecondaryDamagePerShot, SecondaryDamageType, SecondaryPelletCount, SecondaryMaxRange,
+            RepoolUnstowDuration, RepoolBulletsPerSecond
+        FROM FpsWeapons WHERE Id = 'hdgw_rifle_ballistic_01'";
+    reader = cmd.ExecuteReader();
+    while (reader.Read())
+    {
+        Console.WriteLine($"  {reader.GetString(0)} [{reader.GetString(1)}/{reader.GetString(2)}] "
+            + $"{reader.GetInt32(3)} variantes, chargeur {reader.GetInt32(4)}");
+        Console.WriteLine($"    principal : {reader.GetFloat(5)} {reader.GetString(6)} ×{reader.GetInt32(7)} "
+            + $"cadence {reader.GetInt32(8)} | max {reader.GetFloat(9)}m | pleins {reader.GetFloat(10)}m | plancher {reader.GetFloat(11)}m");
+        Console.WriteLine($"    secondaire: {reader.GetFloat(12)} {reader.GetString(13)} ×{reader.GetInt32(14)} | max {reader.GetFloat(15)}m");
+        Console.WriteLine($"    extraction: {reader.GetFloat(16)}s, {reader.GetInt32(17)} balles/s");
+    }
+    reader.Dispose();
+
+    cmd.CommandText = @"SELECT LocalizedName, PrimaryDamagePerShot, SecondaryDamagePerShot
+        FROM FpsWeapons WHERE HasSecondaryFire = 1 OR PrimaryDamagePerShot IS NULL ORDER BY LocalizedName";
+    reader = cmd.ExecuteReader();
+    Console.WriteLine("  armes à double tir ou sans dégâts principaux :");
+    while (reader.Read())
+    {
+        var primary = reader.IsDBNull(1) ? "NULL" : reader.GetFloat(1).ToString("0.##");
+        var secondary = reader.IsDBNull(2) ? "—" : reader.GetFloat(2).ToString("0.##");
+        Console.WriteLine($"    {reader.GetString(0),-34} principal={primary,-8} secondaire={secondary}");
+    }
+    reader.Dispose();
+
+    cmd.CommandText = @"SELECT LocalizedName, Id, VariantCount, MagazineSize
+        FROM FpsWeapons WHERE LocalizedName LIKE '%P8-AR%' OR LocalizedName LIKE '%Animus%' ORDER BY LocalizedName";
+    reader = cmd.ExecuteReader();
+    Console.WriteLine("  contrôle des anomalies corrigées (P8-AR regroupé, Animus chargeur) :");
+    while (reader.Read())
+    {
+        var mag = reader.IsDBNull(3) ? "—" : reader.GetInt32(3).ToString();
+        Console.WriteLine($"    {reader.GetString(0),-34} groupe={reader.GetString(1),-34} variantes={reader.GetInt32(2)} chargeur={mag}");
+    }
+    reader.Dispose();
+
+    cmd.CommandText = @"SELECT LocalizedName, PrimaryDamagePerShot, PrimaryExplosiveDamage,
+            SecondaryDamagePerShot, SecondaryExplosiveDamage
+        FROM FpsWeapons WHERE PrimaryExplosiveDamage IS NOT NULL OR SecondaryExplosiveDamage IS NOT NULL
+        ORDER BY PrimaryExplosiveDamage DESC";
+    reader = cmd.ExecuteReader();
+    Console.WriteLine("  armes explosives (direct / explosif) :");
+    while (reader.Read())
+    {
+        string F(int i) => reader.IsDBNull(i) ? "—" : reader.GetFloat(i).ToString("0.##");
+        Console.WriteLine($"    {reader.GetString(0),-34} principal={F(1)} ({F(2)})   secondaire={F(3)} ({F(4)})");
+    }
+    reader.Dispose();
+
+    cmd.CommandText = "SELECT WeaponClass, COUNT(*) FROM FpsWeapons GROUP BY WeaponClass ORDER BY 2 DESC";
+    reader = cmd.ExecuteReader();
+    Console.WriteLine("  répartition par classe :");
+    while (reader.Read())
+    {
+        Console.WriteLine($"    {reader.GetString(0),-12} {reader.GetInt32(1)}");
     }
     reader.Dispose();
 

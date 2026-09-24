@@ -25,6 +25,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<ShipTabViewModel>();
         services.AddTransient<P4kShipTabViewModel>();
+        services.AddTransient<FpsWeaponsTabViewModel>();
         services.AddTransient<ItemsTabViewModel>();
         services.AddTransient<ContainerTabViewModel>();
         services.AddTransient<FriendListTabViewModel>();
@@ -73,6 +74,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDbContextFactory, DbContextFactory>();
         services.AddSingleton<ILocationRepository, LocationRepository>();
         services.AddSingleton<IScItemRepository, ScItemRepository>();
+        services.AddSingleton<IFpsWeaponRepository, FpsWeaponRepository>();
         services.AddSingleton<ILocaleEntryRepository, LocaleEntryRepository>();
 
         // Service API externe pour la communication avec Alliance Orbital (profil utilisateur)

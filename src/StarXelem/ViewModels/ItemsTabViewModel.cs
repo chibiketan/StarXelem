@@ -18,6 +18,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using StarXelem.ViewModels.Popup;
 
 namespace StarXelem.ViewModels;
@@ -59,8 +60,15 @@ public partial class ItemsTabViewModel : PageViewModelBase
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.PersonAccounts);
     [ObservableProperty] public Task<IList<ItemViewModel>>? _itemList;
     [ObservableProperty] public ItemViewModel? _selectedItem;
-    [ObservableProperty] private bool _isLoading = false;
-    [ObservableProperty] private string _treatmentStatus = "";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsBusy), nameof(BusyMessage))] private bool _isLoading = false;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(BusyMessage))] private string _treatmentStatus = "";
+    /// <summary>Vrai du moment où un filtre est demandé jusqu'à ce que la liste correspondante soit entièrement affichée.</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsBusy), nameof(BusyMessage))] private bool _isFiltering;
+    /// <summary>
+    /// Lignes affichées par le tableau. Distincte de <see cref="ItemList"/>, qui porte le résultat complet du filtre
+    /// pour l'export et la synchronisation : cette collection est alimentée par paquets pour ne pas figer l'UI.
+    /// </summary>
+    [ObservableProperty] private ObservableCollection<ItemViewModel> _displayedItems = new();
     [ObservableProperty] private bool _useConnectedProfilAsOwner = true;
     [ObservableProperty] private bool _useUserInventoryList = true;
     [ObservableProperty] private bool _useTreeProjection = false;
@@ -89,9 +97,27 @@ public partial class ItemsTabViewModel : PageViewModelBase
     [ObservableProperty] private string _nameSortLabel = "Trier par Nom A→Z";
 
     private Task<IList<ItemViewModel>>? _unfilteredItemList;
+    private CancellationTokenSource? _filterCts;
 
-    public ItemsTabViewModel(IGrpcClientService clientService, IScItemRepository scItemRepository, ILocaleEntryRepository localeEntryRepository, ILocationService locationService)
+    // Délai d'inactivité de la saisie avant de filtrer : assez court pour rester réactif,
+    // assez long pour qu'une frappe rapide ne déclenche qu'un seul filtrage.
+    private static readonly TimeSpan NameFilterDelay = TimeSpan.FromMilliseconds(300);
+    // Cases à cocher des types : délai réduit, suffisant pour absorber une série de clics rapprochés.
+    private static readonly TimeSpan TypeFilterDelay = TimeSpan.FromMilliseconds(120);
+    // Le tableau est alimenté par paquets : entre deux paquets, le thread d'UI traite la saisie et le rendu,
+    // ce qui garde l'indicateur animé et la fenêtre réactive pendant la construction des lignes.
+    private const int DisplayBatchSize = 20;
+
+    private readonly ILogger<ItemsTabViewModel> _logger;
+
+    public bool IsBusy => IsLoading || IsFiltering;
+    public string BusyMessage => IsLoading
+        ? (string.IsNullOrWhiteSpace(TreatmentStatus) ? "Chargement des objets…" : TreatmentStatus)
+        : "Filtrage en cours…";
+
+    public ItemsTabViewModel(IGrpcClientService clientService, IScItemRepository scItemRepository, ILocaleEntryRepository localeEntryRepository, ILocationService locationService, ILogger<ItemsTabViewModel> logger)
     {
+        _logger = logger;
         _clientService = clientService;
         _scItemRepository = scItemRepository;
         _localeEntryRepository = localeEntryRepository;
@@ -168,7 +194,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
                     SelectedFilterTypes.Remove(opt.Type);
             }
             
-            ApplyFilters();
+            ScheduleFilters(TypeFilterDelay);
             // Rafraîchir la vue triée quand une sélection change
             OnPropertyChanged(nameof(FilterTypeListSorted));
         }
@@ -231,7 +257,10 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
         _unfilteredItemList = Task.FromResult<IList<ItemViewModel>>(result);
         IsLoading = false;
-        ApplyFilters();
+
+        // Rattrape la liste filtrée complète avant de rendre la main : la commande reste "en cours"
+        // (et le bouton désactivé) jusqu'à l'affichage complet des lignes.
+        await ScheduleFilters(TimeSpan.Zero);
     }
     
     [RelayCommand(CanExecute = nameof(CanResetSelectedTypes))]
@@ -280,42 +309,155 @@ public partial class ItemsTabViewModel : PageViewModelBase
         return _clientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame && (LocationList == null || LocationList.IsCompleted);
     }
 
-    partial void OnNameFilterChanged(string value)
-    {
-        ApplyFilters();
-    }
+    partial void OnNameFilterChanged(string value) => ScheduleFilters(NameFilterDelay);
 
     partial void OnLocationListChanged(Task<IList<FilterLocationOptionModel>?>? value)
     {
         ReloadLocationListCommand.NotifyCanExecuteChanged();
     }
 
-    private async void ApplyFilters()
+    /// <summary>
+    /// Planifie un filtrage différé : toute demande encore en attente ou en cours est annulée,
+    /// de sorte qu'une rafale de modifications ne produit qu'un seul recalcul, après la dernière.
+    /// Le calcul s'exécute hors du thread d'UI, et l'affichage du résultat se fait par paquets.
+    /// La tâche retournée se termine quand la liste est entièrement affichée, ou dès que la demande
+    /// est remplacée par une plus récente. À appeler depuis le thread d'UI.
+    /// </summary>
+    private Task ScheduleFilters(TimeSpan delay)
     {
-        if (_unfilteredItemList == null)
-            return;
-
-        var items = await _unfilteredItemList;
-
-        IEnumerable<ItemViewModel> filtered = items;
-
-        // Filter by name if provided (case-insensitive)
-        if (!string.IsNullOrWhiteSpace(NameFilter))
+        var unfiltered = _unfilteredItemList;
+        if (unfiltered == null)
         {
-            filtered = filtered.Where(it =>
-                !string.IsNullOrEmpty(it.Name.Result) &&
-                it.Name.Result!.Contains(NameFilter, StringComparison.CurrentCultureIgnoreCase));
+            return Task.CompletedTask;
         }
 
-        // Filter by selected types (multi-select). If none selected, do not filter by type
-        if (SelectedFilterTypes is { Count: > 0 })
-        {
-            var selectedSet = SelectedFilterTypes.ToHashSet();
-            filtered = filtered.Where(i => selectedSet.Contains(i.ItemType));
-        }
+        _filterCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _filterCts = cts;
 
-        ItemList = Task.FromResult<IList<ItemViewModel>>(filtered.ToList());
+        // Copie de l'état des filtres : le calcul qui suit ne doit lire aucune propriété du ViewModel.
+        var criteria = new ItemFilterCriteria(
+            Needle: string.IsNullOrWhiteSpace(NameFilter) ? null : NameFilter,
+            Types: SelectedFilterTypes is { Count: > 0 } ? SelectedFilterTypes.ToHashSet() : null);
+
+        UpdateIsFiltering(true);
+        return RunFilterAsync(unfiltered, criteria, delay, cts.Token);
     }
+
+    private async Task RunFilterAsync(Task<IList<ItemViewModel>> unfiltered, ItemFilterCriteria criteria, TimeSpan delay, CancellationToken token)
+    {
+        try
+        {
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, token);
+            }
+
+            var items = await unfiltered;
+            var result = await Task.Run(() => FilterItemsAsync(items, criteria, token), token);
+
+            await Dispatcher.UIThread.InvokeAsync(() => DisplayResultAsync(result, token), DispatcherPriority.Background);
+        }
+        catch (OperationCanceledException)
+        {
+            // Remplacée par une demande plus récente : comportement normal.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erreur lors du filtrage de la liste des objets");
+        }
+        finally
+        {
+            // Une demande annulée a forcément une remplaçante, qui reste propriétaire de l'indicateur.
+            if (!token.IsCancellationRequested)
+            {
+                UpdateIsFiltering(false);
+            }
+        }
+    }
+
+    private static async Task<List<ItemViewModel>> FilterItemsAsync(IList<ItemViewModel> items, ItemFilterCriteria criteria, CancellationToken token)
+    {
+        var result = new List<ItemViewModel>();
+
+        foreach (var item in items)
+        {
+            token.ThrowIfCancellationRequested();
+
+            // Le type se lit sans coût : on l'examine avant le nom, dont la résolution interroge la base locale.
+            if (criteria.Types != null && !criteria.Types.Contains(item.ItemType))
+            {
+                continue;
+            }
+
+            if (criteria.Needle != null)
+            {
+                var name = await item.Name.ConfigureAwait(false);
+                if (string.IsNullOrEmpty(name) || !name.Contains(criteria.Needle, StringComparison.CurrentCultureIgnoreCase))
+                {
+                    continue;
+                }
+            }
+
+            result.Add(item);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Publie le résultat complet dans <see cref="ItemList"/>, puis l'affiche en alimentant une nouvelle collection
+    /// par paquets : construire toutes les lignes d'un coup bloquerait le thread d'UI. S'interrompt dès que la demande
+    /// est annulée.
+    /// </summary>
+    private async Task DisplayResultAsync(List<ItemViewModel> result, CancellationToken token)
+    {
+        if (token.IsCancellationRequested)
+        {
+            return;
+        }
+
+        ItemList = Task.FromResult<IList<ItemViewModel>>(result);
+
+        // Reconstruire le tableau est l'opération coûteuse : on l'évite quand le résultat ne change pas.
+        if (DisplayedItems.SequenceEqual(result))
+        {
+            return;
+        }
+
+        var target = new ObservableCollection<ItemViewModel>();
+        DisplayedItems = target;
+
+        for (var index = 0; index < result.Count; index += DisplayBatchSize)
+        {
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            foreach (var item in result.Skip(index).Take(DisplayBatchSize))
+            {
+                target.Add(item);
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+        }
+    }
+
+    // Écrit depuis RunFilterAsync, qui peut reprendre hors du thread d'UI : IsFiltering ne doit y être écrit que là.
+    private void UpdateIsFiltering(bool value)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            IsFiltering = value;
+        }
+        else
+        {
+            Dispatcher.UIThread.Post(() => UpdateIsFiltering(value), DispatcherPriority.MaxValue);
+        }
+    }
+
+    private sealed record ItemFilterCriteria(string? Needle, HashSet<EItemType>? Types);
 
     // Active/désactive le bouton d'export lorsqu'on change la liste
     partial void OnItemListChanged(Task<IList<ItemViewModel>>? value)

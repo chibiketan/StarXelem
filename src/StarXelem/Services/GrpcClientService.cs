@@ -194,7 +194,7 @@ public class GrpcClientService : IGrpcClientService
         var andFilters = new List<EntityFilter>(8);
 
         // Filtre owner
-        if ((itemQueryModel.useConnectedUserOwner && (itemQueryModel.InventoryIdList?.Count ?? 0) == 0) || !string.IsNullOrEmpty(itemQueryModel.ownerId))
+        if (itemQueryModel.useConnectedUserOwner || !string.IsNullOrEmpty(itemQueryModel.ownerId))
         {
             ulong ownerId = itemQueryModel.useConnectedUserOwner ? _playerInfo.Player.Geid : ulong.Parse(itemQueryModel.ownerId);
             andFilters.Add(PropEqULong("ownerId", ownerId));
@@ -213,7 +213,11 @@ public class GrpcClientService : IGrpcClientService
         }
 
         // Filtre par conteneur (STOWED_IN) avec option OR owner
-        if ((itemQueryModel.InventoryIdList?.Count ?? 0) > 0)
+        // Filtre actif uniquement si pas de owner ou pas d'id direct (sinon la requête mouline sans retourner)
+        if ((itemQueryModel.InventoryIdList?.Count ?? 0) > 0
+            && string.IsNullOrEmpty(itemQueryModel.Id) && string.IsNullOrEmpty(itemQueryModel.ownerId)
+            && !itemQueryModel.useConnectedUserOwner
+                )
         {
             var stowedIn = new EdgeFilter { EdgeType = "STOWED_IN" };
             stowedIn.Values.AddRange(itemQueryModel.InventoryIdList!.Select(id => Str(id)));
@@ -274,6 +278,12 @@ public class GrpcClientService : IGrpcClientService
             }
         };
 
+        if (compositeFilter.Filters.Count == 0)
+        {
+            // pas de sous éléments donc supprime le and
+            request.Body.Query.Filter = null;
+        }
+
         var edgeDict = new Dictionary<ulong, EntityEdge>(500);
         var snapshotDict = new Dictionary<ulong, EntitySnapshot>(500);
         var nodes = new List<Node>(800);
@@ -284,6 +294,9 @@ public class GrpcClientService : IGrpcClientService
             EntityQueryResponse? response = null;
             await semaphoreSlim.WaitAsync().ConfigureAwait(false);
             request.Body.Query.InventoryId = inventoryId;
+            // La requête est partagée entre les conteneurs : sans cette remise à zéro, la première page du conteneur suivant
+            // reprend le curseur de fin du précédent et ignore tout objet dont le geid le précède.
+            request.Body.Query.Pagination.After = "";
             try
             {
                 do

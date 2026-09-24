@@ -1,4 +1,22 @@
-﻿## [0.2.4]
+﻿## [0.2.5]
+Version SC : 4.10.1
+
+### Ajouté
+- Ajout d'un écran pour voir les armes FPS
+- Ajout des véhicules basés sur un acteur (ARGO ATLS et ses variants, PowerSuit) à la base locale des vaisseaux
+
+### Corrigé
+- Amélioration de la réactivité de l'écran des objets : le filtrage ne fige plus l'interface
+- Ajout d'un indicateur de chargement et de filtrage sur l'écran des objets
+- Correction de la récupération des objets lorsque plusieurs conteneurs sont interrogés, qui en omettait une partie
+- Correction de l'affichage du nom du vaisseau pour l'écran des objets
+- Correction de la résolution du contenant de l'objet (pour la liste d'objets et pour le hangar)
+- Légère modification des recherches pour remonter mieux les objets
+
+
+## [0.2.4]
+Version SC : 4.10.1
+
 ### Ajouté
 - Support de la version 4.10.1 de Star Citizen
 
@@ -10,6 +28,7 @@
 
 
 ## [0.2.3]
+Version SC : 4.10.0
 ### Ajouté
 - Ajout de l'information de qualité pour les cargos
 - Utilisation d'une base de données locale à la place du fichier P4K

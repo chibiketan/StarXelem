@@ -7,6 +7,9 @@
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
         <ApplicationIcon>Assets\xelem-logo.ico</ApplicationIcon>
+        <!-- Version des builds locaux : la CI de release l'écrase à partir du tag git. -->
+        <Version>0.0.0-dev</Version>
+        <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
         <!-- Incite le GC à rendre la mémoire à l'OS de façon plus agressive (au prix d'un peu de débit) :
              important pour une appli censée cohabiter avec le jeu, dont l'empreinte mémoire doit rester sobre. -->
         <ConserveMemory>9</ConserveMemory>

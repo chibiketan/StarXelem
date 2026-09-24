@@ -24,6 +24,7 @@ public static class DesignData
     
     public static ItemComparisonPopupContentViewModel ItemComparisonPopupContentViewModel { get; } = App.Current.Services.GetRequiredService<ItemComparisonPopupContentViewModel>();
     public static P4kShipTabViewModel P4kShipTabViewModel { get; } = App.Current.Services.GetRequiredService<P4kShipTabViewModel>();
+    public static FpsWeaponsTabViewModel FpsWeaponsTabViewModel { get; } = App.Current.Services.GetRequiredService<FpsWeaponsTabViewModel>();
     public static MissionsTabViewModel MissionsTabViewModel { get; } = App.Current.Services.GetRequiredService<MissionsTabViewModel>();
     public static ReputationTabViewModel ReputationTabViewModel { get; } = App.Current.Services.GetRequiredService<ReputationTabViewModel>();
 
@@ -183,6 +184,66 @@ public static class DesignData
                 PortName = "MissileB1"
             }
         ]);
+
+        // Armes FPS : deux exemples représentatifs, dont une arme à double munition.
+        FpsWeaponsTabViewModel.WeaponClassList = ["Toutes les classes", "Fusil d'assaut", "Pistolet"];
+        FpsWeaponsTabViewModel.DamageUpperBound = 120;
+        FpsWeaponsTabViewModel.DamageMax = 120;
+        FpsWeaponsTabViewModel.EffectiveRangeUpperBound = 500;
+        FpsWeaponsTabViewModel.EffectiveRangeMax = 500;
+        FpsWeaponsTabViewModel.Weapons.Add(new FpsWeaponModel
+        {
+            Id = "hdgw_rifle_ballistic_01",
+            Name = "Arlington",
+            TechnicalName = "hdgw_rifle_ballistic_01",
+            WeaponClass = "rifle",
+            Manufacturer = "Hedeby Gunworks",
+            Size = 2,
+            Grade = 1,
+            VariantCount = 4,
+            VariantNames = "Arlington\nArlington Tint01\nArlington Tint02\nArlington Tint03",
+            MagazineSize = 20,
+            RepoolUnstowDuration = 1f,
+            RepoolBulletsPerSecond = 10,
+            PrimaryModeName = "Slug",
+            PrimaryDamageType = "Physical",
+            PrimaryDamagePerShot = 80f,
+            PrimaryPelletCount = 1,
+            PrimaryFireRate = 85,
+            PrimaryProjectileSpeed = 550f,
+            PrimaryMaxRange = 1100f,
+            PrimaryEffectiveRange = 50f,
+            PrimaryDamageFloorRange = 500f,
+            HasSecondaryFire = true,
+            SecondaryModeName = "Single",
+            SecondaryDamageType = "Energy",
+            SecondaryDamagePerShot = 100f,
+            SecondaryPelletCount = 8,
+            SecondaryFireRate = 85,
+            SecondaryProjectileSpeed = 300f,
+            SecondaryMaxRange = 600f
+        });
+        FpsWeaponsTabViewModel.Weapons.Add(new FpsWeaponModel
+        {
+            Id = "behr_pistol_ballistic_01",
+            Name = "S-38",
+            TechnicalName = "behr_pistol_ballistic_01",
+            WeaponClass = "pistol",
+            Manufacturer = "Behring",
+            Size = 1,
+            Grade = 1,
+            VariantCount = 1,
+            VariantNames = "S-38",
+            MagazineSize = 20,
+            PrimaryModeName = "Single",
+            PrimaryDamageType = "Physical",
+            PrimaryDamagePerShot = 30f,
+            PrimaryExplosiveDamage = 75f,
+            PrimaryPelletCount = 1,
+            PrimaryFireRate = 240,
+            PrimaryMaxRange = 900f,
+            PrimaryEffectiveRange = 35f
+        });
 
         BlueprintListTabViewModel.IsLoading = true;
         BlueprintListTabViewModel.TreatmentStatus = "En cours de chargement...";
