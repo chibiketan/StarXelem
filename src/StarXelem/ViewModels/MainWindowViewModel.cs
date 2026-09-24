@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -74,6 +75,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
             return statusText;
         }
+    }
+
+    public string WindowTitle { get; } = BuildWindowTitle();
+
+    private static string BuildWindowTitle()
+    {
+        var version = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        return string.IsNullOrEmpty(version) ? "StarXelem" : $"StarXelem v{version}";
     }
 
     private void OnGrpcConnectionStatusChanged(object? sender, GrpcConnectionStatus status)
