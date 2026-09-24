@@ -499,30 +499,28 @@ public class LocalDatabaseService : ILocalDatabaseService
                 var resolvedName = await _p4kService.GetEntityClassName(entityClass);
                 var attachDef = entityClass.Components.OfType<SAttachableComponentParams>().FirstOrDefault()?.AttachDef as SItemDefinition;
 
-                shipScItems.Add(new ScItemEntity
-                {
-                    RecordId = guid,
-                    Crc32 = crc,
-                    TechnicalName = record.RecordName,
-                    LocalizedName = resolvedName ?? StripRecordPrefix(record.RecordName) ?? record.RecordName,
-                    TypeName = attachDef?.Type.ToString() ?? string.Empty,
-                    SubTypeName = attachDef?.SubType.ToString() ?? string.Empty,
-                    Size = attachDef?.Size,
-                    Grade = attachDef?.Grade,
-                    LocaleNameKey = attachDef?.Localization.Name,
-                    LocaleDescKey = attachDef?.Localization.Description,
-                    ManufacturerId = manufacturerId
-                });
+                var (scItem, ship) = BuildShipEntities(guid, crc, record.RecordName, attachDef, resolvedName, manufacturerId, isVisible);
+                shipScItems.Add(scItem);
+                ships.Add(ship);
+            }
+            else if (IsActorVehicle(entityClass, out var actorItemDef))
+            {
+                var guid = record.RecordId.ToString();
+                var crc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([record.RecordId]));
+                _entityClassToGuid[entityClass] = guid;
 
-                ships.Add(new ShipEntity
+                foreach (var tagId in ExtractShipTags(entityClass, tagResolutionMap))
                 {
-                    EntityClassGuid = guid,
-                    Crc32 = crc,
-                    TechnicalName = record.RecordName,
-                    LocalizedName = resolvedName ?? "Unknown",
-                    ManufacturerId = manufacturerId,
-                    IsVisible = isVisible
-                });
+                    shipTags.Add(new ShipTagEntity { ShipGuid = guid, TagSelfId = tagId });
+                }
+
+                var manufacturerId = ResolveActorVehicleManufacturerId(entityClass, record.RecordName, manufacturerCache, manufacturers);
+                var isVisible = ComputeIsVisible(record.RecordName);
+                var resolvedName = await _p4kService.GetEntityClassName(entityClass);
+
+                var (scItem, ship) = BuildShipEntities(guid, crc, record.RecordName, actorItemDef, resolvedName, manufacturerId, isVisible);
+                shipScItems.Add(scItem);
+                ships.Add(ship);
             }
 
             // Build component GUID map for attachable components
@@ -1159,6 +1157,89 @@ public class LocalDatabaseService : ILocalDatabaseService
             manufacturers.Add(entity);
         }
         return entity;
+    }
+
+    private static bool IsActorVehicle(EntityClassDefinition entityClass, out SItemDefinition itemDef)
+    {
+        itemDef = null;
+        if (entityClass.Components.OfType<VehicleComponentParams>().Any())
+            return false;
+
+        var attachable = entityClass.Components.OfType<SAttachableComponentParams>().FirstOrDefault();
+        if (attachable?.AttachDef is not SItemDefinition def)
+            return false;
+
+        if (def.Type != EItemType.NOITEM_Vehicle)
+            return false;
+
+        var actorParams = entityClass.Components.OfType<SActorComponentParams>().FirstOrDefault();
+        if (actorParams?.actorType != EActorType.Transport)
+            return false;
+
+        itemDef = def;
+        return true;
+    }
+
+    private string ResolveActorVehicleManufacturerId(
+        EntityClassDefinition entityClass,
+        string recordName,
+        Dictionary<string, ManufacturerEntity> manufacturerCache,
+        List<ManufacturerEntity> manufacturers)
+    {
+        var insurance = entityClass.StaticEntityClassData.OfType<SEntityInsuranceProperties>().FirstOrDefault();
+        var manufacturerRef = insurance?.displayParams?.manufacturer;
+        if (manufacturerRef is not null
+            && (!string.IsNullOrEmpty(manufacturerRef.Code) || !string.IsNullOrEmpty(manufacturerRef.Localization.Name)))
+        {
+            return ResolveManufacturerId(manufacturerRef, manufacturerCache, manufacturers);
+        }
+
+        var name = StripRecordPrefix(recordName);
+        if (name is not null)
+        {
+            var token = name.Split('_')[0];
+            if (manufacturerCache.TryGetValue(token, out var manufacturer))
+                return manufacturer.Id;
+        }
+
+        return GetOrCreateUnknownManufacturer(manufacturerCache, manufacturers).Id;
+    }
+
+    private static (ScItemEntity ScItem, ShipEntity Ship) BuildShipEntities(
+        string guid,
+        uint crc,
+        string recordName,
+        SItemDefinition? attachDef,
+        string? resolvedName,
+        string manufacturerId,
+        bool isVisible)
+    {
+        var scItem = new ScItemEntity
+        {
+            RecordId = guid,
+            Crc32 = crc,
+            TechnicalName = recordName,
+            LocalizedName = resolvedName ?? StripRecordPrefix(recordName) ?? recordName,
+            TypeName = attachDef?.Type.ToString() ?? string.Empty,
+            SubTypeName = attachDef?.SubType.ToString() ?? string.Empty,
+            Size = attachDef?.Size,
+            Grade = attachDef?.Grade,
+            LocaleNameKey = attachDef?.Localization.Name,
+            LocaleDescKey = attachDef?.Localization.Description,
+            ManufacturerId = manufacturerId
+        };
+
+        var ship = new ShipEntity
+        {
+            EntityClassGuid = guid,
+            Crc32 = crc,
+            TechnicalName = recordName,
+            LocalizedName = resolvedName ?? "Unknown",
+            ManufacturerId = manufacturerId,
+            IsVisible = isVisible
+        };
+
+        return (scItem, ship);
     }
 
     /* ========================================================================
@@ -3147,6 +3228,9 @@ public class LocalDatabaseService : ILocalDatabaseService
                     return false;
 
                 if (ec.Components.OfType<VehicleComponentParams>().Any())
+                    return false;
+
+                if (IsActorVehicle(ec, out _))
                     return false;
 
                 return true;

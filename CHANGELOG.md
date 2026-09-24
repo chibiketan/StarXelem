@@ -3,6 +3,7 @@ Version SC : 4.10.1
 
 ### Ajouté
 - Ajout d'un écran pour voir les armes FPS
+- Ajout des véhicules basés sur un acteur (ARGO ATLS et ses variants, PowerSuit) à la base locale des vaisseaux
 
 ### Corrigé
 - Amélioration de la réactivité de l'écran des objets : le filtrage ne fige plus l'interface

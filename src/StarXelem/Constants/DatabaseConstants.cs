@@ -7,5 +7,5 @@ namespace StarXelem.Constants;
 /// </summary>
 public static class DatabaseConstants
 {
-    public const int DatabaseVersion = 5;
+    public const int DatabaseVersion = 6;
 }
