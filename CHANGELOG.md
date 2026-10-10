@@ -1,4 +1,10 @@
-﻿## [0.2.5]
+﻿## [0.2.6]
+Version SC : 4.10.2
+
+### Modifié
+- Mise à jour de Starbreaker pour utiliser le contenu des datafiles de la 4.10.2
+
+## [0.2.5]
 Version SC : 4.10.1
 
 ### Ajouté
