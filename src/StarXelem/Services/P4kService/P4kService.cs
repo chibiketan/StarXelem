@@ -303,6 +303,27 @@ public class P4kService : IP4kService, INotifyPropertyChanged
             _locale.Clear();
             using (var sr = new StreamReader(globalEntry, Encoding.UTF8, true))
             {
+                string? pendingKey = null;
+                StringBuilder? pendingValue = null;
+
+                void FlushPendingEntry()
+                {
+                    if (pendingKey is null)
+                        return;
+
+                    try
+                    {
+                        _locale.Add($"@{pendingKey}", pendingValue!.ToString());
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e, "Parsing error dans le fichier de langue (clé {Key})", pendingKey);
+                    }
+
+                    pendingKey = null;
+                    pendingValue = null;
+                }
+
                 while (await sr.ReadLineAsync().ConfigureAwait(false) is { } line)
                 {
                     if (_cancellationTokenSource.IsCancellationRequested)
@@ -311,17 +332,35 @@ public class P4kService : IP4kService, INotifyPropertyChanged
                         break;
                     }
 
-                    if (!string.IsNullOrEmpty(line))
-                    {
-                        var parts = line.Split('=', 2, StringSplitOptions.TrimEntries);
-                        var key = parts[0];
-                        var value = parts[1];
+                    if (string.IsNullOrEmpty(line))
+                        continue;
 
-                        if (key.EndsWith(",P"))
-                            key = key[..^2];
-                        _locale.Add($"@{key}", value);
+                    var separatorIndex = line.IndexOf('=');
+                    if (separatorIndex < 0)
+                    {
+                        // Depuis SC 4.10.2, certaines valeurs contiennent un vrai saut de ligne au lieu du texte "\n" :
+                        // la ligne courante est la suite de la valeur précédente.
+                        if (pendingValue is null)
+                        {
+                            _logger.LogWarning("Ligne orpheline ignorée dans le fichier de langue : {Line}", line);
+                            continue;
+                        }
+
+                        pendingValue.Append("\\n").Append(line.TrimEnd());
+                        continue;
                     }
+
+                    FlushPendingEntry();
+
+                    var key = line[..separatorIndex].Trim();
+                    if (key.EndsWith(",P"))
+                        key = key[..^2];
+
+                    pendingKey = key;
+                    pendingValue = new StringBuilder(line[(separatorIndex + 1)..].Trim());
                 }
+
+                FlushPendingEntry();
             }
             sw.Stop();
             _logger.LogTrace("Extracted all locale values in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
