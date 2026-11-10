@@ -1,4 +1,4 @@
-﻿using System.Buffers.Binary;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -21,6 +21,8 @@ public partial class ItemViewModel : ViewModelBase
     private readonly ILocaleEntryRepository _localeRepository;
     private readonly System.Lazy<Task<string?>> _location;
     public readonly Lazy<Task<string>> _owner;
+    // Préfixe technique ajouté par le service aux lieux du jeu : le cas général, inutile à l'affichage.
+    private const string LocationPrefix = "[LOCATION] ";
     private ushort? _contentQuality;
     private ulong? _contentQuantity;
 
@@ -29,6 +31,7 @@ public partial class ItemViewModel : ViewModelBase
     public Task<string> Owner => _owner.Value;
     public string ParentUrn => _entityNodeProperties.EntityNodeProperties.ParentUrn;
     public EItemType ItemType => (EItemType)_entityNodeProperties.EntityNodeProperties.ItemTypeEnum;
+    public string ItemTypeLabel => ItemTypeLabels.Get(ItemType);
     public EItemSubType ItemSubType => (EItemSubType)_entityNodeProperties.EntityNodeProperties.ItemSubTypeEnum;
     public uint LocationId => _entityNodeProperties.EntityNodeProperties.LocationId;
     public string? StowLocation => null;
@@ -118,7 +121,11 @@ public partial class ItemViewModel : ViewModelBase
 
     private async Task<string?> GetLocation()
     {
-        return await _locationService.ResolveLocation(_entityNodeProperties).ConfigureAwait(false);
+        var location = await _locationService.ResolveLocation(_entityNodeProperties).ConfigureAwait(false);
+
+        return location?.StartsWith(LocationPrefix, StringComparison.Ordinal) == true
+            ? location[LocationPrefix.Length..]
+            : location;
         
     }
 

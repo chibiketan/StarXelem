@@ -1,9 +1,11 @@
-﻿# StarXelem — Design System Reference
+# StarXelem — Design System Reference
 
 > Document de référence pour tous les composants graphiques de l'application StarXelem.  
 > Généré à partir des maquettes et décisions prises au cours du projet.  
 > **Format couleurs : ARGB 8 bits (ex: `#FF534AB7`)**  
 > **Tailles : px | Poids : `normal`, `500`, `bold`**
+>
+> **Refonte en cours :** la section 18 est la nouvelle référence. Tout nouvel écran et tout écran migré la suivent, et elle prime sur les sections 1 à 17 en cas de conflit. Ces sections restent valables pour les écrans pas encore migrés.
 
 ---
 
@@ -617,4 +619,60 @@ Quand il est actif :
 
 ---
 
-*Dernière mise à jour : mai 2026*
+## 18. Nouvelle charte (refonte)
+
+Validée en novembre 2026 à partir des maquettes de la direction « Inventaire expert ». Écran migré à ce jour : **Objets**. Implémentation : `Style/SxTheme.axaml` (ressources `Sx.*`) et `Components/`.
+
+Un écran migré applique les classes `sx`, sans valeur en dur. **Thème sombre uniquement pour l'instant** : un écran migré force le thème sombre avec `ThemeVariantScope` tant que le thème clair n'est pas dessiné.
+
+### 18.1 Couleurs
+
+| Rôle | Ressource | Valeur |
+|---|---|---|
+| Fond | `Sx.BackgroundBrush` | `#FF0B0D12` |
+| Surface (panneaux, cartes) | `Sx.SurfaceBrush` | `#FF12151C` |
+| Relief (survol, champs, bouton secondaire) | `Sx.ReliefBrush` | `#FF1A1E27` |
+| Ligne (bordures, séparateurs) | `Sx.LineBrush` | `#FF2A2F3A` |
+| Texte | `Sx.TextBrush` | `#FFF2F4F8` |
+| Secondaire (labels) | `Sx.SecondaryBrush` | `#FFA4ACBA` |
+| Discret (indications) | `Sx.MutedBrush` | `#FF8A93A5` |
+| Accent (action, sélection) | `Sx.AccentBrush` | `#FFE8B04A` |
+| Accent survol | `Sx.AccentHoverBrush` | `#D9E8B04A` |
+| Accent doux (fond sélectionné) | `Sx.AccentSoftBrush` | `#24E8B04A` |
+| Accent marqué (icône de filtre actif) | `Sx.AccentStrongBrush` | `#55E8B04A` |
+| Sur accent (texte d'un bouton plein) | `Sx.OnAccentBrush` | `#FF0B0D12` |
+
+Tons réservés aux badges, à ajouter aux ressources au premier écran qui en a besoin : Succès `#FF4FD1A5`, Attention `#FFF08A4B`, Danger `#FFF2666A`, Info `#FF6CB6FF`.
+
+### 18.2 Typographie
+
+Quatre tailles : **20** (titre, 600), **14 ou 13** (texte), **12** (légende, en-tête de colonne), **11** (compteur monospace). Polices : `Sx.FontSans` et `Sx.FontMono` pour les nombres et identifiants. La cible est IBM Plex Sans / Mono ; Inter et Cascadia Mono les remplacent tant que les polices ne sont pas embarquées.
+
+### 18.3 Formes
+
+- **Angles coupés** (`comp:NotchedBorder`, haut droit et bas gauche) : 9 px petit champ et bouton compact, 11 px champ et bouton, 12 px panneau flottant, 18 px bloc principal.
+- **Puces** (`Button.sx-chip`) : seul élément arrondi, rayon 17 px, hauteur 34 px.
+- **Bordures** : 1 px, couleur Ligne. La règle des 0,5 px ne s'applique pas ici.
+- L'ombre portée du panneau flottant est autorisée ; aucune autre.
+
+### 18.4 Composants
+
+| Composant | Classe ou contrôle | Règle |
+|---|---|---|
+| Bouton | `Button.sx`, `.primary`, `.small` | Hauteur 44 px (34 px en `.small`). Un seul `.primary` par barre d'outils. |
+| Champ | `NotchedBorder.sx-field` + `TextBox.sx` | Contour accent au focus. |
+| Filtre rapide | `Button.sx-chip`, `.on` | Compteur monospace dans la puce. Au plus 8 puces, le reste passe par le filtre de colonne. |
+| Tableau | `DataGrid.sx` | Lignes de 34 px, séparateurs horizontaux, sélection en Accent doux. |
+| En-tête de colonne | `comp:ColumnHeader` | Voir 18.5. |
+
+### 18.5 Tri et filtre par colonne
+
+- Le tri et le filtrage sont faits par le ViewModel (`CanUserSortColumns="False"`), pour survivre au rechargement des lignes.
+- Un clic sur le titre trie en ordre croissant, puis décroissant, puis revient à l'ordre d'origine. La flèche n'apparaît que sur la colonne triée.
+- Filtre par valeurs (`ColumnFilterViewModel`) sur les colonnes à valeurs répétées seulement. **Rien de coché signifie tout afficher**, et le filtre s'applique dès le clic.
+- Les valeurs sont triées par ordre alphabétique et en cascade : chacune indique son nombre de lignes selon les autres filtres, et une valeur à zéro disparaît sauf si elle est cochée.
+- Filtre actif : entonnoir en accent et nombre de valeurs cochées. Une puce et le filtre de sa colonne partagent le même état.
+
+---
+
+*Dernière mise à jour : novembre 2026*

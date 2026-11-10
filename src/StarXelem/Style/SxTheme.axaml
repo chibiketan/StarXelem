@@ -1,0 +1,307 @@
+<!-- Nouvelle charte graphique (section 18 de CLAUDE_design_convention.md). Thème sombre uniquement pour l'instant. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:comp="clr-namespace:StarXelem.Components">
+    <Styles.Resources>
+        <SolidColorBrush x:Key="Sx.BackgroundBrush" Color="#FF0B0D12" />
+        <SolidColorBrush x:Key="Sx.SurfaceBrush" Color="#FF12151C" />
+        <SolidColorBrush x:Key="Sx.ReliefBrush" Color="#FF1A1E27" />
+        <SolidColorBrush x:Key="Sx.LineBrush" Color="#FF2A2F3A" />
+        <SolidColorBrush x:Key="Sx.TextBrush" Color="#FFF2F4F8" />
+        <SolidColorBrush x:Key="Sx.SecondaryBrush" Color="#FFA4ACBA" />
+        <SolidColorBrush x:Key="Sx.MutedBrush" Color="#FF8A93A5" />
+        <SolidColorBrush x:Key="Sx.AccentBrush" Color="#FFE8B04A" />
+        <SolidColorBrush x:Key="Sx.AccentHoverBrush" Color="#D9E8B04A" />
+        <SolidColorBrush x:Key="Sx.AccentSoftBrush" Color="#24E8B04A" />
+        <SolidColorBrush x:Key="Sx.AccentStrongBrush" Color="#55E8B04A" />
+        <SolidColorBrush x:Key="Sx.OnAccentBrush" Color="#FF0B0D12" />
+        <FontFamily x:Key="Sx.FontSans">fonts:Inter#Inter, $Default</FontFamily>
+        <FontFamily x:Key="Sx.FontMono">Cascadia Mono, Consolas, monospace</FontFamily>
+        <StreamGeometry x:Key="Sx.SearchIcon">M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3</StreamGeometry>
+    </Styles.Resources>
+
+    <!-- Textes -->
+    <Style Selector="TextBlock.sx-title">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.sx-caption">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.sx-count, TextBlock.sx-filter-count">
+        <Setter Property="FontFamily" Value="{DynamicResource Sx.FontMono}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.sx-count">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.sx-mono">
+        <Setter Property="FontFamily" Value="{DynamicResource Sx.FontMono}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Boutons à angles coupés -->
+    <Style Selector="Button.sx">
+        <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="Template">
+            <ControlTemplate TargetType="Button">
+                <comp:NotchedBorder CutSize="11" Background="{TemplateBinding Background}">
+                    <ContentPresenter Name="SxContent"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      Padding="{TemplateBinding Padding}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      HorizontalContentAlignment="Center"
+                                      VerticalContentAlignment="Center" />
+                </comp:NotchedBorder>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="Button.sx:pointerover">
+        <Setter Property="Background" Value="{DynamicResource Sx.LineBrush}" />
+    </Style>
+    <Style Selector="Button.sx:disabled">
+        <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+    </Style>
+    <Style Selector="Button.sx.primary">
+        <Setter Property="Background" Value="{DynamicResource Sx.AccentBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.OnAccentBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.sx.primary:pointerover">
+        <Setter Property="Background" Value="{DynamicResource Sx.AccentHoverBrush}" />
+    </Style>
+    <Style Selector="Button.sx.primary:disabled">
+        <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+    </Style>
+    <Style Selector="Button.sx.small">
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- Puces de filtre rapide -->
+    <Style Selector="Button.sx-chip">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Sx.LineBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Margin" Value="0,0,6,6" />
+        <Setter Property="Template">
+            <ControlTemplate TargetType="Button">
+                <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="17"
+                        MinHeight="34"
+                        Padding="13,0">
+                    <ContentPresenter Name="SxContent"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      VerticalContentAlignment="Center" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="Button.sx-chip:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Sx.SecondaryBrush}" />
+    </Style>
+    <Style Selector="Button.sx-chip.on">
+        <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Sx.AccentBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+    </Style>
+
+    <!-- Boutons d'en-tête de colonne et liens -->
+    <Style Selector="Button.sx-sort, Button.sx-filter, Button.sx-link">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Template">
+            <ControlTemplate TargetType="Button">
+                <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                    <ContentPresenter Name="SxContent"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      HorizontalContentAlignment="Center"
+                                      VerticalContentAlignment="Center" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="Button.sx-sort">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="Button.sx-sort:pointerover, Button.sx-sort.sorted">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+    </Style>
+    <Style Selector="Button.sx-sort Path">
+        <Setter Property="Stroke" Value="{DynamicResource Sx.TextBrush}" />
+        <Setter Property="StrokeThickness" Value="2" />
+        <Setter Property="StrokeLineCap" Value="Round" />
+        <Setter Property="StrokeJoin" Value="Round" />
+        <Setter Property="Stretch" Value="Uniform" />
+    </Style>
+    <Style Selector="comp|ColumnHeader.right Button.sx-sort">
+        <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <Style Selector="Button.sx-filter">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="MinWidth" Value="34" />
+        <Setter Property="Padding" Value="6,0" />
+    </Style>
+    <Style Selector="Button.sx-filter:pointerover, Button.sx-filter:flyout-open">
+        <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+    </Style>
+    <Style Selector="Button.sx-filter.active, Button.sx-filter:flyout-open">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
+    </Style>
+    <!-- Sélecteurs directs : un sélecteur de descendant s'appliquerait aussi aux icônes du panneau flottant. -->
+    <Style Selector="Button.sx-filter > StackPanel > Path">
+        <Setter Property="Stroke" Value="{DynamicResource Sx.MutedBrush}" />
+        <Setter Property="StrokeThickness" Value="1.5" />
+        <Setter Property="StrokeJoin" Value="Round" />
+        <Setter Property="Stretch" Value="Uniform" />
+        <Setter Property="Fill" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.sx-filter.active > StackPanel > Path">
+        <Setter Property="Stroke" Value="{DynamicResource Sx.AccentBrush}" />
+        <Setter Property="Fill" Value="{DynamicResource Sx.AccentStrongBrush}" />
+    </Style>
+    <Style Selector="Button.sx-filter:flyout-open > StackPanel > Path">
+        <Setter Property="Stroke" Value="{DynamicResource Sx.AccentBrush}" />
+    </Style>
+    <Style Selector="Button.sx-link">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="Padding" Value="6,0" />
+    </Style>
+    <Style Selector="Button.sx-link:disabled">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+    </Style>
+
+    <!-- Champs -->
+    <Style Selector="comp|NotchedBorder.sx-field">
+        <Setter Property="Background" Value="{DynamicResource Sx.BackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Sx.LineBrush}" />
+        <Setter Property="StrokeThickness" Value="1" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-field:focus-within">
+        <Setter Property="BorderBrush" Value="{DynamicResource Sx.AccentBrush}" />
+    </Style>
+    <Style Selector="Path.sx-search-icon">
+        <Setter Property="Data" Value="{DynamicResource Sx.SearchIcon}" />
+        <Setter Property="Stroke" Value="{DynamicResource Sx.SecondaryBrush}" />
+        <Setter Property="StrokeThickness" Value="2" />
+        <Setter Property="StrokeLineCap" Value="Round" />
+        <Setter Property="Stretch" Value="Uniform" />
+        <Setter Property="Width" Value="15" />
+        <Setter Property="Height" Value="15" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBox.sx">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="TextBox.sx /template/ Border#PART_BorderElement,
+                     TextBox.sx:pointerover /template/ Border#PART_BorderElement,
+                     TextBox.sx:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="TextBox.sx:pointerover, TextBox.sx:focus">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+    </Style>
+    <Style Selector="TextBox.sx /template/ TextBlock#PART_Watermark,
+                     TextBox.sx:pointerover /template/ TextBlock#PART_Watermark,
+                     TextBox.sx:focus /template/ TextBlock#PART_Watermark">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+    </Style>
+    <Style Selector="CheckBox.sx-muted">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- Panneau de filtre : la forme est portée par le contenu -->
+    <Style Selector="FlyoutPresenter.sx-popup">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MaxWidth" Value="320" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+    </Style>
+
+    <!-- Tableau -->
+    <Style Selector="DataGrid.sx">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="GridLinesVisibility" Value="Horizontal" />
+        <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource Sx.LineBrush}" />
+        <Setter Property="HeadersVisibility" Value="Column" />
+        <Setter Property="RowBackground" Value="Transparent" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="DataGrid.sx DataGridColumnHeader,
+                     DataGrid.sx DataGridColumnHeader:pointerover,
+                     DataGrid.sx DataGridColumnHeader:pressed">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="AreSeparatorsVisible" Value="False" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Padding" Value="22,0,6,0" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>    <Style Selector="DataGrid.sx DataGridRow">
+        <Setter Property="MinHeight" Value="34" />
+    </Style>
+    <Style Selector="DataGrid.sx DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
+        <Setter Property="Fill" Value="{DynamicResource Sx.ReliefBrush}" />
+        <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="DataGrid.sx DataGridRow:selected /template/ Rectangle#BackgroundRectangle,
+                     DataGrid.sx DataGridRow:selected:pointerover /template/ Rectangle#BackgroundRectangle,
+                     DataGrid.sx DataGridRow:selected:focus /template/ Rectangle#BackgroundRectangle">
+        <Setter Property="Fill" Value="{DynamicResource Sx.AccentSoftBrush}" />
+        <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="DataGrid.sx DataGridCell">
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+    </Style>
+    <Style Selector="DataGrid.sx DataGridCell:focus /template/ Grid#FocusVisual">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="ProgressBar.sx-quality">
+        <Setter Property="Minimum" Value="0" />
+        <Setter Property="Maximum" Value="1000" />
+        <Setter Property="MinHeight" Value="4" />
+        <Setter Property="Height" Value="4" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="CornerRadius" Value="2" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
+        <Setter Property="Background" Value="{DynamicResource Sx.LineBrush}" />
+    </Style>
+</Styles>
