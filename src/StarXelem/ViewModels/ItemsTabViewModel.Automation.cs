@@ -64,6 +64,7 @@ public partial class ItemsTabViewModel
             var parentId = item.Edge?.End.HasEntityId == true ? item.Edge.End.EntityId : (ulong?)null;
             var parent = parentId is { } id ? itemsById.GetValueOrDefault(id) : null;
 
+            var location = await GetLocationAsync(item);
             rows.Add(new
             {
                 item.Id,
@@ -72,7 +73,9 @@ public partial class ItemsTabViewModel
                 SubType = item.ItemSubType.ToString(),
                 TechnicalName = item.LocalTypeName,
                 item.ClassGuidCrc,
-                Location = await GetLocationKeyAsync(item),
+                Location = location.Name,
+                LocationKind = location.Kind.ToString(),
+                LocationId = location.Id,
                 EdgeType = item.EdgeType?.ToString(),
                 item.EdgeLocation,
                 ParentId = parentId,

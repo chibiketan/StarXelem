@@ -141,7 +141,7 @@
                                     <ItemsControl ItemsSource="{Binding LocationList^}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:ItemsTabViewModel+FilterLocationOptionModel">
-                                                <CheckBox MinHeight="30" Content="{Binding Name^, FallbackValue=Chargement}" IsChecked="{Binding IsSelected}" />
+                                                <CheckBox MinHeight="30" Content="{Binding Name^.DisplayName, FallbackValue=Chargement}" IsChecked="{Binding IsSelected}" />
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
@@ -220,7 +220,7 @@
                                         <comp:ColumnHeader DataContext="{Binding TypeColumn}" />
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Width="20*" Binding="{Binding Location^, FallbackValue=Chargement}">
+                                <DataGridTextColumn Width="20*" Binding="{Binding Location^.DisplayName, FallbackValue=Chargement}">
                                     <DataGridTextColumn.Header>
                                         <comp:ColumnHeader DataContext="{Binding LocationColumn}" />
                                     </DataGridTextColumn.Header>
@@ -323,7 +323,7 @@
 
                             <Grid Classes="detail-row" ColumnDefinitions="Auto,*">
                                 <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Emplacement" />
-                                <TextBlock Grid.Column="1" FontSize="13" Text="{Binding Location^, FallbackValue=Chargement}" />
+                                <TextBlock Grid.Column="1" FontSize="13" Text="{Binding Location^.DisplayName, FallbackValue=Chargement}" />
                             </Grid>
                             <Grid Classes="detail-row" ColumnDefinitions="Auto,*">
                                 <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Quantité" />

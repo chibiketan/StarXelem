@@ -15,7 +15,7 @@ namespace StarXelem.Services.LocationService;
 public class LocationService : ILocationService
 {
     private readonly IGrpcClientService _grpcClientService;
-    private const string NoLocationData = "pas de données";
+    private static readonly ResolvedLocation NoLocationData = new(LocationKind.Other, null, "pas de données");
 
     private readonly ILocationRepository _locationRepository;
     private readonly IScItemRepository _scItemRepository;
@@ -48,7 +48,7 @@ public class LocationService : ILocationService
     ///   ou remonte l'arbre de possession si l'entité est un placeholder ou d'un type non autorisé.</description></item>
     /// </list>
     /// </remarks>
-    public async Task<string?> ResolveEntityLocation(string? entityLocation, IList<EItemType>? allowedTypes = null)
+    public async Task<ResolvedLocation?> ResolveEntityLocation(string? entityLocation, IList<EItemType>? allowedTypes = null)
     {
         if (string.IsNullOrWhiteSpace(entityLocation))
         {
@@ -61,12 +61,12 @@ public class LocationService : ILocationService
 
         if (type == ELocationType.UNKNOWN)
         {
-            return entityLocation;
+            return Other(entityLocation);
         }
 
         if (type == ELocationType.PlayerInventory)
         {
-            return "Porté";       
+            return new ResolvedLocation(LocationKind.Worn, null, "Porté");       
         }
 
         var id = ulong.Parse(split[2]);
@@ -90,7 +90,7 @@ public class LocationService : ILocationService
 
             if (results.Count == 0)
             {
-                return $"Entité non trouvée ({split[0]})";
+                return new ResolvedLocation(LocationKind.Item, containerId, "Entité non trouvée");
             }
 
             if (allowedTypes is { Count: > 0 })
@@ -121,10 +121,10 @@ public class LocationService : ILocationService
                 }
             }
             
-            return $"[{split[0]}] {typeName}";
+            return new ResolvedLocation(LocationKind.Item, containerId, typeName);
         }
         
-        return entityLocation;
+        return Other(entityLocation);
     }
     
     /// <inheritdoc/>
@@ -136,7 +136,7 @@ public class LocationService : ILocationService
     ///   <item><term>References</term><description>Non implémenté, retourne un message indicatif.</description></item>
     /// </list>
     /// </remarks>
-    public Task<string?> ResolveLocation(EntityItemQueryResult entity, IList<EItemType>? allowedTypes = null)
+    public Task<ResolvedLocation?> ResolveLocation(EntityItemQueryResult entity, IList<EItemType>? allowedTypes = null)
     {
         if (entity.EntityEdge != null)
         {
@@ -153,12 +153,12 @@ public class LocationService : ILocationService
 
                     if (entity.EntityEdge.End.HasInventoryId)
                     {
-                        return Task.FromResult($"[ATTACHED_TO][INVENTORY] {entity.EntityEdge.End.InventoryId}");
+                        return Task.FromResult<ResolvedLocation?>(Other($"[ATTACHED_TO][INVENTORY] {entity.EntityEdge.End.InventoryId}"));
                     }
 
                     if (entity.EntityEdge.End.HasShardId)
                     {
-                        return Task.FromResult($"[SHARD] {entity.EntityEdge.End.ShardId}");
+                        return Task.FromResult<ResolvedLocation?>(Other($"[SHARD] {entity.EntityEdge.End.ShardId}"));
                     }
                     break;
                 case EntityEdgeType.StowedIn:
@@ -166,7 +166,7 @@ public class LocationService : ILocationService
                     return this.ResolveEntityLocation(entity.EntityEdge.End.InventoryId, allowedTypes);
                 case EntityEdgeType.References:
                     // Lié à une référence ?
-                    return Task.FromResult("[EDGE] Référence à traiter")!;
+                    return Task.FromResult<ResolvedLocation?>(Other("[EDGE] Référence à traiter"));
             }
         }
 
@@ -176,7 +176,7 @@ public class LocationService : ILocationService
         //     return ResolveEntityLocation(entity.EntityNodeProperties.StowCtx.Inv);
         // }
         
-        return Task.FromResult(NoLocationData)!;
+        return Task.FromResult<ResolvedLocation?>(NoLocationData);
     }
 
     /// <summary>
@@ -189,8 +189,8 @@ public class LocationService : ILocationService
     /// Liste optionnelle des types d'items acceptés comme emplacement final.
     /// Si le type de l'entité ne figure pas dans cette liste, la résolution remonte la chaîne de possession.
     /// </param>
-    /// <returns>Le nom localisé de l'emplacement, ou un message d'erreur si l'entité est introuvable.</returns>
-    public async Task<String?> ResolveEntityLocation(ulong guid, string? inventoryId, IList<EItemType>? allowedTypes = null)
+    /// <returns>L'emplacement retenu au dernier saut, y compris quand l'entité est introuvable.</returns>
+    public async Task<ResolvedLocation?> ResolveEntityLocation(ulong guid, string? inventoryId, IList<EItemType>? allowedTypes = null)
     {
         // TODO remove
         var results = await _entityCache.GetOrAdd(guid, entityId =>
@@ -214,7 +214,7 @@ public class LocationService : ILocationService
 
         if (results.Count == 0)
         {
-            return $"Entité non trouvée ({guid})";
+            return new ResolvedLocation(LocationKind.Item, guid, "Entité non trouvée");
         }
 
         if (allowedTypes is { Count: > 0 })
@@ -232,7 +232,9 @@ public class LocationService : ILocationService
         {
             // Pièce de structure : la base locale n'importe que les entités attachables. Ce qui la porte est le vrai emplacement.
             var parentLocation = await ResolveLocation(results[0], allowedTypes);
-            return parentLocation is null or NoLocationData ? $"[{guid}] Inconnu" : parentLocation;
+            return parentLocation is null || parentLocation == NoLocationData
+                ? new ResolvedLocation(LocationKind.Item, guid, "Inconnu")
+                : parentLocation;
         }
 
         if (scItem.LocaleNameKey == "@LOC_PLACEHOLDER")
@@ -249,7 +251,7 @@ public class LocationService : ILocationService
             typeName = tmpeName;
         }
 
-        return $"[{guid}] {typeName}";
+        return new ResolvedLocation(LocationKind.Item, guid, typeName);
     }
 
     /// <summary>
@@ -258,9 +260,9 @@ public class LocationService : ILocationService
     /// Le résultat est mis en cache dans <see cref="_locationCache"/>.
     /// </summary>
     /// <param name="id">Hash CRC de l'emplacement.</param>
-    /// <param name="type">Type de localisation (<c>Location</c> ou <c>Hangar</c>), utilisé comme préfixe dans le nom retourné.</param>
-    /// <returns>Le nom localisé préfixé du type, ou un libellé de fallback si la résolution échoue.</returns>
-    private async Task<string> ResolveLocationId(uint id, ELocationType type)
+    /// <param name="type">Type de localisation (<c>Location</c> ou <c>Hangar</c>), qui détermine la nature de l'emplacement retourné.</param>
+    /// <returns>L'emplacement portant le CRC et le nom localisé, ou un nom de repli si la résolution échoue.</returns>
+    private async Task<ResolvedLocation> ResolveLocationId(uint id, ELocationType type)
     {
         var locationName = await _locationCache.GetOrAdd(id, async (crc) =>
         {
@@ -275,11 +277,20 @@ public class LocationService : ILocationService
 
         if (String.IsNullOrEmpty(locationName))
         {
-            return $"[{type.ToString().ToUpperInvariant()}] INCONNU ({id})";
+            return new ResolvedLocation(ToLocationKind(type), id, "Inconnu");
         }
 
-        return $"[{type.ToString().ToUpperInvariant()}] {locationName}";        
+        return new ResolvedLocation(ToLocationKind(type), id, locationName);        
     }
+
+    private static ResolvedLocation Other(string name) => new(LocationKind.Other, null, name);
+
+    private static LocationKind ToLocationKind(ELocationType type) => type switch
+    {
+        ELocationType.Location => LocationKind.Location,
+        ELocationType.Hangar => LocationKind.Hangar,
+        _ => LocationKind.Other
+    };
 
     /// <inheritdoc/>
     public void ClearCache()

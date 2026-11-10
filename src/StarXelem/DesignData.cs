@@ -367,14 +367,14 @@ public static class DesignData
             new(new Entitlement { EntityClassGuid = "GUID1", Status = EntitlementStatus.Delivered, Metadata = new EntitlementMetadata { Name = "Idris-P", SourceSku = "PackageName", RealMoney = true}})
             {
                 Shipname = "AEGS_Idris_P",
-                ReadableLocation = "[HANGAR] Area 18 - ArcCorp",
+                ResolvedLocation = new ResolvedLocation(LocationKind.Hangar, 1, "Area 18 - ArcCorp"),
                 StowContext = new EntityStowContext { IsStowed = true, ShardId = "pub_use1b_3.24_12345" }
             },
             // UNSTOWED — porté sur le joueur
             new(new Entitlement { EntityClassGuid = "GUID2", Status = EntitlementStatus.Delivered, Metadata = new EntitlementMetadata { Name = "", SourceSku = "Aurora MR Starter Pack", RealMoney = true } })
             {
                 Shipname = "RSIN_AuroraMR",
-                ReadableLocation = "Porté",
+                ResolvedLocation = new ResolvedLocation(LocationKind.Worn, null, "Porté"),
                 StowContext = new EntityStowContext { IsStowed = false, ShardId = "pub_euw1b_3.24_67890" }
             },
             // DESTROYED — StowContext null
@@ -386,13 +386,13 @@ public static class DesignData
             new(new Entitlement { EntityClassGuid = "GUID4", Status = EntitlementStatus.Undelivered, Metadata = new EntitlementMetadata { Name = "Avenger Titan", SourceSku = "PackageName", RealMoney = true} })
             {
                 Shipname = "AEGS_Avenger_Titan",
-                ReadableLocation = "[123456] Idris-P",
+                ResolvedLocation = new ResolvedLocation(LocationKind.Item, 123456, "Idris-P"),
             },
             // STOWED — achat CCU (pas d'argent réel)
             new(new Entitlement { EntityClassGuid = "GUID5", Status = EntitlementStatus.Delivered, Metadata = new EntitlementMetadata { Name = "Carrack", SourceSku = "PackageName", RealMoney = false }})
             {
                 Shipname = "MISC_Carrack",
-                ReadableLocation = "[LOCATION] Lorville - Hurston",
+                ResolvedLocation = new ResolvedLocation(LocationKind.Location, 2, "Lorville - Hurston"),
                 StowContext = new EntityStowContext { IsStowed = true, ShardId = "pub_use1b_3.24_99999" }
             },
         });

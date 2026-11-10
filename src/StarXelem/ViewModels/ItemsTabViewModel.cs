@@ -41,12 +41,12 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     public partial class FilterLocationOptionModel : ObservableObject
     {
-        public Task<String?> Name { get; }
+        public Task<ResolvedLocation?> Name { get; }
         public string Location { get; }
         [ObservableProperty]
         private bool _isSelected;
 
-        public FilterLocationOptionModel(string location, Task<String?> name)
+        public FilterLocationOptionModel(string location, Task<ResolvedLocation?> name)
         {
             Name = name;
             Location = location;
@@ -109,7 +109,6 @@ public partial class ItemsTabViewModel : PageViewModelBase
     // Au-delà, les puces prendraient trop de place : les valeurs restantes sont accessibles par le filtre de colonne.
     private const int MaxChipCount = 8;
     private const int LocationResolutionParallelism = 16;
-    private const string UnknownLocationLabel = "Emplacement inconnu";
     private static readonly TimeSpan LocationRefreshInterval = TimeSpan.FromMilliseconds(1500);
 
     private readonly Dictionary<ColumnHeaderViewModel, ItemSortColumn> _sortColumns = new();
@@ -117,7 +116,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     private EItemSubType? _selectedSubType;
     private List<string> _typesByFrequency = new();
     // Emplacements déjà résolus, par identifiant d'objet. Une ligne absente est encore en attente de résolution.
-    private readonly ConcurrentDictionary<ulong, string> _resolvedLocations = new();
+    private readonly ConcurrentDictionary<ulong, ResolvedLocation> _resolvedLocations = new();
     private CancellationTokenSource? _locationResolutionCts;
     private Task? _locationResolutionTask;
 
@@ -339,7 +338,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
             var options = new ParallelOptions { MaxDegreeOfParallelism = LocationResolutionParallelism, CancellationToken = token };
             var worker = Task.Run(() => Parallel.ForEachAsync(items, options, async (item, cancellation) =>
             {
-                var location = await GetLocationKeyAsync(item).ConfigureAwait(false);
+                var location = await GetLocationAsync(item).ConfigureAwait(false);
                 cancellation.ThrowIfCancellationRequested();
                 _resolvedLocations[item.Id] = location;
             }), token);
@@ -385,13 +384,16 @@ public partial class ItemsTabViewModel : PageViewModelBase
         LocationFilter.StatusText = isComplete ? null : $"Emplacements résolus : {ResolvedLocationCount} / {total}";
 
         // Tant que la résolution continue, une valeur cochée doit rester proposée même si aucune ligne ne l'a encore.
-        var keys = _resolvedLocations.Values.Distinct().ToHashSet();
+        var options = BuildLocationOptions(_resolvedLocations.Values);
         if (!isComplete)
         {
-            keys.UnionWith(LocationFilter.GetSelectedKeys() ?? []);
+            foreach (var key in LocationFilter.GetSelectedKeys() ?? new HashSet<string>())
+            {
+                options.TryAdd(key, LocationFilter.GetLabel(key));
+            }
         }
 
-        LocationFilter.SetOptions(keys.Select(key => KeyValuePair.Create(key, GetLocationLabel(key))));
+        LocationFilter.SetOptions(options);
 
         if (isComplete || !IsFiltering)
         {
@@ -426,22 +428,34 @@ public partial class ItemsTabViewModel : PageViewModelBase
         }
     }
 
-    private async Task<string> GetLocationKeyAsync(ItemViewModel item)
+    // Deux vaisseaux du même modèle portent le même nom : seul l'identifiant les distingue dans le filtre.
+    private static Dictionary<string, string> BuildLocationOptions(IEnumerable<ResolvedLocation> locations)
+    {
+        var distinct = locations.DistinctBy(location => location.Key).ToList();
+        var homonyms = distinct
+            .GroupBy(location => location.DisplayName)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToHashSet();
+
+        return distinct.ToDictionary(
+            location => location.Key,
+            location => location.Id != null && homonyms.Contains(location.DisplayName)
+                ? $"{location.DisplayName} ({location.Id})"
+                : location.DisplayName);
+    }
+
+    private async Task<ResolvedLocation> GetLocationAsync(ItemViewModel item)
     {
         try
         {
-            return await item.Location.ConfigureAwait(false) ?? string.Empty;
+            return await item.Location.ConfigureAwait(false) ?? ResolvedLocation.Unknown;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Impossible de résoudre l'emplacement de l'objet {Id}", item.Id);
-            return string.Empty;
+            return ResolvedLocation.Unknown;
         }
-    }
-
-    private static string GetLocationLabel(string? location)
-    {
-        return string.IsNullOrEmpty(location) ? UnknownLocationLabel : location;
     }
 
     [RelayCommand(CanExecute = nameof(CanResetSelectedTypes))]
@@ -584,7 +598,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         var matchingText = rows.Where(row => MatchesNeedle(row, criteria.Needle)).ToList();
         bool InTypes(ItemFilterRow row) => criteria.Types == null || criteria.Types.Contains(row.Item.ItemType.ToString());
         bool InSubType(ItemFilterRow row) => criteria.SubType == null || row.Item.ItemSubType == criteria.SubType;
-        bool InLocations(ItemFilterRow row) => criteria.Locations == null || (row.LocationKey != null && criteria.Locations.Contains(row.LocationKey));
+        bool InLocations(ItemFilterRow row) => criteria.Locations == null || (row.Location != null && criteria.Locations.Contains(row.Location.Key));
 
         var typeBase = matchingText.Where(InLocations).ToList();
         var subTypeBase = typeBase.Where(InTypes).ToList();
@@ -596,7 +610,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
             items.Count,
             CountByKey(typeBase, row => row.Item.ItemType.ToString()),
             CountByKey(subTypeBase, row => row.Item.ItemSubType.ToString()),
-            CountByKey(locationBase.Where(row => row.LocationKey != null), row => row.LocationKey!));
+            CountByKey(locationBase.Where(row => row.Location != null), row => row.Location!.Key));
     }
 
     private static bool MatchesNeedle(ItemFilterRow row, string? needle)
@@ -609,7 +623,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         return row.Name.Contains(needle, StringComparison.CurrentCultureIgnoreCase)
                || row.Item.ItemTypeLabel.Contains(needle, StringComparison.CurrentCultureIgnoreCase)
                || row.Item.ItemSubType.ToString().Contains(needle, StringComparison.CurrentCultureIgnoreCase)
-               || (row.LocationKey != null && GetLocationLabel(row.LocationKey).Contains(needle, StringComparison.CurrentCultureIgnoreCase));
+               || (row.Location != null && row.Location.DisplayName.Contains(needle, StringComparison.CurrentCultureIgnoreCase));
     }
 
     private static Dictionary<string, int> CountByKey(IEnumerable<ItemFilterRow> rows, Func<ItemFilterRow, string> keySelector)
@@ -639,10 +653,10 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     private static IEnumerable<ItemFilterRow> SortByLocation(IEnumerable<ItemFilterRow> rows, bool descending)
     {
-        var pendingLast = rows.OrderBy(row => row.LocationKey == null);
+        var pendingLast = rows.OrderBy(row => row.Location == null);
         return descending
-            ? pendingLast.ThenByDescending(row => GetLocationLabel(row.LocationKey), StringComparer.CurrentCultureIgnoreCase)
-            : pendingLast.ThenBy(row => GetLocationLabel(row.LocationKey), StringComparer.CurrentCultureIgnoreCase);
+            ? pendingLast.ThenByDescending(row => row.Location?.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            : pendingLast.ThenBy(row => row.Location?.DisplayName, StringComparer.CurrentCultureIgnoreCase);
     }
 
     // Une ligne sans valeur reste en fin de tableau, quel que soit le sens du tri.
@@ -796,7 +810,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         ItemSortColumn? SortColumn,
         bool SortDescending);
 
-    private sealed record ItemFilterRow(ItemViewModel Item, string Name, string? LocationKey);
+    private sealed record ItemFilterRow(ItemViewModel Item, string Name, ResolvedLocation? Location);
 
     private sealed record ItemFilterOutcome(
         List<ItemViewModel> Items,
@@ -950,7 +964,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
                         foreach (var it in items)
                         {
                             var name = await it.Name ?? string.Empty;
-                            var storage = await it.Location ?? string.Empty;
+                            var storage = (await it.Location)?.DisplayName ?? string.Empty;
                             var owner = await it.Owner;
 
                             ws.Cell(rowIndex, 1).Value = it.Id.ToString();
@@ -1008,7 +1022,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
                 foreach (var it in items)
                 {
                     var name = await it.Name ?? string.Empty;
-                    var storage = await it.Location ?? string.Empty;
+                    var storage = (await it.Location)?.DisplayName ?? string.Empty;
                     var owner = await it.Owner;
 
                     ws.Cell(rowIndex, 1).Value = it.Id.ToString();

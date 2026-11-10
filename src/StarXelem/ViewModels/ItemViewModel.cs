@@ -19,10 +19,13 @@ public partial class ItemViewModel : ViewModelBase
     private readonly EntityItemQueryResult _entityNodeProperties;
     private readonly ScItemEntity? _scItem;
     private readonly ILocaleEntryRepository _localeRepository;
-    private readonly System.Lazy<Task<string?>> _location;
+    private readonly System.Lazy<Task<ResolvedLocation?>> _location;
     public readonly Lazy<Task<string>> _owner;
-    // Préfixe technique ajouté par le service aux lieux du jeu : le cas général, inutile à l'affichage.
-    private const string LocationPrefix = "[LOCATION] ";
+    // Types sur lesquels s'arrête la résolution d'un emplacement : joueur et vaisseaux, armes, armures, caisses.
+    // Les pièces intermédiaires (supports, portes, modules…) sont traversées pour remonter à l'un d'eux.
+    private static readonly IList<EItemType> LocationStopTypes = Enum.GetValues<EItemType>()
+        .Where(type => IsLocationStopType(type.ToString()))
+        .ToList();
     private ushort? _contentQuality;
     private ulong? _contentQuantity;
 
@@ -37,7 +40,7 @@ public partial class ItemViewModel : ViewModelBase
     public string? StowLocation => null;
     public string? StowShard => null;
     public string? LocalTypeName => _scItem?.TechnicalName;
-    public Task<string?> Location => _location.Value;
+    public Task<ResolvedLocation?> Location => _location.Value;
 
     public EntityEdge? Edge => _entityNodeProperties.EntityEdge;
     public EntityEdgeType? EdgeType => _entityNodeProperties.EntityEdge?.Type;
@@ -72,7 +75,7 @@ public partial class ItemViewModel : ViewModelBase
         _entityNodeProperties = entityItemResult;
         _scItem = scItem;
         _name = new Lazy<Task<string?>>(GetLocaleValue);
-        _location = new Lazy<Task<string?>>(() => GetLocation().ContinueWith(t =>
+        _location = new Lazy<Task<ResolvedLocation?>>(() => GetLocation().ContinueWith(t =>
         {
             OnPropertyChanged(nameof(Location));
             return t.Result;
@@ -119,13 +122,17 @@ public partial class ItemViewModel : ViewModelBase
         }
     }
 
-    private async Task<string?> GetLocation()
+    private static bool IsLocationStopType(string typeName)
     {
-        var location = await _locationService.ResolveLocation(_entityNodeProperties).ConfigureAwait(false);
+        return typeName.StartsWith("NOITEM_", StringComparison.Ordinal)
+               || typeName.StartsWith("Char_Armor_", StringComparison.Ordinal)
+               || typeName.StartsWith("FPS_Weapon", StringComparison.Ordinal)
+               || typeName is nameof(EItemType.WeaponPersonal) or nameof(EItemType.Container) or nameof(EItemType.InventoryContainer);
+    }
 
-        return location?.StartsWith(LocationPrefix, StringComparison.Ordinal) == true
-            ? location[LocationPrefix.Length..]
-            : location;
+    private async Task<ResolvedLocation?> GetLocation()
+    {
+        return await _locationService.ResolveLocation(_entityNodeProperties, LocationStopTypes).ConfigureAwait(false);
         
     }
 

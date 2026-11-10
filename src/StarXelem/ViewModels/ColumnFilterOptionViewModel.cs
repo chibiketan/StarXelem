@@ -9,6 +9,7 @@ public partial class ColumnFilterOptionViewModel : ObservableObject
 {
     [ObservableProperty] private int _count;
     [ObservableProperty] private bool _isSelected;
+    [ObservableProperty] private string _label;
 
     /// <summary>
     /// Initialise une valeur de filtre.
@@ -18,12 +19,9 @@ public partial class ColumnFilterOptionViewModel : ObservableObject
     public ColumnFilterOptionViewModel(string key, string label)
     {
         Key = key;
-        Label = label;
+        _label = label;
     }
 
     /// <summary>Identifiant stable de la valeur.</summary>
     public string Key { get; }
-
-    /// <summary>Texte affiché à l'utilisateur.</summary>
-    public string Label { get; }
 }
