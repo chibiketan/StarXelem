@@ -122,11 +122,11 @@ public partial class ShipTabViewModel : PageViewModelBase
         {
             if (null == spaceship.EntityProperties)
             {
-                spaceship.ReadableLocation = await _locationService.ResolveEntityLocation(spaceship.Location);
+                spaceship.ResolvedLocation = await _locationService.ResolveEntityLocation(spaceship.Location);
             }
             else
             {
-                spaceship.ReadableLocation = await _locationService.ResolveLocation(spaceship.EntityProperties, [EItemType.NOITEM_Vehicle]);
+                spaceship.ResolvedLocation = await _locationService.ResolveLocation(spaceship.EntityProperties, [EItemType.NOITEM_Vehicle]);
             }
         }
         

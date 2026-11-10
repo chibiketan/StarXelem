@@ -61,8 +61,14 @@ public partial class ColumnFilterViewModel : ObservableObject
             _options.Remove(key);
         }
 
-        foreach (var (key, label) in incoming.Where(value => !_options.ContainsKey(value.Key)))
+        foreach (var (key, label) in incoming)
         {
+            if (_options.TryGetValue(key, out var existing))
+            {
+                existing.Label = label;
+                continue;
+            }
+
             var option = new ColumnFilterOptionViewModel(key, label);
             option.PropertyChanged += OnOptionPropertyChanged;
             _options.Add(key, option);
@@ -92,6 +98,13 @@ public partial class ColumnFilterViewModel : ObservableObject
         return HasSelection
             ? _options.Values.Where(option => option.IsSelected).Select(option => option.Key).ToHashSet()
             : null;
+    }
+
+    /// <summary>Retourne le libellé d'une valeur, ou son identifiant si elle n'est pas connue.</summary>
+    /// <param name="key">Identifiant de la valeur.</param>
+    public string GetLabel(string key)
+    {
+        return _options.TryGetValue(key, out var option) ? option.Label : key;
     }
 
     /// <summary>Indique si une valeur est cochée.</summary>
