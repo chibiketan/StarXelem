@@ -15,6 +15,8 @@ namespace StarXelem.Services.LocationService;
 public class LocationService : ILocationService
 {
     private readonly IGrpcClientService _grpcClientService;
+    private const string NoLocationData = "pas de données";
+
     private readonly ILocationRepository _locationRepository;
     private readonly IScItemRepository _scItemRepository;
     private readonly ILocaleEntryRepository _localeEntryRepository;
@@ -174,7 +176,7 @@ public class LocationService : ILocationService
         //     return ResolveEntityLocation(entity.EntityNodeProperties.StowCtx.Inv);
         // }
         
-        return Task.FromResult("pas de données")!;
+        return Task.FromResult(NoLocationData)!;
     }
 
     /// <summary>
@@ -225,22 +227,26 @@ public class LocationService : ILocationService
         }
 
         var scItem = await _scItemRepository.GetByCrc32Async(results[0].EntityNodeProperties!.ClassGuidCrc);
-        var typeName = scItem?.TechnicalName ?? "Inconnu";
 
-        if (scItem != null)
+        if (scItem == null)
         {
-            if (scItem.LocaleNameKey == "@LOC_PLACEHOLDER")
-            {
-                // C'est un placeholder, on va chercher son possesseur
-                return await ResolveLocation(results[0], allowedTypes);
-            }
+            // Pièce de structure : la base locale n'importe que les entités attachables. Ce qui la porte est le vrai emplacement.
+            var parentLocation = await ResolveLocation(results[0], allowedTypes);
+            return parentLocation is null or NoLocationData ? $"[{guid}] Inconnu" : parentLocation;
+        }
 
-            var tmpeName = await _localeEntryRepository.GetValueByKeyAsync(scItem.LocaleNameKey);
+        if (scItem.LocaleNameKey == "@LOC_PLACEHOLDER")
+        {
+            // C'est un placeholder, on va chercher son possesseur
+            return await ResolveLocation(results[0], allowedTypes);
+        }
 
-            if (!string.IsNullOrEmpty(tmpeName))
-            {
-                typeName = tmpeName;
-            }
+        var typeName = scItem.TechnicalName;
+        var tmpeName = await _localeEntryRepository.GetValueByKeyAsync(scItem.LocaleNameKey);
+
+        if (!string.IsNullOrEmpty(tmpeName))
+        {
+            typeName = tmpeName;
         }
 
         return $"[{guid}] {typeName}";
