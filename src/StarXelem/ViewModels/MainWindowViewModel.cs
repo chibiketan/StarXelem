@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -566,7 +566,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var hasScreenshot = !string.IsNullOrWhiteSpace(AppConfig.ScreenshotPath);
         var hasClose = AppConfig.AutoClose;
 
-        if (!hasScreen && !hasScreenshot && !hasClose)
+        if (!hasScreen && !hasScreenshot && !hasClose && !AppConfig.LoadItems)
             return;
 
         // 1. Navigation vers l'onglet demandé
@@ -614,6 +614,23 @@ public partial class MainWindowViewModel : ViewModelBase
             else
             {
                 _logger.LogWarning("Onglet CLI inconnu : {ScreenName}", AppConfig.ScreenName);
+            }
+        }
+
+        // Chargement réel de l'écran Objets, avant la capture pour qu'elle montre les données
+        if (AppConfig.LoadItems)
+        {
+            try
+            {
+                await WaitForP4kReadyAsync();
+                await WaitForDbReadyAsync();
+
+                var itemsPage = _pages.OfType<ItemsTabViewModel>().First();
+                await Dispatcher.UIThread.InvokeAsync(() => itemsPage.RunAutomatedLoadAsync(AppConfig.ItemsReportPath));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors du chargement automatique des objets");
             }
         }
 

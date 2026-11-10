@@ -119,6 +119,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     // Emplacements déjà résolus, par identifiant d'objet. Une ligne absente est encore en attente de résolution.
     private readonly ConcurrentDictionary<ulong, string> _resolvedLocations = new();
     private CancellationTokenSource? _locationResolutionCts;
+    private Task? _locationResolutionTask;
 
     private Task<IList<ItemViewModel>>? _unfilteredItemList;
     private CancellationTokenSource? _filterCts;
@@ -323,7 +324,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         // Les emplacements arrivent ensuite, en tâche de fond : le tableau est utilisable sans les attendre.
         var locationCts = new CancellationTokenSource();
         _locationResolutionCts = locationCts;
-        _ = ResolveLocationsAsync(result, locationCts.Token);
+        _locationResolutionTask = ResolveLocationsAsync(result, locationCts.Token);
     }
     
     private async Task ResolveLocationsAsync(IReadOnlyList<ItemViewModel> items, CancellationToken token)
