@@ -4,7 +4,7 @@ using System.IO;
 namespace StarXelem.Models;
 
 /// <summary>
-/// Configuration CLI statique : --screen, --screenshot, --close, --load-items, --items-report
+/// Configuration CLI statique : --screen, --screenshot, --close, --load-items, --items-report, --load-ships, --ships-report
 /// </summary>
 static class AppConfig
 {
@@ -15,6 +15,10 @@ static class AppConfig
     public static bool LoadItems { get; set; }
     /// <summary>Fichier JSON où écrire le détail des objets une fois le chargement terminé.</summary>
     public static string? ItemsReportPath { get; set; }
+    /// <summary>Lance un vrai chargement de Mon hangar, comme un clic sur Actualiser.</summary>
+    public static bool LoadShips { get; set; }
+    /// <summary>Fichier JSON où écrire le détail des vaisseaux une fois le chargement terminé.</summary>
+    public static string? ShipsReportPath { get; set; }
 
     public static void Parse(string[] args)
     {
@@ -38,6 +42,15 @@ static class AppConfig
             {
                 ItemsReportPath = Path.GetFullPath(args[++i]);
                 LoadItems = true;
+            }
+            else if (arg == "--load-ships")
+            {
+                LoadShips = true;
+            }
+            else if (arg == "--ships-report" && i + 1 < args.Length)
+            {
+                ShipsReportPath = Path.GetFullPath(args[++i]);
+                LoadShips = true;
             }
             else if (arg == "--close")
             {

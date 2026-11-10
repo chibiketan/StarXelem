@@ -566,7 +566,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var hasScreenshot = !string.IsNullOrWhiteSpace(AppConfig.ScreenshotPath);
         var hasClose = AppConfig.AutoClose;
 
-        if (!hasScreen && !hasScreenshot && !hasClose && !AppConfig.LoadItems)
+        if (!hasScreen && !hasScreenshot && !hasClose && !AppConfig.LoadItems && !AppConfig.LoadShips)
             return;
 
         // 1. Navigation vers l'onglet demandé
@@ -631,6 +631,24 @@ public partial class MainWindowViewModel : ViewModelBase
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erreur lors du chargement automatique des objets");
+            }
+        }
+
+        // Chargement réel de Mon hangar, avant la capture pour qu'elle montre les données
+        if (AppConfig.LoadShips)
+        {
+            try
+            {
+                await WaitForP4kReadyAsync();
+                await WaitForDbReadyAsync();
+
+                var shipsPage = _pages.OfType<ShipTabViewModel>().First();
+                var isLoaded = await Dispatcher.UIThread.InvokeAsync(() => shipsPage.RunAutomatedLoadAsync(AppConfig.ShipsReportPath));
+                _logger.LogInformation("Chargement automatique de la flotte : {Result}", isLoaded ? "terminé" : "abandonné, pas de connexion au jeu");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors du chargement automatique de la flotte");
             }
         }
 
