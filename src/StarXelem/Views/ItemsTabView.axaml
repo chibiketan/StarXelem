@@ -1,171 +1,359 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:StarXelem.ViewModels"
              xmlns:local="clr-namespace:StarXelem"
+             xmlns:models="clr-namespace:StarXelem.Models"
              xmlns:conv="clr-namespace:StarXelem.Converters"
-             xmlns:comp="clr-namespace:StarXelem.Comparer"
-             xmlns:ic="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
+             xmlns:comp="clr-namespace:StarXelem.Components"
              xmlns:ui="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             mc:Ignorable="d" d:DesignWidth="1300" d:DesignHeight="800"
              x:DataType="vm:ItemsTabViewModel"
              d:DataContext="{x:Static local:DesignData.ItemsTabViewModel}"
              x:Class="StarXelem.Views.ItemsTabView">
     <UserControl.Resources>
         <conv:MicroScuConverter x:Key="MicroScuConverter" />
-        <conv:TaskIsFinishedConverter x:Key="TaskIsFinishedConverter" />
-        <conv:TaskIsNotFinishedConverter x:Key="TaskIsNotFinishedConverter" />
-        <comp:TaskStringComparer x:Key="TaskStringComparer" />
-        <comp:ItemViewModelName x:Key="ItemViewModelName" />
-        <comp:ItemViewModelOwnerComparer x:Key="ItemViewModelOwnerComparer" />
-        <StreamGeometry x:Key="arrow_rotate_clockwise_regular">M12 3C16.9706 3 21 7.02944 21 12C21 15.0777 19.4407 17.865 16.9769 19.5009L18.75 19.5C19.1642 19.5 19.5 19.8358 19.5 20.25C19.5 20.6297 19.2178 20.9435 18.8518 20.9932L18.75 21H14.75C14.3703 21 14.0565 20.7178 14.0068 20.3518L14 20.25V16.25C14 15.8358 14.3358 15.5 14.75 15.5C15.1297 15.5 15.4435 15.7822 15.4932 16.1482L15.5 16.25L15.501 18.635C17.9241 17.3557 19.5 14.8247 19.5 12C19.5 7.85786 16.1421 4.5 12 4.5C7.85786 4.5 4.5 7.85786 4.5 12C4.5 12.4142 4.16421 12.75 3.75 12.75C3.33579 12.75 3 12.4142 3 12C3 7.02944 7.02944 3 12 3ZM12 9.25C13.5188 9.25 14.75 10.4812 14.75 12C14.75 13.5188 13.5188 14.75 12 14.75C10.4812 14.75 9.25 13.5188 9.25 12C9.25 10.4812 10.4812 9.25 12 9.25ZM12 10.75C11.3096 10.75 10.75 11.3096 10.75 12C10.75 12.6904 11.3096 13.25 12 13.25C12.6904 13.25 13.25 12.6904 13.25 12C13.25 11.3096 12.6904 10.75 12 10.75Z</StreamGeometry>
-        <StreamGeometry x:Key="arrow_sync_circle_regular">M12,2 C17.5228,2 22,6.47715 22,12 C22,17.5228 17.5228,22 12,22 C6.47715,22 2,17.5228 2,12 C2,6.47715 6.47715,2 12,2 Z M12,3.5 C7.30558,3.5 3.5,7.30558 3.5,12 C3.5,16.6944 7.30558,20.5 12,20.5 C16.6944,20.5 20.5,16.6944 20.5,12 C20.5,7.30558 16.6944,3.5 12,3.5 Z M16.75,12 C17.1296833,12 17.4434889,12.2821653 17.4931531,12.6482323 L17.5,12.75 L17.5,15.75 C17.5,16.1642 17.1642,16.5 16.75,16.5 C16.3703167,16.5 16.0565111,16.2178347 16.0068469,15.8517677 L16,15.75 L16,15 C15.0881,16.2143 13.6362,17 11.9999,17 C10.4748,17 9.09587,16.316 8.17857,15.237 C7.91028,14.9214 7.94862,14.4481 8.2642,14.1798 C8.57979,13.9115 9.05311,13.9499 9.3214,14.2655 C9.96322,15.0204 10.9293,15.5 11.9999,15.5 C13.32553,15.5 14.4803167,14.7625672 15.0742404,13.6746351 L15.1633,13.5 L14,13.5 C13.5858,13.5 13.25,13.1642 13.25,12.75 C13.25,12.3703167 13.5321653,12.0565111 13.8982323,12.0068469 L14,12 L16.75,12 Z M11.9999,7 C13.5368,7 14.9041,7.66036 15.8268,8.77062 C16.0915,9.08918 16.0479,9.56205 15.7294,9.8268 C15.4108,10.0916 14.9379,10.0479 14.6732,9.72938 C14.0368,8.96361 13.093,8.5 11.9999,8.5 C10.5754318,8.5 9.34895806,9.35140335 8.80281957,10.5730172 L8.72948,10.75 L10,10.75 C10.4142,10.75 10.75,11.0858 10.75,11.5 C10.75,11.8796833 10.4678347,12.1934889 10.1017677,12.2431531 L10,12.25 L7.25,12.25 C6.8703075,12.25 6.55650958,11.9678347 6.50684668,11.6017677 L6.5,11.5 L6.5,8.25 C6.5,7.83579 6.83579,7.5 7.25,7.5 C7.6296925,7.5 7.94349042,7.78215688 7.99315332,8.14823019 L8,8.25 L8,8.99955 C8.9121,7.78531 10.364,7 11.9999,7 Z</StreamGeometry>
-        <StreamGeometry x:Key="remove_regular">M3.7547787,12.4995322 L20.2466903,12.4995322 C20.6609039,12.4995322 20.9966903,12.1637458 20.9966903,11.7495322 C20.9966903,11.3353187 20.6609039,10.9995322 20.2466903,10.9995322 L3.7547787,10.9995322 C3.34056514,10.9995322 3.0047787,11.3353187 3.0047787,11.7495322 C3.0047787,12.1637458 3.34056514,12.4995322 3.7547787,12.4995322 Z</StreamGeometry>
     </UserControl.Resources>
-    <Grid RowDefinitions="Auto,Auto,Auto,*">
-        <Expander Grid.Row="0" IsExpanded="True">
-            <Expander.Header>Rechercher</Expander.Header>
-            <Grid ColumnDefinitions="*,*,*,*,*,*" RowDefinitions="40,40,40,40,40,40" ColumnSpacing="7">
-                <CheckBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Right" FlowDirection="RightToLeft" IsChecked="{Binding UseConnectedProfilAsOwner}" >Utiliser le compte connecté</CheckBox>
-                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" IsVisible="{Binding IsInDebugMode}">id possesseur</TextBlock>
-                <TextBox Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Text="{Binding OwnerId}" IsEnabled="{Binding !UseConnectedProfilAsOwner}" />
-                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center">id</TextBlock>
-                <TextBox Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Id}" />
-                <Button Grid.Row="5" Grid.Column="5" HorizontalAlignment="Center" Command="{Binding LoadItemListCommand}">Chercher</Button>
-                
-                <TextBlock Grid.Column="2" VerticalAlignment="Center">Type:</TextBlock>
-                <ScrollViewer Grid.Row="1" Grid.Column="2" Grid.RowSpan="4" >
-                    <ItemsControl ItemsSource="{Binding SearchTypeListSorted}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Vertical"  />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <CheckBox Margin="0,0,8,0" HorizontalAlignment="Stretch" Content="{Binding Type}" IsChecked="{Binding IsSelected}" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-                <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Command="{Binding ResetSelectedTypesCommand}" Height="20" Width="25">
-                         
-                    </Button>
-                </StackPanel>
+    <UserControl.Styles>
+        <Style Selector="Grid.detail-row">
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+        <Style Selector="Grid.detail-row > TextBlock:nth-child(2)">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="TextAlignment" Value="Right" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="16,0,0,0" />
+        </Style>
+    </UserControl.Styles>
 
-                <!-- Liste des inventaires -->
-                <TextBlock Grid.Row="0" Grid.Column="4" Grid.ColumnSpan="2" VerticalAlignment="Center">Inventaires :</TextBlock>
-                <StackPanel Grid.Row="0" Grid.Column="4" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <CheckBox IsThreeState="True" IsChecked="{Binding SelectAllLocation}" IsEnabled="{Binding !!LocationList^.Count, FallbackValue=false}" />
-                    <Button Command="{Binding ReloadLocationListCommand}" ToolTip.Tip="Rafraîchir la liste" Height="20" Width="25" >
-                        <PathIcon Data="{StaticResource arrow_sync_circle_regular}" Height="14" />
-                    </Button>
-                </StackPanel>
-                <ScrollViewer Grid.Row="1" Grid.Column="4" Grid.RowSpan="4" Grid.ColumnSpan="2" >
-                    <ItemsControl ItemsSource="{Binding LocationList^}" Margin="5 0 0 0 ">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Vertical"  />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <CheckBox Margin="0,0,8,0" HorizontalAlignment="Stretch" Content="{Binding Name^, FallbackValue=Chargement}" IsChecked="{Binding IsSelected}" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+    <!-- La nouvelle charte n'existe qu'en thème sombre : l'écran reste sombre même si Windows est en thème clair. -->
+    <ThemeVariantScope RequestedThemeVariant="Dark">
+        <ThemeVariantScope.Resources>
+            <!-- Le tri est géré par comp:ColumnHeader : l'icône native du tableau ne doit pas réserver de place. -->
+            <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#FFE8B04A" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#D9E8B04A" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#D9E8B04A" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#FFE8B04A" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#D9E8B04A" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#D9E8B04A" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#FF0B0D12" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#FF0B0D12" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#FF0B0D12" />
+        </ThemeVariantScope.Resources>
 
-                
-                <CheckBox Grid.Row="5" Grid.Column="4" Content="Debug mode" IsChecked="{Binding IsInDebugMode}" />
-                <CheckBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Content="Charger les objets liés (lent)" IsChecked="{Binding UseTreeProjection}" />
-                <CheckBox Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Content="Charger le contenu des objets" IsChecked="{Binding LoadInventoryContent}" />
-                <!-- <CheckBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Right" FlowDirection="RightToLeft" IsChecked="{Binding UseUserInventoryList}" >Utiliser les inventaires du compte</CheckBox> -->
-            </Grid>
-        </Expander>
-        <Expander Grid.Row="1">
-            <Expander.Header>Filtrer</Expander.Header>
-            <StackPanel Orientation="Horizontal" Margin="0,5" Spacing="10">
-                <TextBlock VerticalAlignment="Center">Filtrer par nom:</TextBlock>
-                <TextBox Text="{Binding NameFilter}" Width="300" Watermark="Entrez un nom à filtrer..." Height="30" />
-                <TextBlock VerticalAlignment="Center">Type:</TextBlock>
-                <ScrollViewer Height="125">
-                    <ItemsControl ItemsSource="{Binding FilterTypeListSorted}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Vertical"  />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <CheckBox Margin="0,0,8,0" Content="{Binding Type}" IsChecked="{Binding IsSelected}" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </StackPanel>
-        </Expander>
-        <Label Grid.Row="2" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" Content="{Binding TreatmentStatus}" Margin="30,0,0,0" />
-        <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto,*" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,5,10,1" ColumnSpacing="7">
-            <Label Grid.Column="0" Content="{Binding ItemList^.Count, FallbackValue='Vide', StringFormat='{}{0} élément(s) trouvé(s)'}" VerticalAlignment="Center"/>
-            <Button Grid.Column="1" Classes="btn export" Command="{Binding SendItemlistToOrbitalAllianceCommand}" ToolTip.Tip="Synchroniser la liste d'objets avec Orbital Alliance">
-                <Grid ColumnDefinitions="Auto,*">
-                    <ic:SymbolIcon Grid.Column="0" Symbol="ArrowUpload" Margin="0,0,10,0">
-                        <ic:SymbolIcon.RenderTransform>
-                            <RotateTransform Angle="45"/>
-                        </ic:SymbolIcon.RenderTransform>
-                    </ic:SymbolIcon>
-                    <TextBlock Grid.Column="1">Sync</TextBlock>
+        <Grid Background="{DynamicResource Sx.BackgroundBrush}"
+              ColumnDefinitions="*,12,320"
+              Margin="0"
+              TextElement.FontFamily="{DynamicResource Sx.FontSans}">
+
+            <!-- Bloc principal -->
+            <comp:NotchedBorder Grid.Column="0" Margin="12,12,0,12" CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}">
+                <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+                    <!-- Barre d'outils -->
+                    <Border Grid.Row="0" BorderBrush="{DynamicResource Sx.LineBrush}" BorderThickness="0,0,0,1" Padding="20,14">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                            <TextBlock Classes="sx-title" Text="Objets" Margin="0,0,8,0" />
+
+                            <comp:NotchedBorder Grid.Column="1" Classes="sx-field" MinWidth="180">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <Path Classes="sx-search-icon" Margin="12,0,0,0" />
+                                    <TextBox Grid.Column="1"
+                                             Classes="sx"
+                                             Height="44"
+                                             Watermark="Filtrer par nom, type, emplacement..."
+                                             Text="{Binding NameFilter}" />
+                                </Grid>
+                            </comp:NotchedBorder>
+
+                            <TextBlock Grid.Column="2" Classes="sx-caption" Text="{Binding ResultSummary}" />
+
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8">
+                                <CheckBox Classes="sx-muted" Content="Debug" IsChecked="{Binding IsInDebugMode}" />
+                                <Button Classes="sx"
+                                        ToolTip.Tip="Comparaison depuis un export"
+                                        Command="{Binding CompareDataFromImportCommand}">Comparer</Button>
+                                <Button Classes="sx" Command="{Binding ExportToExcelCommand}">Exporter Excel</Button>
+                                <Button Classes="sx"
+                                        ToolTip.Tip="Synchroniser la liste d'objets avec Orbital Alliance"
+                                        Command="{Binding SendItemlistToOrbitalAllianceCommand}">Synchroniser</Button>
+                                <Button Classes="sx primary" Command="{Binding LoadItemListCommand}">Charger</Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <ProgressBar Grid.Row="0"
+                                 Classes="sx-quality"
+                                 VerticalAlignment="Bottom"
+                                 IsVisible="{Binding IsResolvingLocations}"
+                                 Maximum="{Binding LocationResolutionTotal}"
+                                 Value="{Binding ResolvedLocationCount}"
+                                 ToolTip.Tip="Résolution des emplacements en cours" />
+
+                    <!-- Critères de recherche, réservés au mode debug -->
+                    <Border Grid.Row="1"
+                            IsVisible="{Binding IsInDebugMode}"
+                            BorderBrush="{DynamicResource Sx.LineBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="20,12">
+                        <Grid ColumnDefinitions="220,*,*" ColumnSpacing="20">
+                            <StackPanel Spacing="8">
+                                <CheckBox Classes="sx-muted" Content="Utiliser le compte connecté" IsChecked="{Binding UseConnectedProfilAsOwner}" />
+                                <TextBlock Classes="sx-caption" Text="Id possesseur" />
+                                <comp:NotchedBorder Classes="sx-field" CutSize="9">
+                                    <TextBox Classes="sx" Height="36" Text="{Binding OwnerId}" IsEnabled="{Binding !UseConnectedProfilAsOwner}" />
+                                </comp:NotchedBorder>
+                                <TextBlock Classes="sx-caption" Text="Id objet" />
+                                <comp:NotchedBorder Classes="sx-field" CutSize="9">
+                                    <TextBox Classes="sx" Height="36" Text="{Binding Id}" />
+                                </comp:NotchedBorder>
+                            </StackPanel>
+
+                            <Grid Grid.Column="1" RowDefinitions="Auto,*">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Classes="sx-caption" Text="Types recherchés" />
+                                    <Button Grid.Column="1" Classes="sx-link" Command="{Binding ResetSelectedTypesCommand}">Réinitialiser</Button>
+                                </Grid>
+                                <ScrollViewer Grid.Row="1" Height="130">
+                                    <ItemsControl ItemsSource="{Binding SearchTypeListSorted}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ItemsTabViewModel+FilterTypeOption">
+                                                <CheckBox MinHeight="30" Content="{Binding Type}" IsChecked="{Binding IsSelected}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+
+                            <Grid Grid.Column="2" RowDefinitions="Auto,*">
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                    <TextBlock Classes="sx-caption" Text="Inventaires" />
+                                    <CheckBox Grid.Column="1"
+                                              IsThreeState="True"
+                                              IsChecked="{Binding SelectAllLocation}"
+                                              IsEnabled="{Binding !!LocationList^.Count, FallbackValue=false}" />
+                                    <Button Grid.Column="2" Classes="sx-link" Command="{Binding ReloadLocationListCommand}">Rafraîchir</Button>
+                                </Grid>
+                                <ScrollViewer Grid.Row="1" Height="130">
+                                    <ItemsControl ItemsSource="{Binding LocationList^}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ItemsTabViewModel+FilterLocationOptionModel">
+                                                <CheckBox MinHeight="30" Content="{Binding Name^, FallbackValue=Chargement}" IsChecked="{Binding IsSelected}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- Filtres rapides -->
+                    <Border Grid.Row="2"
+                            IsVisible="{Binding HasLoadedItems}"
+                            BorderBrush="{DynamicResource Sx.LineBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="20,12,20,6">
+                        <StackPanel>
+                            <Grid ColumnDefinitions="72,*">
+                                <TextBlock Classes="sx-caption" Text="Type" VerticalAlignment="Top" Margin="0,9,0,0" />
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding TypeChips}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:FilterChipViewModel">
+                                            <Button Classes="sx-chip" Classes.on="{Binding IsSelected}" Command="{Binding ToggleCommand}">
+                                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                                                    <TextBlock Classes="sx-count" Text="{Binding Count}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                            <Grid ColumnDefinitions="72,*">
+                                <TextBlock Classes="sx-caption" Text="Sous-type" VerticalAlignment="Top" Margin="0,9,0,0" />
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding SubTypeChips}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:FilterChipViewModel">
+                                            <Button Classes="sx-chip" Classes.on="{Binding IsSelected}" Command="{Binding ToggleCommand}">
+                                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                                                    <TextBlock Classes="sx-count" Text="{Binding Count}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Tableau -->
+                    <Grid Grid.Row="3">
+                        <DataGrid Classes="sx"
+                                  ItemsSource="{Binding DisplayedItems}"
+                                  SelectedItem="{Binding SelectedItem}"
+                                  IsReadOnly="True"
+                                  AutoGenerateColumns="False"
+                                  CanUserSortColumns="False"
+                                  CanUserReorderColumns="False">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Width="34*" Foreground="{DynamicResource Sx.TextBrush}" FontWeight="Medium" Binding="{Binding Name^, FallbackValue=Chargement}">
+                                    <DataGridTextColumn.Header>
+                                        <comp:ColumnHeader DataContext="{Binding NameColumn}" />
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Width="18*" Binding="{Binding ItemTypeLabel}">
+                                    <DataGridTextColumn.Header>
+                                        <comp:ColumnHeader DataContext="{Binding TypeColumn}" />
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Width="20*" Binding="{Binding Location^, FallbackValue=Chargement}">
+                                    <DataGridTextColumn.Header>
+                                        <comp:ColumnHeader DataContext="{Binding LocationColumn}" />
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTemplateColumn Width="10*">
+                                    <DataGridTemplateColumn.Header>
+                                        <comp:ColumnHeader Classes="right" DataContext="{Binding QuantityColumn}" />
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:ItemViewModel">
+                                            <TextBlock Classes="sx-mono"
+                                                       Foreground="{DynamicResource Sx.TextBrush}"
+                                                       HorizontalAlignment="Right"
+                                                       Margin="0,0,10,0"
+                                                       Text="{Binding StackSize}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="18*">
+                                    <DataGridTemplateColumn.Header>
+                                        <comp:ColumnHeader DataContext="{Binding QualityColumn}" />
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:ItemViewModel">
+                                            <Grid Margin="10,0,20,0" VerticalAlignment="Center">
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="9" IsVisible="{Binding ContentQuality, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                                    <ProgressBar Classes="sx-quality" VerticalAlignment="Center" Value="{Binding ContentQuality}" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Classes="sx-mono"
+                                                               FontSize="12"
+                                                               Foreground="{DynamicResource Sx.TextBrush}"
+                                                               Text="{Binding ContentQuality}" />
+                                                </Grid>
+                                                <TextBlock Foreground="{DynamicResource Sx.MutedBrush}"
+                                                           IsVisible="{Binding ContentQuality, Converter={x:Static ObjectConverters.IsNull}}"
+                                                           Text="—" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Colonnes techniques du mode debug -->
+                                <DataGridTextColumn Width="160" Header="id" Binding="{Binding Id}" IsVisible="{Binding IsInDebugMode}" />
+                                <DataGridTextColumn Width="180" Header="Possesseur" Binding="{Binding Owner^, FallbackValue=Chargement}" IsVisible="{Binding IsInDebugMode}" />
+                                <DataGridTextColumn Width="180" Header="Type technique" Binding="{Binding LocalTypeName}" IsVisible="{Binding IsInDebugMode}" />
+                                <DataGridTextColumn Width="180" Header="parentUrn" Binding="{Binding ParentUrn}" IsVisible="{Binding IsInDebugMode}" />
+                                <DataGridTextColumn Width="120" Header="Possède une entrée Edge" Binding="{Binding Edge, Converter={x:Static ObjectConverters.IsNotNull}}" IsVisible="{Binding IsInDebugMode}" />
+                                <DataGridTextColumn Width="120" Header="Location id" Binding="{Binding LocationId}" IsVisible="{Binding IsInDebugMode}" />
+                                <DataGridTextColumn Width="140" Header="Location stockage" Binding="{Binding StowLocation}" IsVisible="{Binding IsInDebugMode}" />
+                                <DataGridTextColumn Width="140" Header="Location stockage shard" Binding="{Binding StowShard}" IsVisible="{Binding IsInDebugMode}" />
+                                <DataGridTextColumn Width="120" Header="EDGE Type" Binding="{Binding EdgeType}" IsVisible="{Binding IsInDebugMode}" />
+                                <DataGridTextColumn Width="160" Header="EDGE Location id" Binding="{Binding EdgeLocation}" IsVisible="{Binding IsInDebugMode}" />
+                                <DataGridTextColumn Width="140" Header="EDGE AttachmentType" Binding="{Binding EdgeAttachmentType}" IsVisible="{Binding IsInDebugMode}" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Classes="sx-caption"
+                                   HorizontalAlignment="Center"
+                                   IsVisible="{Binding HasNotLoadedItems}"
+                                   Text="Cliquez sur Charger pour récupérer les objets de votre compte." />
+                        <TextBlock Classes="sx-caption"
+                                   HorizontalAlignment="Center"
+                                   IsVisible="{Binding ShowNoMatch}"
+                                   Text="Aucun objet ne correspond à ces filtres." />
+
+                        <!-- Indicateur de chargement / filtrage, superposé au tableau -->
+                        <Grid IsVisible="{Binding IsBusy}" IsHitTestVisible="False">
+                            <Border Background="{DynamicResource Sx.SurfaceBrush}" Opacity="0.75" />
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                                <ui:ProgressRing IsIndeterminate="True" Width="40" Height="40" HorizontalAlignment="Center" />
+                                <TextBlock Classes="sx-caption" HorizontalAlignment="Center" Text="{Binding BusyMessage}" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
                 </Grid>
-            </Button>
-            <Button Grid.Column="2" Classes="btn export" Command="{Binding ExportToExcelCommand}" >Exporter Excel</Button>
-            <Button Grid.Column="3" Command="{Binding CompareDataFromImportCommand}">Comparaison depuis export</Button>
+            </comp:NotchedBorder>
+
+            <!-- Détail de l'objet sélectionné -->
+            <comp:NotchedBorder Grid.Column="2"
+                                Margin="0,12,12,12"
+                                CutSize="18"
+                                Background="{DynamicResource Sx.SurfaceBrush}"
+                                Padding="20,22">
+                <Panel>
+                    <TextBlock Classes="sx-caption"
+                               TextWrapping="Wrap"
+                               VerticalAlignment="Top"
+                               IsVisible="{Binding SelectedItem, Converter={x:Static ObjectConverters.IsNull}}"
+                               Text="Sélectionnez un objet pour voir son détail." />
+                    <Panel IsVisible="{Binding SelectedItem, Converter={x:Static ObjectConverters.IsNotNull}}" DataContext="{Binding}">
+                        <Panel DataContext="{Binding SelectedItem}">
+                        <StackPanel x:DataType="models:ItemViewModel">
+                            <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="{Binding ItemTypeLabel}" />
+                            <TextBlock FontSize="20"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sx.TextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,18"
+                                       Text="{Binding Name^, FallbackValue=Chargement}" />
+
+                            <Grid Classes="detail-row" ColumnDefinitions="Auto,*">
+                                <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Emplacement" />
+                                <TextBlock Grid.Column="1" FontSize="13" Text="{Binding Location^, FallbackValue=Chargement}" />
+                            </Grid>
+                            <Grid Classes="detail-row" ColumnDefinitions="Auto,*">
+                                <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Quantité" />
+                                <TextBlock Grid.Column="1" FontFamily="{DynamicResource Sx.FontMono}" FontSize="13" Text="{Binding StackSize}" />
+                            </Grid>
+                            <Grid Classes="detail-row" ColumnDefinitions="Auto,*">
+                                <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Taille occupée" />
+                                <TextBlock Grid.Column="1" FontFamily="{DynamicResource Sx.FontMono}" FontSize="13" Text="{Binding EdgeOccupancy, Converter={StaticResource MicroScuConverter}}" />
+                            </Grid>
+                            <Grid Classes="detail-row" ColumnDefinitions="Auto,*">
+                                <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Sous-type" />
+                                <TextBlock Grid.Column="1" FontSize="13" Text="{Binding ItemSubType}" />
+                            </Grid>
+                            <Grid Classes="detail-row" ColumnDefinitions="Auto,*">
+                                <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Qualité du contenu" />
+                                <TextBlock Grid.Column="1" FontFamily="{DynamicResource Sx.FontMono}" FontSize="13" Text="{Binding ContentQuality, TargetNullValue='—'}" />
+                            </Grid>
+                            <Grid Classes="detail-row" ColumnDefinitions="Auto,*">
+                                <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Quantité du contenu" />
+                                <TextBlock Grid.Column="1" FontFamily="{DynamicResource Sx.FontMono}" FontSize="13" Text="{Binding ContentQuantity, Converter={StaticResource MicroScuConverter}}" />
+                            </Grid>
+                            <Grid Classes="detail-row" ColumnDefinitions="Auto,*">
+                                <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Identifiant" />
+                                <TextBlock Grid.Column="1" FontFamily="{DynamicResource Sx.FontMono}" FontSize="12" Text="{Binding Id}" />
+                            </Grid>
+                        </StackPanel>
+                        </Panel>
+                    </Panel>
+                </Panel>
+            </comp:NotchedBorder>
         </Grid>
-        <Grid Grid.Row="3" Margin="0,5,0,0">
-            <DataGrid ItemsSource="{Binding DisplayedItems}" SelectedItem="{Binding SelectedItem}">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="id" Binding="{Binding Id}" />
-                    <!-- <DataGridTextColumn Header="ownerId" Binding="{Binding OwnerId}" IsVisible="{Binding IsInDebugMode}" /> -->
-                    <DataGridTextColumn Header="Possesseur" Binding="{Binding Owner^, FallbackValue=Chargement}" CustomSortComparer="{StaticResource ItemViewModelOwnerComparer}" CanUserSort="True" IsVisible="{Binding IsInDebugMode}" />
-                    <DataGridTextColumn Header="Nom" CustomSortComparer="{StaticResource ItemViewModelName}" CanUserSort="True" Binding="{Binding Name^, FallbackValue=Chargement}" />
-                    <DataGridTextColumn Header="Type technique" Binding="{Binding LocalTypeName}" IsVisible="{Binding IsInDebugMode}" />
-                    <DataGridTextColumn Header="parentUrn" Binding="{Binding ParentUrn}"  IsVisible="{Binding IsInDebugMode}" />
-                    <DataGridTemplateColumn Header="Stockage template">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                    <TextBlock VerticalAlignment="Stretch" HorizontalAlignment="Stretch" TextAlignment="Left"  IsVisible="{Binding Location, Converter={StaticResource TaskIsFinishedConverter}}" Text="{Binding Location^}" />
-                                    <TextBlock VerticalAlignment="Stretch" HorizontalAlignment="Stretch" TextAlignment="Left" IsVisible="{Binding Location, Converter={StaticResource TaskIsNotFinishedConverter}}" >Chargement</TextBlock>
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Nombre élément" Binding="{Binding StackSize}"  />
-                    <DataGridTextColumn Header="Taille occupée" Binding="{Binding EdgeOccupancy, Converter={StaticResource MicroScuConverter}}"  />
-                    <DataGridTextColumn Header="Qualité contenu" Binding="{Binding ContentQuality}"  />
-                    <DataGridTextColumn Header="Quantité contenu" Binding="{Binding ContentQuantity, Converter={StaticResource MicroScuConverter}}"  />
-                    <DataGridTextColumn Header="Possède une entrée Edge" Binding="{Binding Edge, Converter={x:Static ObjectConverters.IsNotNull }}" IsVisible="{Binding IsInDebugMode}"  />
-                    <!-- <DataGridTextColumn Header="classe" Binding="{Binding TypeGuid}"  IsVisible="{Binding IsInDebugMode}" /> -->
-                    <DataGridTextColumn Header="type" Binding="{Binding ItemType}" />
-                    <DataGridTextColumn Header="sous-type" Binding="{Binding ItemSubType}" />
-                    <DataGridTextColumn Header="Location id" Binding="{Binding LocationId}"  IsVisible="{Binding IsInDebugMode}" />
-                    <DataGridTextColumn Header="Location stockage" Binding="{Binding StowLocation}"  IsVisible="{Binding IsInDebugMode}" />
-                    <DataGridTextColumn Header="location stockage shard" Binding="{Binding StowShard}"  IsVisible="{Binding IsInDebugMode}" />
-                    <DataGridTextColumn Header="EDGE Type" Binding="{Binding EdgeType}"  IsVisible="{Binding IsInDebugMode}" />
-                    <DataGridTextColumn Header="EDGE Location id" Binding="{Binding EdgeLocation}"  IsVisible="{Binding IsInDebugMode}" />
-                    <DataGridTextColumn Header="EDGE AttachmentType" Binding="{Binding EdgeAttachmentType}"  IsVisible="{Binding IsInDebugMode}" />
-                </DataGrid.Columns>
-            </DataGrid>
-            <!-- Indicateur de chargement / filtrage, superposé au tableau -->
-            <Grid IsVisible="{Binding IsBusy}" IsHitTestVisible="False">
-                <Border Background="{DynamicResource CardBackgroundBrush}" Opacity="0.75" CornerRadius="8" />
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
-                    <ui:ProgressRing IsIndeterminate="True" Width="40" Height="40" HorizontalAlignment="Center" />
-                    <TextBlock HorizontalAlignment="Center" Text="{Binding BusyMessage}" />
-                </StackPanel>
-            </Grid>
-        </Grid>
-    </Grid>
+    </ThemeVariantScope>
 </UserControl>

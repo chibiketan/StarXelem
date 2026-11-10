@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using Sc.External.Services.Entitygraph.V1;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Data;
@@ -280,6 +280,18 @@ public class LocationService : ILocationService
     {
         _entityCache.Clear();
         _locationCache.Clear();
+    }
+
+    /// <inheritdoc/>
+    public void AddKnownEntities(IEnumerable<EntityItemQueryResult> entities)
+    {
+        foreach (var entity in entities)
+        {
+            if (entity.EntityNodeProperties is { } properties)
+            {
+                _entityCache.TryAdd(properties.Geid, Task.FromResult<IList<EntityItemQueryResult>>(new List<EntityItemQueryResult> { entity }));
+            }
+        }
     }
     
     private readonly ConcurrentDictionary<ulong, Task<IList<EntityItemQueryResult>>> _entityCache = new();

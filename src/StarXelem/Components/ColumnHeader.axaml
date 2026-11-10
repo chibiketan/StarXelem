@@ -1,0 +1,99 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels"
+             xmlns:comp="clr-namespace:StarXelem.Components"
+             x:DataType="vm:ColumnHeaderViewModel"
+             x:Class="StarXelem.Components.ColumnHeader">
+    <Grid ColumnDefinitions="*,Auto">
+        <Button x:Name="SortButton"
+                Classes="sx-sort"
+                Classes.sorted="{Binding IsSorted}"
+                Command="{Binding RequestSortCommand}"
+                ToolTip.Tip="{Binding Title, StringFormat='Trier par {0}'}">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+                <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                <Panel Width="12" Height="12" VerticalAlignment="Center">
+                    <Path IsVisible="{Binding IsSortedAscending}" Data="M12 19V5M6 11l6-6 6 6" />
+                    <Path IsVisible="{Binding IsSortedDescending}" Data="M12 5v14M6 13l6 6 6-6" />
+                </Panel>
+            </StackPanel>
+        </Button>
+
+        <Button x:Name="FilterButton"
+                Grid.Column="1"
+                Classes="sx-filter"
+                Classes.active="{Binding Filter.HasSelection, FallbackValue=False}"
+                IsVisible="{Binding HasFilter}"
+                ToolTip.Tip="{Binding Title, StringFormat='Filtrer la colonne {0}'}">
+            <Button.Flyout>
+                <Flyout Placement="BottomEdgeAlignedLeft" FlyoutPresenterClasses="sx-popup">
+                    <comp:NotchedBorder Width="300"
+                                        CutSize="12"
+                                        Background="{DynamicResource Sx.ReliefBrush}"
+                                        BorderBrush="{DynamicResource Sx.LineBrush}"
+                                        StrokeThickness="1"
+                                        DataContext="{Binding Filter}">
+                        <Grid RowDefinitions="Auto,Auto,Auto,Auto" x:DataType="vm:ColumnFilterViewModel">
+                            <comp:NotchedBorder Grid.Row="0" Margin="10,10,10,8" CutSize="9" Classes="sx-field">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <Path Classes="sx-search-icon" Margin="10,0,0,0" />
+                                    <TextBox x:Name="SearchBox"
+                                             Grid.Column="1"
+                                             Classes="sx"
+                                             Height="36"
+                                             Watermark="Chercher dans les valeurs"
+                                             Text="{Binding SearchText}" />
+                                </Grid>
+                            </comp:NotchedBorder>
+
+                            <Border Grid.Row="1" BorderBrush="{DynamicResource Sx.LineBrush}" BorderThickness="0,0,0,1" Padding="12,0">
+                                <CheckBox Classes="sx-muted" MinHeight="34" IsChecked="{Binding AreAllVisibleSelected}">Tout sélectionner</CheckBox>
+                            </Border>
+
+                            <ScrollViewer Grid.Row="2" MaxHeight="232" Padding="0,4">
+                                <StackPanel>
+                                    <TextBlock Classes="sx-caption"
+                                               Margin="12,6"
+                                               IsVisible="{Binding StatusText, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                               Text="{Binding StatusText}" />
+                                    <ItemsControl ItemsSource="{Binding VisibleOptions}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ColumnFilterOptionViewModel">
+                                                <Grid ColumnDefinitions="*,Auto" Margin="12,0">
+                                                    <CheckBox MinHeight="34" IsChecked="{Binding IsSelected}">
+                                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                                    </CheckBox>
+                                                    <TextBlock Grid.Column="1" Classes="sx-count" Margin="8,0,0,0" Text="{Binding Count}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Classes="sx-caption"
+                                               Margin="12,10"
+                                               IsVisible="{Binding HasNoVisibleOption}"
+                                               Text="Aucune valeur ne correspond." />
+                                </StackPanel>
+                            </ScrollViewer>
+
+                            <Border Grid.Row="3" BorderBrush="{DynamicResource Sx.LineBrush}" BorderThickness="0,1,0,0" Padding="10,8">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Button Classes="sx-link" HorizontalAlignment="Left" Command="{Binding ResetCommand}">Réinitialiser</Button>
+                                    <Button x:Name="CloseFilterButton"
+                                            Grid.Column="1"
+                                            Classes="sx primary small"
+                                            Click="OnCloseFilterClick">Fermer</Button>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </comp:NotchedBorder>
+                </Flyout>
+            </Button.Flyout>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <Path Width="14" Height="14" Data="M3 5h18l-7 8.5V20l-4-2v-4.5z" />
+                <TextBlock Classes="sx-filter-count"
+                           IsVisible="{Binding Filter.HasSelection, FallbackValue=False}"
+                           Text="{Binding Filter.SelectedCount, FallbackValue=''}" />
+            </StackPanel>
+        </Button>
+    </Grid>
+</UserControl>

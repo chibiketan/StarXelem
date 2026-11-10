@@ -132,5 +132,6 @@
         <StyleInclude Source="Style/BlueprintStyles.axaml" />
                 <StyleInclude Source="Style/VisualSourceControl.axaml"/>
                 <StyleInclude Source="Style/NavigationViewStyles.axaml"/>
+        <StyleInclude Source="Style/SxTheme.axaml" />
     </Application.Styles>
 </Application>

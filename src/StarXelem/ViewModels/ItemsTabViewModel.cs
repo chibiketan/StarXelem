@@ -1,5 +1,7 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using ClosedXML.Excel;
@@ -71,14 +73,16 @@ public partial class ItemsTabViewModel : PageViewModelBase
     [ObservableProperty] private ObservableCollection<ItemViewModel> _displayedItems = new();
     [ObservableProperty] private bool _useConnectedProfilAsOwner = true;
     [ObservableProperty] private bool _useUserInventoryList = true;
-    [ObservableProperty] private bool _useTreeProjection = false;
-    [ObservableProperty] private bool _loadInventoryContent = false;
     [ObservableProperty] private string _ownerId = "";
     [ObservableProperty] private string _id = "";
     [ObservableProperty] private bool _isInDebugMode = false;
     [ObservableProperty] private string _nameFilter = "";
-    [ObservableProperty] private ObservableCollection<FilterTypeOption> _filterTypeList;
-    [ObservableProperty] private ObservableCollection<EItemType> _selectedFilterTypes = new ObservableCollection<EItemType>();
+    [ObservableProperty] private string _resultSummary = "Aucun objet chargé";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasNotLoadedItems))] private bool _hasLoadedItems;
+    [ObservableProperty] private bool _showNoMatch;
+    [ObservableProperty] private bool _isResolvingLocations;
+    [ObservableProperty] private int _resolvedLocationCount;
+    [ObservableProperty] private int _locationResolutionTotal = 1;
 
     [ObservableProperty] private ObservableCollection<FilterTypeOption> _searchTypeList;
     [ObservableProperty] private Task<IList<FilterLocationOptionModel>?>? _locationList = Task.FromResult<IList<FilterLocationOptionModel>?>(null);
@@ -88,13 +92,33 @@ public partial class ItemsTabViewModel : PageViewModelBase
     public IEnumerable<FilterTypeOption> SearchTypeListSorted => _searchTypeList
         .OrderByDescending(o => o.IsSelected)
         .ThenBy(o => o.Type.ToString(), StringComparer.CurrentCultureIgnoreCase);
-    public IEnumerable<FilterTypeOption> FilterTypeListSorted => _filterTypeList
-        .OrderByDescending(o => o.IsSelected)
-        .ThenBy(o => o.Type.ToString(), StringComparer.CurrentCultureIgnoreCase);
 
-    // Sorting state for Name column
-    [ObservableProperty] private bool _isNameSortAscending = true;
-    [ObservableProperty] private string _nameSortLabel = "Trier par Nom A→Z";
+    /// <summary>Filtre par valeurs de la colonne Type, partagé avec les puces de type.</summary>
+    public ColumnFilterViewModel TypeFilter { get; } = new();
+    /// <summary>Filtre par valeurs de la colonne Emplacement.</summary>
+    public ColumnFilterViewModel LocationFilter { get; } = new();
+    public ColumnHeaderViewModel NameColumn { get; }
+    public ColumnHeaderViewModel TypeColumn { get; }
+    public ColumnHeaderViewModel LocationColumn { get; }
+    public ColumnHeaderViewModel QuantityColumn { get; }
+    public ColumnHeaderViewModel QualityColumn { get; }
+    public ObservableCollection<FilterChipViewModel> TypeChips { get; } = new();
+    public ObservableCollection<FilterChipViewModel> SubTypeChips { get; } = new();
+    public bool HasNotLoadedItems => !HasLoadedItems;
+
+    // Au-delà, les puces prendraient trop de place : les valeurs restantes sont accessibles par le filtre de colonne.
+    private const int MaxChipCount = 8;
+    private const int LocationResolutionParallelism = 16;
+    private const string UnknownLocationLabel = "Emplacement inconnu";
+    private static readonly TimeSpan LocationRefreshInterval = TimeSpan.FromMilliseconds(1500);
+
+    private readonly Dictionary<ColumnHeaderViewModel, ItemSortColumn> _sortColumns = new();
+    private ColumnHeaderViewModel? _activeSortColumn;
+    private EItemSubType? _selectedSubType;
+    private List<string> _typesByFrequency = new();
+    // Emplacements déjà résolus, par identifiant d'objet. Une ligne absente est encore en attente de résolution.
+    private readonly ConcurrentDictionary<ulong, string> _resolvedLocations = new();
+    private CancellationTokenSource? _locationResolutionCts;
 
     private Task<IList<ItemViewModel>>? _unfilteredItemList;
     private CancellationTokenSource? _filterCts;
@@ -124,16 +148,19 @@ public partial class ItemsTabViewModel : PageViewModelBase
         _locationService = locationService;
 
         _clientService.OnStatusChanged += (sender, status) => { OnConnectedStatusChanged(status); };
-        // Initialize filter options for multi-select type filter
-        _filterTypeList = new ObservableCollection<FilterTypeOption>(
-            Enum.GetValues<EItemType>().Select(t =>
-            {
-                var opt = new FilterTypeOption(t);
-                opt.PropertyChanged += OnFilterTypeOptionPropertyChanged;
-                return opt;
-            })
-        );
-        
+        NameColumn = CreateColumn("Nom", ItemSortColumn.Name);
+        TypeColumn = CreateColumn("Type", ItemSortColumn.Type, TypeFilter);
+        LocationColumn = CreateColumn("Emplacement", ItemSortColumn.Location, LocationFilter);
+        QuantityColumn = CreateColumn("Qté", ItemSortColumn.Quantity);
+        QualityColumn = CreateColumn("Qualité", ItemSortColumn.Quality);
+        TypeFilter.SelectionChanged += (_, _) =>
+        {
+            // Le sous-type sélectionné n'a plus de sens une fois la famille de types modifiée.
+            _selectedSubType = null;
+            ScheduleFilters(TypeFilterDelay);
+        };
+        LocationFilter.SelectionChanged += (_, _) => ScheduleFilters(TypeFilterDelay);
+
         // Initialize options for multi-select type
         _searchTypeList = new ObservableCollection<FilterTypeOption>(
             Enum.GetValues<EItemType>().Select(t =>
@@ -144,7 +171,6 @@ public partial class ItemsTabViewModel : PageViewModelBase
             })
         );
         _searchTypeList.CollectionChanged += (_, __) => OnPropertyChanged(nameof(SearchTypeListSorted));
-        _filterTypeList.CollectionChanged += (_, __) => OnPropertyChanged(nameof(FilterTypeListSorted));
 
         
         // TODO for testing purpose
@@ -177,27 +203,50 @@ public partial class ItemsTabViewModel : PageViewModelBase
         }
     }
 
-    private void OnFilterTypeOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private ColumnHeaderViewModel CreateColumn(string title, ItemSortColumn sortColumn, ColumnFilterViewModel? filter = null)
     {
-        if (e.PropertyName == nameof(FilterTypeOption.IsSelected) && sender is FilterTypeOption opt)
-        {
+        var column = new ColumnHeaderViewModel(title, OnSortRequested, filter);
+        _sortColumns.Add(column, sortColumn);
+        return column;
+    }
 
-            // Keep SelectedFilterTypes in sync
-            if (opt.IsSelected)
-            {
-                if (!SelectedFilterTypes.Contains(opt.Type))
-                    SelectedFilterTypes.Add(opt.Type);
-            }
-            else
-            {
-                if (SelectedFilterTypes.Contains(opt.Type))
-                    SelectedFilterTypes.Remove(opt.Type);
-            }
-            
-            ScheduleFilters(TypeFilterDelay);
-            // Rafraîchir la vue triée quand une sélection change
-            OnPropertyChanged(nameof(FilterTypeListSorted));
+    // Cycle d'un clic sur un titre : croissant, décroissant, puis retour à l'ordre d'origine.
+    private void OnSortRequested(ColumnHeaderViewModel column)
+    {
+        var next = column.SortDirection switch
+        {
+            null => ListSortDirection.Ascending,
+            ListSortDirection.Ascending => ListSortDirection.Descending,
+            _ => (ListSortDirection?)null
+        };
+
+        foreach (var header in _sortColumns.Keys)
+        {
+            header.SortDirection = null;
         }
+
+        column.SortDirection = next;
+        _activeSortColumn = next == null ? null : column;
+        ScheduleFilters(TimeSpan.Zero);
+    }
+
+    private void ToggleTypeChip(string? key)
+    {
+        if (key == null)
+        {
+            TypeFilter.Reset();
+        }
+        else
+        {
+            TypeFilter.Toggle(key);
+        }
+    }
+
+    private void ToggleSubTypeChip(string? key)
+    {
+        var requested = key == null ? (EItemSubType?)null : Enum.Parse<EItemSubType>(key);
+        _selectedSubType = requested == _selectedSubType ? null : requested;
+        ScheduleFilters(TypeFilterDelay);
     }
 
     private void OnTypeOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -219,19 +268,24 @@ public partial class ItemsTabViewModel : PageViewModelBase
     public async Task LoadItemList()
     {
         IsLoading = true;
+        _locationResolutionCts?.Cancel();
+        _resolvedLocations.Clear();
         _locationService.ClearCache();
         TreatmentStatus = "Appel RSI";
      
+        // Hors mode debug, on charge toujours tous les objets du compte connecté : les critères de recherche sont ignorés.
+        var useSearchCriteria = IsInDebugMode;
         var searchQuery = new ItemQueryModel();
-        searchQuery.useConnectedUserOwner = _useConnectedProfilAsOwner;
-        searchQuery.ownerId = _ownerId;
-        searchQuery.Id = _id;
-        searchQuery.UseProjection = UseTreeProjection;
-        searchQuery.TypeList = SearchTypeList.Where(i => i.IsSelected).Select(i => i.Type).ToList();
-        searchQuery.LoadInventoryContent = LoadInventoryContent;
+        searchQuery.useConnectedUserOwner = !useSearchCriteria || UseConnectedProfilAsOwner;
+        searchQuery.ownerId = useSearchCriteria ? OwnerId : "";
+        searchQuery.Id = useSearchCriteria ? Id : "";
+        searchQuery.UseProjection = true;
+        searchQuery.TypeList = useSearchCriteria
+            ? SearchTypeList.Where(i => i.IsSelected).Select(i => i.Type).ToList()
+            : new List<EItemType>();
 
         var inventoryList = (await LocationList ?? new List<FilterLocationOptionModel>())
-            .Where(i => i.IsSelected)
+            .Where(i => !useSearchCriteria || i.IsSelected)
             .Select(i => i.Location)
             .ToList();
         // Si on utilise la liste des conteneurs, on la charge et on désactive le filtrage par owner
@@ -245,6 +299,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement de la liste des objets");
 
         var itemList = await _clientService.QueryGraphBySearch(searchQuery);
+        // La plupart des parents d'objets attachés sont dans ce résultat : autant de requêtes serveur en moins.
+        _locationService.AddKnownEntities(itemList);
         
         // récupérer les instances de vaisseaux
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Terminé");
@@ -255,14 +311,138 @@ public partial class ItemsTabViewModel : PageViewModelBase
             result.Add(new ItemViewModel(_localeEntryRepository, _locationService, _clientService, this, item, scItem));
         }
 
+        ConfigureColumnFilters(result);
+
         _unfilteredItemList = Task.FromResult<IList<ItemViewModel>>(result);
         IsLoading = false;
 
         // Rattrape la liste filtrée complète avant de rendre la main : la commande reste "en cours"
         // (et le bouton désactivé) jusqu'à l'affichage complet des lignes.
         await ScheduleFilters(TimeSpan.Zero);
+
+        // Les emplacements arrivent ensuite, en tâche de fond : le tableau est utilisable sans les attendre.
+        var locationCts = new CancellationTokenSource();
+        _locationResolutionCts = locationCts;
+        _ = ResolveLocationsAsync(result, locationCts.Token);
     }
     
+    private async Task ResolveLocationsAsync(IReadOnlyList<ItemViewModel> items, CancellationToken token)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        LocationResolutionTotal = Math.Max(1, items.Count);
+        ResolvedLocationCount = 0;
+        IsResolvingLocations = true;
+
+        try
+        {
+            var options = new ParallelOptions { MaxDegreeOfParallelism = LocationResolutionParallelism, CancellationToken = token };
+            var worker = Task.Run(() => Parallel.ForEachAsync(items, options, async (item, cancellation) =>
+            {
+                var location = await GetLocationKeyAsync(item).ConfigureAwait(false);
+                cancellation.ThrowIfCancellationRequested();
+                _resolvedLocations[item.Id] = location;
+            }), token);
+
+            while (!worker.IsCompleted && !token.IsCancellationRequested)
+            {
+                await Task.WhenAny(worker, Task.Delay(LocationRefreshInterval, token));
+                if (!worker.IsCompleted && !token.IsCancellationRequested)
+                {
+                    await RefreshLocationResultsAsync(items.Count, isComplete: false);
+                }
+            }
+
+            await worker;
+            await RefreshLocationResultsAsync(items.Count, isComplete: true);
+            _logger.LogInformation("{Count} emplacements résolus en {Elapsed}", items.Count, stopwatch.Elapsed);
+        }
+        catch (OperationCanceledException)
+        {
+            // Un nouveau chargement a remplacé celui-ci : comportement normal.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erreur lors de la résolution des emplacements");
+        }
+        finally
+        {
+            // Une résolution annulée a forcément une remplaçante, qui reste propriétaire de l'indicateur.
+            if (!token.IsCancellationRequested)
+            {
+                IsResolvingLocations = false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Publie les emplacements résolus jusqu'ici. Attend la fin de l'affichage, et cède la place à un filtrage en cours :
+    /// un rafraîchissement ne doit jamais interrompre une construction du tableau qu'il devrait ensuite recommencer.
+    /// </summary>
+    private async Task RefreshLocationResultsAsync(int total, bool isComplete)
+    {
+        ResolvedLocationCount = _resolvedLocations.Count;
+        LocationFilter.StatusText = isComplete ? null : $"Emplacements résolus : {ResolvedLocationCount} / {total}";
+
+        // Tant que la résolution continue, une valeur cochée doit rester proposée même si aucune ligne ne l'a encore.
+        var keys = _resolvedLocations.Values.Distinct().ToHashSet();
+        if (!isComplete)
+        {
+            keys.UnionWith(LocationFilter.GetSelectedKeys() ?? []);
+        }
+
+        LocationFilter.SetOptions(keys.Select(key => KeyValuePair.Create(key, GetLocationLabel(key))));
+
+        if (isComplete || !IsFiltering)
+        {
+            await ScheduleFilters(TimeSpan.Zero, showBusyIndicator: false);
+        }
+    }
+
+    private void ConfigureColumnFilters(IReadOnlyList<ItemViewModel> items)
+    {
+        TypeFilter.SetOptions(items
+            .Select(item => item.ItemType)
+            .Distinct()
+            .Select(type => KeyValuePair.Create(type.ToString(), ItemTypeLabels.Get(type))));
+
+        _typesByFrequency = items
+            .GroupBy(item => item.ItemType)
+            .OrderByDescending(group => group.Count())
+            .Select(group => group.Key.ToString())
+            .ToList();
+    }
+
+    private async Task<string> GetNameAsync(ItemViewModel item)
+    {
+        try
+        {
+            return await item.Name.ConfigureAwait(false) ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Impossible de résoudre le nom de l'objet {Id}", item.Id);
+            return string.Empty;
+        }
+    }
+
+    private async Task<string> GetLocationKeyAsync(ItemViewModel item)
+    {
+        try
+        {
+            return await item.Location.ConfigureAwait(false) ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Impossible de résoudre l'emplacement de l'objet {Id}", item.Id);
+            return string.Empty;
+        }
+    }
+
+    private static string GetLocationLabel(string? location)
+    {
+        return string.IsNullOrEmpty(location) ? UnknownLocationLabel : location;
+    }
+
     [RelayCommand(CanExecute = nameof(CanResetSelectedTypes))]
     public void ResetSelectedTypes()
     {
@@ -323,7 +503,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     /// La tâche retournée se termine quand la liste est entièrement affichée, ou dès que la demande
     /// est remplacée par une plus récente. À appeler depuis le thread d'UI.
     /// </summary>
-    private Task ScheduleFilters(TimeSpan delay)
+    private Task ScheduleFilters(TimeSpan delay, bool showBusyIndicator = true)
     {
         var unfiltered = _unfilteredItemList;
         if (unfiltered == null)
@@ -337,10 +517,18 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
         // Copie de l'état des filtres : le calcul qui suit ne doit lire aucune propriété du ViewModel.
         var criteria = new ItemFilterCriteria(
-            Needle: string.IsNullOrWhiteSpace(NameFilter) ? null : NameFilter,
-            Types: SelectedFilterTypes is { Count: > 0 } ? SelectedFilterTypes.ToHashSet() : null);
+            Needle: string.IsNullOrWhiteSpace(NameFilter) ? null : NameFilter.Trim(),
+            Types: TypeFilter.GetSelectedKeys(),
+            SubType: _selectedSubType,
+            Locations: LocationFilter.GetSelectedKeys(),
+            SortColumn: _activeSortColumn == null ? null : _sortColumns[_activeSortColumn],
+            SortDescending: _activeSortColumn?.IsSortedDescending ?? false);
 
-        UpdateIsFiltering(true);
+        if (showBusyIndicator)
+        {
+            UpdateIsFiltering(true);
+        }
+
         return RunFilterAsync(unfiltered, criteria, delay, cts.Token);
     }
 
@@ -354,9 +542,9 @@ public partial class ItemsTabViewModel : PageViewModelBase
             }
 
             var items = await unfiltered;
-            var result = await Task.Run(() => FilterItemsAsync(items, criteria, token), token);
+            var outcome = await Task.Run(() => ComputeFilterOutcomeAsync(items, criteria, token), token);
 
-            await Dispatcher.UIThread.InvokeAsync(() => DisplayResultAsync(result, token), DispatcherPriority.Background);
+            await Dispatcher.UIThread.InvokeAsync(() => DisplayResultAsync(outcome, token), DispatcherPriority.Background);
         }
         catch (OperationCanceledException)
         {
@@ -376,33 +564,156 @@ public partial class ItemsTabViewModel : PageViewModelBase
         }
     }
 
-    private static async Task<List<ItemViewModel>> FilterItemsAsync(IList<ItemViewModel> items, ItemFilterCriteria criteria, CancellationToken token)
+    /// <summary>
+    /// Calcule les lignes à afficher et, pour chaque filtre, le nombre de lignes de chaque valeur en tenant compte des
+    /// autres filtres seulement : une liste de valeurs ne se réduit pas sous l'effet de ses propres coches.
+    /// </summary>
+    private async Task<ItemFilterOutcome> ComputeFilterOutcomeAsync(IList<ItemViewModel> items, ItemFilterCriteria criteria, CancellationToken token)
     {
-        var result = new List<ItemViewModel>();
-
+        // Le nom passe par la base locale : on ne le résout que si le filtre ou le tri en a besoin.
+        var needsName = criteria.Needle != null || criteria.SortColumn == ItemSortColumn.Name;
+        var rows = new List<ItemFilterRow>(items.Count);
         foreach (var item in items)
         {
             token.ThrowIfCancellationRequested();
-
-            // Le type se lit sans coût : on l'examine avant le nom, dont la résolution interroge la base locale.
-            if (criteria.Types != null && !criteria.Types.Contains(item.ItemType))
-            {
-                continue;
-            }
-
-            if (criteria.Needle != null)
-            {
-                var name = await item.Name.ConfigureAwait(false);
-                if (string.IsNullOrEmpty(name) || !name.Contains(criteria.Needle, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    continue;
-                }
-            }
-
-            result.Add(item);
+            var name = needsName ? await GetNameAsync(item).ConfigureAwait(false) : string.Empty;
+            rows.Add(new ItemFilterRow(item, name, _resolvedLocations.GetValueOrDefault(item.Id)));
         }
 
-        return result;
+        var matchingText = rows.Where(row => MatchesNeedle(row, criteria.Needle)).ToList();
+        bool InTypes(ItemFilterRow row) => criteria.Types == null || criteria.Types.Contains(row.Item.ItemType.ToString());
+        bool InSubType(ItemFilterRow row) => criteria.SubType == null || row.Item.ItemSubType == criteria.SubType;
+        bool InLocations(ItemFilterRow row) => criteria.Locations == null || (row.LocationKey != null && criteria.Locations.Contains(row.LocationKey));
+
+        var typeBase = matchingText.Where(InLocations).ToList();
+        var subTypeBase = typeBase.Where(InTypes).ToList();
+        var locationBase = matchingText.Where(row => InTypes(row) && InSubType(row)).ToList();
+        var displayed = SortRows(subTypeBase.Where(InSubType), criteria).Select(row => row.Item).ToList();
+
+        return new ItemFilterOutcome(
+            displayed,
+            items.Count,
+            CountByKey(typeBase, row => row.Item.ItemType.ToString()),
+            CountByKey(subTypeBase, row => row.Item.ItemSubType.ToString()),
+            CountByKey(locationBase.Where(row => row.LocationKey != null), row => row.LocationKey!));
+    }
+
+    private static bool MatchesNeedle(ItemFilterRow row, string? needle)
+    {
+        if (needle == null)
+        {
+            return true;
+        }
+
+        return row.Name.Contains(needle, StringComparison.CurrentCultureIgnoreCase)
+               || row.Item.ItemTypeLabel.Contains(needle, StringComparison.CurrentCultureIgnoreCase)
+               || row.Item.ItemSubType.ToString().Contains(needle, StringComparison.CurrentCultureIgnoreCase)
+               || (row.LocationKey != null && GetLocationLabel(row.LocationKey).Contains(needle, StringComparison.CurrentCultureIgnoreCase));
+    }
+
+    private static Dictionary<string, int> CountByKey(IEnumerable<ItemFilterRow> rows, Func<ItemFilterRow, string> keySelector)
+    {
+        return rows.CountBy(keySelector).ToDictionary(count => count.Key, count => count.Value);
+    }
+
+    private static IEnumerable<ItemFilterRow> SortRows(IEnumerable<ItemFilterRow> rows, ItemFilterCriteria criteria)
+    {
+        return criteria.SortColumn switch
+        {
+            ItemSortColumn.Name => SortByText(rows, row => row.Name, criteria.SortDescending),
+            ItemSortColumn.Type => SortByText(rows, row => row.Item.ItemTypeLabel, criteria.SortDescending),
+            ItemSortColumn.Location => SortByLocation(rows, criteria.SortDescending),
+            ItemSortColumn.Quantity => SortByNumber(rows, row => row.Item.StackSize, criteria.SortDescending),
+            ItemSortColumn.Quality => SortByNumber(rows, row => (uint?)row.Item.ContentQuality, criteria.SortDescending),
+            _ => rows
+        };
+    }
+
+    private static IEnumerable<ItemFilterRow> SortByText(IEnumerable<ItemFilterRow> rows, Func<ItemFilterRow, string> key, bool descending)
+    {
+        return descending
+            ? rows.OrderByDescending(key, StringComparer.CurrentCultureIgnoreCase)
+            : rows.OrderBy(key, StringComparer.CurrentCultureIgnoreCase);
+    }
+
+    private static IEnumerable<ItemFilterRow> SortByLocation(IEnumerable<ItemFilterRow> rows, bool descending)
+    {
+        var pendingLast = rows.OrderBy(row => row.LocationKey == null);
+        return descending
+            ? pendingLast.ThenByDescending(row => GetLocationLabel(row.LocationKey), StringComparer.CurrentCultureIgnoreCase)
+            : pendingLast.ThenBy(row => GetLocationLabel(row.LocationKey), StringComparer.CurrentCultureIgnoreCase);
+    }
+
+    // Une ligne sans valeur reste en fin de tableau, quel que soit le sens du tri.
+    private static IEnumerable<ItemFilterRow> SortByNumber(IEnumerable<ItemFilterRow> rows, Func<ItemFilterRow, uint?> key, bool descending)
+    {
+        var withoutValueLast = rows.OrderBy(row => key(row) == null);
+        return descending ? withoutValueLast.ThenByDescending(key) : withoutValueLast.ThenBy(key);
+    }
+
+    private void ApplyFilterOutcome(ItemFilterOutcome outcome)
+    {
+        TypeFilter.UpdateCounts(outcome.TypeCounts);
+        LocationFilter.UpdateCounts(outcome.LocationCounts);
+        SyncChips(TypeChips, BuildTypeChipStates(outcome.TypeCounts), ToggleTypeChip);
+        SyncChips(SubTypeChips, BuildSubTypeChipStates(outcome.SubTypeCounts), ToggleSubTypeChip);
+
+        HasLoadedItems = outcome.TotalCount > 0;
+        ShowNoMatch = HasLoadedItems && outcome.Items.Count == 0;
+        ResultSummary = $"{outcome.Items.Count} sur {outcome.TotalCount} éléments";
+    }
+
+    // Les puces suivent la fréquence au chargement : elles ne changent pas de place pendant que l'utilisateur filtre.
+    private List<ChipState> BuildTypeChipStates(IReadOnlyDictionary<string, int> counts)
+    {
+        var keys = _typesByFrequency
+            .Where((key, index) => index < MaxChipCount || TypeFilter.IsSelected(key))
+            .ToList();
+        var states = new List<ChipState> { new(null, "Tout", counts.Values.Sum(), !TypeFilter.HasSelection) };
+        states.AddRange(keys.Select(key => new ChipState(
+            key,
+            ItemTypeLabels.Get(Enum.Parse<EItemType>(key)),
+            counts.GetValueOrDefault(key),
+            TypeFilter.IsSelected(key))));
+        return states;
+    }
+
+    private List<ChipState> BuildSubTypeChipStates(IReadOnlyDictionary<string, int> counts)
+    {
+        var selectedKey = _selectedSubType?.ToString();
+        var keys = counts
+            .OrderByDescending(count => count.Value)
+            .ThenBy(count => count.Key, StringComparer.CurrentCultureIgnoreCase)
+            .Select(count => count.Key)
+            .Take(MaxChipCount)
+            .ToList();
+        if (selectedKey != null && !keys.Contains(selectedKey))
+        {
+            keys.Add(selectedKey);
+        }
+
+        var states = new List<ChipState> { new(null, "Tous", counts.Values.Sum(), _selectedSubType == null) };
+        states.AddRange(keys.Select(key => new ChipState(key, key, counts.GetValueOrDefault(key), key == selectedKey)));
+        return states;
+    }
+
+    // Quand les puces sont les mêmes, on les met à jour sur place pour ne pas perdre le focus clavier.
+    private static void SyncChips(ObservableCollection<FilterChipViewModel> chips, IReadOnlyList<ChipState> states, Action<string?> toggle)
+    {
+        if (!chips.Select(chip => chip.Key).SequenceEqual(states.Select(state => state.Key)))
+        {
+            chips.Clear();
+            foreach (var state in states)
+            {
+                chips.Add(new FilterChipViewModel(state.Key, state.Label, toggle));
+            }
+        }
+
+        for (var index = 0; index < states.Count; index++)
+        {
+            chips[index].Count = states[index].Count;
+            chips[index].IsSelected = states[index].IsSelected;
+        }
     }
 
     /// <summary>
@@ -410,13 +721,16 @@ public partial class ItemsTabViewModel : PageViewModelBase
     /// par paquets : construire toutes les lignes d'un coup bloquerait le thread d'UI. S'interrompt dès que la demande
     /// est annulée.
     /// </summary>
-    private async Task DisplayResultAsync(List<ItemViewModel> result, CancellationToken token)
+    private async Task DisplayResultAsync(ItemFilterOutcome outcome, CancellationToken token)
     {
         if (token.IsCancellationRequested)
         {
             return;
         }
 
+        ApplyFilterOutcome(outcome);
+
+        var result = outcome.Items;
         ItemList = Task.FromResult<IList<ItemViewModel>>(result);
 
         // Reconstruire le tableau est l'opération coûteuse : on l'évite quand le résultat ne change pas.
@@ -425,6 +739,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
             return;
         }
 
+        // Le tableau perd sa sélection quand sa collection est remplacée : on la rétablit si l'objet reste affiché.
+        var selectedItem = SelectedItem;
         var target = new ObservableCollection<ItemViewModel>();
         DisplayedItems = target;
 
@@ -442,6 +758,11 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
             await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
         }
+
+        if (selectedItem != null && result.Contains(selectedItem))
+        {
+            SelectedItem = selectedItem;
+        }
     }
 
     // Écrit depuis RunFilterAsync, qui peut reprendre hors du thread d'UI : IsFiltering ne doit y être écrit que là.
@@ -457,7 +778,33 @@ public partial class ItemsTabViewModel : PageViewModelBase
         }
     }
 
-    private sealed record ItemFilterCriteria(string? Needle, HashSet<EItemType>? Types);
+    private enum ItemSortColumn
+    {
+        Name,
+        Type,
+        Location,
+        Quantity,
+        Quality
+    }
+
+    private sealed record ItemFilterCriteria(
+        string? Needle,
+        HashSet<string>? Types,
+        EItemSubType? SubType,
+        HashSet<string>? Locations,
+        ItemSortColumn? SortColumn,
+        bool SortDescending);
+
+    private sealed record ItemFilterRow(ItemViewModel Item, string Name, string? LocationKey);
+
+    private sealed record ItemFilterOutcome(
+        List<ItemViewModel> Items,
+        int TotalCount,
+        Dictionary<string, int> TypeCounts,
+        Dictionary<string, int> SubTypeCounts,
+        Dictionary<string, int> LocationCounts);
+
+    private sealed record ChipState(string? Key, string Label, int Count, bool IsSelected);
 
     // Active/désactive le bouton d'export lorsqu'on change la liste
     partial void OnItemListChanged(Task<IList<ItemViewModel>>? value)

@@ -1,4 +1,4 @@
-﻿using StarBreaker.DataCoreGenerated;
+using StarBreaker.DataCoreGenerated;
 using StarXelem.Models;
 
 namespace StarXelem.Services.LocationService;
@@ -47,4 +47,10 @@ public interface ILocationService
     /// À appeler lors d'un rechargement de données ou d'une déconnexion.
     /// </summary>
     void ClearCache();
+
+    /// <summary>
+    /// Mémorise des entités déjà chargées, pour qu'une résolution ultérieure n'ait pas à les redemander au serveur.
+    /// </summary>
+    /// <param name="entities">Résultats d'une requête sur le graphe d'entités du jeu.</param>
+    void AddKnownEntities(IEnumerable<EntityItemQueryResult> entities);
 }

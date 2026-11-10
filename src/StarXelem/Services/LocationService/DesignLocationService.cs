@@ -1,4 +1,4 @@
-﻿using StarBreaker.DataCoreGenerated;
+using StarBreaker.DataCoreGenerated;
 using StarXelem.Models;
 
 namespace StarXelem.Services.LocationService;
@@ -24,6 +24,11 @@ public class DesignLocationService : ILocationService
 
     /// <inheritdoc/>
     public void ClearCache()
+    {
+    }
+
+    /// <inheritdoc/>
+    public void AddKnownEntities(IEnumerable<EntityItemQueryResult> entities)
     {
     }
 }
