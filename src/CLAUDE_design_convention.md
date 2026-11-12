@@ -642,7 +642,7 @@ Un écran migré applique les classes `sx`, sans valeur en dur. **Thème sombre 
 | Accent marqué (icône de filtre actif) | `Sx.AccentStrongBrush` | `#55E8B04A` |
 | Sur accent (texte d'un bouton plein) | `Sx.OnAccentBrush` | `#FF0B0D12` |
 
-Tons réservés aux badges, à ajouter aux ressources au premier écran qui en a besoin : Succès `#FF4FD1A5`, Attention `#FFF08A4B`, Danger `#FFF2666A`, Info `#FF6CB6FF`.
+Tons de badge et de pastille, chacun avec une ressource pleine et une ressource `SoftBrush` à alpha `24` : Succès `#FF4FD1A5`, Attention `#FFF08A4B`, Info `#FF6CB6FF`, Neutre `#FFA4ACBA`. Danger `#FFF2666A` reste à ajouter au premier écran qui en a besoin.
 
 ### 18.2 Typographie
 
@@ -650,7 +650,7 @@ Quatre tailles : **20** (titre, 600), **14 ou 13** (texte), **12** (légende, en
 
 ### 18.3 Formes
 
-- **Angles coupés** (`comp:NotchedBorder`, haut droit et bas gauche) : 9 px petit champ et bouton compact, 11 px champ et bouton, 12 px panneau flottant, 18 px bloc principal.
+- **Angles coupés** (`comp:NotchedBorder`, haut droit et bas gauche) : 7 px pastille d'icône, 9 px petit champ et bouton compact, 11 px champ et bouton, 12 px panneau flottant, 18 px bloc principal.
 - **Puces** (`Button.sx-chip`) : seul élément arrondi, rayon 17 px, hauteur 34 px.
 - **Bordures** : 1 px, couleur Ligne. La règle des 0,5 px ne s'applique pas ici.
 - L'ombre portée du panneau flottant est autorisée ; aucune autre.
@@ -663,9 +663,24 @@ Quatre tailles : **20** (titre, 600), **14 ou 13** (texte), **12** (légende, en
 | Champ | `NotchedBorder.sx-field` + `TextBox.sx` | Contour accent au focus. |
 | Filtre rapide | `Button.sx-chip`, `.on` | Compteur monospace dans la puce. Au plus 8 puces, le reste passe par le filtre de colonne. |
 | Tableau | `DataGrid.sx` | Lignes de 34 px, séparateurs horizontaux, sélection en Accent doux. |
-| En-tête de colonne | `comp:ColumnHeader` | Voir 18.5. |
+| En-tête de colonne | `comp:ColumnHeader` | Voir 18.6. |
 
-### 18.5 Tri et filtre par colonne
+### 18.5 Emplacement d'un objet
+
+Une pastille d'icône (`comp:LocationIcon`, 24 px), le nom, puis la destination finale en texte Discret 12 px. L'infobulle et le panneau de détail donnent le chemin complet.
+
+| Catégorie | Icône | Ton |
+|---|---|---|
+| Lieu | Épingle | Info |
+| Hangar | Maison | Info |
+| Vaisseau | Vaisseau | Accent |
+| Arme | Arme | Succès |
+| Armure, casque | Bouclier | Succès |
+| Porté | Silhouette | Succès |
+| Caisse | Cube | Attention |
+| Autre | Point d'interrogation | Neutre |
+
+### 18.6 Tri et filtre par colonne
 
 - Le tri et le filtrage sont faits par le ViewModel (`CanUserSortColumns="False"`), pour survivre au rechargement des lignes.
 - Un clic sur le titre trie en ordre croissant, puis décroissant, puis revient à l'ordre d'origine. La flèche n'apparaît que sur la colonne triée.

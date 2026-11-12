@@ -348,12 +348,12 @@ public partial class ItemsTabViewModel : PageViewModelBase
                 await Task.WhenAny(worker, Task.Delay(LocationRefreshInterval, token));
                 if (!worker.IsCompleted && !token.IsCancellationRequested)
                 {
-                    await RefreshLocationResultsAsync(items.Count, isComplete: false);
+                    await RefreshLocationResultsAsync(items, isComplete: false);
                 }
             }
 
             await worker;
-            await RefreshLocationResultsAsync(items.Count, isComplete: true);
+            await RefreshLocationResultsAsync(items, isComplete: true);
             _logger.LogInformation("{Count} emplacements résolus en {Elapsed}", items.Count, stopwatch.Elapsed);
         }
         catch (OperationCanceledException)
@@ -378,10 +378,11 @@ public partial class ItemsTabViewModel : PageViewModelBase
     /// Publie les emplacements résolus jusqu'ici. Attend la fin de l'affichage, et cède la place à un filtrage en cours :
     /// un rafraîchissement ne doit jamais interrompre une construction du tableau qu'il devrait ensuite recommencer.
     /// </summary>
-    private async Task RefreshLocationResultsAsync(int total, bool isComplete)
+    private async Task RefreshLocationResultsAsync(IReadOnlyList<ItemViewModel> items, bool isComplete)
     {
         ResolvedLocationCount = _resolvedLocations.Count;
-        LocationFilter.StatusText = isComplete ? null : $"Emplacements résolus : {ResolvedLocationCount} / {total}";
+        LocationFilter.StatusText = isComplete ? null : $"Emplacements résolus : {ResolvedLocationCount} / {items.Count}";
+        ApplyLocationDisplays(items);
 
         // Tant que la résolution continue, une valeur cochée doit rester proposée même si aucune ligne ne l'a encore.
         var options = BuildLocationOptions(_resolvedLocations.Values);
