@@ -26,6 +26,7 @@ public partial class ItemViewModel : ViewModelBase
     private static readonly IList<EItemType> LocationStopTypes = Enum.GetValues<EItemType>()
         .Where(type => IsLocationStopType(type.ToString()))
         .ToList();
+    [ObservableProperty] private ItemLocationDisplay? _locationDisplay;
     private ushort? _contentQuality;
     private ulong? _contentQuantity;
 

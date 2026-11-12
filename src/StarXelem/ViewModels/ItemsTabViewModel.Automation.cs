@@ -76,6 +76,8 @@ public partial class ItemsTabViewModel
                 Location = location.Name,
                 LocationKind = location.Kind.ToString(),
                 LocationId = location.Id,
+                LocationCategory = item.LocationDisplay?.Category.ToString(),
+                LocationDetail = item.LocationDisplay?.Detail,
                 EdgeType = item.EdgeType?.ToString(),
                 item.EdgeLocation,
                 ParentId = parentId,

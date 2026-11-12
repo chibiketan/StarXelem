@@ -15,6 +15,14 @@
         <SolidColorBrush x:Key="Sx.AccentSoftBrush" Color="#24E8B04A" />
         <SolidColorBrush x:Key="Sx.AccentStrongBrush" Color="#55E8B04A" />
         <SolidColorBrush x:Key="Sx.OnAccentBrush" Color="#FF0B0D12" />
+        <SolidColorBrush x:Key="Sx.InfoBrush" Color="#FF6CB6FF" />
+        <SolidColorBrush x:Key="Sx.InfoSoftBrush" Color="#246CB6FF" />
+        <SolidColorBrush x:Key="Sx.SuccessBrush" Color="#FF4FD1A5" />
+        <SolidColorBrush x:Key="Sx.SuccessSoftBrush" Color="#244FD1A5" />
+        <SolidColorBrush x:Key="Sx.WarningBrush" Color="#FFF08A4B" />
+        <SolidColorBrush x:Key="Sx.WarningSoftBrush" Color="#24F08A4B" />
+        <SolidColorBrush x:Key="Sx.NeutralBrush" Color="#FFA4ACBA" />
+        <SolidColorBrush x:Key="Sx.NeutralSoftBrush" Color="#24A4ACBA" />
         <FontFamily x:Key="Sx.FontSans">fonts:Inter#Inter, $Default</FontFamily>
         <FontFamily x:Key="Sx.FontMono">Cascadia Mono, Consolas, monospace</FontFamily>
         <StreamGeometry x:Key="Sx.SearchIcon">M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3</StreamGeometry>

@@ -210,22 +210,50 @@
                                   CanUserSortColumns="False"
                                   CanUserReorderColumns="False">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Width="34*" Foreground="{DynamicResource Sx.TextBrush}" FontWeight="Medium" Binding="{Binding Name^, FallbackValue=Chargement}">
+                                <DataGridTextColumn Width="28*" Foreground="{DynamicResource Sx.TextBrush}" FontWeight="Medium" Binding="{Binding Name^, FallbackValue=Chargement}">
                                     <DataGridTextColumn.Header>
                                         <comp:ColumnHeader DataContext="{Binding NameColumn}" />
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Width="18*" Binding="{Binding ItemTypeLabel}">
+                                <DataGridTextColumn Width="15*" Binding="{Binding ItemTypeLabel}">
                                     <DataGridTextColumn.Header>
                                         <comp:ColumnHeader DataContext="{Binding TypeColumn}" />
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Width="20*" Binding="{Binding Location^.DisplayName, FallbackValue=Chargement}">
-                                    <DataGridTextColumn.Header>
+                                <DataGridTemplateColumn Width="30*">
+                                    <DataGridTemplateColumn.Header>
                                         <comp:ColumnHeader DataContext="{Binding LocationColumn}" />
-                                    </DataGridTextColumn.Header>
-                                </DataGridTextColumn>
-                                <DataGridTemplateColumn Width="10*">
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:ItemViewModel">
+                                            <Panel Margin="12,0,10,0" VerticalAlignment="Center">
+                                                <TextBlock Classes="sx-caption"
+                                                           IsVisible="{Binding LocationDisplay, Converter={x:Static ObjectConverters.IsNull}}"
+                                                           Text="Chargement" />
+                                                <DockPanel DataContext="{Binding LocationDisplay}"
+                                                           IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                                    <comp:LocationIcon DockPanel.Dock="Left" Margin="0,0,8,0" />
+                                                    <TextBlock x:DataType="models:ItemLocationDisplay"
+                                                               DockPanel.Dock="Left"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource Sx.TextBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip.Tip="{Binding FullText}"
+                                                               Text="{Binding Name}" />
+                                                    <TextBlock x:DataType="models:ItemLocationDisplay"
+                                                               Margin="8,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="12"
+                                                               Foreground="{DynamicResource Sx.MutedBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip.Tip="{Binding FullText}"
+                                                               Text="{Binding Destination}" />
+                                                </DockPanel>
+                                            </Panel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Width="9*">
                                     <DataGridTemplateColumn.Header>
                                         <comp:ColumnHeader Classes="right" DataContext="{Binding QuantityColumn}" />
                                     </DataGridTemplateColumn.Header>
@@ -321,9 +349,24 @@
                                        Margin="0,4,0,18"
                                        Text="{Binding Name^, FallbackValue=Chargement}" />
 
-                            <Grid Classes="detail-row" ColumnDefinitions="Auto,*">
-                                <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Emplacement" />
-                                <TextBlock Grid.Column="1" FontSize="13" Text="{Binding Location^.DisplayName, FallbackValue=Chargement}" />
+                            <Grid ColumnDefinitions="Auto,*"
+                                  ColumnSpacing="10"
+                                  Margin="0,0,0,16"
+                                  DataContext="{Binding LocationDisplay}"
+                                  IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <comp:LocationIcon VerticalAlignment="Top" />
+                                <StackPanel Grid.Column="1" x:DataType="models:ItemLocationDisplay" VerticalAlignment="Center">
+                                    <TextBlock FontSize="14"
+                                               FontWeight="Medium"
+                                               Foreground="{DynamicResource Sx.TextBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="{Binding Name}" />
+                                    <TextBlock FontSize="12"
+                                               Foreground="{DynamicResource Sx.MutedBrush}"
+                                               TextWrapping="Wrap"
+                                               IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                               Text="{Binding Detail}" />
+                                </StackPanel>
                             </Grid>
                             <Grid Classes="detail-row" ColumnDefinitions="Auto,*">
                                 <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Quantité" />
