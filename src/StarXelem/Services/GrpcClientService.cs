@@ -1,4 +1,5 @@
-﻿using Grpc.Core;
+﻿using System.Diagnostics;
+using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using Sc.External.Common.Api.V1;
@@ -212,6 +213,8 @@ public class GrpcClientService : IGrpcClientService
             andFilters.Add(PropIn("itemTypeEnum", itemQueryModel.TypeList!.Select(t => Int((int)t))));
         }
 
+        EdgeFilter stowedIn = null;
+
         // Filtre par conteneur (STOWED_IN) avec option OR owner
         // Filtre actif uniquement si pas de owner ou pas d'id direct (sinon la requête mouline sans retourner)
         if ((itemQueryModel.InventoryIdList?.Count ?? 0) > 0
@@ -219,7 +222,7 @@ public class GrpcClientService : IGrpcClientService
             && !itemQueryModel.useConnectedUserOwner
                 )
         {
-            var stowedIn = new EdgeFilter { EdgeType = "STOWED_IN" };
+            stowedIn = new EdgeFilter { EdgeType = "STOWED_IN" };
             stowedIn.Values.AddRange(itemQueryModel.InventoryIdList!.Select(id => Str(id)));
         
             var or = new EntityCompositeFilter { Operator = LogicalOperator.Or };
@@ -288,11 +291,19 @@ public class GrpcClientService : IGrpcClientService
         var snapshotDict = new Dictionary<ulong, EntitySnapshot>(500);
         var nodes = new List<Node>(800);
 
+        // Indicateurs de temps : où passe le chargement des objets ?
+        var totalWatch = Stopwatch.StartNew();
+        var semaphoreTime = TimeSpan.Zero;
+        var networkTime = TimeSpan.Zero;
+        var pageCount = 0;
+
         // Exécution paginée générique
         async Task RunPagedQueryAsync(string inventoryId)
         {
             EntityQueryResponse? response = null;
+            var waitStart = Stopwatch.GetTimestamp();
             await semaphoreSlim.WaitAsync().ConfigureAwait(false);
+            semaphoreTime += Stopwatch.GetElapsedTime(waitStart);
             request.Body.Query.InventoryId = inventoryId;
             // La requête est partagée entre les conteneurs : sans cette remise à zéro, la première page du conteneur suivant
             // reprend le curseur de fin du précédent et ignore tout objet dont le geid le précède.
@@ -304,7 +315,10 @@ public class GrpcClientService : IGrpcClientService
                     if (response != null)
                         request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
 
+                    var callStart = Stopwatch.GetTimestamp();
                     response = await service.EntityQueryAsync(request, _authHeaders).ConfigureAwait(false);
+                    networkTime += Stopwatch.GetElapsedTime(callStart);
+                    pageCount++;
 
                     foreach (var edge in response.Body.Results.Edges)
                     {
@@ -318,7 +332,7 @@ public class GrpcClientService : IGrpcClientService
                     {
                         if (!snapshotDict.TryAdd(entitySnapshot.EntityId, entitySnapshot))
                         {
-                            _logger.LogInformation("Le snapshot existe déjà pour l'entité avec l'id {id}", entitySnapshot.EntityId);
+                            //_logger.LogInformation("Le snapshot existe déjà pour l'entité avec l'id {id}", entitySnapshot.EntityId);
                         } 
                     }
 
@@ -335,103 +349,120 @@ public class GrpcClientService : IGrpcClientService
         foreach (var inventoryId in itemQueryModel.InventoryIdList)
         {
             await RunPagedQueryAsync(inventoryId).ConfigureAwait(false);
-            
+
         }
 
-        // 2) Chargement optionnel du contenu des inventaires trouvés
+        var initialElapsed = totalWatch.Elapsed;
+        var initialNetwork = networkTime;
+        var initialPages = pageCount;
+        var initialNodeCount = nodes.Count;
+        var containerDetectionTime = TimeSpan.Zero;
+        var subQueryTime = TimeSpan.Zero;
+        var loopDedupTime = TimeSpan.Zero;
+        var containerCount = 0;
+        var emptyContainerCount = 0;
+        var subQueryNodeCount = 0;
+
+        // 2) Chargement optionnel du contenu des conteneurs trouvés
+        // Le serveur exige l'inventaire dans la requête : un filtre STOWED_IN groupant plusieurs conteneurs ne renvoie
+        // plus rien. On fait donc une requête par conteneur, avec son inventaire, y compris pour ceux trouvés à l'intérieur.
         if (itemQueryModel.LoadInventoryContent)
         {
-            var containerList = new List<ulong>(500);
+            var knownIds = nodes.Select(node => node.Properties.EntityProperties.Geid).ToHashSet();
+            var pendingContainers = new Queue<ulong>();
 
-            // Détection des conteneurs déjà trouvés
-            foreach (var node in nodes)
+            async Task EnqueueContainersAsync(IEnumerable<Node> found)
             {
-                var type = await _p4kService.GetEntityType(node.Properties.EntityProperties.ClassGuidCrc).ConfigureAwait(false);
-                var container = ((EntityClassDefinition?)type?.Data)?.Components.OfType<SCItemInventoryContainerComponentParams>().FirstOrDefault();
-                if (container != null)
-                {
-                    containerList.Add(node.Properties.EntityProperties.Geid);
-                }
-            }
-
-            // Fonction locale pour mettre à jour/ajouter le filtre STOWED_IN (OR owner éventuellement)
-            void UpsertStowedInFilter(IEnumerable<ulong> geids)
-            {
-                var inventoryIdListFilter = new EdgeFilter { EdgeType = "STOWED_IN" };
-                inventoryIdListFilter.Values.AddRange(geids.Select(g => Str($"{g}:Container:0")));
-
-                var or = new EntityCompositeFilter { Operator = LogicalOperator.Or };
-                or.Filters.Add(new EntityFilter { EdgeFilter = inventoryIdListFilter });
-
-                if (itemQueryModel.useConnectedUserOwner)
-                    or.Filters.Add(PropEqULong("ownerId", _playerInfo.Player.Geid));
-
-                var existing = compositeFilter.Filters.FirstOrDefault(c =>
-                    c.CompositeFilter != null &&
-                    c.CompositeFilter.Operator == LogicalOperator.Or &&
-                    c.CompositeFilter.Filters.Any(f => f.EdgeFilter is { EdgeType: "STOWED_IN" }));
-
-                if (existing != null)
-                    existing.CompositeFilter = or;
-                else
-                    compositeFilter.Filters.Add(new EntityFilter { CompositeFilter = or });
-            }
-
-            while (containerList.Count > 0)
-            {
-                var batch = containerList.Take(50).ToList();
-                containerList.RemoveRange(0, batch.Count);
-
-                UpsertStowedInFilter(batch);
-
-                // Reset pagination pour repartir du début
-                request.Body.Query.Pagination.After = "";
-
-                // Requête paginée pour cette fournée + découverte de nouveaux conteneurs
-                EntityQueryResponse? response = null;
-                await semaphoreSlim.WaitAsync().ConfigureAwait(false);
+                var detectionStart = Stopwatch.GetTimestamp();
                 try
                 {
-                    do
-                    {
-                        if (response != null)
-                            request.Body.Query.Pagination.After = response.Body.PageInfo.EndCursor;
-
-                        response = await service.EntityQueryAsync(request, _authHeaders).ConfigureAwait(false);
-
-                        foreach (var edge in response.Body.Results.Edges)
-                        {
-                            if (edge.Start.HasEntityId)
-                                edgeDict.TryAdd(edge.Start.EntityId, edge);
-                            else
-                                _logger.LogInformation("Edge start pas de type Entity : {Type}", edge.Start.Type);
-                        }
-
-                        nodes.AddRange(response.Body.Results.Nodes);
-
-                        foreach (var containerNode in response.Body.Results.Nodes)
-                        {
-                            var type = await _p4kService.GetEntityType(containerNode.Properties.EntityProperties.ClassGuidCrc).ConfigureAwait(false);
-                            var container = ((EntityClassDefinition?)type?.Data)?.Components.OfType<SCItemInventoryContainerComponentParams>().FirstOrDefault();
-                            if (container != null)
-                                containerList.Add(containerNode.Properties.EntityProperties.Geid);
-                        }
-                    } while (response.Body.PageInfo.HasNextPage);
+                    await EnqueueContainersCoreAsync(found).ConfigureAwait(false);
                 }
                 finally
                 {
-                    semaphoreSlim.Release();
+                    containerDetectionTime += Stopwatch.GetElapsedTime(detectionStart);
                 }
+            }
+
+            async Task EnqueueContainersCoreAsync(IEnumerable<Node> found)
+            {
+                foreach (var node in found)
+                {
+                    var type = await _p4kService.GetEntityType(node.Properties.EntityProperties.ClassGuidCrc).ConfigureAwait(false);
+                    var container = ((EntityClassDefinition?)type?.Data)?.Components.OfType<SCItemInventoryContainerComponentParams>().FirstOrDefault();
+                    if (container != null)
+                    {
+                        pendingContainers.Enqueue(node.Properties.EntityProperties.Geid);
+                    }
+                }
+            }
+
+            await EnqueueContainersAsync(nodes.ToList()).ConfigureAwait(false);
+
+            while (pendingContainers.Count > 0)
+            {
+                var containerId = pendingContainers.Dequeue();
+                var firstNewIndex = nodes.Count;
+                containerCount++;
+                var subQueryStart = Stopwatch.GetTimestamp();
+
+                try
+                {
+                    if (null != stowedIn)
+                    {
+                        stowedIn.Values.Clear();
+                        stowedIn.Values.Add(new ScalarValue{ StringValue = $"{containerId}:Container:0"});
+                    }
+                    await RunPagedQueryAsync($"{containerId}:Container:0").ConfigureAwait(false);
+                }
+                catch (RpcException ex)
+                {
+                    _logger.LogWarning(ex, "Impossible de charger le contenu du conteneur {ContainerId}", containerId);
+                    continue;
+                }
+                finally
+                {
+                    subQueryTime += Stopwatch.GetElapsedTime(subQueryStart);
+                }
+
+                // Un objet déjà connu (par la projection arborescente notamment) ne doit pas apparaître deux fois.
+                var dedupStart = Stopwatch.GetTimestamp();
+                var found = nodes.GetRange(firstNewIndex, nodes.Count - firstNewIndex);
+                nodes.RemoveRange(firstNewIndex, found.Count);
+                var newNodes = found.Where(node => knownIds.Add(node.Properties.EntityProperties.Geid)).ToList();
+                nodes.AddRange(newNodes);
+                loopDedupTime += Stopwatch.GetElapsedTime(dedupStart);
+                subQueryNodeCount += found.Count;
+                if (found.Count == 0)
+                {
+                    emptyContainerCount++;
+                }
+
+                await EnqueueContainersAsync(newNodes).ConfigureAwait(false);
             }
         }
 
-        return nodes.Select(n => new EntityItemQueryResult
+        // Plusieurs inventaires peuvent renvoyer le même objet : il ne doit apparaître qu'une fois.
+        var finalStart = Stopwatch.GetTimestamp();
+        var result = nodes.DistinctBy(n => n.Properties.EntityProperties.Geid).Select(n => new EntityItemQueryResult
         {
             EntityNodeProperties = n.Properties.EntityProperties,
             EntityEdge = GetFromDict(edgeDict, n.Properties.EntityProperties.Geid),
             EntitySnapshot = GetFromDict(snapshotDict, n.Properties.EntityProperties.Geid),
             EntityClassProperties = null
         }).ToList();
+        var finalTime = Stopwatch.GetElapsedTime(finalStart);
+
+        _logger.LogInformation(
+            "[Chrono objets] total {Total} | requête initiale {Initial} ({InitialInventories} inventaires, {InitialPages} pages, {InitialNodes} nœuds, réseau {InitialNetwork})"
+            + " | détection conteneurs {Detection} | sous-requêtes {SubQueries} ({Containers} conteneurs dont {EmptyContainers} vides, {SubPages} pages,"
+            + " {SubNodes} nœuds, réseau {SubNetwork}) | dédoublonnage boucle {LoopDedup} | dédoublonnage final + construction {Final} ({ResultCount} objets)"
+            + " | attente sémaphore {Semaphore}",
+            totalWatch.Elapsed, initialElapsed, itemQueryModel.InventoryIdList.Count, initialPages, initialNodeCount, initialNetwork,
+            containerDetectionTime, subQueryTime, containerCount, emptyContainerCount, pageCount - initialPages,
+            subQueryNodeCount, networkTime - initialNetwork, loopDedupTime, finalTime, result.Count, semaphoreTime);
+
+        return result;
     }
 
     public async Task<IList<EntityStowContext>> GetEntityStowContextByParentUrnList(IList<string> urnList, List<uint> crcTypeList)

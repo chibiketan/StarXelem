@@ -280,6 +280,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         searchQuery.ownerId = useSearchCriteria ? OwnerId : "";
         searchQuery.Id = useSearchCriteria ? Id : "";
         searchQuery.UseProjection = true;
+        searchQuery.LoadInventoryContent = true;
         searchQuery.TypeList = useSearchCriteria
             ? SearchTypeList.Where(i => i.IsSelected).Select(i => i.Type).ToList()
             : new List<EItemType>();
@@ -298,18 +299,23 @@ public partial class ItemsTabViewModel : PageViewModelBase
         
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement de la liste des objets");
 
+        var loadWatch = Stopwatch.StartNew();
         var itemList = await _clientService.QueryGraphBySearch(searchQuery);
+        var queryTime = loadWatch.Elapsed;
         // La plupart des parents d'objets attachés sont dans ce résultat : autant de requêtes serveur en moins.
         _locationService.AddKnownEntities(itemList);
-        
+        var knownEntitiesTime = loadWatch.Elapsed - queryTime;
+
         // récupérer les instances de vaisseaux
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Terminé");
+        var rowsStart = loadWatch.Elapsed;
         var result = new List<ItemViewModel>();
         foreach (var item in itemList)
         {
             var scItem = await _scItemRepository.GetByCrc32Async(item.EntityNodeProperties.ClassGuidCrc);
             result.Add(new ItemViewModel(_localeEntryRepository, _locationService, _clientService, this, item, scItem));
         }
+        var rowsTime = loadWatch.Elapsed - rowsStart;
 
         ConfigureColumnFilters(result);
 
@@ -318,7 +324,11 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
         // Rattrape la liste filtrée complète avant de rendre la main : la commande reste "en cours"
         // (et le bouton désactivé) jusqu'à l'affichage complet des lignes.
+        var filtersStart = loadWatch.Elapsed;
         await ScheduleFilters(TimeSpan.Zero);
+        _logger.LogInformation(
+            "[Chrono objets] écran : requête {Query} | cache emplacements {KnownEntities} | construction des lignes {Rows} | filtres colonnes + affichage {Filters} | total {Total}",
+            queryTime, knownEntitiesTime, rowsTime, loadWatch.Elapsed - filtersStart, loadWatch.Elapsed);
 
         // Les emplacements arrivent ensuite, en tâche de fond : le tableau est utilisable sans les attendre.
         var locationCts = new CancellationTokenSource();
