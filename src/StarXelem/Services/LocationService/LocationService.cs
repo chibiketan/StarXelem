@@ -78,50 +78,9 @@ public class LocationService : ILocationService
 
         if (type == ELocationType.Container)
         {
-            // TODO remove
-            //return $"Entité non trouvée ({split[0]})";
-            var containerId = ulong.Parse(split[0]);
-
-            var queryProp = new ItemQueryModel();
-            queryProp.Id = split[0];
-            queryProp.useConnectedUserOwner = false;
-            queryProp.UseProjection = false;
-            var results = await _grpcClientService.QueryGraphBySearch(queryProp);
-
-            if (results.Count == 0)
-            {
-                return new ResolvedLocation(LocationKind.Item, containerId, "Entité non trouvée");
-            }
-
-            if (allowedTypes is { Count: > 0 })
-            {
-                var itemType = (EItemType)results[0].EntityNodeProperties!.ItemTypeEnum;
-                if (!allowedTypes.Contains(itemType))
-                {
-                    return await ResolveLocation(results[0], allowedTypes);
-                }
-            }
-
-            var scItem = await _scItemRepository.GetByCrc32Async(results[0].EntityNodeProperties.ClassGuidCrc);
-            var typeName = scItem?.TechnicalName ?? "Inconnu";
-
-            if (scItem != null)
-            {
-                if (scItem.LocaleNameKey == "@LOC_PLACEHOLDER")
-                {
-                    // C'est un placeholder, on va chercher son possesseur
-                    return await ResolveLocation(results[0], allowedTypes);
-                }
-                
-                var tmpeName = await _localeEntryRepository.GetValueByKeyAsync(scItem.LocaleNameKey);
-
-                if (!string.IsNullOrEmpty(tmpeName))
-                {
-                    typeName = tmpeName;
-                }
-            }
-            
-            return new ResolvedLocation(LocationKind.Item, containerId, typeName);
+            // Le conteneur fait souvent partie des objets déjà chargés : la résolution par identifiant les réutilise,
+            // là où une requête sans inventaire ne renvoie plus rien.
+            return await ResolveEntityLocation(ulong.Parse(split[0]), null, allowedTypes);
         }
         
         return Other(entityLocation);
