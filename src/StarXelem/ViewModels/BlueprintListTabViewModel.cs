@@ -247,7 +247,11 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         var missionPools = row.MissionPools
             .GroupBy(mp => mp.PoolName)
             .Select(g => new MissionPoolGroup(g.Key,
-                g.Select(mp => new MissionInfo(mp.MissionTitle, mp.MissionDebugName)).ToList()))
+                // Plusieurs variantes d'une mission portent le même titre : une seule ligne par titre, avec leur nombre.
+                g.GroupBy(mp => mp.MissionTitle)
+                    .Select(titleGroup => new MissionInfo(titleGroup.Key, titleGroup.First().MissionDebugName, titleGroup.Count()))
+                    .OrderBy(mission => mission.MissionTitle, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList()))
             .ToList();
 
         return new BlueprintViewModel
@@ -477,10 +481,20 @@ public class MissionInfo
     public string MissionTitle { get; }
     public string MissionDebugName { get; }
 
-    public MissionInfo(string missionTitle, string missionDebugName)
+    /// <summary>Nombre de variantes de la mission portant ce titre.</summary>
+    public int VariantCount { get; }
+
+    /// <summary>Vrai si plusieurs variantes portent ce titre : affiche le compteur.</summary>
+    public bool HasVariants => VariantCount > 1;
+
+    /// <summary>Compteur affiché à côté du titre (ex : « ×14 »).</summary>
+    public string VariantCountLabel => $"×{VariantCount}";
+
+    public MissionInfo(string missionTitle, string missionDebugName, int variantCount = 1)
     {
         MissionTitle = missionTitle;
         MissionDebugName = missionDebugName;
+        VariantCount = variantCount;
     }
 }
 

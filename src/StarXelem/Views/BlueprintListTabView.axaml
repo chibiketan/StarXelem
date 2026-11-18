@@ -402,15 +402,31 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:MissionPoolGroup">
                                             <StackPanel Spacing="4">
-                                                <TextBlock FontSize="12" FontWeight="Medium" Foreground="{DynamicResource Sx.MutedBrush}" Text="{Binding PoolName}" />
+                                                <!-- Identifiant technique du pool de récompenses -->
+                                                <TextBlock FontSize="11"
+                                                           FontFamily="{DynamicResource Sx.FontMono}"
+                                                           Foreground="{DynamicResource Sx.MutedBrush}"
+                                                           ToolTip.Tip="Pool de récompenses du jeu"
+                                                           Text="{Binding PoolName}" />
                                                 <ItemsControl ItemsSource="{Binding Missions}">
                                                     <ItemsControl.ItemTemplate>
+                                                        <!-- Une ligne par titre ; le compteur indique ses variantes (lieu, difficulté…) -->
                                                         <DataTemplate x:DataType="vm:MissionInfo">
-                                                            <TextBlock FontSize="13"
-                                                                       Margin="0,2"
-                                                                       Foreground="{DynamicResource Sx.SecondaryBrush}"
-                                                                       TextWrapping="Wrap"
-                                                                       Text="{Binding MissionTitle}" />
+                                                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                                                                <TextBlock FontSize="13"
+                                                                           VerticalAlignment="Center"
+                                                                           Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                                           TextWrapping="Wrap"
+                                                                           Text="{Binding MissionTitle}" />
+                                                                <Border IsVisible="{Binding HasVariants}"
+                                                                        Background="{DynamicResource Sx.NeutralSoftBrush}"
+                                                                        CornerRadius="9"
+                                                                        Padding="7,1"
+                                                                        VerticalAlignment="Center"
+                                                                        ToolTip.Tip="Nombre de variantes de cette mission">
+                                                                    <TextBlock Classes="sx-count" Text="{Binding VariantCountLabel}" />
+                                                                </Border>
+                                                            </StackPanel>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
