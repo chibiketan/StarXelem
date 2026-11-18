@@ -29,6 +29,15 @@ public class SpaceshipModel
     public string? Shard => StowContext?.ShardId;
     public string? ClassRecordName { get; set; }
 
+    /// <summary>Nom court de la classe : <see cref="ClassRecordName"/> est au format « Type.NomCourt ».</summary>
+    public string? TechnicalName => ClassRecordName?[(ClassRecordName.IndexOf('.') + 1)..];
+
+    /// <summary>Vrai si le joueur a donné un nom à ce vaisseau.</summary>
+    public bool HasCustomName => Name.Length > 0;
+
+    /// <summary>Présentation de l'emplacement dans l'écran Mon hangar, ou <c>null</c> si l'emplacement est inconnu.</summary>
+    public ItemLocationDisplay? LocationDisplay { get; set; }
+
     public Entitlement Entitlement { get; }
     public EntityItemQueryResult? EntityProperties { get; set; }
     public EntityStowContext? StowContext { get; set; }
@@ -69,7 +78,8 @@ public class SpaceshipModel
             return false;
         }
 
-        if (entitlementName.Equals(ClassRecordName, StringComparison.CurrentCultureIgnoreCase))
+        if (entitlementName.Equals(ClassRecordName, StringComparison.CurrentCultureIgnoreCase)
+            || entitlementName.Equals(TechnicalName, StringComparison.CurrentCultureIgnoreCase))
         {
             return false;
         }

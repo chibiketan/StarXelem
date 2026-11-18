@@ -23,6 +23,8 @@
         <SolidColorBrush x:Key="Sx.WarningSoftBrush" Color="#24F08A4B" />
         <SolidColorBrush x:Key="Sx.NeutralBrush" Color="#FFA4ACBA" />
         <SolidColorBrush x:Key="Sx.NeutralSoftBrush" Color="#24A4ACBA" />
+        <SolidColorBrush x:Key="Sx.DangerBrush" Color="#FFF2666A" />
+        <SolidColorBrush x:Key="Sx.DangerSoftBrush" Color="#24F2666A" />
         <FontFamily x:Key="Sx.FontSans">fonts:Inter#Inter, $Default</FontFamily>
         <FontFamily x:Key="Sx.FontMono">Cascadia Mono, Consolas, monospace</FontFamily>
         <StreamGeometry x:Key="Sx.SearchIcon">M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3</StreamGeometry>
@@ -131,6 +133,54 @@
         <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Sx.AccentBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+    </Style>
+
+    <!-- Badge de statut : pastille de couleur et libellé sur fond doux du même ton (neutre par défaut) -->
+    <Style Selector="comp|NotchedBorder.sx-badge">
+        <Setter Property="CutSize" Value="7" />
+        <Setter Property="Padding" Value="9,4" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Background" Value="{DynamicResource Sx.NeutralSoftBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.NeutralBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge Ellipse">
+        <Setter Property="Width" Value="7" />
+        <Setter Property="Height" Value="7" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Fill" Value="{DynamicResource Sx.NeutralBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.success">
+        <Setter Property="Background" Value="{DynamicResource Sx.SuccessSoftBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.success TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.SuccessBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.success Ellipse">
+        <Setter Property="Fill" Value="{DynamicResource Sx.SuccessBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.warning">
+        <Setter Property="Background" Value="{DynamicResource Sx.WarningSoftBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.warning TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.WarningBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.warning Ellipse">
+        <Setter Property="Fill" Value="{DynamicResource Sx.WarningBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.danger">
+        <Setter Property="Background" Value="{DynamicResource Sx.DangerSoftBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.danger TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.DangerBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.danger Ellipse">
+        <Setter Property="Fill" Value="{DynamicResource Sx.DangerBrush}" />
     </Style>
 
     <!-- Boutons d'en-tête de colonne et liens -->

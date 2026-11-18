@@ -642,7 +642,7 @@ Un écran migré applique les classes `sx`, sans valeur en dur. **Thème sombre 
 | Accent marqué (icône de filtre actif) | `Sx.AccentStrongBrush` | `#55E8B04A` |
 | Sur accent (texte d'un bouton plein) | `Sx.OnAccentBrush` | `#FF0B0D12` |
 
-Tons de badge et de pastille, chacun avec une ressource pleine et une ressource `SoftBrush` à alpha `24` : Succès `#FF4FD1A5`, Attention `#FFF08A4B`, Info `#FF6CB6FF`, Neutre `#FFA4ACBA`. Danger `#FFF2666A` reste à ajouter au premier écran qui en a besoin.
+Tons de badge et de pastille, chacun avec une ressource pleine et une ressource `SoftBrush` à alpha `24` : Succès `#FF4FD1A5`, Attention `#FFF08A4B`, Info `#FF6CB6FF`, Neutre `#FFA4ACBA`, Danger `#FFF2666A`.
 
 ### 18.2 Typographie
 
@@ -663,6 +663,7 @@ Quatre tailles : **20** (titre, 600), **14 ou 13** (texte), **12** (légende, en
 | Champ | `NotchedBorder.sx-field` + `TextBox.sx` | Contour accent au focus. |
 | Filtre rapide | `Button.sx-chip`, `.on` | Compteur monospace dans la puce. Au plus 8 puces, le reste passe par le filtre de colonne. |
 | Tableau | `DataGrid.sx` | Lignes de 34 px, séparateurs horizontaux, sélection en Accent doux. |
+| Badge de statut | `NotchedBorder.sx-badge` + `.success`, `.warning`, `.danger` | Coupe 7 px, pastille 7 px et libellé 12 px semi-gras dans le ton, fond doux du même ton. Neutre sans classe. |
 | En-tête de colonne | `comp:ColumnHeader` | Voir 18.6. |
 
 ### 18.5 Emplacement d'un objet

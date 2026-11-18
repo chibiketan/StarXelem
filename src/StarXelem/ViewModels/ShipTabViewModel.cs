@@ -44,6 +44,7 @@ public partial class ShipTabViewModel : PageViewModelBase
         _localDatabaseService = localDatabaseService;
         _locationService = locationService;
         _allianceOrbitalService = allianceOrbitalService;
+        InitializeDisplay();
 
         _p4KService.SelectedP4KFileChanged += OnSelectedP4KFileChanged;
         _clientService.OnStatusChanged += (sender, _) => LoadShipNotifyCanExecuteChanged();

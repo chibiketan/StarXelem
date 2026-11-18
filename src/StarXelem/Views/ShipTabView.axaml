@@ -2,108 +2,216 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:ic="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
              xmlns:vm="clr-namespace:StarXelem.ViewModels"
              xmlns:local="clr-namespace:StarXelem"
              xmlns:models="clr-namespace:StarXelem.Models"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             xmlns:comp="clr-namespace:StarXelem.Components"
+             xmlns:ui="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
+             mc:Ignorable="d" d:DesignWidth="1300" d:DesignHeight="800"
              x:DataType="vm:ShipTabViewModel"
              d:DataContext="{x:Static local:DesignData.ShipTabViewModel}"
              x:Class="StarXelem.Views.ShipTabView">
-    <Grid RowDefinitions="Auto,*" Classes="main">
-        <Grid Grid.Row="0" Classes="header" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
-            <!-- Groupe boutons gauche : Sync Flotte + Actualiser -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="5">
-                <Button Classes="btn export" Command="{Binding SendFleetToOrbitalAllianceCommand}">
-                    <Grid ColumnDefinitions="Auto,*">
-                        <ic:SymbolIcon Grid.Column="0" Symbol="ArrowUpload">
-                            <ic:SymbolIcon.RenderTransform>
-                                <RotateTransform Angle="45"/>
-                            </ic:SymbolIcon.RenderTransform>
-                        </ic:SymbolIcon>
-                        <TextBlock Grid.Column="1">Sync Flotte</TextBlock>
-                    </Grid>
-                </Button>
-                <Button Classes="btn principal" Command="{Binding LoadShipListCommand}">
-                    <Grid ColumnDefinitions="Auto,*">
-                        <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync">
-                            <ic:SymbolIcon.RenderTransform>
-                                <RotateTransform Angle="90"/>
-                            </ic:SymbolIcon.RenderTransform>
-                        </ic:SymbolIcon>
-                        <TextBlock Grid.Column="1">Actualiser</TextBlock>
-                    </Grid>
-                </Button>
-            </StackPanel>
-            <TextBlock Grid.Column="1" Classes="dimming" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" Text="{Binding TreatmentStatus}" />
-            <Grid Grid.Column="2" HorizontalAlignment="Right" ColumnDefinitions="Auto,Auto" VerticalAlignment="Center">
-                <TextBlock Grid.Column="0" Classes="demi-dimming" Text="{Binding Spaceships^.Count, FallbackValue=-}" Margin="0 0 7 0" />
-                <TextBlock Grid.Column="1" Classes="dimming" >Vaisseaux</TextBlock>
-            </Grid>
-        </Grid>
-        <Grid Grid.Row="1">
-            <DataGrid  ItemsSource="{Binding Spaceships^}" AutoGenerateColumns="False" IsReadOnly="True" >
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="NOM" Binding="{Binding Name}" />
-                    <DataGridTextColumn Header="MODÈLE" Binding="{Binding Shipname}" CellStyleClasses="demi-dimming" />
-                    <DataGridTemplateColumn Header="STORE" MinWidth="0" SortMemberPath="IsRealPurchase">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate DataType="{x:Type models:SpaceshipModel}">
-                                <Ellipse Classes="status-indicator" Classes.connected="{Binding IsRealPurchase}"
-                                         Width="8" Height="8" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="STATUT" SortMemberPath="DisplayState">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate DataType="{x:Type models:SpaceshipModel}">
-                                <Border Classes="badge"
-                                        Classes.tiers-1="{Binding IsStowed}"
-                                        Classes.arenaCommander="{Binding IsUnstowed}"
-                                        Classes.usage="{Binding IsUnclaimed}"
-                                        Classes.destroyed="{Binding IsDestroyed}"
-                                        HorizontalAlignment="Left" Margin="15,0">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <Ellipse Width="7" Height="7" VerticalAlignment="Center" />
-                                        <TextBlock Text="{Binding DisplayState}" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="EMPLACEMENT">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate DataType="{x:Type models:SpaceshipModel}">
-                                <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center" Margin="15,10" ColumnSpacing="6">
-                                    <TextBlock Grid.Column="0" Grid.ColumnSpan="2" IsVisible="{Binding IsEmptyLocation}" Classes="dimming" Text="—" VerticalAlignment="Center" />
-                                    <Border Grid.Column="0" Classes="badge arenaCommander" IsVisible="{Binding IsPorte}" VerticalAlignment="Center" Padding="4.5">
-                                        <ic:SymbolIcon Symbol="Person" FontSize="14" VerticalAlignment="Center" />
-                                    </Border>
-                                    <Border Grid.Column="0" Classes="badge regionEurope" IsVisible="{Binding IsLocationTypeLocation}" Padding="4.5">
-                                        <ic:SymbolIcon Symbol="Home" FontSize="14" VerticalAlignment="Center" />
-                                    </Border>
-                                    <Border Grid.Column="0" Classes="badge tiers-1" IsVisible="{Binding IsLocationTypeHangar}" Padding="4.5">
-                                        <ic:SymbolIcon Symbol="Location" FontSize="14" VerticalAlignment="Center" />
-                                    </Border>
-                                    <Border Grid.Column="0" Classes="badge arenaCommander" IsVisible="{Binding IsLocationTypeId}" Padding="4.5">
-                                        <ic:SymbolIcon Symbol="VehicleShip" FontSize="14" VerticalAlignment="Center" />
-                                    </Border>
-                                    <Border Grid.Column="0" Classes="badge offline" IsVisible="{Binding IsLocationTypeOther}" HorizontalAlignment="Left" Padding="4.5">
-                                        <ic:SymbolIcon Symbol="Question" FontSize="14" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Grid.Column="1" Text="Logout dedans" VerticalAlignment="Center" IsVisible="{Binding IsPorte}" />
-                                    <TextBlock Grid.Column="1" Text="{Binding LocationName}" VerticalAlignment="Center" IsVisible="{Binding IsLocationTypeLocation}" />
-                                    <TextBlock Grid.Column="1" Text="{Binding LocationName}" VerticalAlignment="Center" IsVisible="{Binding IsLocationTypeHangar}" />
-                                    <TextBlock Grid.Column="1" Text="{Binding LocationName}" VerticalAlignment="Center" IsVisible="{Binding IsLocationTypeId}" />
-                                    <TextBlock Grid.Column="1" Text="{Binding LocationName}" VerticalAlignment="Center" IsVisible="{Binding IsLocationTypeOther}" />
 
+    <!-- La nouvelle charte n'existe qu'en thème sombre : l'écran reste sombre même si Windows est en thème clair. -->
+    <ThemeVariantScope RequestedThemeVariant="Dark">
+        <ThemeVariantScope.Resources>
+            <!-- Le tri est géré par comp:ColumnHeader : l'icône native du tableau ne doit pas réserver de place. -->
+            <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#FFE8B04A" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#D9E8B04A" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#D9E8B04A" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#FFE8B04A" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#D9E8B04A" />
+            <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#D9E8B04A" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#FF0B0D12" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#FF0B0D12" />
+            <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#FF0B0D12" />
+        </ThemeVariantScope.Resources>
+
+        <Grid Background="{DynamicResource Sx.BackgroundBrush}" TextElement.FontFamily="{DynamicResource Sx.FontSans}">
+
+            <!-- Bloc principal -->
+            <comp:NotchedBorder Margin="12" CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}">
+                <Grid RowDefinitions="Auto,Auto,*">
+
+                    <!-- Barre d'outils -->
+                    <Border Grid.Row="0" BorderBrush="{DynamicResource Sx.LineBrush}" BorderThickness="0,0,0,1" Padding="20,14">
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
+                            <TextBlock Classes="sx-title" Text="Mon hangar" Margin="0,0,8,0" />
+                            <TextBlock Grid.Column="1" Classes="sx-caption" FontSize="13" Text="{Binding ResultSummary}" />
+
+                            <comp:NotchedBorder Grid.Column="2" Classes="sx-field" MinWidth="180">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <Path Classes="sx-search-icon" Margin="12,0,0,0" />
+                                    <TextBox Grid.Column="1"
+                                             Classes="sx"
+                                             Height="44"
+                                             Watermark="Modèle, nom, emplacement..."
+                                             Text="{Binding SearchText}" />
                                 </Grid>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="SHARD" Binding="{Binding Shard}" />
-                </DataGrid.Columns>
-            </DataGrid>
+                            </comp:NotchedBorder>
+
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8">
+                                <Button Classes="sx"
+                                        ToolTip.Tip="Synchroniser la flotte avec Orbital Alliance"
+                                        Command="{Binding SendFleetToOrbitalAllianceCommand}">Sync Flotte</Button>
+                                <Button Classes="sx primary" Command="{Binding LoadShipListCommand}">Actualiser</Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Filtres rapides -->
+                    <Border Grid.Row="1"
+                            IsVisible="{Binding HasLoadedShips}"
+                            BorderBrush="{DynamicResource Sx.LineBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="20,12,20,6">
+                        <Grid ColumnDefinitions="72,*">
+                            <TextBlock Classes="sx-caption" Text="Statut" VerticalAlignment="Top" Margin="0,9,0,0" />
+                            <ItemsControl Grid.Column="1" ItemsSource="{Binding StatusChips}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:FilterChipViewModel">
+                                        <Button Classes="sx-chip" Classes.on="{Binding IsSelected}" Command="{Binding ToggleCommand}">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                                                <TextBlock Classes="sx-count" Text="{Binding Count}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </Border>
+
+                    <!-- Tableau -->
+                    <Grid Grid.Row="2">
+                        <DataGrid Classes="sx"
+                                  ItemsSource="{Binding DisplayedShips}"
+                                  IsReadOnly="True"
+                                  AutoGenerateColumns="False"
+                                  CanUserSortColumns="False"
+                                  CanUserReorderColumns="False">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Width="34*">
+                                    <DataGridTemplateColumn.Header>
+                                        <comp:ColumnHeader DataContext="{Binding ModelColumn}" />
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:SpaceshipModel">
+                                            <StackPanel Margin="12,5,10,5" VerticalAlignment="Center">
+                                                <TextBlock FontSize="14"
+                                                           FontWeight="Medium"
+                                                           Foreground="{DynamicResource Sx.TextBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Text="{Binding Shipname}" />
+                                                <!-- Le nom donné par le joueur prime sur le nom technique, qui reste dans l'infobulle. -->
+                                                <TextBlock FontSize="12"
+                                                           Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           IsVisible="{Binding HasCustomName}"
+                                                           ToolTip.Tip="{Binding TechnicalName}"
+                                                           Text="{Binding Name, StringFormat='« {0} »'}" />
+                                                <TextBlock Classes="sx-mono"
+                                                           FontSize="11"
+                                                           Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           IsVisible="{Binding !HasCustomName}"
+                                                           Text="{Binding TechnicalName, TargetNullValue='—'}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTemplateColumn Width="18*">
+                                    <DataGridTemplateColumn.Header>
+                                        <comp:ColumnHeader DataContext="{Binding StatusColumn}" />
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:SpaceshipModel">
+                                            <comp:NotchedBorder Classes="sx-badge"
+                                                                Classes.success="{Binding IsStowed}"
+                                                                Classes.warning="{Binding IsUnstowed}"
+                                                                Classes.danger="{Binding IsDestroyed}"
+                                                                Margin="12,0,10,0">
+                                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                                    <Ellipse />
+                                                    <TextBlock Text="{Binding DisplayState}" />
+                                                </StackPanel>
+                                            </comp:NotchedBorder>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTemplateColumn Width="38*">
+                                    <DataGridTemplateColumn.Header>
+                                        <comp:ColumnHeader DataContext="{Binding LocationColumn}" />
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:SpaceshipModel">
+                                            <Panel Margin="12,0,10,0" VerticalAlignment="Center">
+                                                <TextBlock Foreground="{DynamicResource Sx.MutedBrush}"
+                                                           IsVisible="{Binding LocationDisplay, Converter={x:Static ObjectConverters.IsNull}}"
+                                                           Text="—" />
+                                                <DockPanel DataContext="{Binding LocationDisplay}"
+                                                           IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                                    <comp:LocationIcon DockPanel.Dock="Left" Margin="0,0,8,0" />
+                                                    <TextBlock x:DataType="models:ItemLocationDisplay"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource Sx.TextBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip.Tip="{Binding FullText}"
+                                                               Text="{Binding Name}" />
+                                                </DockPanel>
+                                            </Panel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTemplateColumn Width="10*">
+                                    <DataGridTemplateColumn.Header>
+                                        <comp:ColumnHeader DataContext="{Binding StoreColumn}" />
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:SpaceshipModel">
+                                            <Ellipse Width="8"
+                                                     Height="8"
+                                                     Margin="12,0,0,0"
+                                                     HorizontalAlignment="Left"
+                                                     VerticalAlignment="Center"
+                                                     Fill="{DynamicResource Sx.SuccessBrush}"
+                                                     IsVisible="{Binding IsRealPurchase}"
+                                                     ToolTip.Tip="Acheté au store" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Classes="sx-caption"
+                                   HorizontalAlignment="Center"
+                                   IsVisible="{Binding HasNotLoadedShips}"
+                                   Text="Cliquez sur Actualiser pour récupérer les vaisseaux de votre compte." />
+                        <TextBlock Classes="sx-caption"
+                                   HorizontalAlignment="Center"
+                                   IsVisible="{Binding ShowNoMatch}"
+                                   Text="Aucun vaisseau ne correspond à ces filtres." />
+
+                        <!-- Indicateur de chargement, superposé au tableau -->
+                        <Grid IsVisible="{Binding IsLoading}" IsHitTestVisible="False">
+                            <Border Background="{DynamicResource Sx.SurfaceBrush}" Opacity="0.75" />
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                                <ui:ProgressRing IsIndeterminate="True" Width="40" Height="40" HorizontalAlignment="Center" />
+                                <TextBlock Classes="sx-caption" HorizontalAlignment="Center" Text="{Binding TreatmentStatus}" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </comp:NotchedBorder>
         </Grid>
-    </Grid>
+    </ThemeVariantScope>
 </UserControl>
