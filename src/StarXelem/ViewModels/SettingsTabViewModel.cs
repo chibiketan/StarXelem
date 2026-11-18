@@ -36,7 +36,7 @@ public partial class SettingsTabViewModel : PageViewModelBase
     {
         try
         {
-            var savedKey = await _settingsService.GetAsync(ApiKeySettingName).ConfigureAwait(false);
+            var savedKey = await _settingsService.GetAsync(ApiKeySettingName);
             ApiKey = savedKey ?? string.Empty;
         }
         catch (Exception ex)
@@ -50,9 +50,9 @@ public partial class SettingsTabViewModel : PageViewModelBase
     {
         try
         {
-            await _settingsService.SetAsync(ApiKeySettingName, ApiKey).ConfigureAwait(false);
+            await _settingsService.SetAsync(ApiKeySettingName, ApiKey);
             Saved = true;
-            await Task.Delay(2000).ConfigureAwait(false);
+            await Task.Delay(2000);
             Saved = false;
         }
         catch (Exception ex)
