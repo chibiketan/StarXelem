@@ -25,7 +25,7 @@
         <Style Selector="ListBox.bp-list ListBoxItem">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
-            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Padding" Value="10,7" />
             <Setter Property="Margin" Value="0,0,0,2" />
             <Setter Property="MinHeight" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
@@ -46,6 +46,70 @@
         <Style Selector="ListBox.bp-list ListBoxItem:selected">
             <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- Icône de famille d'objet : pastille neutre, le vert reste réservé à « obtenu » -->
+        <Style Selector="comp|NotchedBorder.family-tile">
+            <Setter Property="CutSize" Value="7" />
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Background" Value="{DynamicResource Sx.NeutralSoftBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="comp|NotchedBorder.family-tile.large">
+            <Setter Property="CutSize" Value="11" />
+            <Setter Property="Width" Value="56" />
+            <Setter Property="Height" Value="56" />
+        </Style>
+        <Style Selector="Path.family-icon">
+            <Setter Property="Stroke" Value="{DynamicResource Sx.SecondaryBrush}" />
+            <Setter Property="StrokeThickness" Value="1.8" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="StrokeJoin" Value="Round" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="comp|NotchedBorder.family-tile.large Path.family-icon">
+            <Setter Property="Stroke" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="StrokeThickness" Value="1.6" />
+        </Style>
+        <Style Selector="Button.sx-chip.on Path.family-icon">
+            <Setter Property="Stroke" Value="{DynamicResource Sx.TextBrush}" />
+        </Style>
+        <Style Selector="ListBox.bp-list ListBoxItem:selected Path.family-icon">
+            <Setter Property="Stroke" Value="{DynamicResource Sx.TextBrush}" />
+        </Style>
+
+        <!-- Type précis sous le nom -->
+        <Style Selector="TextBlock.type-label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+        </Style>
+        <Style Selector="ListBox.bp-list ListBoxItem:selected TextBlock.type-label">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        </Style>
+
+        <!-- Coche « obtenu » -->
+        <Style Selector="Border.obtained-mark">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Background" Value="{DynamicResource Sx.SuccessSoftBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Path.check">
+            <Setter Property="Data" Value="M5 12l5 5 9-10" />
+            <Setter Property="Width" Value="12" />
+            <Setter Property="Height" Value="12" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Stroke" Value="{DynamicResource Sx.SuccessBrush}" />
+            <Setter Property="StrokeThickness" Value="2.4" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="StrokeJoin" Value="Round" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <!-- Détail : une carte par composant -->
@@ -73,11 +137,11 @@
     <!-- La nouvelle charte n'existe qu'en thème sombre : l'écran reste sombre même si Windows est en thème clair. -->
     <ThemeVariantScope RequestedThemeVariant="Dark">
         <Grid Background="{DynamicResource Sx.BackgroundBrush}" TextElement.FontFamily="{DynamicResource Sx.FontSans}">
-        <Grid ColumnDefinitions="320,*" ColumnSpacing="12" Margin="12">
+        <Grid ColumnDefinitions="340,*" ColumnSpacing="12" Margin="12">
 
             <!-- Liste des blueprints -->
             <comp:NotchedBorder CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}" Padding="14,18,14,14">
-                <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="12">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="6,0">
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Classes="sx-title" Text="Blueprints" />
@@ -104,6 +168,7 @@
                                 IsEnabled="{Binding IsGrpcConnected}"
                                 ToolTip.Tip="Nécessite la connexion au jeu">
                             <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Ellipse Width="7" Height="7" Fill="{DynamicResource Sx.SuccessBrush}" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding ObtainedChip.Label}" VerticalAlignment="Center" />
                                 <TextBlock Classes="sx-count" Text="{Binding ObtainedChip.Count}" />
                             </StackPanel>
@@ -118,17 +183,47 @@
                         </Button>
                     </WrapPanel>
 
-                    <Grid Grid.Row="3">
+                    <!-- Familles d'objet : cumulables, rien de coché = tout afficher -->
+                    <ItemsControl Grid.Row="3" ItemsSource="{Binding FamilyChips}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FilterChipViewModel">
+                                <Button Classes="sx-chip" Classes.on="{Binding IsSelected}" Command="{Binding ToggleCommand}" Padding="11,0">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Classes="family-icon" Width="14" Height="14" Data="{Binding Key, Converter={x:Static conv:BlueprintFamilyIconConverter.Instance}}" />
+                                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                                        <TextBlock Classes="sx-count" Text="{Binding Count}" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Grid Grid.Row="4">
                         <ListBox Classes="bp-list" ItemsSource="{Binding BlueprintList}" SelectedItem="{Binding SelectedBluePrint}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:BlueprintViewModel">
-                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}">
-                                        <TextBlock.ContextMenu>
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Background="Transparent">
+                                        <Grid.ContextMenu>
                                             <ContextMenu>
                                                 <MenuItem Header="Copier GUID" Command="{Binding CopyIdCommand}" />
                                             </ContextMenu>
-                                        </TextBlock.ContextMenu>
-                                    </TextBlock>
+                                        </Grid.ContextMenu>
+                                        <comp:NotchedBorder Classes="family-tile" ToolTip.Tip="{Binding FamilyLabel}">
+                                            <Path Classes="family-icon" Width="15" Height="15" Data="{Binding FamilyIcon}" />
+                                        </comp:NotchedBorder>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                                            <TextBlock Classes="type-label" Text="{Binding TypeLabel}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Classes="obtained-mark" IsVisible="{Binding IsObtained}" ToolTip.Tip="Obtenu">
+                                            <Path Classes="check" />
+                                        </Border>
+                                    </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
@@ -157,48 +252,63 @@
             <comp:NotchedBorder Grid.Column="1" CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}">
                 <Grid RowDefinitions="Auto,*">
                     <!-- En-tête : nom, badges et envoi Orbital Alliance -->
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="18" Margin="28,26,28,8">
-                        <StackPanel Spacing="10" IsVisible="{Binding HasSelection}">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="18" Margin="28,26,28,8">
+                        <comp:NotchedBorder Classes="family-tile large"
+                                            VerticalAlignment="Top"
+                                            IsVisible="{Binding HasSelection}"
+                                            ToolTip.Tip="{Binding SelectedBluePrint.FamilyLabel, FallbackValue=''}">
+                            <Path Classes="family-icon" Width="28" Height="28" Data="{Binding SelectedBluePrint.FamilyIcon, FallbackValue={x:Null}}" />
+                        </comp:NotchedBorder>
+
+                        <StackPanel Grid.Column="1" Spacing="10" IsVisible="{Binding HasSelection}">
                             <TextBlock FontSize="30"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource Sx.TextBrush}"
                                        TextWrapping="Wrap"
                                        Text="{Binding SelectedBluePrint.Name, FallbackValue=''}" />
                             <WrapPanel>
-                                <comp:NotchedBorder Classes="sx-badge" Margin="0,0,8,0" IsVisible="{Binding SelectedBluePrint.HasTier, FallbackValue=False}">
+                                <comp:NotchedBorder Classes="sx-badge success" Margin="0,0,8,6" IsVisible="{Binding SelectedBluePrint.IsObtained, FallbackValue=False}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="check" Width="11" Height="11" />
+                                        <TextBlock Text="Obtenu" />
+                                    </StackPanel>
+                                </comp:NotchedBorder>
+                                <comp:NotchedBorder Classes="sx-badge" Margin="0,0,8,6">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="family-icon" Width="12" Height="12" Stroke="{DynamicResource Sx.NeutralBrush}" Data="{Binding SelectedBluePrint.FamilyIcon, FallbackValue={x:Null}}" />
+                                        <TextBlock Text="{Binding SelectedBluePrint.TypeLabel, FallbackValue=''}" />
+                                    </StackPanel>
+                                </comp:NotchedBorder>
+                                <comp:NotchedBorder Classes="sx-badge" Margin="0,0,8,6" IsVisible="{Binding SelectedBluePrint.HasTier, FallbackValue=False}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Ellipse />
                                         <TextBlock Text="{Binding SelectedBluePrint.TierLabel, FallbackValue=''}" />
                                     </StackPanel>
                                 </comp:NotchedBorder>
-                                <comp:NotchedBorder Classes="sx-badge success" Margin="0,0,8,0" IsVisible="{Binding SelectedBluePrint.HasRemainingUse, FallbackValue=False}">
+                                <comp:NotchedBorder Classes="sx-badge" Margin="0,0,8,6" IsVisible="{Binding SelectedBluePrint.HasRemainingUse, FallbackValue=False}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Ellipse />
                                         <TextBlock Text="{Binding SelectedBluePrint.RemainingUseLabel, FallbackValue=''}" />
                                     </StackPanel>
                                 </comp:NotchedBorder>
-                                <comp:NotchedBorder Classes="sx-badge" Margin="0,0,8,0" IsVisible="{Binding SelectedBluePrint.HasCraftDuration, FallbackValue=False}"
+                                <comp:NotchedBorder Classes="sx-badge" Margin="0,0,8,6" IsVisible="{Binding SelectedBluePrint.HasCraftDuration, FallbackValue=False}"
                                                     ToolTip.Tip="Durée de fabrication">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Ellipse />
                                         <TextBlock FontFamily="{DynamicResource Sx.FontMono}" Text="{Binding SelectedBluePrint.CraftDurationLabel, FallbackValue=''}" />
                                     </StackPanel>
                                 </comp:NotchedBorder>
-                                <comp:NotchedBorder Classes="sx-badge info" Margin="0,0,8,0" IsVisible="{Binding SelectedBluePrint.IsObtained, FallbackValue=False}">
-                                    <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Ellipse />
-                                        <TextBlock Text="Obtenu" />
-                                    </StackPanel>
-                                </comp:NotchedBorder>
+
                             </WrapPanel>
                         </StackPanel>
 
-                        <TextBlock Classes="sx-caption"
+                        <TextBlock Grid.ColumnSpan="2"
+                                   Classes="sx-caption"
                                    FontSize="13"
                                    IsVisible="{Binding !HasSelection}"
                                    Text="Sélectionnez un blueprint dans la liste pour afficher son détail." />
 
-                        <Button Grid.Column="1"
+                        <Button Grid.Column="2"
                                 Classes="sx"
                                 VerticalAlignment="Top"
                                 Command="{Binding SendToOrbitalAllianceCommand}"

@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Collections.ObjectModel;
+using System.Globalization;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
@@ -9,6 +10,8 @@ using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StarBreaker.DataCoreGenerated;
+using StarXelem.Extensions;
+using StarXelem.Models;
 using StarXelem.Services;
 
 namespace StarXelem.ViewModels;
@@ -32,6 +35,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     private readonly IGrpcClientService _clientService;
     private readonly ILocalDatabaseService _localDatabaseService;
     private CancellationTokenSource? _filterCts;
+    private readonly HashSet<BlueprintFamily> _selectedFamilies = new();
 
     public override string Name => "Blueprints";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Copy);
@@ -71,6 +75,9 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
 
     /// <summary>Puce « De mission » : ne garde que les blueprints obtenus en récompense de mission.</summary>
     public FilterChipViewModel MissionChip { get; }
+
+    /// <summary>Puces de famille d'objet, cumulables ; rien de coché signifie tout afficher.</summary>
+    public ObservableCollection<FilterChipViewModel> FamilyChips { get; } = new();
 
     /// <summary>Nombre de blueprints retenus par les filtres sur le total.</summary>
     public string ResultSummary => $"{FilteredCount} sur {_allBlueprints?.Count ?? 0} blueprints";
@@ -157,6 +164,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             {
                 TreatmentStatus = $"Terminé — {loaded.Count} blueprints chargés";
                 _allBlueprints = loaded;
+                BuildFamilyChips();
                 IsLoading = false;
                 ScheduleFilters(TimeSpan.Zero);
                 SendToOrbitalAllianceCommand.NotifyCanExecuteChanged();
@@ -251,7 +259,9 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             CraftDuration = row.CraftDuration,
             CategoryList = categories.ToList(),
             IsObtained = obtainedIds != null && obtainedIds.Contains(row.SelfId),
-            MissionPools = missionPools
+            MissionPools = missionPools,
+            Family = BlueprintFamilyInfo.GetFamily(row.Product?.TypeName),
+            TypeLabel = BlueprintFamilyInfo.GetTypeLabel(row.Product)
         };
     }
 
@@ -300,6 +310,27 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         }
     }
 
+    private void BuildFamilyChips()
+    {
+        FamilyChips.Clear();
+        foreach (var family in Enum.GetValues<BlueprintFamily>().Where(family => _allBlueprints!.Any(blueprint => blueprint.Family == family)))
+        {
+            FamilyChips.Add(new FilterChipViewModel(family.ToString(), family.GetDisplayName() ?? family.ToString(), ToggleFamily));
+        }
+
+        _selectedFamilies.RemoveWhere(family => FamilyChips.All(chip => chip.Key != family.ToString()));
+    }
+
+    private void ToggleFamily(string? key)
+    {
+        if (Enum.TryParse<BlueprintFamily>(key, out var family) && !_selectedFamilies.Remove(family))
+        {
+            _selectedFamilies.Add(family);
+        }
+
+        ScheduleFilters(SelectionFilterDelay);
+    }
+
     /// <summary>
     /// Planifie un filtrage différé : toute demande encore en attente ou en cours est annulée, de sorte qu'une rafale de
     /// modifications ne produit qu'un seul recalcul, après la dernière. À appeler depuis le thread d'UI.
@@ -315,7 +346,8 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             _allBlueprints ?? new List<BlueprintViewModel>(),
             string.IsNullOrWhiteSpace(Search) ? null : Search.Trim(),
             ShowOnlyObtained,
-            ShowOnlyWithMissions);
+            ShowOnlyWithMissions,
+            _selectedFamilies.Count == 0 ? null : _selectedFamilies.ToHashSet());
 
         IsFiltering = true;
         _ = RunFilterAsync(criteria, delay, cts.Token);
@@ -357,15 +389,23 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             .Where(blueprint => criteria.Needle == null || blueprint.Name.Contains(criteria.Needle, StringComparison.CurrentCultureIgnoreCase))
             .ToList();
 
-        // Chaque puce compte selon l'autre filtre, pas le sien.
-        var obtainedCount = searched.Count(blueprint => blueprint.IsObtained && (!criteria.OnlyWithMissions || blueprint.HasMissions));
-        var missionCount = searched.Count(blueprint => blueprint.HasMissions && (!criteria.OnlyObtained || blueprint.IsObtained));
+        bool MatchesObtained(BlueprintViewModel blueprint) => !criteria.OnlyObtained || blueprint.IsObtained;
+        bool MatchesMissions(BlueprintViewModel blueprint) => !criteria.OnlyWithMissions || blueprint.HasMissions;
+        bool MatchesFamily(BlueprintViewModel blueprint) => criteria.Families == null || criteria.Families.Contains(blueprint.Family);
+
+        // Chaque puce compte selon les autres filtres, pas le sien.
+        var obtainedCount = searched.Count(blueprint => blueprint.IsObtained && MatchesMissions(blueprint) && MatchesFamily(blueprint));
+        var missionCount = searched.Count(blueprint => blueprint.HasMissions && MatchesObtained(blueprint) && MatchesFamily(blueprint));
+        var familyCounts = searched
+            .Where(blueprint => MatchesObtained(blueprint) && MatchesMissions(blueprint))
+            .GroupBy(blueprint => blueprint.Family)
+            .ToDictionary(group => group.Key, group => group.Count());
 
         var rows = searched
-            .Where(blueprint => (!criteria.OnlyObtained || blueprint.IsObtained) && (!criteria.OnlyWithMissions || blueprint.HasMissions))
+            .Where(blueprint => MatchesObtained(blueprint) && MatchesMissions(blueprint) && MatchesFamily(blueprint))
             .ToList();
 
-        return new BlueprintFilterOutcome(rows, obtainedCount, missionCount);
+        return new BlueprintFilterOutcome(rows, obtainedCount, missionCount, familyCounts);
     }
 
     private void DisplayResult(BlueprintFilterOutcome outcome, CancellationToken token)
@@ -379,6 +419,12 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         ObtainedChip.IsSelected = ShowOnlyObtained;
         MissionChip.Count = outcome.MissionCount;
         MissionChip.IsSelected = ShowOnlyWithMissions;
+        foreach (var chip in FamilyChips)
+        {
+            var family = Enum.Parse<BlueprintFamily>(chip.Key!);
+            chip.Count = outcome.FamilyCounts.GetValueOrDefault(family);
+            chip.IsSelected = _selectedFamilies.Contains(family);
+        }
 
         FilteredCount = outcome.Blueprints.Count;
 
@@ -404,10 +450,14 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     }
 
     /// <summary>État des filtres au moment de la demande, lu par le calcul hors du thread d'UI.</summary>
-    private sealed record BlueprintFilterCriteria(IReadOnlyList<BlueprintViewModel> Blueprints, string? Needle, bool OnlyObtained, bool OnlyWithMissions);
+    private sealed record BlueprintFilterCriteria(IReadOnlyList<BlueprintViewModel> Blueprints, string? Needle, bool OnlyObtained, bool OnlyWithMissions, HashSet<BlueprintFamily>? Families);
 
     /// <summary>Résultat d'un filtrage : lignes à afficher et compteurs des puces.</summary>
-    private sealed record BlueprintFilterOutcome(List<BlueprintViewModel> Blueprints, int ObtainedCount, int MissionCount);
+    private sealed record BlueprintFilterOutcome(
+        List<BlueprintViewModel> Blueprints,
+        int ObtainedCount,
+        int MissionCount,
+        IReadOnlyDictionary<BlueprintFamily, int> FamilyCounts);
 }
 
 public class MissionPoolGroup
@@ -513,6 +563,18 @@ public partial class BlueprintViewModel : ViewModelBase
 
     /// <summary>Liste des pools de mission qui récompensent ce Blueprint.</summary>
     public List<MissionPoolGroup> MissionPools { get; set; } = new();
+
+    /// <summary>Famille de l'objet fabriqué (armure, arme FPS, composant…).</summary>
+    public BlueprintFamily Family { get; set; } = BlueprintFamily.Other;
+
+    /// <summary>Type précis de l'objet fabriqué (ex : « Casque · Armure lourde »).</summary>
+    public string TypeLabel { get; set; } = string.Empty;
+
+    /// <summary>Nom de la famille, pour l'infobulle de l'icône.</summary>
+    public string FamilyLabel => Family.GetDisplayName() ?? Family.ToString();
+
+    /// <summary>Icône de la famille.</summary>
+    public Avalonia.Media.Geometry FamilyIcon => BlueprintFamilyInfo.GetIcon(Family);
 
     /// <summary>Vrai si au moins une mission récompense ce blueprint.</summary>
     public bool HasMissions => MissionPools.Count > 0;
