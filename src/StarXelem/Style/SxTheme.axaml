@@ -164,6 +164,15 @@
     <Style Selector="comp|NotchedBorder.sx-badge.success Ellipse">
         <Setter Property="Fill" Value="{DynamicResource Sx.SuccessBrush}" />
     </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.info">
+        <Setter Property="Background" Value="{DynamicResource Sx.InfoSoftBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.info TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.InfoBrush}" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.info Ellipse">
+        <Setter Property="Fill" Value="{DynamicResource Sx.InfoBrush}" />
+    </Style>
     <Style Selector="comp|NotchedBorder.sx-badge.warning">
         <Setter Property="Background" Value="{DynamicResource Sx.WarningSoftBrush}" />
     </Style>

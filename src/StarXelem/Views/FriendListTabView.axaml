@@ -2,119 +2,204 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:ic="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
              xmlns:vm="clr-namespace:StarXelem.ViewModels"
              xmlns:local="clr-namespace:StarXelem"
-             xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
              xmlns:models="clr-namespace:StarXelem.Models"
-             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="450"
+             xmlns:comp="clr-namespace:StarXelem.Components"
+             xmlns:ui="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
+             xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="1300" d:DesignHeight="800"
              x:DataType="vm:FriendListTabViewModel"
              d:DataContext="{x:Static local:DesignData.FriendListTabViewModel}"
              x:Class="StarXelem.Views.FriendListTabView">
-    <Grid RowDefinitions="Auto,*" Classes="main">
-        <Grid Grid.Row="0" ColumnSpacing="15" Classes="header" ColumnDefinitions="Auto, Auto, *,Auto" Height="45">
-            <Button Classes="btn principal" Command="{Binding LoadFriendListCommand}">
-                <Grid ColumnDefinitions="Auto,*">
-                    <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync">
-                        <ic:SymbolIcon.RenderTransform>
-                            <RotateTransform Angle="90"/>
-                        </ic:SymbolIcon.RenderTransform>
-                    </ic:SymbolIcon>
-                    <TextBlock Grid.Column="1">Actualiser</TextBlock>
+
+    <!-- La nouvelle charte n'existe qu'en thème sombre : l'écran reste sombre même si Windows est en thème clair. -->
+    <ThemeVariantScope RequestedThemeVariant="Dark">
+        <ThemeVariantScope.Resources>
+            <!-- Le tri est géré par comp:ColumnHeader : l'icône native du tableau ne doit pas réserver de place. -->
+            <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>
+        </ThemeVariantScope.Resources>
+
+        <Grid Background="{DynamicResource Sx.BackgroundBrush}" TextElement.FontFamily="{DynamicResource Sx.FontSans}">
+
+            <!-- Bloc principal -->
+            <comp:NotchedBorder Margin="12" CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}">
+                <Grid RowDefinitions="Auto,Auto,*">
+
+                    <!-- Barre d'outils -->
+                    <Border Grid.Row="0" BorderBrush="{DynamicResource Sx.LineBrush}" BorderThickness="0,0,0,1" Padding="20,14">
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
+                            <TextBlock Classes="sx-title" Text="Amis" Margin="0,0,8,0" />
+                            <TextBlock Grid.Column="1" Classes="sx-caption" FontSize="13" Text="{Binding ResultSummary}" />
+
+                            <comp:NotchedBorder Grid.Column="2" Classes="sx-field" MinWidth="180">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <Path Classes="sx-search-icon" Margin="12,0,0,0" />
+                                    <TextBox Grid.Column="1"
+                                             Classes="sx"
+                                             Height="44"
+                                             Watermark="Pseudo, compte, shard..."
+                                             Text="{Binding SearchText}" />
+                                </Grid>
+                            </comp:NotchedBorder>
+
+                            <Button Grid.Column="3" Classes="sx primary" Command="{Binding LoadFriendListCommand}">Actualiser</Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- Filtres rapides -->
+                    <Border Grid.Row="1"
+                            IsVisible="{Binding HasLoadedFriends}"
+                            BorderBrush="{DynamicResource Sx.LineBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="20,12,20,6">
+                        <Grid ColumnDefinitions="72,*">
+                            <TextBlock Classes="sx-caption" Text="Activité" VerticalAlignment="Top" Margin="0,9,0,0" />
+                            <ItemsControl Grid.Column="1" ItemsSource="{Binding ActivityChips}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:FilterChipViewModel">
+                                        <Button Classes="sx-chip" Classes.on="{Binding IsSelected}" Command="{Binding ToggleCommand}">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                                                <TextBlock Classes="sx-count" Text="{Binding Count}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </Border>
+
+                    <!-- Tableau -->
+                    <Grid Grid.Row="2">
+                        <DataGrid Classes="sx"
+                                  ItemsSource="{Binding DisplayedFriends}"
+                                  IsReadOnly="True"
+                                  AutoGenerateColumns="False"
+                                  CanUserSortColumns="False"
+                                  CanUserReorderColumns="False">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Width="30*">
+                                    <DataGridTemplateColumn.Header>
+                                        <comp:ColumnHeader DataContext="{Binding NameColumn}" />
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:FriendViewModel">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="12,5,10,5" VerticalAlignment="Center">
+                                                <comp:NotchedBorder Width="28" Height="28" CutSize="7" Background="{DynamicResource Sx.ReliefBrush}">
+                                                    <Panel>
+                                                        <TextBlock HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   FontSize="11"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                                   Text="{Binding Initials}" />
+                                                        <Image Stretch="UniformToFill"
+                                                               asyncImageLoader:ImageLoader.Source="{Binding AvatarUrl}"
+                                                               IsVisible="{Binding AvatarUrl, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                                    </Panel>
+                                                </comp:NotchedBorder>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock FontSize="14"
+                                                               FontWeight="Medium"
+                                                               Foreground="{DynamicResource Sx.TextBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Text="{Binding DisplayName}" />
+                                                    <TextBlock FontSize="12"
+                                                               Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Text="{Binding TokenName}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTemplateColumn Width="20*">
+                                    <DataGridTemplateColumn.Header>
+                                        <comp:ColumnHeader DataContext="{Binding StatusColumn}" />
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:FriendViewModel">
+                                            <comp:NotchedBorder Classes="sx-badge"
+                                                                Classes.success="{Binding IsInPersistentUniverse}"
+                                                                Classes.info="{Binding IsInMenu}"
+                                                                Classes.warning="{Binding IsInArenaCommander}"
+                                                                Margin="12,0,10,0">
+                                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                                    <Ellipse />
+                                                    <TextBlock Text="{Binding ActivityLabel}" />
+                                                </StackPanel>
+                                            </comp:NotchedBorder>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTemplateColumn Width="32*">
+                                    <DataGridTemplateColumn.Header>
+                                        <comp:ColumnHeader DataContext="{Binding ShardColumn}" />
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:FriendViewModel">
+                                            <StackPanel Margin="12,0,10,0" VerticalAlignment="Center">
+                                                <TextBlock Classes="sx-mono"
+                                                           FontSize="12"
+                                                           Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Text="{Binding ShardId^, TargetNullValue='—', FallbackValue='…'}" />
+                                                <StackPanel Orientation="Horizontal"
+                                                            Spacing="4"
+                                                            IsVisible="{Binding ShardPlayerCount^, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}">
+                                                    <TextBlock Classes="sx-mono" FontSize="11" Foreground="{DynamicResource Sx.TextBrush}" Text="{Binding ShardPlayerCount^}" />
+                                                    <TextBlock Classes="sx-mono" FontSize="11" Foreground="{DynamicResource Sx.MutedBrush}" Text="{Binding ShardTotalPlayers^, StringFormat='/ {0} joueurs'}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTemplateColumn Width="18*">
+                                    <DataGridTemplateColumn.Header>
+                                        <comp:ColumnHeader DataContext="{Binding RegionColumn}" />
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:FriendViewModel">
+                                            <TextBlock Margin="12,0,10,0"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="13"
+                                                       Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                       Text="{Binding ShardRegion^, TargetNullValue='—', FallbackValue='—'}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Classes="sx-caption"
+                                   HorizontalAlignment="Center"
+                                   IsVisible="{Binding HasNotLoadedFriends}"
+                                   Text="Cliquez sur Actualiser pour récupérer votre liste d'amis." />
+                        <TextBlock Classes="sx-caption"
+                                   HorizontalAlignment="Center"
+                                   IsVisible="{Binding ShowNoMatch}"
+                                   Text="Aucun ami ne correspond à ces filtres." />
+
+                        <!-- Indicateur de chargement / filtrage, superposé au tableau -->
+                        <Grid IsVisible="{Binding IsBusy}" IsHitTestVisible="False">
+                            <Border Background="{DynamicResource Sx.SurfaceBrush}" Opacity="0.75" />
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                                <ui:ProgressRing IsIndeterminate="True" Width="40" Height="40" HorizontalAlignment="Center" />
+                                <TextBlock Classes="sx-caption" HorizontalAlignment="Center" Text="{Binding BusyMessage}" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
                 </Grid>
-            </Button>
-            <Separator Grid.Column="1" Classes="vertical" />
-            <ToggleSwitch Grid.Column="2" OffContent="Tous les amis" OnContent="Uniquement les amis connectés" IsChecked="{Binding OnlyConnected}" VerticalAlignment="Center"  VerticalContentAlignment="Center" />
-            <Grid Grid.Column="3" ColumnDefinitions="Auto,Auto" VerticalAlignment="Center" Margin="0 0 15 0">
-                <TextBlock Grid.Column="0" Text="{Binding FilteredFriendList.Count, FallbackValue=''}" />
-                <TextBlock Grid.Column="1" Classes="dimming" Text="{Binding FriendList^.Count, StringFormat=' / {0} amis', FallbackValue=0 amis}" />
-            </Grid>
+            </comp:NotchedBorder>
         </Grid>
-        <Grid Grid.Row="1">
-            <DataGrid ItemsSource="{Binding FilteredFriendList}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal" >
-                <DataGrid.Resources>
-                    <!-- Permet de ne plus réserver d'espace à droite pour l'icone de tri -->
-                    <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>
-                </DataGrid.Resources>
-                <DataGrid.Styles>
-                    <Style Selector="DataGridColumnHeader:nth-last-child(1)">
-                        <Setter Property="HorizontalContentAlignment" Value="Right"></Setter>
-                    </Style>
-                </DataGrid.Styles>
-                <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate DataType="{x:Type models:FriendViewModel}">
-                                <Panel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Image Classes="avatar"
-                                           asyncImageLoader:ImageLoader.Source="{Binding AvatarUrl}"
-                                           IsVisible="{Binding AvatarUrl, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                                    <Border Classes="badge persistentUniverse avatar-placeholder"
-                                            IsVisible="{Binding AvatarUrl, Converter={x:Static ObjectConverters.IsNull}}">
-                                        <TextBlock Text="{Binding Initials}" />
-                                    </Border>
-                                </Panel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="PSEUDO">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate DataType="{x:Type models:FriendViewModel}">
-                                <Grid ColumnDefinitions="Auto,*" Margin="15,0">
-                                    <Ellipse Grid.Column="0" Classes="status-indicator" Classes.connected="{Binding IsConnected}" Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                    <TextBlock Grid.Column="1" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Classes.dimming="{Binding IsConnected, Converter={x:Static BoolConverters.Not}}" />
-                                </Grid>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="NOM DU COMPTE" Binding="{Binding TokenName}" CellStyleClasses="dimming" />
-                    <DataGridTemplateColumn Header="STATUT">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate DataType="{x:Type models:FriendViewModel}">
-                                <Border Classes="badge"
-                                        Classes.offline="{Binding IsOffline}"
-                                        Classes.persistentUniverse="{Binding IsInPersistentUniverse}"
-                                        Classes.menu="{Binding IsInMenu}"
-                                        Classes.arenaCommander="{Binding IsInArenaCommander}"
-                                        HorizontalAlignment="Left" Margin="15,0">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <Ellipse Width="7" Height="7" VerticalAlignment="Center" />
-                                        <TextBlock Text="{Binding ActivityLabel}" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="SHARD" Binding="{Binding ShardId^, FallbackValue=Chargement}" CellStyleClasses="dimming" />
-                    <DataGridTemplateColumn Header="REGION">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate DataType="{x:Type models:FriendViewModel}">
-                                <Border Classes="badge"
-                                        Classes.regionEurope="{Binding IsEuropeRegion^}"
-                                        Classes.regionUsa="{Binding IsUsaRegion^}"
-                                        Classes.regionAsie="{Binding IsAsieRegion^}"
-                                        Classes.regionAustralie="{Binding IsAustralieRegion^}"
-                                        IsVisible="{Binding ShardRegion^, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                        HorizontalAlignment="Left" Margin="15,0">
-                                    <TextBlock Text="{Binding ShardRegion^}" VerticalAlignment="Center" />
-                                </Border>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="JOUEUR" >
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate DataType="{x:Type models:FriendViewModel}">
-                                <Grid ColumnDefinitions="30,10,30" IsVisible="{Binding ShardTotalPlayers^, Converter={x:Static ObjectConverters.IsNotNull}}" VerticalAlignment="Center" HorizontalAlignment="Right">
-                                    <TextBlock Grid.Column="0" Text="{Binding ShardPlayerCount^}" HorizontalAlignment="Right" />
-                                    <TextBlock Grid.Column="1" Classes="dimming" HorizontalAlignment="Center">/</TextBlock>
-                                    <TextBlock Grid.Column="2" Classes="dimming" Text="{Binding ShardTotalPlayers^}" />
-                                </Grid>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    
-                </DataGrid.Columns>
-            </DataGrid>
-        </Grid>
-    </Grid>
+    </ThemeVariantScope>
 </UserControl>

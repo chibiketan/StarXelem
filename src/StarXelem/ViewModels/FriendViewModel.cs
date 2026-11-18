@@ -26,6 +26,15 @@ public class FriendViewModel : ViewModelBase
         _ => Activity
     };
 
+    /// <summary>Clé de tri et de filtre de l'activité : regroupe les joueurs déconnectés sous « offline ».</summary>
+    public string ActivityKey => IsConnected ? Activity : "offline";
+
+    /// <summary>Identifiant du shard s'il est déjà chargé, sans déclencher de requête.</summary>
+    public string? KnownShardId => _shardInfo.IsValueCreated && _shardInfo.Value.IsCompletedSuccessfully ? _shardInfo.Value.Result?.Id : null;
+
+    /// <summary>Région du shard si elle est déjà connue, sans déclencher de requête.</summary>
+    public string? KnownShardRegion => KnownShardId is { } id ? GetRegionLabel(id) : null;
+
     public bool IsOffline => !IsConnected;
     public bool IsInPersistentUniverse => Activity == "persistent_universe";
     public bool IsInMenu => Activity == "menu";
@@ -133,10 +142,12 @@ public class FriendViewModel : ViewModelBase
     private async Task<string?> GetShardRegionAsync()
     {
         var shardInfo = await _shardInfo.Value;
-        if (shardInfo?.Id is not { } id)
-            return null;
+        return shardInfo?.Id is { } id ? GetRegionLabel(id) : null;
+    }
 
-        var parts = id.Split('_');
+    private static string? GetRegionLabel(string shardId)
+    {
+        var parts = shardId.Split('_');
         if (parts.Length < 2)
             return null;
 
