@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Sc.External.Services.Entitlement.V1;
 using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
@@ -25,6 +26,7 @@ public partial class ShipTabViewModel : PageViewModelBase
     private readonly ILocalDatabaseService _localDatabaseService;
     private readonly ILocationService _locationService;
     private readonly IAllianceOrbitalService _allianceOrbitalService;
+    private readonly ILogger<ShipTabViewModel> _logger;
     public override string Name => "Mon hangar";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Home);
     
@@ -37,8 +39,10 @@ public partial class ShipTabViewModel : PageViewModelBase
     /// <summary>Indique si la synchronisation de flotte est en cours.</summary>
     [ObservableProperty] private bool _isSyncing;
 
-    public ShipTabViewModel(IGrpcClientService clientService, IP4kService p4kService, ILocalDatabaseService localDatabaseService, ILocationService locationService, IAllianceOrbitalService allianceOrbitalService)
+    public ShipTabViewModel(IGrpcClientService clientService, IP4kService p4kService, ILocalDatabaseService localDatabaseService, ILocationService locationService, IAllianceOrbitalService allianceOrbitalService,
+        ILogger<ShipTabViewModel> logger)
     {
+        _logger = logger;
         _clientService = clientService;
         _p4KService = p4kService;
         _localDatabaseService = localDatabaseService;

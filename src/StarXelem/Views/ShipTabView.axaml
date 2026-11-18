@@ -201,12 +201,12 @@
                                    IsVisible="{Binding ShowNoMatch}"
                                    Text="Aucun vaisseau ne correspond à ces filtres." />
 
-                        <!-- Indicateur de chargement, superposé au tableau -->
-                        <Grid IsVisible="{Binding IsLoading}" IsHitTestVisible="False">
+                        <!-- Indicateur de chargement / filtrage, superposé au tableau -->
+                        <Grid IsVisible="{Binding IsBusy}" IsHitTestVisible="False">
                             <Border Background="{DynamicResource Sx.SurfaceBrush}" Opacity="0.75" />
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
                                 <ui:ProgressRing IsIndeterminate="True" Width="40" Height="40" HorizontalAlignment="Center" />
-                                <TextBlock Classes="sx-caption" HorizontalAlignment="Center" Text="{Binding TreatmentStatus}" />
+                                <TextBlock Classes="sx-caption" HorizontalAlignment="Center" Text="{Binding BusyMessage}" />
                             </StackPanel>
                         </Grid>
                     </Grid>
