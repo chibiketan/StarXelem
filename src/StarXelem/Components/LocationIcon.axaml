@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="clr-namespace:StarXelem.Models"
+             xmlns:conv="clr-namespace:StarXelem.Converters"
+             xmlns:comp="clr-namespace:StarXelem.Components"
+             x:DataType="models:ItemLocationDisplay"
+             x:Class="StarXelem.Components.LocationIcon">
+    <UserControl.Resources>
+        <conv:ItemLocationCategoryConverter x:Key="CategoryConverter" />
+    </UserControl.Resources>
+    <comp:NotchedBorder Width="24"
+                        Height="24"
+                        CutSize="7"
+                        Background="{Binding Category, Converter={StaticResource CategoryConverter}, ConverterParameter=background}">
+        <Path Width="14"
+              Height="14"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              Stretch="Uniform"
+              StrokeThickness="1.6"
+              StrokeLineCap="Round"
+              StrokeJoin="Round"
+              Data="{Binding Category, Converter={StaticResource CategoryConverter}, ConverterParameter=icon}"
+              Stroke="{Binding Category, Converter={StaticResource CategoryConverter}, ConverterParameter=foreground}" />
+    </comp:NotchedBorder>
+</UserControl>

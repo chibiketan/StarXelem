@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -20,7 +20,11 @@ public record DbBlueprintRow(
     string? OutputEntityClassRef,
     TimeSpan? CraftDuration,
     DbBlueprintCostRow[] Costs,
-    DbMissionPoolRow[] MissionPools);
+    DbMissionPoolRow[] MissionPools,
+    DbBlueprintProductRow? Product = null);
+
+/// <summary>Objet fabriqué par un blueprint, tel qu'enregistré dans ScItems.</summary>
+public record DbBlueprintProductRow(string TypeName, string SubTypeName, int? Size, int? Grade);
 
 public record DbBlueprintCostRow(
     string CostType,
@@ -4329,6 +4333,14 @@ public class LocalDatabaseService : ILocalDatabaseService
 
             var blueprintIds = batch.Select(b => b.SelfId).ToHashSet();
 
+            // Objet fabriqué : donne le type, la taille et le grade du blueprint.
+            var productIds = batch.Select(b => b.OutputEntityClassRef).OfType<string>().Where(id => id.Length > 0).ToHashSet();
+            var products = await db.ScItems
+                .Where(i => productIds.Contains(i.RecordId))
+                .Select(i => new { i.RecordId, i.TypeName, i.SubTypeName, i.Size, i.Grade })
+                .ToDictionaryAsync(i => i.RecordId, i => new DbBlueprintProductRow(i.TypeName, i.SubTypeName, i.Size, i.Grade), cancellationToken)
+                .ConfigureAwait(false);
+
             var missionPoolsMap = new Dictionary<string, List<DbMissionPoolRow>>();
             if (blueprintIds.Count > 0)
             {
@@ -4392,7 +4404,8 @@ public class LocalDatabaseService : ILocalDatabaseService
                     bp.OutputEntityClassRef,
                     bp.CraftDuration,
                     costRows,
-                    missionPools?.ToArray() ?? Array.Empty<DbMissionPoolRow>()
+                    missionPools?.ToArray() ?? Array.Empty<DbMissionPoolRow>(),
+                    bp.OutputEntityClassRef != null ? products.GetValueOrDefault(bp.OutputEntityClassRef) : null
                 );
             }
 
@@ -4570,7 +4583,34 @@ public class LocalDatabaseService : ILocalDatabaseService
             .Include(m => m.CompletionTags)
                 .ThenInclude(ct => ct.Tag)
             .Include(m => m.BlueprintPools)
+                .ThenInclude(pool => pool.Entries)
+                    .ThenInclude(entry => entry.Blueprint)
+                        .ThenInclude(blueprint => blueprint!.OutputItem)
+            .AsSplitQuery()
             .ToListAsync();
+
+        // Les rangs de réputation sont stockés en clés de traduction (« @RepScope_Contractor_Rank1 ») :
+        // on les remplace par leur libellé, les entités n'étant pas suivies.
+        var standingKeys = missions
+            .SelectMany(m => new[] { m.MinStandingDisplayName, m.MaxStandingDisplayName })
+            .Where(key => !string.IsNullOrEmpty(key))
+            .Distinct()
+            .ToList();
+        var standingNames = await db.LocaleEntries.AsNoTracking()
+            .Where(entry => standingKeys.Contains(entry.Key))
+            .ToDictionaryAsync(entry => entry.Key, entry => entry.Value);
+        foreach (var mission in missions)
+        {
+            if (mission.MinStandingDisplayName != null && standingNames.TryGetValue(mission.MinStandingDisplayName, out var minName))
+            {
+                mission.MinStandingDisplayName = minName;
+            }
+
+            if (mission.MaxStandingDisplayName != null && standingNames.TryGetValue(mission.MaxStandingDisplayName, out var maxName))
+            {
+                mission.MaxStandingDisplayName = maxName;
+            }
+        }
 
         return missions
             .GroupBy(m => m.Category?.Id ?? "Uncategorized")

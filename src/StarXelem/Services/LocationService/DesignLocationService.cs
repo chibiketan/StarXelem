@@ -1,4 +1,4 @@
-﻿using StarBreaker.DataCoreGenerated;
+using StarBreaker.DataCoreGenerated;
 using StarXelem.Models;
 
 namespace StarXelem.Services.LocationService;
@@ -11,19 +11,24 @@ namespace StarXelem.Services.LocationService;
 public class DesignLocationService : ILocationService
 {
     /// <inheritdoc/>
-    public Task<string?> ResolveEntityLocation(string? entityLocation, IList<EItemType>? allowedTypes = null)
+    public Task<ResolvedLocation?> ResolveEntityLocation(string? entityLocation, IList<EItemType>? allowedTypes = null)
     {
-        return Task.FromResult(entityLocation);
+        return Task.FromResult<ResolvedLocation?>(entityLocation == null ? null : new ResolvedLocation(LocationKind.Other, null, entityLocation));
     }
 
     /// <inheritdoc/>
-    public Task<string?> ResolveLocation(EntityItemQueryResult entity, IList<EItemType>? allowedTypes = null)
+    public Task<ResolvedLocation?> ResolveLocation(EntityItemQueryResult entity, IList<EItemType>? allowedTypes = null)
     {
-        return Task.FromResult<string?>("ResolveLocation");
+        return Task.FromResult<ResolvedLocation?>(new ResolvedLocation(LocationKind.Other, null, "ResolveLocation"));
     }
 
     /// <inheritdoc/>
     public void ClearCache()
+    {
+    }
+
+    /// <inheritdoc/>
+    public void AddKnownEntities(IEnumerable<EntityItemQueryResult> entities)
     {
     }
 }

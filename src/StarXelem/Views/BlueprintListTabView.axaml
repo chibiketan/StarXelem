@@ -1,4 +1,4 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -6,237 +6,440 @@
              xmlns:vm="clr-namespace:StarXelem.ViewModels"
              xmlns:local="clr-namespace:StarXelem"
              xmlns:conv="clr-namespace:StarXelem.Converters"
-             xmlns:comp="clr-namespace:StarXelem.Comparer"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             xmlns:comp="clr-namespace:StarXelem.Components"
+             xmlns:ui="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
+             mc:Ignorable="d" d:DesignWidth="1300" d:DesignHeight="800"
              x:DataType="vm:BlueprintListTabViewModel"
              d:DataContext="{x:Static local:DesignData.BlueprintListTabViewModel}"
-              x:Class="StarXelem.Views.BlueprintListTabView">
+             x:Class="StarXelem.Views.BlueprintListTabView">
+    <UserControl.Resources>
+        <conv:HumanScuConverter x:Key="ScuConverter" />
+    </UserControl.Resources>
     <UserControl.Styles>
-        <Style Selector="ic|SymbolIcon.loading">
-            <Style.Animations>
-                <Animation Duration="0:0:1" IterationCount="Infinite">
-                    <KeyFrame Cue="0%">
-                        <Setter Property="RotateTransform.Angle" Value="90" />
-                    </KeyFrame>
-                    <KeyFrame Cue="100%">
-                        <Setter Property="RotateTransform.Angle" Value="450" />
-                    </KeyFrame>
-                </Animation>
-            </Style.Animations>
+        <!-- Liste des blueprints : lignes à angles coupés, sélection en accent doux -->
+        <Style Selector="ListBox.bp-list">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="ListBox.bp-list ListBoxItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <ControlTemplate TargetType="ListBoxItem">
+                    <comp:NotchedBorder CutSize="9" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalContentAlignment="Stretch" />
+                    </comp:NotchedBorder>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ListBox.bp-list ListBoxItem:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+        </Style>
+        <Style Selector="ListBox.bp-list ListBoxItem:selected">
+            <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- Icône de famille d'objet : pastille neutre, le vert reste réservé à « obtenu » -->
+        <Style Selector="comp|NotchedBorder.family-tile">
+            <Setter Property="CutSize" Value="7" />
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Background" Value="{DynamicResource Sx.NeutralSoftBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="comp|NotchedBorder.family-tile.large">
+            <Setter Property="CutSize" Value="11" />
+            <Setter Property="Width" Value="56" />
+            <Setter Property="Height" Value="56" />
+        </Style>
+        <Style Selector="Path.family-icon">
+            <Setter Property="Stroke" Value="{DynamicResource Sx.SecondaryBrush}" />
+            <Setter Property="StrokeThickness" Value="1.8" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="StrokeJoin" Value="Round" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="comp|NotchedBorder.family-tile.large Path.family-icon">
+            <Setter Property="Stroke" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="StrokeThickness" Value="1.6" />
+        </Style>
+        <Style Selector="Button.sx-chip.on Path.family-icon">
+            <Setter Property="Stroke" Value="{DynamicResource Sx.TextBrush}" />
+        </Style>
+        <Style Selector="ListBox.bp-list ListBoxItem:selected Path.family-icon">
+            <Setter Property="Stroke" Value="{DynamicResource Sx.TextBrush}" />
+        </Style>
+
+        <!-- Type précis sous le nom -->
+        <Style Selector="TextBlock.type-label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+        </Style>
+        <Style Selector="ListBox.bp-list ListBoxItem:selected TextBlock.type-label">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        </Style>
+
+        <!-- Coche « obtenu » -->
+        <Style Selector="Border.obtained-mark">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Background" Value="{DynamicResource Sx.SuccessSoftBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Path.check">
+            <Setter Property="Data" Value="M5 12l5 5 9-10" />
+            <Setter Property="Width" Value="12" />
+            <Setter Property="Height" Value="12" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Stroke" Value="{DynamicResource Sx.SuccessBrush}" />
+            <Setter Property="StrokeThickness" Value="2.4" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="StrokeJoin" Value="Round" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Détail : une carte par composant -->
+        <Style Selector="comp|NotchedBorder.part-card">
+            <Setter Property="CutSize" Value="14" />
+            <Setter Property="Padding" Value="20,18" />
+            <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+        </Style>
+        <Style Selector="Grid.value-row">
+            <Setter Property="Margin" Value="0,5" />
+        </Style>
+        <Style Selector="Grid.value-row TextBlock.name">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="Grid.value-row TextBlock.value">
+            <Setter Property="FontFamily" Value="{DynamicResource Sx.FontMono}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
         </Style>
     </UserControl.Styles>
-    <UserControl.Resources>
-        <ResourceDictionary>
-            <conv:HumanScuConverter x:Key="ScuConverter" />
-            <conv:MinusOneToInfinityConverter x:Key="MinusOneToInfinityConverter" />
-            <conv:PercentageConverter x:Key="PercentageConverter" />
-            <conv:ResourceKeyToGeometryConverter x:Key="ResourceKeyToGeometryConverter" />
-        </ResourceDictionary>
-    </UserControl.Resources>
-    <Grid RowDefinitions="*" ColumnDefinitions="Auto,300,Auto,*" Classes="master-detail">
-    <Separator Grid.Row="0" Grid.Column="0" Classes="vertical" />
-    <Grid Grid.Row="0" Grid.Column="1" Classes="master" RowDefinitions="Auto,Auto,Auto,*,Auto" ColumnDefinitions="*">
-        <Grid Grid.Row="0" RowDefinitions="*,*,*" ColumnDefinitions="*,Auto">
-            <TextBlock Grid.Column="0" Classes="title">BLUEPRINT</TextBlock>
-            <Button Grid.Row="0" Grid.Column="1" Classes="btn principal" Command="{Binding LoadItemListCommand}">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <ic:SymbolIcon Grid.Column="0" Symbol="ArrowSync" Classes.loading="{Binding IsLoading}">
-                        <ic:SymbolIcon.RenderTransform>
-                            <RotateTransform Angle="90"/>
-                        </ic:SymbolIcon.RenderTransform>
-                    </ic:SymbolIcon>
-                    <TextBlock Grid.Column="1">Charger</TextBlock>
-                </Grid>
-            </Button>
-            <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Vertical" Spacing="6" Margin="7 4 0 0">
-                <CheckBox Content="Afficher uniquement les BP obtenus"
-                          IsChecked="{Binding ShowOnlyObtained}"
-                          IsEnabled="{Binding IsGrpcConnected}" />
-                <CheckBox Content="Afficher uniquement les BP de mission"
-                          IsChecked="{Binding ShowOnlyWithMissions}" />
-            </StackPanel>
-        </Grid>
-        <RelativePanel Grid.Row="1" >
-            <TextBox Name="Search" RelativePanel.AlignLeftWithPanel="True" RelativePanel.AlignRightWithPanel="True" Padding="28 0 28 0" VerticalContentAlignment="Center" HorizontalAlignment="Stretch" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" />
-            <Label Target="Search" RelativePanel.AlignLeftWith="Search" RelativePanel.AlignVerticalCenterWith="Search">
-                <ic:SymbolIcon  Margin="2 0 0 0" Symbol="Search" />
-            </Label>
-            <Button Classes="btn icon" RelativePanel.AlignVerticalCenterWith="Search" RelativePanel.AlignRightWith="Search" Margin="0 0 4 0" Command="{Binding ClearSearchCommand}" IsVisible="{Binding Search, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" >
-                <ic:SymbolIcon Symbol="DismissCircle" />
-            </Button>
-        </RelativePanel>
-        <Separator Grid.Row="2" Classes="horizontal" />
-        <ListBox Grid.Row="3" Classes="bp-list" ItemsSource="{Binding BlueprintList}" SelectedItem="{Binding SelectedBluePrint}">
-            <ListBox.DataTemplates>
-                <DataTemplate DataType="{x:Type vm:BlueprintViewModel}">
-                    <Grid Classes="bp-list-row" RowDefinitions="*" ColumnDefinitions="Auto,*,Auto">
-                        <Grid.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Copier GUID" Command="{Binding CopyIdCommand}" />
-                            </ContextMenu>
-                        </Grid.ContextMenu>
-                        <Border Classes="badge tiers-1" Grid.Row="0" Grid.Column="0">
-                            <TextBlock Text="{Binding TierLevel, StringFormat=T{0}}" />
-                        </Border>
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}" />
-                        <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding RemainingUse, Converter={StaticResource MinusOneToInfinityConverter}}" />
+
+    <!-- La nouvelle charte n'existe qu'en thème sombre : l'écran reste sombre même si Windows est en thème clair. -->
+    <ThemeVariantScope RequestedThemeVariant="Dark">
+        <Grid Background="{DynamicResource Sx.BackgroundBrush}" TextElement.FontFamily="{DynamicResource Sx.FontSans}">
+        <Grid ColumnDefinitions="340,*" ColumnSpacing="12" Margin="12">
+
+            <!-- Liste des blueprints -->
+            <comp:NotchedBorder CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}" Padding="14,18,14,14">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="12">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="6,0">
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Classes="sx-title" Text="Blueprints" />
+                            <TextBlock Classes="sx-caption" Text="{Binding ResultSummary}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="sx primary" Command="{Binding LoadItemListCommand}">Charger</Button>
                     </Grid>
-                </DataTemplate>
-            </ListBox.DataTemplates>
-        </ListBox>
-        <Button Grid.Row="4" Classes="btn export" Command="{Binding SendToOrbitalAllianceCommand}" Margin="5 15" HorizontalAlignment="Center" >
-            <Grid ColumnDefinitions="Auto,*">
-                <ic:SymbolIcon Grid.Column="0" Symbol="ArrowUpload" Margin=" 0 0 10 0">
-                    <ic:SymbolIcon.RenderTransform>
-                        <RotateTransform Angle="45"/>
-                    </ic:SymbolIcon.RenderTransform>
-                </ic:SymbolIcon>
-                <TextBlock Grid.Column="1">Envoi Orbital Alliance</TextBlock>
-            </Grid>
-        </Button>
 
-    </Grid>
-    <Separator Grid.Row="0" Grid.Column="2" Classes="vertical" />
-    <Grid Grid.Row="0" Grid.Column="3" Classes="detail" Margin="0" IsVisible="{Binding SelectedBluePrint, Converter={x:Static ObjectConverters.IsNotNull}}" RowDefinitions="Auto,*">
-        <Border Grid.Row="0" Classes="header">
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="20,Auto,*" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" >
-                <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Classes="equipment-icon">
-                    <!-- TODO comment choisir le bon item ? Binding ? -->
-                    <Path Name="ItemType" Data="{Binding SelectedBluePrint.ItemIconKey, Converter={StaticResource ResourceKeyToGeometryConverter}}" />
-                </Border>
-                <TextBlock Grid.Row="1" Grid.Column="1" Classes="title" Text="{Binding SelectedBluePrint.Name}" />
-                <WrapPanel Grid.Row="2" Grid.Column="1">
-                    <Border Classes="badge tiers-1">
-                        <TextBlock Text="{Binding SelectedBluePrint.TierLevel, StringFormat='Tiers {0}'}" />
-                    </Border>
-                    <Border Classes="badge usage">
-                        <TextBlock Text="{Binding SelectedBluePrint.RemainingUse, Converter={StaticResource MinusOneToInfinityConverter}, StringFormat='\{0} Utilisations'}" />
-                    </Border>
-                    <Border Classes="badge temps">
-                        <Grid ColumnDefinitions="Auto,Auto,Auto">
-                            <ic:SymbolIcon Grid.Column="0" Symbol="Timer" />
-                            <TextBlock Grid.Column="1" Text="{Binding SelectedBluePrint.CraftDuration}" />
+                    <comp:NotchedBorder Grid.Row="1" Classes="sx-field">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Path Classes="sx-search-icon" Margin="12,0,0,0" />
+                            <TextBox Grid.Column="1"
+                                     Classes="sx"
+                                     Height="44"
+                                     Watermark="Rechercher un blueprint..."
+                                     Text="{Binding Search}" />
                         </Grid>
-                    </Border>
-                </WrapPanel>
-            </Grid>
-        </Border>
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel>
-            <ItemsControl Classes="content" ItemsSource="{Binding SelectedBluePrint.CategoryList}">
-            <ItemsControl.DataTemplates>
-                <DataTemplate DataType="{x:Type vm:BlueprintCategoryModel}">
-                    <Border Classes="card">
-                        <Grid RowDefinitions="Auto,Auto,*">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 demi-bold" Text="{Binding Name}" />
-                            <Separator Grid.Row="1" Grid.Column="0" Classes="horizontal" />
-                            <Grid Grid.Row="2" Grid.Column="0" RowDefinitions="Auto,*" ColumnDefinitions="*,Auto,*">
-                                <TextBlock Grid.Row="0" Grid.Column="0" Classes="h1 dimming bold">Ressources</TextBlock>
-                                <ItemsControl Grid.Row="1" Grid.Column="0" ItemsSource="{Binding MaterialList}">
-                                    <ItemsControl.DataTemplates>
-                                        <!-- Ressource brute en SCU (ex : Fer 0,2 SCU) -->
-                                        <DataTemplate DataType="{x:Type vm:BlueprintResourceModel}">
-                                            <Grid ColumnDefinitions="Auto,*,Auto">
-                                                <Border Grid.Column="0" Classes="bulletpoint" />
-                                                <TextBlock Grid.Column="1" Classes="demi-dimming" Text="{Binding Name}" />
-                                                <TextBlock Grid.Column="2" Classes="demi-bold" Text="{Binding QuantityInScu, Converter={StaticResource ScuConverter}}" />
-                                            </Grid>
-                                        </DataTemplate>
+                    </comp:NotchedBorder>
 
-                                        <!-- Objet en quantité physique (ex : minerai Sadaryx 4 unités) -->
-                                        <DataTemplate DataType="{x:Type vm:BlueprintItemModel}">
-                                            <Grid ColumnDefinitions="Auto,*,Auto">
-                                                <Border Grid.Column="0" Classes="bulletpoint" />
-                                                <TextBlock Grid.Column="1" Classes="demi-dimming" Text="{Binding Name}" />
-                                                <TextBlock Grid.Column="2" Classes="demi-bold" Text="{Binding QuantityCount, StringFormat='\{0} unités'}" />
-                                            </Grid>
-                                        </DataTemplate>
+                    <WrapPanel Grid.Row="2">
+                        <Button Classes="sx-chip"
+                                Classes.on="{Binding ObtainedChip.IsSelected}"
+                                Command="{Binding ObtainedChip.ToggleCommand}"
+                                IsEnabled="{Binding IsGrpcConnected}"
+                                ToolTip.Tip="Nécessite la connexion au jeu">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Ellipse Width="7" Height="7" Fill="{DynamicResource Sx.SuccessBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding ObtainedChip.Label}" VerticalAlignment="Center" />
+                                <TextBlock Classes="sx-count" Text="{Binding ObtainedChip.Count}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="sx-chip"
+                                Classes.on="{Binding MissionChip.IsSelected}"
+                                Command="{Binding MissionChip.ToggleCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <TextBlock Text="{Binding MissionChip.Label}" VerticalAlignment="Center" />
+                                <TextBlock Classes="sx-count" Text="{Binding MissionChip.Count}" />
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
 
-                                        <!-- Repli pour tout sous-type inconnu : affiche le nom sans quantité -->
-                                        <DataTemplate DataType="{x:Type vm:BlueprintMaterialModel}">
-                                            <Grid ColumnDefinitions="Auto,*,Auto">
-                                                <Border Grid.Column="0" Classes="bulletpoint" />
-                                                <TextBlock Grid.Column="1" Classes="demi-dimming" Text="{Binding Name}" />
-                                                <TextBlock Grid.Column="2" Classes="demi-bold" Text="(type inconnu)" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.DataTemplates>
-                                </ItemsControl>
-                                <Separator Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Classes="vertical spacer" />
-                                <TextBlock Grid.Row="0" Grid.Column="2" Classes="h1 dimming bold">Propriétés :</TextBlock>
-                                <ItemsControl Grid.Row="1" Grid.Column="2" ItemsSource="{Binding StatModifierList}">
-                                    <ItemsControl.DataTemplates>
+                    <!-- Familles d'objet : cumulables, rien de coché = tout afficher -->
+                    <ItemsControl Grid.Row="3" ItemsSource="{Binding FamilyChips}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FilterChipViewModel">
+                                <Button Classes="sx-chip" Classes.on="{Binding IsSelected}" Command="{Binding ToggleCommand}" Padding="11,0">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Classes="family-icon" Width="14" Height="14" Data="{Binding Key, Converter={x:Static conv:BlueprintFamilyIconConverter.Instance}}" />
+                                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                                        <TextBlock Classes="sx-count" Text="{Binding Count}" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
-                                        <!-- Modificateur multiplicatif linéaire (ex: 80% → 120%) -->
-                                        <DataTemplate DataType="{x:Type vm:BlueprintStatLinearModel}">
-                                            <Grid ColumnDefinitions="*,Auto">
-                                                <TextBlock Grid.Column="0" Classes="demi-dimming" Text="{Binding Name}" />
-                                                <Grid Grid.Column="1" ColumnDefinitions="Auto,25,Auto">
-                                                    <TextBlock Grid.Column="0" Classes="demi-bold" Text="{Binding Min, Converter={StaticResource PercentageConverter}, ConverterParameter=4}" />
-                                                    <Separator Grid.Column="1" Classes="horizontal" Margin="5 0" />
-                                                    <TextBlock Grid.Column="2" Classes="demi-bold" Text="{Binding Max, Converter={StaticResource PercentageConverter}, ConverterParameter=4}" />
-                                                </Grid>
-                                            </Grid>
-                                        </DataTemplate>
+                    <Grid Grid.Row="4">
+                        <ListBox Classes="bp-list" ItemsSource="{Binding BlueprintList}" SelectedItem="{Binding SelectedBluePrint}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:BlueprintViewModel">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Background="Transparent">
+                                        <Grid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Copier GUID" Command="{Binding CopyIdCommand}" />
+                                            </ContextMenu>
+                                        </Grid.ContextMenu>
+                                        <comp:NotchedBorder Classes="family-tile" ToolTip.Tip="{Binding FamilyLabel}">
+                                            <Path Classes="family-icon" Width="15" Height="15" Data="{Binding FamilyIcon}" />
+                                        </comp:NotchedBorder>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                                            <TextBlock Classes="type-label" Text="{Binding TypeLabel}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Classes="obtained-mark" IsVisible="{Binding IsObtained}" ToolTip.Tip="Obtenu">
+                                            <Path Classes="check" />
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
 
-                                        <!-- Modificateur additif entier par plages de qualité (ex: -2 | -1 | 0 | +1 | +2) -->
-                                        <DataTemplate DataType="{x:Type vm:BlueprintStatAdditiveModel}">
-                                            <Grid RowDefinitions="Auto,Auto" Margin="0 2 0 4">
-                                                <TextBlock Grid.Row="0" Classes="demi-dimming" Text="{Binding Name}" />
-                                                <ItemsControl Grid.Row="1" ItemsSource="{Binding Bands}" Margin="0 2 0 0">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <StackPanel Orientation="Horizontal" Spacing="6" />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
+                        <TextBlock Classes="sx-caption"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   IsVisible="{Binding ShowNoMatch}"
+                                   Text="Aucun blueprint ne correspond à ces filtres." />
+
+                        <!-- Indicateur de chargement / filtrage, superposé à la liste -->
+                        <Grid IsVisible="{Binding IsBusy}" IsHitTestVisible="False">
+                            <Border Background="{DynamicResource Sx.SurfaceBrush}" Opacity="0.75" />
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Margin="12,0">
+                                <ui:ProgressRing IsIndeterminate="True" Width="40" Height="40" HorizontalAlignment="Center" />
+                                <TextBlock Classes="sx-caption" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding BusyMessage}" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </comp:NotchedBorder>
+
+            <!-- Détail du blueprint sélectionné -->
+            <comp:NotchedBorder Grid.Column="1" CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}">
+                <Grid RowDefinitions="Auto,*">
+                    <!-- En-tête : nom, badges et envoi Orbital Alliance -->
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="18" Margin="28,26,28,8">
+                        <comp:NotchedBorder Classes="family-tile large"
+                                            VerticalAlignment="Top"
+                                            IsVisible="{Binding HasSelection}"
+                                            ToolTip.Tip="{Binding SelectedBluePrint.FamilyLabel, FallbackValue=''}">
+                            <Path Classes="family-icon" Width="28" Height="28" Data="{Binding SelectedBluePrint.FamilyIcon, FallbackValue={x:Null}}" />
+                        </comp:NotchedBorder>
+
+                        <StackPanel Grid.Column="1" Spacing="10" IsVisible="{Binding HasSelection}">
+                            <TextBlock FontSize="30"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sx.TextBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="{Binding SelectedBluePrint.Name, FallbackValue=''}" />
+                            <WrapPanel>
+                                <comp:NotchedBorder Classes="sx-badge success" Margin="0,0,8,6" IsVisible="{Binding SelectedBluePrint.IsObtained, FallbackValue=False}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="check" Width="11" Height="11" />
+                                        <TextBlock Text="Obtenu" />
+                                    </StackPanel>
+                                </comp:NotchedBorder>
+                                <comp:NotchedBorder Classes="sx-badge" Margin="0,0,8,6">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="family-icon" Width="12" Height="12" Stroke="{DynamicResource Sx.NeutralBrush}" Data="{Binding SelectedBluePrint.FamilyIcon, FallbackValue={x:Null}}" />
+                                        <TextBlock Text="{Binding SelectedBluePrint.TypeLabel, FallbackValue=''}" />
+                                    </StackPanel>
+                                </comp:NotchedBorder>
+                                <comp:NotchedBorder Classes="sx-badge" Margin="0,0,8,6" IsVisible="{Binding SelectedBluePrint.HasTier, FallbackValue=False}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Ellipse />
+                                        <TextBlock Text="{Binding SelectedBluePrint.TierLabel, FallbackValue=''}" />
+                                    </StackPanel>
+                                </comp:NotchedBorder>
+                                <comp:NotchedBorder Classes="sx-badge" Margin="0,0,8,6" IsVisible="{Binding SelectedBluePrint.HasRemainingUse, FallbackValue=False}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Ellipse />
+                                        <TextBlock Text="{Binding SelectedBluePrint.RemainingUseLabel, FallbackValue=''}" />
+                                    </StackPanel>
+                                </comp:NotchedBorder>
+                                <comp:NotchedBorder Classes="sx-badge" Margin="0,0,8,6" IsVisible="{Binding SelectedBluePrint.HasCraftDuration, FallbackValue=False}"
+                                                    ToolTip.Tip="Durée de fabrication">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Ellipse />
+                                        <TextBlock FontFamily="{DynamicResource Sx.FontMono}" Text="{Binding SelectedBluePrint.CraftDurationLabel, FallbackValue=''}" />
+                                    </StackPanel>
+                                </comp:NotchedBorder>
+
+                            </WrapPanel>
+                        </StackPanel>
+
+                        <TextBlock Grid.ColumnSpan="2"
+                                   Classes="sx-caption"
+                                   FontSize="13"
+                                   IsVisible="{Binding !HasSelection}"
+                                   Text="Sélectionnez un blueprint dans la liste pour afficher son détail." />
+
+                        <Button Grid.Column="2"
+                                Classes="sx"
+                                VerticalAlignment="Top"
+                                Command="{Binding SendToOrbitalAllianceCommand}"
+                                ToolTip.Tip="Envoie les blueprints obtenus à Orbital Alliance (nécessite la connexion au jeu)">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:SymbolIcon Symbol="ArrowUpload" FontSize="14" />
+                                <TextBlock Text="Envoi Orbital Alliance" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasSelection}">
+                        <StackPanel Margin="28,8,28,26" Spacing="14">
+                            <!-- Composants : matériaux à gauche, modificateurs à droite -->
+                            <ItemsControl ItemsSource="{Binding SelectedBluePrint.CategoryList, FallbackValue={x:Null}}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="14" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:BlueprintCategoryModel">
+                                        <comp:NotchedBorder Classes="part-card">
+                                            <Grid ColumnDefinitions="*,2*" ColumnSpacing="24">
+                                                <StackPanel>
+                                                    <TextBlock FontSize="16"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource Sx.TextBrush}"
+                                                               Margin="0,0,0,7"
+                                                               Text="{Binding Name}" />
+                                                    <ItemsControl ItemsSource="{Binding MaterialList}">
+                                                        <ItemsControl.DataTemplates>
+                                                            <!-- Ressource brute en SCU (ex : Fer 0,2 SCU) -->
+                                                            <DataTemplate DataType="{x:Type vm:BlueprintResourceModel}">
+                                                                <Grid Classes="value-row" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                                    <TextBlock Classes="name" Text="{Binding Name}" />
+                                                                    <TextBlock Grid.Column="1" Classes="value" Text="{Binding QuantityInScu, Converter={StaticResource ScuConverter}}" />
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                            <!-- Objet en quantité physique (ex : minerai Sadaryx 4 unités) -->
+                                                            <DataTemplate DataType="{x:Type vm:BlueprintItemModel}">
+                                                                <Grid Classes="value-row" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                                    <TextBlock Classes="name" Text="{Binding Name}" />
+                                                                    <TextBlock Grid.Column="1" Classes="value" Text="{Binding QuantityLabel}" />
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                            <!-- Repli pour tout sous-type inconnu : affiche le nom sans quantité -->
+                                                            <DataTemplate DataType="{x:Type vm:BlueprintMaterialModel}">
+                                                                <Grid Classes="value-row" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                                    <TextBlock Classes="name" Text="{Binding Name}" />
+                                                                    <TextBlock Grid.Column="1" Classes="value" Text="—" />
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.DataTemplates>
+                                                    </ItemsControl>
+                                                </StackPanel>
+
+                                                <ItemsControl Grid.Column="1" ItemsSource="{Binding StatModifierList}">
                                                     <ItemsControl.DataTemplates>
-                                                        <DataTemplate DataType="{x:Type vm:BlueprintStatBandModel}">
-                                                             <StackPanel Orientation="Vertical" Spacing="1">
-                                                                 <TextBlock Classes="demi-dimming quality-label demi-bold" Text="{Binding QualityLabel}" HorizontalAlignment="Center" />
-                                                                 <TextBlock Classes="demi-bold" Text="{Binding FormattedValue}" HorizontalAlignment="Center" />
-                                                             </StackPanel>
-                                                         </DataTemplate>
+                                                        <!-- Modificateur multiplicatif linéaire (ex : 80% – 120%) -->
+                                                        <DataTemplate DataType="{x:Type vm:BlueprintStatLinearModel}">
+                                                            <Grid Classes="value-row" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                                <TextBlock Classes="name" Text="{Binding Name}" />
+                                                                <TextBlock Grid.Column="1" Classes="value" Text="{Binding RangeDisplay}" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                        <!-- Modificateur additif entier par plage de qualité -->
+                                                        <DataTemplate DataType="{x:Type vm:BlueprintStatAdditiveModel}">
+                                                            <Grid Classes="value-row" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                                <TextBlock Classes="name" Text="{Binding Name}" />
+                                                                <TextBlock Grid.Column="1" Classes="value" Text="{Binding RangeDisplay}" ToolTip.Tip="Valeur par plage de qualité" />
+                                                            </Grid>
+                                                        </DataTemplate>
                                                     </ItemsControl.DataTemplates>
                                                 </ItemsControl>
                                             </Grid>
+                                        </comp:NotchedBorder>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Missions qui récompensent le blueprint -->
+                            <StackPanel Margin="4,14,4,0" Spacing="10" IsVisible="{Binding SelectedBluePrint.HasMissions, FallbackValue=False}">
+                                <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Sx.TextBrush}" Text="Obtenu par mission" />
+                                <ItemsControl ItemsSource="{Binding SelectedBluePrint.MissionPools, FallbackValue={x:Null}}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Spacing="12" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:MissionPoolGroup">
+                                            <StackPanel Spacing="4">
+                                                <!-- Identifiant technique du pool de récompenses -->
+                                                <TextBlock FontSize="11"
+                                                           FontFamily="{DynamicResource Sx.FontMono}"
+                                                           Foreground="{DynamicResource Sx.MutedBrush}"
+                                                           ToolTip.Tip="Pool de récompenses du jeu"
+                                                           Text="{Binding PoolName}" />
+                                                <ItemsControl ItemsSource="{Binding Missions}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <!-- Une ligne par titre ; le compteur indique ses variantes (lieu, difficulté…) -->
+                                                        <DataTemplate x:DataType="vm:MissionInfo">
+                                                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                                                                <TextBlock FontSize="13"
+                                                                           VerticalAlignment="Center"
+                                                                           Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                                           TextWrapping="Wrap"
+                                                                           Text="{Binding MissionTitle}" />
+                                                                <Border IsVisible="{Binding HasVariants}"
+                                                                        Background="{DynamicResource Sx.NeutralSoftBrush}"
+                                                                        CornerRadius="9"
+                                                                        Padding="7,1"
+                                                                        VerticalAlignment="Center"
+                                                                        ToolTip.Tip="Nombre de variantes de cette mission">
+                                                                    <TextBlock Classes="sx-count" Text="{Binding VariantCountLabel}" />
+                                                                </Border>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
                                         </DataTemplate>
-
-                                    </ItemsControl.DataTemplates>
+                                    </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                            </Grid>
-                        </Grid>
-                    </Border>
-                </DataTemplate>
-            </ItemsControl.DataTemplates>
-            </ItemsControl>
-            <Separator Classes="horizontal" />
-                <ItemsControl Classes="content" ItemsSource="{Binding SelectedBluePrint.MissionPools}">
-                    <ItemsControl.DataTemplates>
-                        <DataTemplate DataType="vm:MissionPoolGroup">
-                            <Border Classes="card">
-                                <Grid RowDefinitions="Auto,Auto,*">
-                                    <TextBlock Grid.Row="0" Classes="h1 demi-bold" Text="{Binding PoolName}" />
-                                    <Separator Grid.Row="1" Classes="horizontal" />
-                                    <ItemsControl Grid.Row="2" ItemsSource="{Binding Missions}">
-                                        <ItemsControl.DataTemplates>
-                                            <DataTemplate DataType="vm:MissionInfo">
-                                                <Grid ColumnDefinitions="Auto,*">
-                                                    <Border Grid.Column="0" Classes="bulletpoint" />
-                                                    <TextBlock Grid.Column="1" Classes="demi-dimming"
-                                                               Text="{Binding MissionTitle}"
-                                                               TextWrapping="Wrap" />
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.DataTemplates>
-                                    </ItemsControl>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.DataTemplates>
-                </ItemsControl>
-            </StackPanel>
-            </ScrollViewer>
-    </Grid>
-</Grid>
-
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </comp:NotchedBorder>
+        </Grid>
+        </Grid>
+    </ThemeVariantScope>
 </UserControl>

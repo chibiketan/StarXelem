@@ -1,260 +1,354 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
              xmlns:vm="clr-namespace:StarXelem.ViewModels"
+             xmlns:models="clr-namespace:StarXelem.Models"
              xmlns:local="clr-namespace:StarXelem"
              xmlns:conv="clr-namespace:StarXelem.Converters"
-             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
+             xmlns:comp="clr-namespace:StarXelem.Components"
+             xmlns:ui="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
+             mc:Ignorable="d" d:DesignWidth="1300" d:DesignHeight="800"
              x:DataType="vm:P4kShipTabViewModel"
              d:DataContext="{x:Static local:DesignData.P4kShipTabViewModel}"
              x:Class="StarXelem.Views.P4kShipTabView">
-    <UserControl.Resources>
-        <conv:ComponentGradeToBackgroundColorConverter x:Key="ComponentGradeToBackgroundColorConverter" />
-    </UserControl.Resources>
     <UserControl.Styles>
-        <Style Selector="DataGrid.component DataGridRow">
-            <Setter Property="Background" Value="{Binding Converter={StaticResource ComponentGradeToBackgroundColorConverter}}"></Setter>
+        <!-- Liste des vaisseaux : lignes à angles coupés, sélection en accent doux -->
+        <Style Selector="ListBox.ship-list">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="ListBox.ship-list ListBoxItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <ControlTemplate TargetType="ListBoxItem">
+                    <comp:NotchedBorder CutSize="9" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalContentAlignment="Stretch" />
+                    </comp:NotchedBorder>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ListBox.ship-list ListBoxItem:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+        </Style>
+        <Style Selector="ListBox.ship-list ListBoxItem:selected">
+            <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- Carte d'un type de composant -->
+        <Style Selector="comp|NotchedBorder.component-card">
+            <Setter Property="CutSize" Value="14" />
+            <Setter Property="Padding" Value="18,14" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+        </Style>
+        <Style Selector="TextBlock.card-title">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+
+        <!-- Tableaux armes, missiles et points d'emport -->
+        <Style Selector="TextBlock.section-title">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="Margin" Value="0,6,0,2" />
+        </Style>
+        <Style Selector="Border.table-head">
+            <Setter Property="BorderBrush" Value="{DynamicResource Sx.LineBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="0,11" />
+        </Style>
+        <Style Selector="Border.table-head TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        </Style>
+        <Style Selector="Border.table-row">
+            <Setter Property="BorderBrush" Value="{DynamicResource Sx.LineBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="MinHeight" Value="42" />
+        </Style>
+        <Style Selector="Border.table-row TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style Selector="Border.table-row TextBlock.name">
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+        <Style Selector="Border.table-row TextBlock.muted">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        </Style>
+        <Style Selector="Border.table-row TextBlock.mono">
+            <Setter Property="FontFamily" Value="{DynamicResource Sx.FontMono}" />
         </Style>
     </UserControl.Styles>
-    <Grid ColumnDefinitions="300,*" RowDefinitions="Auto,200,*" RowSpacing="8" ColumnSpacing="8">
-        <!-- Header / Progress -->
-        <StackPanel Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
-            <TextBlock Text="Ships from P4K" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
-            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" Width="150" Height="6" VerticalAlignment="Center"/>
-            <CheckBox Content="Show only visible ships"
-                      IsChecked="{Binding ShowOnlyVisible, Mode=TwoWay}"
-                      VerticalAlignment="Center"/>
-        </StackPanel>
 
-        <!-- Manufacturer list -->
-        <DockPanel Grid.Row="1" Grid.Column="0">
-            <TextBlock DockPanel.Dock="Top" FontWeight="Bold" Margin="10 0 0 0">Constructeurs :</TextBlock>
-            <ScrollViewer>
-                <ListBox
-                        ItemsSource="{Binding AllManufacturer}"
-                        SelectedItem="{Binding SelectedManufacturer}"
-                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel>
-                                <TextBlock Text="{Binding Name}"/>
+    <!-- La nouvelle charte n'existe qu'en thème sombre : l'écran reste sombre même si Windows est en thème clair. -->
+    <ThemeVariantScope RequestedThemeVariant="Dark">
+        <Grid Background="{DynamicResource Sx.BackgroundBrush}" TextElement.FontFamily="{DynamicResource Sx.FontSans}">
+        <Grid ColumnDefinitions="300,*" ColumnSpacing="12" Margin="12">
+
+            <!-- Liste des vaisseaux -->
+            <comp:NotchedBorder CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}" Padding="14,18,14,14">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="12">
+                    <StackPanel Margin="6,0" Spacing="2">
+                        <TextBlock Classes="sx-title" Text="Loadout vaisseaux" />
+                        <TextBlock Classes="sx-caption" Text="{Binding ResultSummary}" />
+                    </StackPanel>
+
+                    <comp:NotchedBorder Grid.Row="1" Classes="sx-field">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Path Classes="sx-search-icon" Margin="12,0,0,0" />
+                            <TextBox Grid.Column="1"
+                                     Classes="sx"
+                                     Height="44"
+                                     Watermark="Vaisseau, constructeur..."
+                                     Text="{Binding Search}" />
+                        </Grid>
+                    </comp:NotchedBorder>
+
+                    <!-- Constructeurs : cumulables, « Tous » retire le filtre. Hauteur bornée : une vingtaine de puces. -->
+                    <ScrollViewer Grid.Row="2" MaxHeight="128" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding ManufacturerChips}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:FilterChipViewModel">
+                                    <Button Classes="sx-chip" Classes.on="{Binding IsSelected}" Command="{Binding ToggleCommand}">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                                            <TextBlock Classes="sx-count" Text="{Binding Count}" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <CheckBox Grid.Row="3"
+                              Classes="sx-muted"
+                              Margin="6,0"
+                              Content="Inclure les vaisseaux masqués"
+                              ToolTip.Tip="Vaisseaux présents dans les données du jeu mais absents des listes en jeu"
+                              IsChecked="{Binding IncludeHidden}" />
+
+                    <Grid Grid.Row="4">
+                        <ListBox Classes="ship-list" ItemsSource="{Binding Ships}" SelectedItem="{Binding SelectedShip}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:P4kShipModel">
+                                    <TextBlock Background="Transparent"
+                                               Text="{Binding Name}"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip.Tip="{Binding TechnicalName}" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <TextBlock Classes="sx-caption"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   IsVisible="{Binding ShowNoMatch}"
+                                   Text="Aucun vaisseau ne correspond à ces filtres." />
+
+                        <!-- Indicateur de chargement / filtrage, superposé à la liste -->
+                        <Grid IsVisible="{Binding IsBusy}" IsHitTestVisible="False">
+                            <Border Background="{DynamicResource Sx.SurfaceBrush}" Opacity="0.75" />
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Margin="12,0">
+                                <ui:ProgressRing IsIndeterminate="True" Width="40" Height="40" HorizontalAlignment="Center" />
+                                <TextBlock Classes="sx-caption" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding BusyMessage}" />
                             </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </ScrollViewer>
-        </DockPanel>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </comp:NotchedBorder>
 
-        <!-- Ship list -->
-        <DockPanel Grid.Row="2" Grid.Column="0">
-            
-            <Separator DockPanel.Dock="Top" />
-            <TextBlock DockPanel.Dock="Top" FontWeight="Bold" Margin="10 0 0 0">Vaisseaux :</TextBlock>
-            <ListBox
-                     ItemsSource="{Binding Ships}"
-                     SelectedItem="{Binding SelectedShip}"
-                     HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Background="Transparent" ToolTip.Tip="{Binding TechnicalName, StringFormat='{}{{{0}}}'}" >
-                            <TextBlock Text="{Binding Name}"/>
+            <!-- Loadout du vaisseau sélectionné -->
+            <comp:NotchedBorder Grid.Column="1" CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}">
+                <Grid>
+                    <TextBlock Classes="sx-caption"
+                               FontSize="13"
+                               Margin="28,26"
+                               IsVisible="{Binding !HasSelection}"
+                               Text="Sélectionnez un vaisseau dans la liste pour afficher son loadout." />
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasSelection}">
+                        <StackPanel Margin="28,26" Spacing="14">
+                            <!-- En-tête : nom et tags du jeu -->
+                            <StackPanel Spacing="10">
+                                <TextBlock FontSize="30"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sx.TextBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding SelectedShip.Name, FallbackValue=''}" />
+                                <ItemsControl ItemsSource="{Binding SelectedShip.TagNames, FallbackValue={x:Null}}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <comp:NotchedBorder Classes="sx-badge" Margin="0,0,6,6">
+                                                <TextBlock FontWeight="Normal" Text="{Binding}" />
+                                            </comp:NotchedBorder>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <!-- Composants : une carte par type, autant de colonnes de 320 px que la largeur le permet -->
+                            <ItemsControl ItemsSource="{Binding ComponentSections}" Margin="0,0,-12,-12">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="{Binding $parent[ItemsControl].Bounds.Width, Converter={x:Static conv:WidthToColumnsConverter.Instance}, ConverterParameter=320}" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:P4kShipComponentSection">
+                                        <comp:NotchedBorder Classes="component-card">
+                                            <StackPanel>
+                                                <TextBlock Classes="card-title" Text="{Binding Title}" />
+                                                <ItemsControl ItemsSource="{Binding Components}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="models:P4kShipComponentModel">
+                                                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10" Margin="0,6">
+                                                                <TextBlock FontWeight="Medium"
+                                                                           VerticalAlignment="Center"
+                                                                           Foreground="{DynamicResource Sx.TextBrush}"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           ToolTip.Tip="{Binding PortName}"
+                                                                           Text="{Binding DisplayName}" />
+                                                                <TextBlock Grid.Column="1"
+                                                                           VerticalAlignment="Center"
+                                                                           Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                                           Text="{Binding DetailLabel}" />
+                                                                <comp:NotchedBorder Grid.Column="2"
+                                                                                    Classes="sx-badge"
+                                                                                    Classes.success="{Binding IsGradeA}"
+                                                                                    Classes.info="{Binding IsGradeB}"
+                                                                                    Classes.warning="{Binding IsGradeC}"
+                                                                                    Classes.danger="{Binding IsGradeLow}"
+                                                                                    IsVisible="{Binding HasGrade}"
+                                                                                    ToolTip.Tip="Grade">
+                                                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                                                        <Ellipse />
+                                                                        <TextBlock Text="{Binding Grade}" />
+                                                                    </StackPanel>
+                                                                </comp:NotchedBorder>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </comp:NotchedBorder>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Armes -->
+                            <StackPanel IsVisible="{Binding HasWeapons}">
+                                <TextBlock Classes="section-title" Text="Armes" />
+                                <Border Classes="table-head">
+                                    <Grid ColumnDefinitions="*,80,200,100" ColumnSpacing="12">
+                                        <TextBlock Text="Nom" />
+                                        <TextBlock Grid.Column="1" Text="Taille" />
+                                        <TextBlock Grid.Column="2" Text="Type" />
+                                        <TextBlock Grid.Column="3" Text="Dégâts" />
+                                    </Grid>
+                                </Border>
+                                <ItemsControl ItemsSource="{Binding WeaponList}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="models:P4kShipComponentModel">
+                                            <Border Classes="table-row">
+                                                <Grid ColumnDefinitions="*,80,200,100" ColumnSpacing="12">
+                                                    <TextBlock Classes="name" Text="{Binding DisplayName}" ToolTip.Tip="{Binding PortName}" />
+                                                    <TextBlock Grid.Column="1" Classes="mono" Text="{Binding SizeLabel}" />
+                                                    <TextBlock Grid.Column="2" Classes="muted" Text="{Binding WeaponTypeLabel}" />
+                                                    <TextBlock Grid.Column="3" Classes="mono" Text="{Binding DamageLabel}" ToolTip.Tip="Dégâts par tir" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <!-- Missiles -->
+                            <StackPanel IsVisible="{Binding HasMissiles}">
+                                <TextBlock Classes="section-title" Text="Missiles" />
+                                <Border Classes="table-head">
+                                    <Grid ColumnDefinitions="*,80,200,100" ColumnSpacing="12">
+                                        <TextBlock Text="Nom" />
+                                        <TextBlock Grid.Column="1" Text="Taille" />
+                                        <TextBlock Grid.Column="2" Text="Guidage" />
+                                        <TextBlock Grid.Column="3" Text="Classe" />
+                                    </Grid>
+                                </Border>
+                                <ItemsControl ItemsSource="{Binding MissileList}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="models:P4kShipComponentModel">
+                                            <Border Classes="table-row">
+                                                <Grid ColumnDefinitions="*,80,200,100" ColumnSpacing="12">
+                                                    <TextBlock Classes="name" Text="{Binding DisplayName}" ToolTip.Tip="{Binding PortName}" />
+                                                    <TextBlock Grid.Column="1" Classes="mono" Text="{Binding SizeLabel}" />
+                                                    <TextBlock Grid.Column="2" Classes="muted" Text="{Binding GuidanceLabel}" />
+                                                    <TextBlock Grid.Column="3" Classes="muted" Text="{Binding ComponentClassLabel}" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <!-- Liste brute de tous les points d'emport, repliée par défaut -->
+                            <StackPanel Spacing="8">
+                                <Button Classes="sx small" HorizontalAlignment="Left" Command="{Binding TogglePortsCommand}" Content="{Binding PortsToggleLabel}" />
+                                <StackPanel IsVisible="{Binding ShowAllPorts}">
+                                    <Border Classes="table-head">
+                                        <Grid ColumnDefinitions="2*,160,3*" ColumnSpacing="12">
+                                            <TextBlock Text="Point d'emport" />
+                                            <TextBlock Grid.Column="1" Text="Classe" />
+                                            <TextBlock Grid.Column="2" Text="Composant" />
+                                        </Grid>
+                                    </Border>
+                                    <ItemsControl ItemsSource="{Binding Components}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="models:P4kShipComponentModel">
+                                                <Border Classes="table-row" MinHeight="34">
+                                                    <Grid ColumnDefinitions="2*,160,3*" ColumnSpacing="12">
+                                                        <TextBlock Classes="mono muted" FontSize="12" Text="{Binding PortName}" ToolTip.Tip="{Binding PortName}" />
+                                                        <TextBlock Grid.Column="1" Classes="muted" Text="{Binding ComponentClassLabel}" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding DisplayName}" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-        </DockPanel>
-
-        <ScrollViewer Grid.Row="1" Grid.Column="1" Grid.RowSpan="2">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*" ColumnDefinitions="10,*,10,*" ColumnSpacing="0" RowSpacing="15">
-                <!-- Séparateur vertical bloc gauche -->
-                <Separator Grid.Row="0" Grid.Column="0" Grid.RowSpan="7" Height="NaN" Width="1" />
-                <!-- Séparateur vertical entre tableaux -->
-                <Separator Grid.Row="1" Grid.Column="2" Grid.RowSpan="5" Height="NaN" Width="1" />
-                <DockPanel Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3">
-                    <Label DockPanel.Dock="Left">Tag : </Label>
-                    <TextBlock Text="{Binding TagList}" TextWrapping="Wrap" />
-                </DockPanel>
-
-                <!-- Powerplant -->
-                <StackPanel Grid.Row="1" Grid.Column="1">
-                    <Label FontWeight="Bold">Générateur(s) :</Label>
-                    <DataGrid ItemsSource="{Binding PowerplantList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component" MinHeight="100">
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="50">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
-                            <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
-                            <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
-                            <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
-
-                <!-- Cooler -->
-                <StackPanel Grid.Row="1" Grid.Column="3">
-                    <Label FontWeight="Bold">Refroisseur(s) :</Label>
-                    <DataGrid ItemsSource="{Binding CoolerList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component" MinHeight="100">
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="50">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
-                            <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
-                            <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
-                            <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
-
-                <!-- Shield -->
-                <StackPanel Grid.Row="2" Grid.Column="1">
-                    <Label FontWeight="Bold">Bouclier(s) :</Label>
-                    <DataGrid ItemsSource="{Binding ShieldList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component" MinHeight="100">
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="50">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
-                            <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
-                            <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
-                            <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
-
-                <!-- Radar -->
-                <StackPanel Grid.Row="2" Grid.Column="3">
-                    <Label FontWeight="Bold">Radar :</Label>
-                    <DataGrid ItemsSource="{Binding RadarList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component" MinHeight="100">
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="50">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
-                            <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
-                            <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
-                            <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
-
-                <!-- Quantum drive -->
-                <StackPanel Grid.Row="3" Grid.Column="1">
-                    <Label FontWeight="Bold">Réacteur(s) quantum :</Label>
-                    <DataGrid ItemsSource="{Binding QuantumdriveList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component" MinHeight="100">
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="50">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
-                            <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
-                            <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
-                            <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
-
-                <!-- Jump drive -->
-                <StackPanel Grid.Row="3" Grid.Column="3">
-                    <Label FontWeight="Bold">Moteur de saut :</Label>
-                    <DataGrid ItemsSource="{Binding QuantumjumpList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component" MinHeight="100">
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="50">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
-                            <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
-                            <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
-                            <DataGridTextColumn Width="80" Header="Grade" Binding="{Binding Grade}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
-
-                <!-- Weapons -->
-                <StackPanel Grid.Row="4" Grid.Column="1">
-                    <Label FontWeight="Bold">Armes :</Label>
-                    <DataGrid ItemsSource="{Binding WeaponList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component" MinHeight="100">
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="50">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
-                            <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
-                             <DataGridTextColumn Width="130" Header="Type" Binding="{Binding WeaponType}" />
-                             <DataGridTextColumn Width="80" Header="Dégâts" Binding="{Binding AlphaDamage}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
-
-                <!-- Missiles -->
-                <StackPanel Grid.Row="4" Grid.Column="3">
-                    <Label FontWeight="Bold">Missiles :</Label>
-                    <DataGrid ItemsSource="{Binding MissileList}" CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" IsReadOnly="True" Classes="component" MinHeight="100">
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="50">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <asyncImageLoader:AdvancedImage Source="{Binding ClassIconPath}" Width="50" Height="50" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Width="*" Header="Nom" Binding="{Binding DisplayName}" />
-                            <DataGridTextColumn Width="85" Header="Classe" Binding="{Binding Class}" />
-                            <DataGridTextColumn Width="72" Header="Taille" Binding="{Binding Size}" />
-                             <DataGridTextColumn Width="80" Header="Guidage" Binding="{Binding GuidanceType}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
-
-                <!-- Components grid (debug) -->
-                <DockPanel Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="3">
-                    <Separator DockPanel.Dock="Top" />
-                    <Label DockPanel.Dock="Top" FontWeight="Bold">Liste des composants et points d'emport :</Label>
-                    <DataGrid
-                        ItemsSource="{Binding Components}"
-                        AutoGenerateColumns="False"
-                        IsReadOnly="True"
-                        GridLinesVisibility="All"
-                        MinHeight="150">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Port" Binding="{Binding PortName}" />
-                            <DataGridTextColumn Header="Type" Binding="{Binding Class}" />
-                            <DataGridTextColumn Header="Display Name" Binding="{Binding DisplayName}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </DockPanel>
-            </Grid>
-        </ScrollViewer>
-    </Grid>
+                    </ScrollViewer>
+                </Grid>
+            </comp:NotchedBorder>
+        </Grid>
+        </Grid>
+    </ThemeVariantScope>
 </UserControl>

@@ -214,6 +214,22 @@ public class FpsWeaponModel
 
     public string VariantCountDisplay => VariantCount > 1 ? VariantCount.ToString() : string.Empty;
 
+    /// <summary>Noms des livrées regroupées sur cette ligne, un par entrée.</summary>
+    public IReadOnlyList<string> VariantNameList => string.IsNullOrWhiteSpace(VariantNames)
+        ? [Name]
+        : VariantNames.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    /// <summary>Titre de la liste des livrées dans le panneau de détail.</summary>
+    public string VariantHeader => VariantCount > 1 ? $"{VariantCount} variantes" : "1 variante";
+
+    /// <summary>Classe et fabricant, en sur-titre du panneau de détail.</summary>
+    public string ClassAndManufacturer => string.IsNullOrEmpty(Manufacturer) ? WeaponClassLabel : $"{WeaponClassLabel} · {Manufacturer}";
+
+    /// <summary>Types de dégâts des modes de tir, pour le filtre par puces.</summary>
+    public IEnumerable<string> DamageTypeLabels => HasSecondaryFire
+        ? new[] { PrimaryDamageTypeLabel, SecondaryDamageTypeLabel }.Distinct()
+        : [PrimaryDamageTypeLabel];
+
     public bool HasMultipleVariants => VariantCount > 1;
 
     private static string FormatDamage(float? direct, float? explosive) =>

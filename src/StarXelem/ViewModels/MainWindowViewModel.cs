@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -164,8 +164,8 @@ public partial class MainWindowViewModel : ViewModelBase
         });
         Pages =
         [
-            App.Current.Services.GetRequiredService<ShipTabViewModel>(),
             App.Current.Services.GetRequiredService<ItemsTabViewModel>(),
+            App.Current.Services.GetRequiredService<ShipTabViewModel>(),
             App.Current.Services.GetRequiredService<BlueprintListTabViewModel>(),
             App.Current.Services.GetRequiredService<FriendListTabViewModel>(),
             App.Current.Services.GetRequiredService<P4kShipTabViewModel>(),
@@ -198,6 +198,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // Abonnement au statut de connexion gRPC
         _grpcClientService.OnStatusChanged += OnGrpcConnectionStatusChanged;
+
+        // Lien vers un blueprint depuis un autre écran (ex : blueprints possibles d'une mission)
+        WeakReferenceMessenger.Default.Register<MainWindowViewModel, OpenBlueprintMessage>(this, (recipient, message) =>
+        {
+            var blueprintsPage = recipient._pages.OfType<BlueprintListTabViewModel>().First();
+            recipient.CurrentPage = blueprintsPage;
+            blueprintsPage.ShowBlueprint(message.BlueprintId);
+        });
 
     }
     
@@ -566,7 +574,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var hasScreenshot = !string.IsNullOrWhiteSpace(AppConfig.ScreenshotPath);
         var hasClose = AppConfig.AutoClose;
 
-        if (!hasScreen && !hasScreenshot && !hasClose)
+        if (!hasScreen && !hasScreenshot && !hasClose && !AppConfig.LoadItems && !AppConfig.LoadShips && !AppConfig.LoadFriends && !AppConfig.LoadReputations)
             return;
 
         // 1. Navigation vers l'onglet demandé
@@ -614,6 +622,73 @@ public partial class MainWindowViewModel : ViewModelBase
             else
             {
                 _logger.LogWarning("Onglet CLI inconnu : {ScreenName}", AppConfig.ScreenName);
+            }
+        }
+
+        // Chargement réel de l'écran Objets, avant la capture pour qu'elle montre les données
+        if (AppConfig.LoadItems)
+        {
+            try
+            {
+                await WaitForP4kReadyAsync();
+                await WaitForDbReadyAsync();
+
+                var itemsPage = _pages.OfType<ItemsTabViewModel>().First();
+                await Dispatcher.UIThread.InvokeAsync(() => itemsPage.RunAutomatedLoadAsync(AppConfig.ItemsReportPath));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors du chargement automatique des objets");
+            }
+        }
+
+        // Chargement réel de Mon hangar, avant la capture pour qu'elle montre les données
+        if (AppConfig.LoadShips)
+        {
+            try
+            {
+                await WaitForP4kReadyAsync();
+                await WaitForDbReadyAsync();
+
+                var shipsPage = _pages.OfType<ShipTabViewModel>().First();
+                var isLoaded = await Dispatcher.UIThread.InvokeAsync(() => shipsPage.RunAutomatedLoadAsync(AppConfig.ShipsReportPath));
+                _logger.LogInformation("Chargement automatique de la flotte : {Result}", isLoaded ? "terminé" : "abandonné, pas de connexion au jeu");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors du chargement automatique de la flotte");
+            }
+        }
+
+        // Chargement réel de la liste d'amis, avant la capture pour qu'elle montre les données
+        if (AppConfig.LoadFriends)
+        {
+            try
+            {
+                var friendsPage = _pages.OfType<FriendListTabViewModel>().First();
+                var isLoaded = await Dispatcher.UIThread.InvokeAsync(friendsPage.RunAutomatedLoadAsync);
+                _logger.LogInformation("Chargement automatique des amis : {Result}", isLoaded ? "terminé" : "abandonné, pas de connexion au jeu");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors du chargement automatique des amis");
+            }
+        }
+
+        // Rechargement des réputations : celui de la première ouverture de l'onglet peut précéder le chargement du P4K
+        if (AppConfig.LoadReputations)
+        {
+            try
+            {
+                await WaitForP4kReadyAsync();
+                await WaitForDbReadyAsync();
+
+                var reputationsPage = _pages.OfType<ReputationTabViewModel>().First();
+                await Dispatcher.UIThread.InvokeAsync(() => reputationsPage.LoadDataCommand.ExecuteAsync(null));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors du chargement automatique des réputations");
             }
         }
 

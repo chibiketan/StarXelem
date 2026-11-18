@@ -14,23 +14,29 @@ public class SpaceshipModel
     public SpaceshipState State => GetState();
     public string? DisplayState => GetState().GetDisplayName();
     public string? Location => EntityProperties?.EntityEdge?.End?.InventoryId;
-    public string? ReadableLocation { get; set; }
-    public bool IsPorte     => ReadableLocation == "Porté";
+    public ResolvedLocation? ResolvedLocation { get; set; }
+    public bool IsPorte     => ResolvedLocation?.Kind == LocationKind.Worn;
     public bool IsStowed    => State == SpaceshipState.STOWED;
     public bool IsUnstowed  => State == SpaceshipState.UNSTOWED;
     public bool IsUnclaimed => State == SpaceshipState.UNCLAIMED;
     public bool IsDestroyed => State == SpaceshipState.DESTROYED;
-    public bool IsEmptyLocation => string.IsNullOrEmpty(ReadableLocation);
-    public bool IsStandardLocation => !IsPorte && !IsEmptyLocation;
-    public string? LocationPrefix => IsStandardLocation ? ExtractLocationPrefix(ReadableLocation!) : null;
-    public string? LocationName  => IsStandardLocation ? ExtractLocationName(ReadableLocation!)  : null;
-    private string? LocationPrefixInner => IsStandardLocation ? ExtractLocationPrefixInner(ReadableLocation!) : null;
-    public bool IsLocationTypeLocation => LocationPrefixInner == "LOCATION";
-    public bool IsLocationTypeHangar   => LocationPrefixInner == "HANGAR";
-    public bool IsLocationTypeId       => LocationPrefixInner != null && System.Text.RegularExpressions.Regex.IsMatch(LocationPrefixInner, @"^\d+$");
-    public bool IsLocationTypeOther    => IsStandardLocation && !IsLocationTypeLocation && !IsLocationTypeHangar && !IsLocationTypeId;
+    public bool IsEmptyLocation => ResolvedLocation == null;
+    public string? LocationName => ResolvedLocation?.Name;
+    public bool IsLocationTypeLocation => ResolvedLocation?.Kind == LocationKind.Location;
+    public bool IsLocationTypeHangar   => ResolvedLocation?.Kind == LocationKind.Hangar;
+    public bool IsLocationTypeId       => ResolvedLocation?.Kind == LocationKind.Item;
+    public bool IsLocationTypeOther    => ResolvedLocation?.Kind == LocationKind.Other;
     public string? Shard => StowContext?.ShardId;
     public string? ClassRecordName { get; set; }
+
+    /// <summary>Nom court de la classe : <see cref="ClassRecordName"/> est au format « Type.NomCourt ».</summary>
+    public string? TechnicalName => ClassRecordName?[(ClassRecordName.IndexOf('.') + 1)..];
+
+    /// <summary>Vrai si le joueur a donné un nom à ce vaisseau.</summary>
+    public bool HasCustomName => Name.Length > 0;
+
+    /// <summary>Présentation de l'emplacement dans l'écran Mon hangar, ou <c>null</c> si l'emplacement est inconnu.</summary>
+    public ItemLocationDisplay? LocationDisplay { get; set; }
 
     public Entitlement Entitlement { get; }
     public EntityItemQueryResult? EntityProperties { get; set; }
@@ -40,27 +46,6 @@ public class SpaceshipModel
     {
         Entitlement = entitlement;
         Shipname = "";
-    }
-
-    private static string ExtractLocationPrefix(string location)
-    {
-        if (!location.StartsWith('[')) return string.Empty;
-        var end = location.IndexOf(']');
-        return end < 0 ? string.Empty : location[..(end + 1)];
-    }
-
-    private static string ExtractLocationName(string location)
-    {
-        if (!location.StartsWith('[')) return location;
-        var end = location.IndexOf(']');
-        return end < 0 ? location : location[(end + 1)..].TrimStart();
-    }
-
-    private static string? ExtractLocationPrefixInner(string location)
-    {
-        if (!location.StartsWith('[')) return null;
-        var end = location.IndexOf(']');
-        return end < 0 ? null : location[1..end];
     }
 
     private SpaceshipState GetState()
@@ -93,7 +78,8 @@ public class SpaceshipModel
             return false;
         }
 
-        if (entitlementName.Equals(ClassRecordName, StringComparison.CurrentCultureIgnoreCase))
+        if (entitlementName.Equals(ClassRecordName, StringComparison.CurrentCultureIgnoreCase)
+            || entitlementName.Equals(TechnicalName, StringComparison.CurrentCultureIgnoreCase))
         {
             return false;
         }

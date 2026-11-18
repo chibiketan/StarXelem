@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 
 using StarXelem.Data;
@@ -10,58 +12,85 @@ using StarXelem.Models;
 namespace StarXelem.ViewModels;
 
 /// <summary>
-/// ViewModel de l'écran des armes FPS : tableau filtrable par nom, par plage de dégâts
-/// et par plage de portée d'efficacité. Les données proviennent de la base locale
+/// ViewModel de l'écran des armes FPS : tableau filtrable par nom, par puces de classe et de type de dégâts,
+/// et par plages de dégâts et de portée d'efficacité. Les données proviennent de la base locale
 /// reconstruite depuis les fichiers du jeu.
 /// </summary>
 public partial class FpsWeaponsTabViewModel : PageViewModelBase
 {
-    private const string AllClassesLabel = "Toutes les classes";
     private readonly IFpsWeaponRepository _fpsWeaponRepository;
     private readonly ILogger<FpsWeaponsTabViewModel> _logger;
+    private readonly HashSet<string> _selectedClasses = new(StringComparer.CurrentCultureIgnoreCase);
+    private readonly HashSet<string> _selectedDamageTypes = new(StringComparer.CurrentCultureIgnoreCase);
+    private readonly Dictionary<ColumnHeaderViewModel, WeaponSortColumn> _sortColumns;
     private List<FpsWeaponModel> _allWeapons = new();
     private bool _isApplyingBounds;
     private CancellationTokenSource? _filterCts;
+    private ColumnHeaderViewModel? _activeSortColumn;
 
     // Délai d'inactivité de la saisie avant de filtrer : assez court pour rester réactif,
     // assez long pour qu'une frappe rapide ne déclenche qu'un seul filtrage.
     private static readonly TimeSpan NameFilterDelay = TimeSpan.FromMilliseconds(300);
-    // Curseurs, classe et case à cocher : délai réduit, suffisant pour absorber le glissement d'un curseur.
+    // Curseurs, puces, tri et case à cocher : délai réduit, suffisant pour absorber le glissement d'un curseur.
     private static readonly TimeSpan ControlFilterDelay = TimeSpan.FromMilliseconds(120);
     // Le tableau est alimenté par paquets : entre deux paquets, le thread d'UI traite la saisie et le rendu,
     // ce qui garde l'indicateur animé et la fenêtre réactive pendant la construction des lignes.
     private const int DisplayBatchSize = 20;
 
     public override string Name => "Armes FPS";
+    protected override string NavIconData => "M3 10h15v5H3zM18 11h3v3h-3M6 15v5h5v-5";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.VideoSettings);
 
     [ObservableProperty] private ObservableCollection<FpsWeaponModel> _weapons = new();
-    [ObservableProperty] private FpsWeaponModel? _selectedWeapon;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasSelectedWeapon))] private FpsWeaponModel? _selectedWeapon;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsBusy), nameof(BusyMessage))] private bool _isLoading;
     /// <summary>Vrai du moment où un filtre est demandé jusqu'à ce que la liste correspondante soit entièrement affichée.</summary>
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsBusy), nameof(BusyMessage))] private bool _isFiltering;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsBusy), nameof(BusyMessage), nameof(ShowNoMatch))] private bool _isFiltering;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ResultSummary), nameof(ShowNoMatch))] private int _filteredCount;
+    [ObservableProperty] private string _nameFilter = string.Empty;
+
+    /// <summary>Vrai quand la ligne des curseurs de plage est dépliée.</summary>
+    [ObservableProperty] private bool _isRangePanelOpen;
 
     public bool IsBusy => IsLoading || IsFiltering;
     public string BusyMessage => IsLoading ? "Chargement des armes…" : "Filtrage en cours…";
-    [ObservableProperty] private string _nameFilter = string.Empty;
-    // Collection créée une fois pour toutes et complétée en place : remplacer l'instance ferait
-    // perdre sa sélection au ComboBox, qui afficherait un champ vide.
-    [ObservableProperty] private ObservableCollection<string> _weaponClassList = [AllClassesLabel];
-    [ObservableProperty] private string _selectedWeaponClass = AllClassesLabel;
+
+    /// <summary>Nombre de modèles retenus par les filtres sur le total.</summary>
+    public string ResultSummary => $"{FilteredCount} sur {_allWeapons.Count} modèles";
+
+    /// <summary>Vrai si les filtres ne laissent aucune arme.</summary>
+    public bool ShowNoMatch => _allWeapons.Count > 0 && FilteredCount == 0 && !IsFiltering;
+
+    /// <summary>Vrai si une arme est sélectionnée : affiche son détail.</summary>
+    public bool HasSelectedWeapon => SelectedWeapon != null;
+
+    /// <summary>Puces de classe d'arme, cumulables ; « Toutes » retire le filtre.</summary>
+    public ObservableCollection<FilterChipViewModel> ClassChips { get; } = new();
+
+    /// <summary>Puces de type de dégâts, cumulables ; « Tous » retire le filtre.</summary>
+    public ObservableCollection<FilterChipViewModel> DamageTypeChips { get; } = new();
+
+    public ColumnHeaderViewModel NameColumn { get; }
+    public ColumnHeaderViewModel ClassColumn { get; }
+    public ColumnHeaderViewModel ManufacturerColumn { get; }
+    public ColumnHeaderViewModel MagazineColumn { get; }
+    public ColumnHeaderViewModel DamageColumn { get; }
+    public ColumnHeaderViewModel FireRateColumn { get; }
+    public ColumnHeaderViewModel MaxRangeColumn { get; }
 
     /* ---- Bornes du filtre de dégâts, déduites des données chargées ---- */
 
-    [ObservableProperty] private double _damageLowerBound;
-    [ObservableProperty] private double _damageUpperBound = 100;
-    [ObservableProperty] private double _damageMin;
-    [ObservableProperty] private double _damageMax = 100;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(RangeButtonLabel))] private double _damageLowerBound;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(RangeButtonLabel))] private double _damageUpperBound = 100;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(RangeButtonLabel))] private double _damageMin;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(RangeButtonLabel))] private double _damageMax = 100;
 
     /* ---- Bornes du filtre de portée d'efficacité ---- */
 
-    [ObservableProperty] private double _effectiveRangeLowerBound;
-    [ObservableProperty] private double _effectiveRangeUpperBound = 100;
-    [ObservableProperty] private double _effectiveRangeMin;
-    [ObservableProperty] private double _effectiveRangeMax = 100;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(RangeButtonLabel))] private double _effectiveRangeLowerBound;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(RangeButtonLabel))] private double _effectiveRangeUpperBound = 100;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(RangeButtonLabel))] private double _effectiveRangeMin;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(RangeButtonLabel))] private double _effectiveRangeMax = 100;
 
     /// <summary>
     /// Conserve dans les résultats les armes dont aucune munition n'a de chute de dégâts,
@@ -70,10 +99,42 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
     /// </summary>
     [ObservableProperty] private bool _includeWeaponsWithoutEffectiveRange = true;
 
+    private bool IsDamageRangeActive => DamageMin > DamageLowerBound || DamageMax < DamageUpperBound;
+
+    private bool IsEffectiveRangeActive => EffectiveRangeMin > EffectiveRangeLowerBound || EffectiveRangeMax < EffectiveRangeUpperBound;
+
+    /// <summary>Libellé du bouton Plages, avec le nombre de plages actives : un filtre replié ne doit pas passer inaperçu.</summary>
+    public string RangeButtonLabel
+    {
+        get
+        {
+            var active = (IsDamageRangeActive ? 1 : 0) + (IsEffectiveRangeActive ? 1 : 0);
+            return active == 0 ? "Plages" : $"Plages · {active}";
+        }
+    }
+
     public FpsWeaponsTabViewModel(IFpsWeaponRepository fpsWeaponRepository, ILogger<FpsWeaponsTabViewModel> logger)
     {
         _fpsWeaponRepository = fpsWeaponRepository;
         _logger = logger;
+
+        NameColumn = new ColumnHeaderViewModel("Nom", OnSortRequested);
+        ClassColumn = new ColumnHeaderViewModel("Classe", OnSortRequested);
+        ManufacturerColumn = new ColumnHeaderViewModel("Fabricant", OnSortRequested);
+        MagazineColumn = new ColumnHeaderViewModel("Chargeur", OnSortRequested);
+        DamageColumn = new ColumnHeaderViewModel("Dégâts", OnSortRequested);
+        FireRateColumn = new ColumnHeaderViewModel("Cadence", OnSortRequested);
+        MaxRangeColumn = new ColumnHeaderViewModel("Portée max", OnSortRequested);
+        _sortColumns = new Dictionary<ColumnHeaderViewModel, WeaponSortColumn>
+        {
+            [NameColumn] = WeaponSortColumn.Name,
+            [ClassColumn] = WeaponSortColumn.Class,
+            [ManufacturerColumn] = WeaponSortColumn.Manufacturer,
+            [MagazineColumn] = WeaponSortColumn.Magazine,
+            [DamageColumn] = WeaponSortColumn.Damage,
+            [FireRateColumn] = WeaponSortColumn.FireRate,
+            [MaxRangeColumn] = WeaponSortColumn.MaxRange
+        };
     }
 
     protected override async Task OnFirstShowAsync()
@@ -93,12 +154,7 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 _allWeapons = weapons;
-
-                foreach (var label in BuildClassLabels(weapons))
-                {
-                    WeaponClassList.Add(label);
-                }
-
+                BuildChips(weapons);
                 ResetBounds(weapons);
 
                 // L'indicateur de chargement reste affiché jusqu'à ce que toutes les lignes soient à l'écran.
@@ -115,6 +171,29 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
         {
             UpdateIsLoading(false);
         }
+    }
+
+    [RelayCommand]
+    private void ToggleRangePanel() => IsRangePanelOpen = !IsRangePanelOpen;
+
+    /// <summary>Remet les deux curseurs à pleine amplitude.</summary>
+    [RelayCommand]
+    private void ResetRanges()
+    {
+        _isApplyingBounds = true;
+        try
+        {
+            DamageMin = DamageLowerBound;
+            DamageMax = DamageUpperBound;
+            EffectiveRangeMin = EffectiveRangeLowerBound;
+            EffectiveRangeMax = EffectiveRangeUpperBound;
+        }
+        finally
+        {
+            _isApplyingBounds = false;
+        }
+
+        ScheduleFilters(ControlFilterDelay);
     }
 
     // Le chargement se poursuit hors du thread d'UI après ConfigureAwait(false) : IsLoading
@@ -170,14 +249,58 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
     };
 
     /// <summary>
-    /// Libellés de classe présents dans les données, triés, sans l'entrée « toutes les classes »
-    /// qui occupe déjà le premier rang de la collection.
+    /// Crée les puces à partir des valeurs réellement présentes dans les données.
     /// </summary>
-    private static List<string> BuildClassLabels(List<FpsWeaponModel> weapons) => weapons
-        .Select(w => w.WeaponClassLabel)
-        .Distinct(StringComparer.CurrentCultureIgnoreCase)
-        .OrderBy(label => label, StringComparer.CurrentCulture)
-        .ToList();
+    private void BuildChips(List<FpsWeaponModel> weapons)
+    {
+        ClassChips.Clear();
+        ClassChips.Add(new FilterChipViewModel(null, "Toutes", key => ToggleChip(_selectedClasses, key)));
+        foreach (var label in weapons.Select(w => w.WeaponClassLabel)
+                     .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                     .Order(StringComparer.CurrentCulture))
+        {
+            ClassChips.Add(new FilterChipViewModel(label, label, key => ToggleChip(_selectedClasses, key)));
+        }
+
+        DamageTypeChips.Clear();
+        DamageTypeChips.Add(new FilterChipViewModel(null, "Tous", key => ToggleChip(_selectedDamageTypes, key)));
+        foreach (var label in weapons.SelectMany(w => w.DamageTypeLabels)
+                     .Where(label => label != "—")
+                     .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                     .Order(StringComparer.CurrentCulture))
+        {
+            DamageTypeChips.Add(new FilterChipViewModel(label, label, key => ToggleChip(_selectedDamageTypes, key)));
+        }
+    }
+
+    private void ToggleChip(HashSet<string> selection, string? key)
+    {
+        if (key == null)
+        {
+            selection.Clear();
+        }
+        else if (!selection.Remove(key))
+        {
+            selection.Add(key);
+        }
+
+        ScheduleFilters(ControlFilterDelay);
+    }
+
+    private void OnSortRequested(ColumnHeaderViewModel column)
+    {
+        var direction = column == _activeSortColumn && column.SortDirection == ListSortDirection.Ascending
+            ? ListSortDirection.Descending
+            : ListSortDirection.Ascending;
+
+        foreach (var header in _sortColumns.Keys)
+        {
+            header.SortDirection = header == column ? direction : null;
+        }
+
+        _activeSortColumn = column;
+        ScheduleFilters(ControlFilterDelay);
+    }
 
     /// <summary>
     /// Recalcule les bornes des curseurs à partir des valeurs réellement présentes, et remet
@@ -253,9 +376,9 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
                 await Task.Delay(delay, token);
             }
 
-            var result = await Task.Run(() => FilterWeapons(source, criteria), token);
+            var outcome = await Task.Run(() => FilterWeapons(source, criteria), token);
 
-            await Dispatcher.UIThread.InvokeAsync(() => DisplayResultAsync(result, token), DispatcherPriority.Background);
+            await Dispatcher.UIThread.InvokeAsync(() => DisplayResultAsync(outcome, token), DispatcherPriority.Background);
         }
         catch (OperationCanceledException)
         {
@@ -279,14 +402,28 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
     /// Affiche le résultat en alimentant une nouvelle collection par paquets : construire toutes les lignes
     /// d'un coup bloquerait le thread d'UI. S'interrompt dès que la demande est annulée.
     /// </summary>
-    private async Task DisplayResultAsync(List<FpsWeaponModel> result, CancellationToken token)
+    private async Task DisplayResultAsync(FilterOutcome outcome, CancellationToken token)
     {
-        // Reconstruire le tableau est l'opération coûteuse : on l'évite quand le résultat ne change pas.
-        if (token.IsCancellationRequested || Weapons.SequenceEqual(result))
+        if (token.IsCancellationRequested)
         {
             return;
         }
 
+        UpdateChips(ClassChips, _selectedClasses, outcome.ClassCounts);
+        UpdateChips(DamageTypeChips, _selectedDamageTypes, outcome.DamageTypeCounts);
+        FilteredCount = outcome.Weapons.Count;
+
+        var result = outcome.Weapons;
+
+        // Reconstruire le tableau est l'opération coûteuse : on l'évite quand le résultat ne change pas.
+        if (Weapons.SequenceEqual(result))
+        {
+            return;
+        }
+
+        // Le tableau perd sa sélection quand sa collection est remplacée : on la rétablit si l'arme reste affichée,
+        // sinon on montre la première pour que le panneau de détail ne reste pas vide.
+        var selected = SelectedWeapon != null && result.Contains(SelectedWeapon) ? SelectedWeapon : result.FirstOrDefault();
         var target = new ObservableCollection<FpsWeaponModel>();
         Weapons = target;
 
@@ -303,6 +440,17 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
             }
 
             await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+        }
+
+        SelectedWeapon = selected;
+    }
+
+    private static void UpdateChips(IEnumerable<FilterChipViewModel> chips, HashSet<string> selection, IReadOnlyDictionary<string, int> counts)
+    {
+        foreach (var chip in chips)
+        {
+            chip.Count = chip.Key == null ? counts.GetValueOrDefault(string.Empty) : counts.GetValueOrDefault(chip.Key);
+            chip.IsSelected = chip.Key == null ? selection.Count == 0 : selection.Contains(chip.Key);
         }
     }
 
@@ -325,66 +473,118 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
     /// </summary>
     private FilterCriteria CaptureCriteria() => new(
         Needle: string.IsNullOrWhiteSpace(NameFilter) ? null : NameFilter.Trim(),
-        WeaponClass: !string.Equals(SelectedWeaponClass, AllClassesLabel, StringComparison.Ordinal)
-                     && !string.IsNullOrEmpty(SelectedWeaponClass)
-            ? SelectedWeaponClass
-            : null,
+        Classes: _selectedClasses.Count == 0 ? null : _selectedClasses.ToHashSet(StringComparer.CurrentCultureIgnoreCase),
+        DamageTypes: _selectedDamageTypes.Count == 0 ? null : _selectedDamageTypes.ToHashSet(StringComparer.CurrentCultureIgnoreCase),
         // Un filtre à pleine amplitude ne doit écarter personne, y compris les armes dont les dégâts sont inconnus.
-        DamageActive: DamageMin > DamageLowerBound || DamageMax < DamageUpperBound,
+        DamageActive: IsDamageRangeActive,
         DamageMin: DamageMin,
         DamageMax: DamageMax,
-        RangeActive: EffectiveRangeMin > EffectiveRangeLowerBound || EffectiveRangeMax < EffectiveRangeUpperBound,
+        RangeActive: IsEffectiveRangeActive,
         RangeMin: EffectiveRangeMin,
         RangeMax: EffectiveRangeMax,
-        IncludeWithoutRange: IncludeWeaponsWithoutEffectiveRange);
+        IncludeWithoutRange: IncludeWeaponsWithoutEffectiveRange,
+        SortColumn: _activeSortColumn is { IsSorted: true } ? _sortColumns[_activeSortColumn] : null,
+        SortDescending: _activeSortColumn?.IsSortedDescending ?? false);
 
-    private static List<FpsWeaponModel> FilterWeapons(List<FpsWeaponModel> source, FilterCriteria criteria)
+    /// <summary>
+    /// Calcule les lignes à afficher et le nombre de modèles de chaque puce. Les compteurs d'une rangée de puces
+    /// tiennent compte de tous les autres filtres, pas des siens : cocher une classe ne fait pas tomber les autres à zéro.
+    /// La clé vide porte le total de la puce « Toutes » ou « Tous ».
+    /// </summary>
+    private static FilterOutcome FilterWeapons(List<FpsWeaponModel> source, FilterCriteria criteria)
     {
-        IEnumerable<FpsWeaponModel> filtered = source;
+        bool MatchesClass(FpsWeaponModel w) => criteria.Classes == null || criteria.Classes.Contains(w.WeaponClassLabel);
+        bool MatchesDamageType(FpsWeaponModel w) => criteria.DamageTypes == null || w.DamageTypeLabels.Any(criteria.DamageTypes.Contains);
 
-        if (criteria.Needle is { } needle)
+        var candidates = source.Where(w => MatchesSearch(w, criteria) && MatchesRanges(w, criteria)).ToList();
+
+        var classPool = candidates.Where(MatchesDamageType).ToList();
+        var classCounts = classPool.GroupBy(w => w.WeaponClassLabel, StringComparer.CurrentCultureIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.CurrentCultureIgnoreCase);
+        classCounts[string.Empty] = classPool.Count;
+
+        var damagePool = candidates.Where(MatchesClass).ToList();
+        var damageCounts = damagePool.SelectMany(w => w.DamageTypeLabels)
+            .GroupBy(label => label, StringComparer.CurrentCultureIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.CurrentCultureIgnoreCase);
+        damageCounts[string.Empty] = damagePool.Count;
+
+        var rows = Sort(candidates.Where(w => MatchesClass(w) && MatchesDamageType(w)), criteria).ToList();
+        return new FilterOutcome(rows, classCounts, damageCounts);
+    }
+
+    private static bool MatchesSearch(FpsWeaponModel w, FilterCriteria criteria) =>
+        criteria.Needle is not { } needle
+        || w.Name.Contains(needle, StringComparison.CurrentCultureIgnoreCase)
+        || w.TechnicalName.Contains(needle, StringComparison.OrdinalIgnoreCase)
+        || (w.Manufacturer?.Contains(needle, StringComparison.CurrentCultureIgnoreCase) ?? false)
+        || (w.VariantNames?.Contains(needle, StringComparison.CurrentCultureIgnoreCase) ?? false);
+
+    private static bool MatchesRanges(FpsWeaponModel w, FilterCriteria criteria) =>
+        (!criteria.DamageActive || w.MatchesDamageRange(criteria.DamageMin, criteria.DamageMax))
+        && (!criteria.RangeActive
+            || w.MatchesEffectiveRange(criteria.RangeMin, criteria.RangeMax)
+            || (criteria.IncludeWithoutRange && w.HasNoKnownEffectiveRange));
+
+    private static IEnumerable<FpsWeaponModel> Sort(IEnumerable<FpsWeaponModel> weapons, FilterCriteria criteria)
+    {
+        if (criteria.SortColumn is not { } column)
         {
-            filtered = filtered.Where(w =>
-                w.Name.Contains(needle, StringComparison.CurrentCultureIgnoreCase)
-                || w.TechnicalName.Contains(needle, StringComparison.OrdinalIgnoreCase)
-                || (w.VariantNames?.Contains(needle, StringComparison.CurrentCultureIgnoreCase) ?? false));
+            return weapons;
         }
 
-        if (criteria.WeaponClass is { } weaponClass)
+        Func<FpsWeaponModel, object?> key = column switch
         {
-            filtered = filtered.Where(w =>
-                string.Equals(w.WeaponClassLabel, weaponClass, StringComparison.CurrentCultureIgnoreCase));
-        }
+            WeaponSortColumn.Class => w => w.WeaponClassLabel,
+            WeaponSortColumn.Manufacturer => w => w.Manufacturer,
+            WeaponSortColumn.Magazine => w => w.MagazineSize,
+            WeaponSortColumn.Damage => w => w.BestDamagePerShot,
+            WeaponSortColumn.FireRate => w => w.PrimaryFireRate,
+            WeaponSortColumn.MaxRange => w => w.PrimaryMaxRange,
+            _ => w => w.Name
+        };
 
-        if (criteria.DamageActive)
-        {
-            filtered = filtered.Where(w => w.MatchesDamageRange(criteria.DamageMin, criteria.DamageMax));
-        }
+        // Les valeurs inconnues restent en fin de liste, quel que soit le sens du tri.
+        var known = weapons.Where(w => key(w) != null);
+        var unknown = weapons.Where(w => key(w) == null);
+        var comparer = Comparer<object?>.Create((left, right) => left is string a && right is string b
+            ? StringComparer.CurrentCultureIgnoreCase.Compare(a, b)
+            : Comparer<object?>.Default.Compare(left, right));
+        var sorted = criteria.SortDescending ? known.OrderByDescending(key, comparer) : known.OrderBy(key, comparer);
+        return sorted.Concat(unknown);
+    }
 
-        if (criteria.RangeActive)
-        {
-            filtered = filtered.Where(w =>
-                w.MatchesEffectiveRange(criteria.RangeMin, criteria.RangeMax)
-                || (criteria.IncludeWithoutRange && w.HasNoKnownEffectiveRange));
-        }
-
-        return filtered.ToList();
+    private enum WeaponSortColumn
+    {
+        Name,
+        Class,
+        Manufacturer,
+        Magazine,
+        Damage,
+        FireRate,
+        MaxRange
     }
 
     private sealed record FilterCriteria(
         string? Needle,
-        string? WeaponClass,
+        HashSet<string>? Classes,
+        HashSet<string>? DamageTypes,
         bool DamageActive,
         double DamageMin,
         double DamageMax,
         bool RangeActive,
         double RangeMin,
         double RangeMax,
-        bool IncludeWithoutRange);
+        bool IncludeWithoutRange,
+        WeaponSortColumn? SortColumn,
+        bool SortDescending);
+
+    private sealed record FilterOutcome(
+        List<FpsWeaponModel> Weapons,
+        IReadOnlyDictionary<string, int> ClassCounts,
+        IReadOnlyDictionary<string, int> DamageTypeCounts);
 
     partial void OnNameFilterChanged(string value) => ScheduleFilters(NameFilterDelay);
-
-    partial void OnSelectedWeaponClassChanged(string value) => ScheduleFilters(ControlFilterDelay);
 
     partial void OnIncludeWeaponsWithoutEffectiveRangeChanged(bool value) => ScheduleFilters(ControlFilterDelay);
 

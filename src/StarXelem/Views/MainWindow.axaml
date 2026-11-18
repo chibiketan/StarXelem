@@ -10,6 +10,7 @@
         xmlns:conv="clr-namespace:StarXelem.Converters"
         xmlns:primitives="clr-namespace:FluentAvalonia.UI.Controls.Primitives;assembly=FluentAvalonia"
         xmlns:style="clr-namespace:StarXelem.Style"
+        xmlns:comp="clr-namespace:StarXelem.Components"
         MinWidth="1024"
         MinHeight="768"
         mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
@@ -79,21 +80,87 @@
                 <ic:SymbolIcon Symbol="DarkTheme" />
             </Button>
         </Grid>
-        <ui:NavigationView
-            Grid.Row="1"
-            Grid.ColumnSpan="3"
-            AlwaysShowHeader="False"
-            MenuItemsSource="{Binding Pages}"
-            SelectedItem="{Binding CurrentPage}"
-            PaneDisplayMode="Left"
-            IsBackEnabled="False"
-            IsSettingsVisible="False"
-            IsPaneToggleButtonVisible="True"
-            IsBackButtonVisible="False"
-            OpenPaneLength="190">
+        <!-- Menu latéral de la nouvelle charte : logo, puis une icône par écran, nom de l'écran au survol -->
+        <ThemeVariantScope Grid.Row="1" Grid.ColumnSpan="3" RequestedThemeVariant="Dark">
+            <Grid ColumnDefinitions="Auto,*" Background="{DynamicResource Sx.BackgroundBrush}">
+                <Grid.Styles>
+                    <Style Selector="ListBox.sx-nav">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="HorizontalAlignment" Value="Center" />
+                    </Style>
+                    <Style Selector="ListBox.sx-nav ListBoxItem">
+                        <!-- Le thème FluentAvalonia impose 88 px de large minimum aux éléments de liste -->
+                        <Setter Property="MinWidth" Value="0" />
+                        <Setter Property="MinHeight" Value="0" />
+                        <Setter Property="Width" Value="44" />
+                        <Setter Property="Height" Value="44" />
+                        <Setter Property="Margin" Value="0,0,0,6" />
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+                        <Setter Property="Cursor" Value="Hand" />
+                        <Setter Property="Template">
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <comp:NotchedBorder CutSize="9" Background="{TemplateBinding Background}">
+                                    <ContentPresenter Content="{TemplateBinding Content}"
+                                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                      HorizontalContentAlignment="Stretch"
+                                                      VerticalContentAlignment="Stretch" />
+                                </comp:NotchedBorder>
+                            </ControlTemplate>
+                        </Setter>
+                    </Style>
+                    <Style Selector="ListBox.sx-nav ListBoxItem:pointerover">
+                        <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+                        <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+                    </Style>
+                    <Style Selector="ListBox.sx-nav ListBoxItem:selected">
+                        <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
+                        <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
+                    </Style>
+                    <Style Selector="Path.nav-icon">
+                        <Setter Property="Width" Value="21" />
+                        <Setter Property="Height" Value="21" />
+                        <Setter Property="Stretch" Value="Uniform" />
+                        <Setter Property="StrokeThickness" Value="1.7" />
+                        <Setter Property="StrokeLineCap" Value="Round" />
+                        <Setter Property="StrokeJoin" Value="Round" />
+                        <Setter Property="HorizontalAlignment" Value="Center" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                    </Style>
+                </Grid.Styles>
 
-            <ContentControl Content="{Binding CurrentPage}" />
-        </ui:NavigationView>
+                <comp:NotchedBorder CutSize="18" Width="64" Margin="12,12,0,12" Padding="0,14" Background="{DynamicResource Sx.SurfaceBrush}">
+                    <DockPanel>
+                        <Image DockPanel.Dock="Top"
+                               Source="/Assets/xelem-logo.png"
+                               Width="34" Height="34"
+                               Margin="0,0,0,12"
+                               RenderOptions.BitmapInterpolationMode="HighQuality"
+                               ToolTip.Tip="StarXelem" />
+                        <ListBox Classes="sx-nav" ItemsSource="{Binding Pages}" SelectedItem="{Binding CurrentPage}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PageViewModelBase">
+                                    <Panel Background="Transparent"
+                                           ToolTip.Tip="{Binding Name}"
+                                           ToolTip.Placement="Right"
+                                           ToolTip.ShowDelay="150"
+                                           AutomationProperties.Name="{Binding Name}">
+                                        <Path Classes="nav-icon"
+                                              Stroke="{Binding $parent[ListBoxItem].Foreground}"
+                                              Data="{Binding NavIcon}" />
+                                    </Panel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </comp:NotchedBorder>
+
+                <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" />
+            </Grid>
+        </ThemeVariantScope>
         <popup:MainPopup Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" DataContext="{Binding PopupViewModel}" />
     </Grid>
 

@@ -3,213 +3,162 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:StarXelem.ViewModels"
+             xmlns:comp="clr-namespace:StarXelem.Components"
              xmlns:ic="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="580"
+             mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="700"
              x:Class="StarXelem.Views.ExtractionTabView"
              x:DataType="vm:ExtractionTabViewModel">
-
     <UserControl.Styles>
-        <!-- Labels de section -->
+        <!-- Titre de page et sous-titre -->
+        <Style Selector="TextBlock.page-title">
+            <Setter Property="FontSize" Value="30" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.page-subtitle">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        </Style>
+
+        <!-- Libellé de section -->
         <Style Selector="TextBlock.section-label">
-            <Setter Property="FontSize" Value="10"/>
-            <Setter Property="FontWeight" Value="Medium"/>
-            <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}"/>
-            <Setter Property="LetterSpacing" Value="0.8"/>
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+            <Setter Property="Margin" Value="0,10,0,0" />
         </Style>
 
-        <!-- Titre d'action card -->
+        <!-- Carte d'action : icône, texte et bouton -->
+        <Style Selector="comp|NotchedBorder.action-card">
+            <Setter Property="CutSize" Value="18" />
+            <Setter Property="Padding" Value="24,20" />
+            <Setter Property="Background" Value="{DynamicResource Sx.SurfaceBrush}" />
+        </Style>
+        <Style Selector="comp|NotchedBorder.action-icon">
+            <Setter Property="CutSize" Value="11" />
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="comp|NotchedBorder.action-icon ic|SymbolIcon">
+            <Setter Property="FontSize" Value="21" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
         <Style Selector="TextBlock.action-title">
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="Medium"/>
-            <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}"/>
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
         </Style>
-
-        <!-- Description d'action card -->
         <Style Selector="TextBlock.action-desc">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Foreground" Value="{DynamicResource DimmingBrush}"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="LineHeight" Value="17"/>
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="LineHeight" Value="19" />
         </Style>
 
-        <!-- Bouton purple (CSV) -->
-        <Style Selector="Button.btn-csv">
-            <Setter Property="Background" Value="{DynamicResource ButtonPrimaryBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource ButtonPrimaryBorderBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource ButtonPrimaryForegroundBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="7"/>
-            <Setter Property="Padding" Value="14,7"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="FontWeight" Value="Medium"/>
-
-            <Style Selector="^:pointerover /template/ ContentPresenter">
-                <Setter Property="Background" Value="{DynamicResource ButtonPrimaryHoverBackgroundBrush}"/>
-            </Style>
+        <!-- Options d'une action : texte normal, case cochée en or (thème sx-muted) -->
+        <Style Selector="CheckBox.sx-muted.option">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Margin" Value="0,0,20,0" />
         </Style>
 
-        <!-- Bouton teal (Langue) -->
-        <Style Selector="Button.btn-lang">
-            <Setter Property="Background" Value="{DynamicResource BadgeUsageBackgroundColor}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BadgeUsageBorderColor}"/>
-            <Setter Property="Foreground" Value="{DynamicResource BadgeUsageForegroundColor}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="7"/>
-            <Setter Property="Padding" Value="14,7"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="FontWeight" Value="Medium"/>
-
-            <Style Selector="^:pointerover /template/ ContentPresenter">
-                <Setter Property="Background" Value="{DynamicResource ButtonLangHoverBackgroundBrush}"/>
-            </Style>
+        <!-- Progression d'une action en cours, sous son texte -->
+        <Style Selector="Border.action-progress">
+            <Setter Property="Margin" Value="0,14,0,0" />
+            <Setter Property="Padding" Value="0,12,0,0" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sx.LineBrush}" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
         </Style>
     </UserControl.Styles>
 
-    <Panel Classes="main">
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled" Classes="main">
-            <StackPanel Margin="28,24" Spacing="14">
+    <!-- La nouvelle charte n'existe qu'en thème sombre : l'écran reste sombre même si Windows est en thème clair. -->
+    <ThemeVariantScope RequestedThemeVariant="Dark">
+        <Grid Background="{DynamicResource Sx.BackgroundBrush}" TextElement.FontFamily="{DynamicResource Sx.FontSans}">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <!-- Contenu étiré jusqu'à 1120 px, aligné à gauche au-delà -->
+                <Grid Margin="32,30,32,32">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MaxWidth="1120" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="page-title" Text="Extractions" />
+                    <TextBlock Classes="page-subtitle" Text="Outils de génération et d'export de données du jeu" />
 
-                <!-- En-tête de page -->
-                <StackPanel Spacing="2">
-                    <TextBlock Text="Extractions" FontSize="15" FontWeight="Medium"
-                               Foreground="{DynamicResource ForegroundBrush}" />
-                    <TextBlock Text="Outils de génération et d'export de données du jeu" FontSize="11"
-                               Foreground="{DynamicResource DimmingBrush}" />
+                    <!-- Section : données brutes -->
+                    <TextBlock Classes="section-label" Text="Données brutes" />
+
+                    <comp:NotchedBorder Classes="action-card">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                            <comp:NotchedBorder Classes="action-icon">
+                                <ic:SymbolIcon Symbol="Document" />
+                            </comp:NotchedBorder>
+
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Classes="action-title" Text="Export CSV des IDs CIG" />
+                                <TextBlock Classes="action-desc"
+                                           Text="Génère un fichier CSV contenant l'ensemble des IDs CIG et leur valeur CRC32." />
+
+                                <Border Classes="action-progress" IsVisible="{Binding IsExtractingCsv}">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Classes="sx-caption" Text="Génération du fichier CSV…" />
+                                        <ProgressBar Classes="sx-quality" Maximum="100" Value="{Binding CsvProgress}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <Button Grid.Column="2" Classes="sx primary" VerticalAlignment="Center" Command="{Binding ExtractCigIdsCommand}">
+                                Générer
+                            </Button>
+                        </Grid>
+                    </comp:NotchedBorder>
+
+                    <!-- Section : fichiers du jeu -->
+                    <TextBlock Classes="section-label" Text="Fichiers du jeu" />
+
+                    <comp:NotchedBorder Classes="action-card">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                            <comp:NotchedBorder Classes="action-icon">
+                                <ic:SymbolIcon Symbol="Globe" />
+                            </comp:NotchedBorder>
+
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Classes="action-title" Text="Mise à jour du fichier de langue" />
+                                <TextBlock Classes="action-desc"
+                                           Text="Extrait les libellés des fichiers du jeu, identifie les composants, ajoute le type, la taille et le rang, puis dépose le fichier au bon endroit pour être utilisé par le jeu." />
+
+                                <WrapPanel Margin="0,7,0,0">
+                                    <CheckBox Classes="sx-muted option"
+                                              Content="Inclure les récompenses Blueprint"
+                                              IsChecked="{Binding IncludeBlueprints}" />
+                                    <CheckBox Classes="sx-muted option"
+                                              Content="Marquer les BP déjà obtenus"
+                                              IsChecked="{Binding IncludeObtainedBlueprints}"
+                                              IsEnabled="{Binding IsGrpcConnected}"
+                                              ToolTip.Tip="Nécessite la connexion au jeu" />
+                                </WrapPanel>
+
+                                <Border Classes="action-progress" IsVisible="{Binding IsExtractingLang}">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Classes="sx-caption" TextWrapping="Wrap" Text="{Binding StatusMessage}" />
+                                        <ProgressBar Classes="sx-quality" Maximum="100" Value="{Binding LangProgress}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <Button Grid.Column="2" Classes="sx primary" VerticalAlignment="Center" Command="{Binding UpdateLocalisationCommand}">
+                                Mettre à jour
+                            </Button>
+                        </Grid>
+                    </comp:NotchedBorder>
                 </StackPanel>
-
-                <Separator Classes="horizontal" Background="{DynamicResource CardBorderBrush}" />
-
-                <!-- Section : Données brutes -->
-                <TextBlock Classes="section-label" Text="DONNÉES BRUTES" />
-
-                <!-- Carte : Export CSV -->
-                <Border Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource CardBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="10"
-                        Padding="18,16">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                        <Border Grid.Column="0"
-                                Width="38" Height="38"
-                                CornerRadius="9"
-                                Background="{DynamicResource ButtonPrimaryBackgroundBrush}"
-                                BorderBrush="{DynamicResource ButtonPrimaryBorderBrush}"
-                                BorderThickness="1"
-                                VerticalAlignment="Center">
-                            <ic:SymbolIcon Symbol="Document"
-                                           Foreground="{DynamicResource ButtonPrimaryForegroundBrush}"
-                                           FontSize="17"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center" />
-                        </Border>
-
-                        <StackPanel Grid.Column="1" Margin="16,0" Spacing="4" VerticalAlignment="Center">
-                            <TextBlock Classes="action-title" Text="Export CSV des IDs CIG" />
-                            <TextBlock Classes="action-desc"
-                                       Text="Génère un fichier CSV contenant l'ensemble des IDs CIG et leur valeur CRC32." />
-                        </StackPanel>
-
-                        <Button Grid.Column="2"
-                                Classes="btn-csv"
-                                Command="{Binding ExtractCigIdsCommand}"
-                                VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <ic:SymbolIcon Symbol="ArrowDownload" FontSize="11" />
-                                <TextBlock Text="Générer" />
-                            </StackPanel>
-                        </Button>
-                    </Grid>
-                </Border>
-
-                <!-- Statut CSV -->
-                <Border IsVisible="{Binding IsExtractingCsv}"
-                        Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource CardBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="7"
-                        Padding="12,8">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ProgressBar IsIndeterminate="False" Minimum="0" Maximum="100"
-                                     Value="{Binding CsvProgress}"
-                                     Height="3" HorizontalAlignment="Stretch" VerticalAlignment="Center" />
-                        <TextBlock FontSize="11" Foreground="{DynamicResource DimmingBrush}" VerticalAlignment="Center">
-                            <Run Text="Génération du fichier " />
-                            <Run Text="CSV" Foreground="{DynamicResource ForegroundBrush}" FontWeight="Medium" />
-                            <Run Text="…" />
-                        </TextBlock>
-                    </StackPanel>
-                </Border>
-
-                <Separator Classes="horizontal" Background="{DynamicResource CardBorderBrush}" />
-
-                <!-- Section : Fichiers du jeu -->
-                <TextBlock Classes="section-label" Text="FICHIERS DU JEU" />
-
-                <!-- Carte : Mise à jour fichier de langue -->
-                <Border Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource CardBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="10"
-                        Padding="18,16">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                        <Border Grid.Column="0"
-                                Width="38" Height="38"
-                                CornerRadius="9"
-                                Background="{DynamicResource BadgeUsageBackgroundColor}"
-                                BorderBrush="{DynamicResource BadgeUsageBorderColor}"
-                                BorderThickness="1"
-                                VerticalAlignment="Center">
-                            <ic:SymbolIcon Symbol="Globe"
-                                           Foreground="{DynamicResource BadgeUsageForegroundColor}"
-                                           FontSize="17"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center" />
-                        </Border>
-
-                        <StackPanel Grid.Column="1" Margin="16,0" Spacing="4" VerticalAlignment="Center">
-                            <TextBlock Classes="action-title" Text="Mise à jour du fichier de langue" />
-                            <TextBlock Classes="action-desc"
-                                       Text="Extrait les libellés des fichiers du jeu, identifie les composants, ajoute le type, la taille et le rang, puis dépose le fichier au bon endroit pour être utilisé par le jeu." />
-                            <CheckBox Content="Inclure les récompenses Blueprint"
-                                      IsChecked="{Binding IncludeBlueprints}"
-                                      FontSize="11" />
-                            <CheckBox Content="Marquer les BP déjà obtenus"
-                                      IsChecked="{Binding IncludeObtainedBlueprints}"
-                                      IsEnabled="{Binding IsGrpcConnected}"
-                                      FontSize="11" />
-                        </StackPanel>
-
-                        <Button Grid.Column="2"
-                                Classes="btn-lang"
-                                Command="{Binding UpdateLocalisationCommand}"
-                                VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <ic:SymbolIcon Symbol="ArrowSync" FontSize="11" />
-                                <TextBlock Text="Mettre à jour" />
-                            </StackPanel>
-                        </Button>
-                    </Grid>
-                </Border>
-
-                <!-- Statut Langue -->
-                <Border IsVisible="{Binding IsExtractingLang}"
-                        Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource BadgeUsageBorderColor}"
-                        BorderThickness="1"
-                        CornerRadius="7"
-                        Padding="12,8">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ProgressBar IsIndeterminate="False" Minimum="0" Maximum="100"
-                                     Value="{Binding LangProgress}"
-                                     Height="3" HorizontalAlignment="Stretch" VerticalAlignment="Center"
-                                     Foreground="{DynamicResource BadgeUsageForegroundColor}" />
-                        <TextBlock Text="{Binding StatusMessage}"
-                                   FontSize="11"
-                                   Foreground="{DynamicResource DimmingBrush}"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
-                </Border>
-
-            </StackPanel>
-        </ScrollViewer></Panel>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+    </ThemeVariantScope>
 </UserControl>

@@ -15,10 +15,9 @@ description: >
 ## Contexte
 
 Ce skill traduit les maquettes HTML/CSS produites pour **StarXelem** en code XAML
-compatible **Avalonia UI 11.3.11 / FluentAvalonia**.
+compatible **Avalonia UI 11.3 / FluentAvalonia**, selon la charte de la refonte (direction « Inventaire expert », novembre 2026). La référence complète de la charte est `src/CLAUDE_design_convention.md`.
 
-La source de vérité de tous les tokens de design (couleurs, espacements, typographie,
-rayons) est le fichier `tokens.json` situé dans ce répertoire de skill.
+Les valeurs de la charte (couleurs, typographie, coupes d'angle, tailles) sont dans `tokens.json`, situé dans ce répertoire de skill, et matérialisées dans `src/StarXelem/Style/SxTheme.axaml`.
 
 ---
 
@@ -32,8 +31,7 @@ rayons) est le fichier `tokens.json` situé dans ce répertoire de skill.
    ```
    ⚠️ Token manquant dans tokens.json :
    - Nom suggéré : color.background.overlay-strong
-   - Valeur dark  : #66000000
-   - Valeur light : #33000000
+   - Valeur       : #66000000
    - Usage        : Overlay semi-opaque pour les dialogues modaux
    - Présent dans : [nom de la maquette]
 
@@ -59,8 +57,8 @@ Avant toute traduction, charger :
 ### Étape 2 — Analyser la maquette HTML
 
 Identifier dans la maquette :
-- Les **variables CSS** utilisées (`var(--xxx)`) → les mapper aux tokens
-- Les **variables CSS inconnues** → les signaler (règle lecture seule)
+- Les **couleurs en dur** des styles en ligne → les mapper aux ressources `Sx.*` (voir `references/css-to-xaml-mapping.md`)
+- Les **valeurs absentes de la charte** → les signaler (règle lecture seule)
 - La **structure de layout** (flex, grid) → déterminer l'équivalent Avalonia
 - Les **composants réutilisables** → proposer des `UserControl` ou `DataTemplate`
 
@@ -74,89 +72,48 @@ Produire dans cet ordre :
 ### Étape 4 — Vérification
 
 Avant de livrer le code :
-- [ ] Tous les `DynamicResource` référencés existent dans `tokens.json`
+- [ ] Toutes les ressources `Sx.*` référencées existent dans `SxTheme.axaml`
+- [ ] Les angles coupés passent par `comp:NotchedBorder`, sans `CornerRadius` (sauf puces et barres)
+- [ ] L'écran est dans un `ThemeVariantScope` sombre
 - [ ] Aucun token inventé (valeur couleur codée en dur sans passer par un resource)
 - [ ] Layout Avalonia valide (pas de propriétés CSS dans XAML)
 - [ ] Conventions de nommage StarXelem respectées (voir skill `starxelem-csharp-conventions`)
 - [ ] `DynamicResource` utilisé pour les couleurs (pas `StaticResource`)
-- [ ] `StaticResource` utilisé pour les styles de texte fixes
+- [ ] Classes `sx-*` utilisées plutôt que des tailles et couleurs en ligne
 
 ---
 
-## Structure des fichiers de sortie attendus
+## Où vivent les éléments de la charte
 
 ```
-Views/
-├── {Nom}View.axaml          ← UserControl traduit
-└── {Nom}View.axaml.cs       ← Code-behind minimal
-
-ViewModels/
-└── {Nom}ViewModel.cs        ← ViewModel associé (si demandé)
-
-Themes/
-├── Tokens.axaml             ← ResourceDictionary généré depuis tokens.json
-└── Styles/
-    ├── Typography.axaml     ← Styles de texte
-    └── Controls.axaml       ← Styles de contrôles communs
+Style/SxTheme.axaml        ← ressources Sx.* (couleurs, polices) et classes sx-* : à réutiliser, ne pas recopier
+Components/NotchedBorder   ← bloc à angles coupés (CutSize)
+Components/ColumnHeader    ← en-tête de colonne avec tri et filtre
+Components/LocationIcon    ← pastille d'emplacement
+Views/{Nom}View.axaml      ← écran traduit (styles propres à l'écran dans UserControl.Styles)
+ViewModels/{Nom}ViewModel.cs
 ```
 
----
+Il n'y a pas de `Tokens.axaml` généré : `SxTheme.axaml` matérialise `tokens.json` à la main, et les deux doivent rester identiques. Une nouvelle valeur commune à plusieurs écrans va dans `SxTheme.axaml` (et `tokens.json`), pas dans une vue.
 
-## Génération du ResourceDictionary (Tokens.axaml)
-
-Quand l'utilisateur demande de générer ou mettre à jour `Tokens.axaml` depuis `tokens.json`,
-produire un ResourceDictionary avec deux variantes par token de couleur :
-
-```xml
-<ResourceDictionary xmlns="https://github.com/avaloniaui"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-
-    <!-- Généré automatiquement depuis tokens.json — NE PAS MODIFIER MANUELLEMENT -->
-    <!-- Modifier tokens.json puis régénérer ce fichier -->
-
-    <!-- ==== THÈME SOMBRE ==== -->
-    <ResourceDictionary.ThemeDictionaries>
-
-        <ResourceDictionary x:Key="Dark">
-            <!-- Background -->
-            <SolidColorBrush x:Key="BackgroundPrimary"   Color="#FF0D0D1A"/>
-            <SolidColorBrush x:Key="BackgroundSecondary" Color="#FF16162A"/>
-            <SolidColorBrush x:Key="BackgroundTertiary"  Color="#FF1E1E35"/>
-            <!-- ... autres tokens dark ... -->
-        </ResourceDictionary>
-
-        <ResourceDictionary x:Key="Light">
-            <!-- Background -->
-            <SolidColorBrush x:Key="BackgroundPrimary"   Color="#FFF3F3F3"/>
-            <SolidColorBrush x:Key="BackgroundSecondary" Color="#FFFFFFFF"/>
-            <SolidColorBrush x:Key="BackgroundTertiary"  Color="#FFEBEBEB"/>
-            <!-- ... autres tokens light ... -->
-        </ResourceDictionary>
-
-    </ResourceDictionary.ThemeDictionaries>
-</ResourceDictionary>
-```
-
-> Pour la liste complète des valeurs, lire `tokens.json`.
+La charte n'existe qu'en thème sombre : pas de variante claire à produire.
 
 ---
 
 ## Conventions de nommage des ressources
 
-| Catégorie token | Pattern de clé XAML | Exemple |
-|---|---|---|
-| `color.background.primary` | `Background{Pascal}` | `BackgroundPrimary` |
-| `color.text.primary` | `Text{Pascal}` | `TextPrimary` |
-| `color.border.primary` | `Border{Pascal}` | `BorderPrimary` |
-| `color.accent.primary` | `Accent{Pascal}` | `AccentPrimary` |
-| `color.status.success` | `Status{Pascal}` | `StatusSuccess` |
-| `color.blueprint.tier.t1` | `Tier{T1}` | `TierT1` |
-| `spacing.md` | `Spacing{Pascal}` | `SpacingMd` |
-| `radius.lg` | `Radius{Pascal}` | `RadiusLg` |
+| Token (`tokens.json`) | Ressource XAML |
+|---|---|
+| `color.background`, `surface`, `relief`, `line` | `Sx.BackgroundBrush`, `Sx.SurfaceBrush`, `Sx.ReliefBrush`, `Sx.LineBrush` |
+| `color.text`, `secondary`, `muted` | `Sx.TextBrush`, `Sx.SecondaryBrush`, `Sx.MutedBrush` |
+| `color.accent.*` | `Sx.AccentBrush`, `Sx.AccentHoverBrush`, `Sx.AccentSoftBrush`, `Sx.AccentStrongBrush`, `Sx.OnAccentBrush` |
+| `color.tone.{ton}` | `Sx.{Ton}Brush` et `Sx.{Ton}SoftBrush` (`Success`, `Warning`, `Danger`, `Info`, `Neutral`) |
+| `typography.family.*` | `Sx.FontSans`, `Sx.FontMono` |
+| `shape.cut.*` | valeur de `CutSize` sur `comp:NotchedBorder` |
 
 ---
-
 ## Références
 
-- **`tokens.json`** — Valeurs de tous les tokens (couleurs ARGB dark/light, espacements, typographie)
-- **`references/css-to-xaml-mapping.md`** — Mapping détaillé CSS → XAML, patterns FluentAvalonia, exemples de composants
+- **`tokens.json`** — Valeurs de la charte (couleurs ARGB, typographie, coupes d'angle, tailles)
+- **`references/css-to-xaml-mapping.md`** — Correspondance des styles de maquette vers les ressources et classes `Sx`, pièges Avalonia
+- **`src/CLAUDE_design_convention.md`** — Référence complète de la charte (mise en page, composants, comportements)

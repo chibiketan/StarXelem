@@ -4,13 +4,25 @@ using System.IO;
 namespace StarXelem.Models;
 
 /// <summary>
-/// Configuration CLI statique : --screen, --screenshot, --close
+/// Configuration CLI statique : --screen, --screenshot, --close, --load-items, --items-report, --load-ships, --ships-report, --load-friends, --load-reputations
 /// </summary>
 static class AppConfig
 {
     public static string? ScreenName { get; set; }
     public static string? ScreenshotPath { get; set; }
     public static bool AutoClose { get; set; }
+    /// <summary>Lance un vrai chargement de l'écran Objets, comme un clic sur Charger.</summary>
+    public static bool LoadItems { get; set; }
+    /// <summary>Fichier JSON où écrire le détail des objets une fois le chargement terminé.</summary>
+    public static string? ItemsReportPath { get; set; }
+    /// <summary>Lance un vrai chargement de Mon hangar, comme un clic sur Actualiser.</summary>
+    public static bool LoadShips { get; set; }
+    /// <summary>Fichier JSON où écrire le détail des vaisseaux une fois le chargement terminé.</summary>
+    public static string? ShipsReportPath { get; set; }
+    /// <summary>Lance un vrai chargement de la liste d'amis, comme un clic sur Actualiser.</summary>
+    public static bool LoadFriends { get; set; }
+    /// <summary>Recharge les réputations une fois le P4K et la base prêts, comme un clic sur Charger les données.</summary>
+    public static bool LoadReputations { get; set; }
 
     public static void Parse(string[] args)
     {
@@ -25,6 +37,32 @@ static class AppConfig
             else if (arg == "--screenshot" && i + 1 < args.Length)
             {
                 ScreenshotPath = Path.GetFullPath(args[++i]);
+            }
+            else if (arg == "--load-items")
+            {
+                LoadItems = true;
+            }
+            else if (arg == "--items-report" && i + 1 < args.Length)
+            {
+                ItemsReportPath = Path.GetFullPath(args[++i]);
+                LoadItems = true;
+            }
+            else if (arg == "--load-ships")
+            {
+                LoadShips = true;
+            }
+            else if (arg == "--ships-report" && i + 1 < args.Length)
+            {
+                ShipsReportPath = Path.GetFullPath(args[++i]);
+                LoadShips = true;
+            }
+            else if (arg == "--load-friends")
+            {
+                LoadFriends = true;
+            }
+            else if (arg == "--load-reputations")
+            {
+                LoadReputations = true;
             }
             else if (arg == "--close")
             {
