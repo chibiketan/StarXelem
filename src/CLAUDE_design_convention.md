@@ -663,6 +663,7 @@ Quatre tailles : **20** (titre, 600), **14 ou 13** (texte), **12** (légende, en
 | Champ | `NotchedBorder.sx-field` + `TextBox.sx` | Contour accent au focus. |
 | Filtre rapide | `Button.sx-chip`, `.on` | Compteur monospace dans la puce. Au plus 8 puces, le reste passe par le filtre de colonne. |
 | Tableau | `DataGrid.sx` | Lignes de 34 px, séparateurs horizontaux, sélection en Accent doux. |
+| Bouton bascule | `Button.sx` + `.on` | Fond Accent doux quand le panneau qu'il ouvre est déplié (ex. « Plages » des Armes FPS). Le libellé compte les filtres actifs du panneau replié. |
 | Badge de statut | `NotchedBorder.sx-badge` + `.success`, `.info`, `.warning`, `.danger` | Coupe 7 px, pastille 7 px et libellé 12 px semi-gras dans le ton, fond doux du même ton. Neutre sans classe. |
 | En-tête de colonne | `comp:ColumnHeader` | Voir 18.6. |
 

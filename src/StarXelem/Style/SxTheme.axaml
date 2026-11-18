@@ -95,6 +95,14 @@
         <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
     </Style>
+    <!-- Bouton bascule actif (panneau ouvert) -->
+    <Style Selector="Button.sx.on">
+        <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+    </Style>
+    <Style Selector="Button.sx.on:pointerover">
+        <Setter Property="Background" Value="{DynamicResource Sx.AccentStrongBrush}" />
+    </Style>
     <Style Selector="Button.sx.small">
         <Setter Property="MinHeight" Value="34" />
         <Setter Property="FontSize" Value="12" />

@@ -186,7 +186,6 @@ public static class DesignData
         ]);
 
         // Armes FPS : deux exemples représentatifs, dont une arme à double munition.
-        FpsWeaponsTabViewModel.WeaponClassList = ["Toutes les classes", "Fusil d'assaut", "Pistolet"];
         FpsWeaponsTabViewModel.DamageUpperBound = 120;
         FpsWeaponsTabViewModel.DamageMax = 120;
         FpsWeaponsTabViewModel.EffectiveRangeUpperBound = 500;
