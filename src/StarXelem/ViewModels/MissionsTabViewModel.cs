@@ -22,6 +22,7 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
     private readonly ILocalDatabaseService _localDatabaseService;
     private readonly IGrpcClientService _clientService;
     public override string Name => "Missions";
+    protected override string NavIconData => "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Target);
 
     private static readonly TimeSpan SearchFilterDelay = TimeSpan.FromMilliseconds(300);

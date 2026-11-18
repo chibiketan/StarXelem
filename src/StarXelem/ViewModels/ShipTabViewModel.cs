@@ -28,6 +28,7 @@ public partial class ShipTabViewModel : PageViewModelBase
     private readonly IAllianceOrbitalService _allianceOrbitalService;
     private readonly ILogger<ShipTabViewModel> _logger;
     public override string Name => "Mon hangar";
+    protected override string NavIconData => "M3 11l9-8 9 8v10H3zM9 21v-7h6v7";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Home);
     
     [ObservableProperty]

@@ -38,6 +38,7 @@ public partial class FpsWeaponsTabViewModel : PageViewModelBase
     private const int DisplayBatchSize = 20;
 
     public override string Name => "Armes FPS";
+    protected override string NavIconData => "M3 10h15v5H3zM18 11h3v3h-3M6 15v5h5v-5";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.VideoSettings);
 
     [ObservableProperty] private ObservableCollection<FpsWeaponModel> _weapons = new();

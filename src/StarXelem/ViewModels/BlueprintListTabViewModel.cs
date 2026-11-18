@@ -38,6 +38,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     private readonly HashSet<BlueprintFamily> _selectedFamilies = new();
 
     public override string Name => "Blueprints";
+    protected override string NavIconData => "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Copy);
     [ObservableProperty] public IList<BlueprintViewModel>? _blueprintList;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasSelection))] public BlueprintViewModel? _selectedBluePrint;

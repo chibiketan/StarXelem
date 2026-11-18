@@ -59,6 +59,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     private readonly ILocaleEntryRepository _localeEntryRepository;
     private readonly ILocationService _locationService;
     public override string Name => "Objets";
+    protected override string NavIconData => "M21 8l-9-5-9 5v8l9 5 9-5V8zM3 8l9 5 9-5M12 13v8";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.PersonAccounts);
     [ObservableProperty] public Task<IList<ItemViewModel>>? _itemList;
     [ObservableProperty] public ItemViewModel? _selectedItem;

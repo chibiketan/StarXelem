@@ -24,6 +24,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
     private readonly ILogger<ExtractionTabViewModel> _logger;
 
     public override string Name => "Extractions";
+    protected override string NavIconData => "M12 3v12M7 11l5 5 5-5M4 21h16";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.ArrowDownload);
 
     [ObservableProperty]

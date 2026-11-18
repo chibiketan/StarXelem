@@ -36,6 +36,7 @@ public partial class FriendListTabViewModel : PageViewModelBase
     private CancellationTokenSource? _filterCts;
 
     public override string Name => "Amis";
+    protected override string NavIconData => "M20 21v-1a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5v1M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.People);
 
     [ObservableProperty] private Task<List<FriendViewModel>?>? _friendList;

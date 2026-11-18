@@ -32,7 +32,8 @@ public partial class ReputationTabViewModel : PageViewModelBase
     private List<ContractorModel> _allContractors = new();
     private CancellationTokenSource? _filterCts;
 
-    public override string Name => "Reputations";
+    public override string Name => "Réputations";
+    protected override string NavIconData => "M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Shield);
 
     [ObservableProperty] private string _searchText = string.Empty;

@@ -21,6 +21,7 @@ public partial class P4kShipTabViewModel : PageViewModelBase
     private CancellationTokenSource? _filterCts;
 
     public override string Name => "Loadout vaisseaux";
+    protected override string NavIconData => "M12 3c3 3 4 6 4 10l3 4-5 1h-4l-5-1 3-4c0-4 1-7 4-10zM12 18v3";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Airplane);
 
     [ObservableProperty] private ObservableCollection<P4kShipModel> _ships = new();
