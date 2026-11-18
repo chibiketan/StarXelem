@@ -314,6 +314,18 @@
         <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
     </Style>
     <Style Selector="CheckBox.sx-muted">
+        <Style.Resources>
+            <!-- Case cochée en accent or plutôt que l'accent Fluent -->
+            <StaticResource x:Key="CheckBoxCheckBackgroundFillChecked" ResourceKey="Sx.AccentBrush" />
+            <StaticResource x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" ResourceKey="Sx.AccentHoverBrush" />
+            <StaticResource x:Key="CheckBoxCheckBackgroundFillCheckedPressed" ResourceKey="Sx.AccentHoverBrush" />
+            <StaticResource x:Key="CheckBoxCheckBackgroundStrokeChecked" ResourceKey="Sx.AccentBrush" />
+            <StaticResource x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" ResourceKey="Sx.AccentHoverBrush" />
+            <StaticResource x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" ResourceKey="Sx.AccentHoverBrush" />
+            <StaticResource x:Key="CheckBoxCheckGlyphForegroundChecked" ResourceKey="Sx.OnAccentBrush" />
+            <StaticResource x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" ResourceKey="Sx.OnAccentBrush" />
+            <StaticResource x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" ResourceKey="Sx.OnAccentBrush" />
+        </Style.Resources>
         <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
         <Setter Property="FontSize" Value="12" />
     </Style>
