@@ -85,8 +85,10 @@ public partial class P4kShipTabViewModel : PageViewModelBase
 
             foreach (var ship in ships)
             {
+                // Tri alphabétique : deux vaisseaux se comparent tag à tag, toujours dans le même ordre.
                 var tagNames = ship.ShipTags
                     .Select(st => st.Tag?.Name ?? st.TagSelfId)
+                    .Order(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
                 shipList.Add(new P4kShipModel
