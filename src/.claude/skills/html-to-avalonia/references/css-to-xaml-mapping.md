@@ -1,278 +1,135 @@
-# Référence de mapping CSS → Avalonia XAML
+# Référence de mapping CSS → Avalonia XAML (charte StarXelem)
+
+Les maquettes de la charte sont les fichiers `project/<Ecran>.dc.html` de l'artefact « StarXelem, nouvelles directions ». Elles écrivent leurs styles en ligne, avec des couleurs en dur : chaque valeur se traduit par une ressource `Sx.*` ou une classe de `Style/SxTheme.axaml`, jamais par une couleur en dur dans le XAML.
 
 ## Table des matières
-1. [Layout](#1-layout)
-2. [Couleurs et tokens](#2-couleurs-et-tokens)
+1. [Couleurs](#1-couleurs)
+2. [Formes : angles coupés](#2-formes--angles-coupés)
 3. [Typographie](#3-typographie)
-4. [Bordures et coins arrondis](#4-bordures-et-coins-arrondis)
-5. [Espacements](#5-espacements)
-6. [Contrôles courants](#6-contrôles-courants)
-7. [Patterns FluentAvalonia spécifiques](#7-patterns-fluentavalonia-spécifiques)
+4. [Layout](#4-layout)
+5. [Composants](#5-composants)
+6. [Pièges Avalonia et FluentAvalonia](#6-pièges-avalonia-et-fluentavalonia)
 
 ---
 
-## 1. Layout
+## 1. Couleurs
 
-### Flexbox → Grid / StackPanel
+| CSS de la maquette | Ressource Avalonia |
+|---|---|
+| `#0B0D12` | `Sx.BackgroundBrush` (et `Sx.OnAccentBrush` pour le texte d'un bouton plein) |
+| `#12151C` | `Sx.SurfaceBrush` |
+| `#1A1E27` | `Sx.ReliefBrush` |
+| `#2A2F3A` | `Sx.LineBrush` |
+| `#F2F4F8` | `Sx.TextBrush` |
+| `#A4ACBA` | `Sx.SecondaryBrush` (`Sx.NeutralBrush` dans un badge) |
+| `#8A93A5` | `Sx.MutedBrush` |
+| `{{accent}}`, `#E8B04A` | `Sx.AccentBrush` |
+| `{{accentSoft}}`, `accent + "24"` | `Sx.AccentSoftBrush` |
+| `accent + "55"` | `Sx.AccentStrongBrush` |
+| `#4FD1A5`, `#4FD1A524` | `Sx.SuccessBrush`, `Sx.SuccessSoftBrush` |
+| `#F08A4B`, `#F08A4B24` | `Sx.WarningBrush`, `Sx.WarningSoftBrush` |
+| `#F2666A`, `#F2666A24` | `Sx.DangerBrush`, `Sx.DangerSoftBrush` |
+| `#6CB6FF`, `#6CB6FF24` | `Sx.InfoBrush`, `Sx.InfoSoftBrush` |
 
-| CSS | Avalonia XAML |
-|-----|---------------|
-| `display: flex; flex-direction: row` | `<StackPanel Orientation="Horizontal">` |
-| `display: flex; flex-direction: column` | `<StackPanel Orientation="Vertical">` |
-| `display: flex; gap: 8px` (row) | `<StackPanel Orientation="Horizontal" Spacing="8">` |
-| `display: flex; justify-content: space-between` | `<Grid>` avec colonnes `* Auto` ou `*` + `HorizontalAlignment` |
-| `display: flex; align-items: center` | `VerticalAlignment="Center"` sur les enfants ou `<StackPanel>` avec `VerticalAlignment` |
-| `display: flex; flex-wrap: wrap` | `<WrapPanel>` |
-| `flex: 1` | `HorizontalAlignment="Stretch"` ou colonne `*` dans un Grid |
-| `display: grid; grid-template-columns: 1fr 2fr` | `<Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>` |
+Toujours `{DynamicResource Sx.…}`. Un écran migré force le thème sombre :
 
-### Cas typique : header de carte (titre à gauche + badge à droite)
-
-**HTML:**
-```html
-<div style="display:flex; justify-content:space-between; align-items:center">
-  <span class="title">Nom</span>
-  <span class="badge">T1</span>
-</div>
-```
-
-**XAML:**
 ```xml
-<Grid>
-  <Grid.ColumnDefinitions>
-    <ColumnDefinition Width="*"/>
-    <ColumnDefinition Width="Auto"/>
-  </Grid.ColumnDefinitions>
-  <TextBlock Grid.Column="0" Text="Nom" Style="{StaticResource TextTitlePrimary}"/>
-  <Border Grid.Column="1" Style="{StaticResource BadgeTier}" Tag="T1">
-    <TextBlock Text="T1" Style="{StaticResource TextBadge}"/>
-  </Border>
-</Grid>
+<ThemeVariantScope RequestedThemeVariant="Dark">
+    <Grid Background="{DynamicResource Sx.BackgroundBrush}" TextElement.FontFamily="{DynamicResource Sx.FontSans}">
+        …
+    </Grid>
+</ThemeVariantScope>
 ```
 
 ---
 
-## 2. Couleurs et tokens
+## 2. Formes : angles coupés
 
-### Correspondance CSS var → StaticResource Avalonia
-
-Les tokens sont définis dans `tokens.json` et matérialisés dans `Themes/Tokens.axaml`.
-
-| CSS variable | StaticResource (dark) | StaticResource (light) | StaticResource thémé |
-|---|---|---|---|
-| `var(--bg-primary)` | `BackgroundPrimaryDark` | `BackgroundPrimaryLight` | `BackgroundPrimary` |
-| `var(--bg-secondary)` | `BackgroundSecondaryDark` | `BackgroundSecondaryLight` | `BackgroundSecondary` |
-| `var(--bg-tertiary)` | `BackgroundTertiaryDark` | `BackgroundTertiaryLight` | `BackgroundTertiary` |
-| `var(--text-primary)` | `TextPrimaryDark` | `TextPrimaryLight` | `TextPrimary` |
-| `var(--text-secondary)` | `TextSecondaryDark` | `TextSecondaryLight` | `TextSecondary` |
-| `var(--text-tertiary)` | `TextTertiaryDark` | `TextTertiaryLight` | `TextTertiary` |
-| `var(--text-accent)` | `TextAccentDark` | `TextAccentLight` | `TextAccent` |
-| `var(--border-primary)` | `BorderPrimaryDark` | `BorderPrimaryLight` | `BorderPrimary` |
-| `var(--border-secondary)` | `BorderSecondaryDark` | `BorderSecondaryLight` | `BorderSecondary` |
-| `var(--accent-primary)` | `AccentPrimaryDark` | `AccentPrimaryLight` | `AccentPrimary` |
-| `var(--accent-subtle)` | `AccentSubtleDark` | `AccentSubtleLight` | `AccentSubtle` |
-| `var(--tier-t1)` | `TierT1Dark` | `TierT1Light` | `TierT1` |
-| `var(--tier-t2)` | `TierT2Dark` | `TierT2Light` | `TierT2` |
-| `var(--tier-t3)` | `TierT3Dark` | `TierT3Light` | `TierT3` |
-
-### Utilisation dans XAML
+La maquette coupe les angles avec `clip-path: polygon(0 0, calc(100% - Npx) 0, 100% Npx, 100% 100%, Npx 100%, 0 calc(100% - Npx))`. En XAML, c'est `comp:NotchedBorder` (`xmlns:comp="clr-namespace:StarXelem.Components"`) avec `CutSize="N"` :
 
 ```xml
-<!-- Fond d'une carte -->
-<Border Background="{DynamicResource BackgroundSecondary}">
-
-<!-- Texte titre -->
-<TextBlock Foreground="{DynamicResource TextPrimary}">
-
-<!-- Bordure -->
-<Border BorderBrush="{DynamicResource BorderPrimary}" BorderThickness="1">
+<comp:NotchedBorder CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}" Padding="28,26">
+    …
+</comp:NotchedBorder>
 ```
 
-> **Important** : utiliser `DynamicResource` (pas `StaticResource`) pour les couleurs thémées, afin que le changement de thème à chaud fonctionne.
+| N dans la maquette | Usage |
+|---|---|
+| 7 | badge, pastille d'icône 24 px |
+| 9 | ligne de liste, bouton de menu, petit champ |
+| 11 | champ, bouton 44 px, tuile d'icône 56 px |
+| 12 | panneau flottant |
+| 14 | carte dans un bloc |
+| 18 (16 sur d'anciennes planches) | bloc principal, menu latéral |
+
+- Contour : `BorderBrush` + `StrokeThickness` du `NotchedBorder` (pas `BorderThickness`).
+- `border-radius: 19px` d'une puce → `Button.sx-chip` (rayon 17, hauteur 34). `border-radius: 6px` d'un badge → `NotchedBorder.sx-badge` (coupe 7) : la charte remplace les arrondis des badges par des angles coupés.
+- `border-radius: 2px` d'une barre de 4 px → `ProgressBar.sx-quality`.
+- Aucun `CornerRadius` ailleurs.
 
 ---
 
 ## 3. Typographie
 
-### Mapping tailles
+| CSS | Avalonia |
+|---|---|
+| `font-family: 'IBM Plex Sans'` | `{DynamicResource Sx.FontSans}` (Inter tant que Plex n'est pas embarquée), posé une fois sur la racine via `TextElement.FontFamily` |
+| `font-family: 'IBM Plex Mono'` | `{DynamicResource Sx.FontMono}` ou classe `sx-mono` |
+| `font-size: 30px; font-weight: 600` | `FontSize="30" FontWeight="SemiBold"` (titre de détail) |
+| `font-size: 22px` mono | valeur de carte |
+| `font-size: 20px; font-weight: 600` | `TextBlock.sx-title` |
+| `font-size: 16px; font-weight: 600` | titre de section |
+| `font-size: 13px`, `14px` | texte courant |
+| `font-size: 12px; color: #A4ACBA` | `TextBlock.sx-caption` |
+| `font-size: 11px` mono | `TextBlock.sx-count` |
 
-| CSS (`font-size`) | Token | Avalonia (`FontSize`) |
-|---|---|---|
-| `10px` | `typography.size.xs` | `10` |
-| `11px` | `typography.size.sm` | `11` |
-| `13px` | `typography.size.md` | `13` |
-| `15px` | `typography.size.lg` | `15` |
-| `18px` | `typography.size.xl` | `18` |
-| `22px` | `typography.size.xxl` | `22` |
+Poids : 400 → `Normal`, 500 → `Medium`, 600 → `SemiBold`. Pas de 700.
 
-### Mapping poids
-
-| CSS (`font-weight`) | Token | Avalonia (`FontWeight`) |
-|---|---|---|
-| `400` | `regular` | `Regular` |
-| `500` | `medium` | `Medium` |
-| `600` | `semibold` | `SemiBold` |
-| `700` | `bold` | `Bold` |
-
-### Styles de texte prédéfinis (dans `Styles/Typography.axaml`)
-
-```xml
-<Style x:Key="TextTitlePrimary" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="18"/>
-    <Setter Property="FontWeight" Value="SemiBold"/>
-    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-</Style>
-
-<Style x:Key="TextLabel" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="11"/>
-    <Setter Property="FontWeight" Value="Medium"/>
-    <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-</Style>
-
-<Style x:Key="TextCaption" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="10"/>
-    <Setter Property="FontWeight" Value="Regular"/>
-    <Setter Property="Foreground" Value="{DynamicResource TextTertiary}"/>
-</Style>
-
-<Style x:Key="TextBadge" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="11"/>
-    <Setter Property="FontWeight" Value="SemiBold"/>
-</Style>
-```
+> `SelectableTextBlock` n'hérite pas des styles `TextBlock.xxx` : poser `FontFamily`, `FontSize` et `Foreground` en ligne.
 
 ---
 
-## 4. Bordures et coins arrondis
+## 4. Layout
 
-| CSS | Token | Avalonia |
-|-----|-------|---------|
-| `border-radius: 4px` | `radius.sm` | `CornerRadius="4"` |
-| `border-radius: 8px` | `radius.md` | `CornerRadius="8"` |
-| `border-radius: 12px` | `radius.lg` | `CornerRadius="12"` |
-| `border-radius: 16px` | `radius.xl` | `CornerRadius="16"` |
-| `border-radius: 9999px` | `radius.full` | `CornerRadius="9999"` |
-| `border: 1px solid` | — | `BorderThickness="1"` |
-| `border-bottom: 1px solid` | — | `BorderThickness="0,0,0,1"` (Top, Left, Bottom, Right... non, **L,T,R,B**) |
+| CSS | Avalonia |
+|---|---|
+| `display: flex` (ligne) | `StackPanel Orientation="Horizontal" Spacing="…"`, ou `Grid ColumnDefinitions="Auto,*,Auto"` quand un élément s'étire |
+| `display: flex; flex-direction: column; gap` | `StackPanel Spacing="…"` |
+| `flex-wrap: wrap` | `WrapPanel` (espacement par `Margin="0,0,6,6"` des enfants) |
+| `flex: 1 1 …` | colonne `*` d'un `Grid` |
+| `flex: 0 0 300px` | colonne de largeur fixe |
+| `grid-template-columns: repeat(auto-fill, minmax(Mpx, 1fr))` | `UniformGrid` dont `Columns` est lié à la largeur : `Columns="{Binding $parent[ItemsControl].Bounds.Width, Converter={x:Static conv:WidthToColumnsConverter.Instance}, ConverterParameter=M}"`, marge `0,0,G,G` sur l'élément et `0,0,-G,-G` sur l'`ItemsControl` |
+| `overflow-y: auto` | `ScrollViewer VerticalScrollBarVisibility="Auto"` |
+| page d'un écran | `Grid ColumnDefinitions="…" ColumnSpacing="12" Margin="12"` : la fenêtre fournit le fond, chaque bloc est un `NotchedBorder` Surface coupe 18 |
 
-> **Rappel Avalonia** : `BorderThickness` suit l'ordre **Left, Top, Right, Bottom**.
-
----
-
-## 5. Espacements
-
-| CSS (`gap` / `padding` / `margin`) | Token | Avalonia (`Spacing` / `Padding` / `Margin`) |
-|---|---|---|
-| `4px` | `spacing.xs` | `4` |
-| `8px` | `spacing.sm` | `8` |
-| `12px` | `spacing.md` | `12` |
-| `16px` | `spacing.lg` | `16` |
-| `24px` | `spacing.xl` | `24` |
-| `32px` | `spacing.xxl` | `32` |
-
-**Syntaxe Avalonia pour padding/margin** :
-- `Padding="12"` → tous côtés
-- `Padding="16,8"` → gauche/droite=16, haut/bas=8
-- `Padding="8,4,8,4"` → gauche, haut, droite, bas
+`BorderThickness` et `Margin` suivent l'ordre **gauche, haut, droite, bas**.
 
 ---
 
-## 6. Contrôles courants
+## 5. Composants
 
-### Carte (card)
-
-**HTML:**
-```html
-<div class="card" style="background:var(--bg-secondary); border-radius:12px; padding:16px; border:1px solid var(--border-primary)">
-```
-
-**XAML:**
-```xml
-<Border Background="{DynamicResource BackgroundSecondary}"
-        CornerRadius="12"
-        Padding="16"
-        BorderBrush="{DynamicResource BorderPrimary}"
-        BorderThickness="1">
-```
-
-### Badge tier
-
-**HTML:**
-```html
-<span class="badge tier-t1" style="background:var(--tier-t1); border-radius:4px; padding:2px 8px">T1</span>
-```
-
-**XAML:**
-```xml
-<Border Background="{DynamicResource TierT1}"
-        CornerRadius="4"
-        Padding="8,2">
-    <TextBlock Text="T1"
-               Style="{StaticResource TextBadge}"
-               Foreground="{DynamicResource TextInverse}"/>
-</Border>
-```
-
-### Séparateur horizontal
-
-**HTML:**
-```html
-<hr style="border-color: var(--border-secondary)"/>
-```
-
-**XAML:**
-```xml
-<Rectangle Height="1"
-           Fill="{DynamicResource BorderSecondary}"
-           HorizontalAlignment="Stretch"/>
-```
-
-### Label + valeur (paire de données)
-
-**HTML:**
-```html
-<div class="field">
-  <span class="label">SCU</span>
-  <span class="value">24</span>
-</div>
-```
-
-**XAML:**
-```xml
-<StackPanel Orientation="Vertical" Spacing="2">
-    <TextBlock Text="SCU" Style="{StaticResource TextLabel}"/>
-    <TextBlock Text="24" Style="{StaticResource TextTitlePrimary}"/>
-</StackPanel>
-```
+| Élément de maquette | XAML |
+|---|---|
+| bouton plein accent | `Button Classes="sx primary"` (un seul par barre d'outils) |
+| bouton fond `#1A1E27` | `Button Classes="sx"` ; `small` pour 34 px ; `on` pour une bascule ouverte |
+| `input` à angles coupés + loupe | `comp:NotchedBorder Classes="sx-field"` contenant `Path Classes="sx-search-icon"` et `TextBox Classes="sx"` |
+| puce de filtre avec compteur | `Button Classes="sx-chip"`, `Classes.on="{Binding IsSelected}"`, compteur en `TextBlock.sx-count` ; ViewModel `FilterChipViewModel`, la puce « Tous » dans la même collection |
+| badge pastille + libellé | `comp:NotchedBorder Classes="sx-badge success"` (ou `info`, `warning`, `danger`, neutre sans classe) contenant `Ellipse` + `TextBlock` |
+| tableau | `DataGrid Classes="sx"`, en-têtes `comp:ColumnHeader` pour le tri et le filtre de colonne |
+| pastille d'emplacement | `comp:LocationIcon` |
+| liste à lignes coupées | `ListBox` dont l'`ItemContainer` a pour modèle un `NotchedBorder CutSize="9"` ; fond `Sx.ReliefBrush` au survol, `Sx.AccentSoftBrush` sélectionné |
+| case à cocher | `CheckBox Classes="sx-muted"` (coche en accent or) |
+| barre de progression 4 px | `ProgressBar Classes="sx-quality"` |
+| icône SVG en contour | `Path` avec `Data` = le `d` du SVG, `Stroke`, `StrokeThickness` = `stroke-width`, `StrokeLineCap="Round"`, `StrokeJoin="Round"`, `Stretch="Uniform"`, taille fixe |
+| chargement | `ui:ProgressRing IsIndeterminate="True"` sur un voile Surface à 0,75 d'opacité |
 
 ---
 
-## 7. Patterns FluentAvalonia spécifiques
+## 6. Pièges Avalonia et FluentAvalonia
 
-### Cacher l'indicateur de sélection d'un ListBoxItem
-
-```xml
-<Style Selector="ListBox.my-class > ListBoxItem:selected /template/ Rectangle#SelectionIndicator">
-    <Setter Property="IsVisible" Value="False"/>
-</Style>
-```
-
-### Cacher les séparateurs de colonnes DataGrid
-
-```xml
-<Style Selector="DataGridColumnHeader">
-    <Setter Property="AreSeparatorsVisible" Value="False"/>
-</Style>
-```
-
-### MinWidth sur une colonne DataGrid
-
-`MinWidth` est une propriété CLR, pas une AvaloniaProperty — la définir directement sur la colonne :
-```xml
-<DataGridTextColumn MinWidth="0" Width="*" Header="Nom" Binding="{Binding Name}"/>
-```
-
-### DynamicResource vs StaticResource pour les thèmes
-
-- `DynamicResource` → couleurs, brushes (changement de thème à chaud)
-- `StaticResource` → styles de texte, templates, valeurs fixes qui ne changent pas avec le thème
+- **`ListBoxItem` FluentAvalonia** : largeur minimale de 88 px. Pour un élément plus étroit, remettre `MinWidth="0"` et `MinHeight="0"`.
+- **Modèle de `ListBoxItem`** : ne pas nommer le `ContentPresenter` `PART_ContentPresenter`, sinon les styles de sélection Fluent s'y appliquent.
+- **`Run.Text`** est lié dans les deux sens par défaut : avec un `StringFormat`, la valeur reformatée revient dans la source et boucle jusqu'au débordement de pile. Mettre `Mode=OneWay`, ou calculer le texte dans le ViewModel.
+- **Couleurs Fluent d'un contrôle** (case cochée, curseur) : redéfinir ses ressources (`CheckBoxCheckBackgroundFillChecked`, `SliderThumbBackground`…) avec les valeurs `Sx` dans `Style.Resources`, comme `CheckBox.sx-muted`.
+- **`MinWidth` d'une colonne `DataGrid`** : propriété CLR, à poser sur la colonne.
+- **`DynamicResource`** pour les pinceaux, **`StaticResource`** pour les convertisseurs et les géométries fixes.

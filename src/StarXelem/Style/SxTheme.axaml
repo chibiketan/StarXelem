@@ -1,4 +1,4 @@
-<!-- Nouvelle charte graphique (section 18 de CLAUDE_design_convention.md). Thème sombre uniquement pour l'instant. -->
+<!-- Charte graphique de StarXelem (CLAUDE_design_convention.md, valeurs dans tokens.json). Thème sombre uniquement pour l'instant. -->
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:comp="clr-namespace:StarXelem.Components">

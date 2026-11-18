@@ -1,675 +1,144 @@
 # StarXelem — Design System Reference
 
-> Document de référence pour tous les composants graphiques de l'application StarXelem.  
-> Généré à partir des maquettes et décisions prises au cours du projet.  
-> **Format couleurs : ARGB 8 bits (ex: `#FF534AB7`)**  
-> **Tailles : px | Poids : `normal`, `500`, `bold`**
->
-> **Refonte en cours :** la section 18 est la nouvelle référence. Tout nouvel écran et tout écran migré la suivent, et elle prime sur les sections 1 à 17 en cas de conflit. Ces sections restent valables pour les écrans pas encore migrés.
+Charte de la refonte, validée en novembre 2026 à partir des maquettes de la direction « Inventaire expert ». Elle est la seule référence pour tout élément visuel de l'application.
+
+- **Implémentation** : `StarXelem/Style/SxTheme.axaml` (ressources `Sx.*`, classes `sx-*`) et `StarXelem/Components/` (`NotchedBorder`, `ColumnHeader`, `LocationIcon`).
+- **Valeurs** : `.claude/skills/html-to-avalonia/tokens.json`, à garder identique à `SxTheme.axaml`.
+- **Maquettes** : fichiers `project/<Ecran>.dc.html` de l'artefact « StarXelem, nouvelles directions ». Les lire avant de modifier un écran.
+- **Thème** : sombre uniquement. Chaque écran force le thème sombre avec `ThemeVariantScope RequestedThemeVariant="Dark"` tant que le thème clair n'est pas dessiné.
+
+L'ancienne charte (accent violet, coins arrondis, bordures de 0,5 px, variantes claires) n'est plus utilisée par aucun écran. Elle reste dans l'historique git de ce fichier ; voir la section 12 pour les éléments qui ne sont pas encore migrés.
 
 ---
 
-## 1. Architecture générale
+## 1. Règles générales
 
-L'application est une fenêtre desktop Windows (.NET / Avalonia UI 11 + FluentAvalonia) composée de trois zones fixes :
-
-```
-┌─────────────────────────────────────────────────────┐
-│  BARRE TITRE  (titlebar)                            │
-├─────────────────────────────────────────────────────┤
-│  BARRE OUTILS  (toolbar)  — présente sur certains   │
-│  écrans seulement                                   │
-├──────┬──────────────────────────────────────────────┤
-│      │                                              │
-│ NAV  │   CONTENU PRINCIPAL                          │
-│ BAR  │   (liste + détail, tableau, formulaire…)     │
-│      │                                              │
-└──────┴──────────────────────────────────────────────┘
-```
-
-- **Sidebar de navigation** : toujours présente, icônes seules (52 px de large)
-- **Barre de titre** : contient le sélecteur de version, les boutons d'action globaux, et l'indicateur de connexion gRPC
-- **Contenu principal** : variable selon l'écran
+- Un écran applique les ressources `Sx.*` et les classes `sx-*`, **sans couleur ni taille en dur**. Une valeur commune à plusieurs écrans va dans `SxTheme.axaml`.
+- Ne pas modifier une couleur, une taille, une coupe ou une règle de cette charte sans validation de l'utilisateur.
+- Pas d'ombre ni de dégradé, sauf l'ombre portée du panneau flottant.
+- Pas de coin arrondi, sauf les puces (rayon 17) et les barres de progression (rayon 2).
+- Le mot accompagne toujours la couleur : un statut n'est jamais signalé par la couleur seule.
+- Cible tactile et hauteur de contrôle : 44 px (34 px pour les contrôles compacts).
 
 ---
 
-## 2. Thèmes
-
-L'application suit le thème Windows (clair ou sombre). **Toutes les couleurs sont définies pour les deux thèmes.**
-
-### 2.1 Surfaces (fonds)
-
-| Rôle | Dark | Light |
-|---|---|---|
-| Application (fond global) | `#FF0F1117` | `#FFF3F3F3` |
-| Sidebar navigation | `#FF0B0D13` | `#FFEBEBEB` |
-| Panneau liste | `#FF111318` | `#FFF8F8F8` |
-| Panneau détail | `#FF0F1117` | `#FFFFFFFF` |
-| En-tête de détail | `#FF0F1117` | `#FFFAFAFA` |
-| Carte / bloc de contenu | `#08FFFFFF` | `#FFFAFAFA` |
-| En-tête de tableau | `#FF111318` | `#FFF8F8F8` |
-| Barre de titre | `#FF0F1117` | `#FFE8E8E8` |
-| Barre d'outils | `#FF0F1117` | `#FFF0F0F0` |
-
-### 2.2 Bordures
-
-| Rôle | Dark | Light |
-|---|---|---|
-| Séparateur principal | `#14FFFFFF` | `#FFD8D8D8` |
-| Bordure de carte | `#14FFFFFF` | `#FFE4E4E4` |
-| Bordure de champ / input | `#1AFFFFFF` | `#FFD0D0D0` |
-| Focus sur champ | `#80A78BFA` | `#FF7F77DD` |
-
-**Règle générale :** bordures à `0.5px solid` sur tous les composants. Jamais de `1px` sauf cas exceptionnel justifié.
-
----
-
-## 3. Couleur d'accentuation (violet)
-
-Le violet est la couleur principale de StarXelem. Il s'applique aux éléments actifs, aux actions primaires, aux badges de sélection, aux icônes de navigation active.
-
-| Rôle | Dark | Light |
-|---|---|---|
-| Accentuation primaire | `#FFA78BFA` | `#FF534AB7` |
-| Accentuation atténuée | `#FF7F77DD` | `#FF7F77DD` |
-| Fond teinté (actif) | `#338B5CF6` | `#FFEEEDFE` |
-| Bordure teintée | `#598B5CF6` | `#FFAFA9EC` |
-| Fond hover | `#408B5CF6` | `#FFCECBF6` |
-
----
-
-## 4. Typographie
-
-La taille de base est 12 px. Pas de taille inférieure à 10 px.
-
-| Rôle | Taille | Poids | Dark | Light |
-|---|---|---|---|---|
-| Titre de page / item principal | 15–16 px | 500 | `#FFFFFFFF` | `#FF1A1A1A` |
-| Titre de bloc (mod-name) | 13 px | 500 | `#D9FFFFFF` | `#FF2A2A2A` |
-| Corps de texte / valeur | 12 px | normal | `#B3FFFFFF` | `#FF555555` |
-| Label de colonne (th) | 10 px | 500 | `#4DFFFFFF` | `#FFBBBBBB` |
-| Sous-titre de section (caps) | 10 px | 500 | `#40FFFFFF` | `#FFBBBBBB` |
-| Texte secondaire / métadonnée | 11 px | normal | `#59FFFFFF` | `#FF999999` |
-| Texte monospace (shard, code) | 11 px | normal | `#47FFFFFF` | `#FF888888` |
-| Texte vide / absent | 11 px | normal | `#26FFFFFF` | `#FFCCCCCC` |
-| Titre de liste (section label) | 11 px | 500 | `#66FFFFFF` | `#FF999999` |
-
-**Règle :** toujours trois niveaux de hiérarchie visibles dans un écran — titre, label, valeur. Ne jamais mélanger plus de deux tailles de police dans un même composant.
-
----
-
-## 5. Sidebar de navigation
-
-- Largeur : **52 px**
-- Icônes seules, pas de labels texte
-- Taille des icônes : 15×15 px, `stroke-width: 1.5`, `fill: none`
-- Icône active : fond teinté + couleur accentuation
-- Séparateurs (`nav-sep`) : ligne de 24 px de large, hauteur 0.5 px
-
-| État | Fond icône | Couleur stroke | Dark | Light |
-|---|---|---|---|---|
-| Inactif | transparent | Atténué | `#4DFFFFFF` | `#FF888888` |
-| Actif | Teinté violet | Violet | `#338B5CF6` fond / `#FFA78BFA` icône | `#FFEEEDFE` fond / `#FF534AB7` icône |
-
----
-
-## 6. Barre de titre (toolbar principal)
-
-Contient de gauche à droite :
-1. **Sélecteur de version** — dropdown avec nom de patch (ex: `HOTFIX - sc-alpha-4.7.0-hotfix`)
-2. **Bouton dossier** — sélection manuelle du répertoire de données
-3. **Bouton export** — action secondaire
-4. **Spacer** — pousse les éléments suivants à droite
-5. **Indicateur de connexion gRPC** — voir section 10
-
-| Élément | Dark fond | Dark bordure | Light fond | Light bordure |
-|---|---|---|---|---|
-| Dropdown version | `#0FFFFFFF` | `#1AFFFFFF` | `#FFFFFFFF` | `#FFC8C8C8` |
-| Bouton action | `#0FFFFFFF` | `#1AFFFFFF` | `#FFFFFFFF` | `#FFC8C8C8` |
-| Séparateur vertical | `#1AFFFFFF` | — | `#FFD0D0D0` | — |
-
----
-
-## 7. Système de badges
-
-Tous les badges suivent le même principe : **fond teinté + bordure 0.5 px + texte de même teinte + point coloré optionnel**. C'est le langage visuel unifié de toute l'application.
-
-### Formule générale
-
-```
-fond   : couleur_base à alpha 0.12–0.15
-bordure: couleur_base à alpha 0.30
-texte  : couleur_base pleine (alpha FF) en dark
-         teinte foncée (stop 800) en light
-```
-
-### 7.1 Badges de statut Blueprint
-
-| Badge | Dark fond | Dark bordure | Dark texte | Light fond | Light bordure | Light texte |
-|---|---|---|---|---|---|---|
-| Tier 1 | `#338B5CF6` | `#598B5CF6` | `#FFA78BFA` | `#FFEEEDFE` | `#FFAFA9EC` | `#FF3C3489` |
-| ∞ Utilisations | `#261D9E75` | `#4D1D9E75` | `#FF5DCAA5` | `#FFE1F5EE` | `#FF5DCAA5` | `#FF0F6E56` |
-| Timer | `#0FFFFFFF` | `#1AFFFFFF` | `#73FFFFFF` | `#FFF2F2F2` | `#FFDDDDD` | `#FF777777` |
-
-### 7.2 Badges de statut Ami / Shard
-
-| Statut | Dark fond | Dark bordure | Dark texte | Light fond | Light bordure | Light texte |
-|---|---|---|---|---|---|---|
-| Persistent Universe | `#268B5CF6` | `#598B5CF6` | `#FFA78BFA` | `#FFEEEDFE` | `#FFAFA9EC` | `#FF3C3489` |
-| Menu principal | `#261D9E75` | `#4D1D9E75` | `#FF5DCAA5` | `#FFE1F5EE` | `#FF5DCAA5` | `#FF0F6E56` |
-| Arena Commander | `#1EEF9F27` | `#4CEF9F27` | `#FFEF9F27` | `#FFFAEEDA` | `#FFEF9F27` | `#FF633806` |
-| Hors ligne | `#0DFFFFFF` | `#1AFFFFFF` | `#40FFFFFF` | `#FFF2F2F2` | `#FFDDDDDD` | `#FFAAAAAA` |
-
-### 7.3 Badges de statut Vaisseau (Mon Hangar)
-
-| Statut | Dark fond | Dark bordure | Dark texte | Light fond | Light bordure | Light texte |
-|---|---|---|---|---|---|---|
-| Rangé | `#1F8B5CF6` | `#4D8B5CF6` | `#FFA78BFA` | `#FFEEEDFE` | `#FFAFA9EC` | `#FF3C3489` |
-| Non demandé | `#1E1D9E75` | `#4D1D9E75` | `#FF5DCAA5` | `#FFE1F5EE` | `#FF5DCAA5` | `#FF0F6E56` |
-| Détruit | `#1DE24B4A` | `#4DE24B4A` | `#FFF09595` | `#FFF7C1C1` | `#FFF09595` | `#FFA32D2D` |
-| Dans la nature | `#1EEF9F27` | `#4CEF9F27` | `#FFEF9F27` | `#FFFAEEDA` | `#FFEF9F27` | `#FF854F0B` |
-| Inconnu | `#0DFFFFFF` | `#1AFFFFFF` | `#40FFFFFF` | `#FFF2F2F2` | `#FFDDDDDD` | `#FFAAAAAA` |
-
-### 7.4 Badges de région (Shard)
-
-| Région | Dark fond | Dark bordure | Dark texte | Light fond | Light bordure | Light texte |
-|---|---|---|---|---|---|---|
-| Europe | `#1E378ADD` | `#4D378ADD` | `#FF85B7EB` | `#FFE6F1FB` | `#FF85B7EB` | `#FF0C447C` |
-| USA | `#1E1D9E75` | `#4D1D9E75` | `#FF5DCAA5` | `#FFE1F5EE` | `#FF5DCAA5` | `#FF085041` |
-| Asie | `#1EEF9F27` | `#4CEF9F27` | `#FFEF9F27` | `#FFFAEEDA` | `#FFEF9F27` | `#FF633806` |
-| Australie | `#1ED85A30` | `#4DD85A30` | `#FFF0997B` | `#FFFAECE7` | `#FFF0997B` | `#FF712B13` |
-
-### 7.5 Badges de type d'emplacement (Mon Hangar / Objets)
-
-Les badges d'emplacement n'affichent que l'icône (pas de label) dans les tableaux. Le label est réservé à la légende en haut de page.
-
-| Type | Dark fond | Dark bordure | Dark icône | Light fond | Light bordure | Light icône |
-|---|---|---|---|---|---|---|
-| Lieu (épingle) | `#1E378ADD` | `#4D378ADD` | `#FF85B7EB` | `#FFE6F1FB` | `#FF85B7EB` | `#FF0C447C` |
-| Hangar (maison) | `#1F8B5CF6` | `#4D8B5CF6` | `#FFA78BFA` | `#FFEEEDFE` | `#FFAFA9EC` | `#FF534AB7` |
-| Vaisseau (café) | `#1EEF9F27` | `#4CEF9F27` | `#FFEF9F27` | `#FFFAEEDA` | `#FFEF9F27` | `#FF633806` |
-| Joueur (silhouette) | `#1E1D9E75` | `#4D1D9E75` | `#FF5DCAA5` | `#FFE1F5EE` | `#FF5DCAA5` | `#FF0F6E56` |
-| Inconnu (?) | `#0DFFFFFF` | `#1AFFFFFF` | `#40FFFFFF` | `#FFF2F2F2` | `#FFDDDDDD` | `#FFAAAAAA` |
-
----
-
-## 8. Bouton "Charger / Actualiser"
-
-Bouton d'action primaire récurrent dans les écrans à liste. Toujours accompagné d'une icône de rechargement (rotation animée pendant le chargement).
-
-| État | Dark fond | Dark bordure | Dark texte | Light fond | Light bordure | Light texte |
-|---|---|---|---|---|---|---|
-| Normal | `#268B5CF6` | `#598B5CF6` | `#FFA78BFA` | `#FFEEEDFE` | `#FFAFA9EC` | `#FF534AB7` |
-| Hover | `#408B5CF6` | `#598B5CF6` | `#FFA78BFA` | `#FFCECBF6` | `#FFAFA9EC` | `#FF534AB7` |
-| Disabled | `#0D8B5CF6` | `#1F8B5CF6` | `#59A78BFA` | `#FFF6F6FD` | `#FFD8D7F3` | `#FFB0ACDB` |
-
-- Taille texte : 11 px, poids 500
-- Icône : 11×11 px, même couleur que le texte
-- Border-radius : 6–7 px
-- Padding : 5 px vertical, 11 px horizontal
-
----
-
-## 9. Champ de recherche
-
-Présent dans les écrans à liste (Blueprints, etc.).
-
-- Fond : légèrement plus clair que le panneau
-- Une icône loupe à gauche (12×12 px, couleur atténuée)
-- Un bouton croix à droite, **visible uniquement quand le champ est rempli**
-- Focus : bordure colorée en violet
-
-| État | Dark fond | Dark bordure | Light fond | Light bordure |
-|---|---|---|---|---|
-| Normal | `#0DFFFFFF` | `#1AFFFFFF` | `#FFFFFFFF` | `#FFD0D0D0` |
-| Focus | `#0DFFFFFF` | `#80A78BFA` | `#FFFFFFFF` | `#FF7F77DD` |
-
----
-
-## 10. Indicateur de connexion gRPC (barre de titre)
-
-Toujours positionné à l'extrême droite de la barre de titre. Affiche l'état de la connexion au serveur du jeu.
-
-| État | Description | Dark fond | Dark bordure | Dark texte | Light fond | Light bordure | Light texte |
-|---|---|---|---|---|---|---|---|
-| Jeu non détecté | Fichier de connexion absent | `#0AFFFFFF` | `#14FFFFFF` | `#4DFFFFFF` | `#0A000000` | `#17000000` | `#FFAAAAAA` |
-| Connexion en cours | Point animé (pulse) | `#1EEF9F27` | `#4CEF9F27` | `#FFEF9F27` | `#19EF9F27` | `#4CEF9F27` | `#FF854F0B` |
-| Connecté | Sans shard | `#1E1D9E75` | `#4D1D9E75` | `#FF5DCAA5` | `#19EF9F27` — voir note | `#4D1D9E75` | `#FF085041` |
-| En jeu + shard | ID de shard affiché | `#268B5CF6` | `#598B5CF6` | `#FFA78BFA` | `#1F8B5CF6` | `#4D8B5CF6` | `#FF3C3489` |
-| Erreur | Message tronqué + tooltip | `#1FE24B4A` | `#4DE24B4A` | `#FFF09595` | `#14E24B4A` | `#4DE24B4A` | `#FFA32D2D` |
-
-**Structure de l'indicateur "En jeu + shard" :**
-```
-● En jeu  ·  pub_euw1b_11523279_080
-```
-- Point : 7 px, couleur pleine
-- Label : 11 px, poids 500
-- Séparateur `·` : 10 px, alpha 35%
-- ID de shard : 10 px, monospace, alpha 65% (dark) / couleur foncée (light)
-
-**Structure de l'indicateur "Erreur" :**
-```
-● Erreur  ·  ⓘ  StatusCode=Unauthenticated, token exp…
-```
-- Le message est tronqué à 160 px max avec `text-overflow: ellipsis`
-- Au survol : tooltip avec le message complet en police monospace
-- Fond du tooltip : toujours sombre (`#FF1C1C2E`) avec bordure rouge dans les deux thèmes
-
----
-
-## 11. Tableaux de données
-
-Utilisés dans : Amis, Mon Hangar, Objets.
-
-### Règles générales
-
-- `table-layout: fixed` — largeurs de colonnes fixes, jamais auto
-- En-tête collant (`position: sticky`) avec fond légèrement différent
-- Hauteur de ligne : 48–56 px selon la densité du contenu
-- Séparateurs horizontaux uniquement (`0.5px`)
-- Hover de ligne : fond très léger (`#08FFFFFF` dark / `#0A000000` light)
-- Pas de bordures verticales entre colonnes
-
-### Couleurs de tableau
-
-| Élément | Dark | Light |
-|---|---|---|
-| Fond en-tête | `#FF111318` | `#FFF8F8F8` |
-| Bordure en-tête | `#14FFFFFF` | `#FFE0E0E0` |
-| Texte en-tête (th) | `#4DFFFFFF` | `#FFBBBBBB` |
-| Fond ligne normal | transparent | transparent |
-| Fond ligne hover | `#08FFFFFF` | `#0A000000` |
-| Bordure ligne | `#0DFFFFFF` | `#FFE8E8E8` |
-| Texte cellule | `#B3FFFFFF` | `#FF555555` |
-
-### Colonnes indicatrices (point seul)
-
-Pour les colonnes booléennes (Store, En ligne...), utiliser un point de 7–8 px centré plutôt qu'une case à cocher ou un texte.
-
-| État | Dark | Light |
-|---|---|---|
-| Vrai / Actif | `#FF5DCAA5` (vert teal) | `#FF1D9E75` |
-| Faux / Inactif | `#30FFFFFF` | `#FFD0D0D0` |
-
----
-
-## 12. Cartes de modificateurs (Blueprint detail)
-
-Chaque modificateur s'affiche dans une carte avec deux colonnes : **Ressources** (gauche) et **Propriétés** (droite), séparées par un diviseur vertical.
-
-| Élément | Dark | Light |
-|---|---|---|
-| Fond de carte | `#08FFFFFF` | `#FFFAFAFA` |
-| Bordure de carte | `#14FFFFFF` | `#FFE4E4E4` |
-| En-tête de carte | même fond | même fond |
-| Bordure bas en-tête | `#0FFFFFFF` | `#FFECECEC` |
-| Titre de carte (mod-name) | `#D9FFFFFF` — 13 px / 500 | `#FF2A2A2A` — 12 px / 500 |
-| Label section (RESSOURCES / PROPRIÉTÉS) | `#4DFFFFFF` — 10 px / 500 / caps | `#FFBBBBBB` — 10 px / 500 / caps |
-| Point de ressource | `#FFA78BFA` | `#FF7F77DD` |
-| Nom de ressource | `#99FFFFFF` — 12 px | `#FF666666` — 11 px |
-| Quantité de ressource | `#D9FFFFFF` — 12 px / 500 | `#FF333333` — 11 px / 500 |
-| Nom de propriété | `#80FFFFFF` — 12 px | `#FF999999` — 11 px |
-| Valeur de propriété | `#D9FFFFFF` — 12 px | `#FF333333` — 11 px |
-| Séparateur min–max | `#33FFFFFF` — 10 px | `#FFCCCCCC` — 10 px |
-| Diviseur vertical | `#12FFFFFF` | `#FFE8E8E8` |
-
----
-
-## 13. Icônes d'équipement (StreamGeometry Avalonia)
-
-8 sous-types définis, utilisables via `{StaticResource Icon.Xxx}` dans un `Path`.
-
-| Clé | Description |
-|---|---|
-| `Icon.Helmet` | Casque — calotte avec oreillettes et visière |
-| `Icon.Body` | Corps — plastron avec épaulières |
-| `Icon.Arms` | Bras — paire de brassards avec coudières |
-| `Icon.Legs` | Jambes — paire de jambières avec genouillères |
-| `Icon.HeavyWeapon` | Arme lourde — fusil épais avec crosse large |
-| `Icon.LightWeapon` | Arme légère — fusil profilé avec chargeur bas |
-| `Icon.Pistol` | Pistolet — compact avec crosse vers le bas |
-| `Icon.Ammunition` | Munition — cartouche vue de face |
-
-**Usage :**
-```xml
-<Path Data="{StaticResource Icon.Helmet}"
-      Stretch="Uniform"
-      Width="20" Height="20"
-      Fill="{DynamicResource AccentBrush}" />
-```
-
-**Notes :** Toutes les géométries sont dessinées dans un espace 38×38. `Stretch="Uniform"` est obligatoire. Pour le rendu filaire original, utiliser `Stroke` + `Fill="Transparent"` + `StrokeThickness="1.5"`.
-
----
-
-## 14. Écran "Extractions" (page d'actions)
-
-Les fonctionnalités sont présentées en **cartes d'action** horizontales, groupées par sections.
-
-**Structure d'une carte :**
-```
-[ ICÔNE ] [ TITRE          ] [ BOUTON ACTION ]
-          [ description     ]
-```
-
-- Icône : 38×38 px, border-radius 9 px, couleur selon la nature de l'action
-- Titre : 13 px / 500
-- Description : 11 px, couleur atténuée, peut être multi-ligne
-- Bouton : aligné à droite, même couleur que l'icône de la carte
-
-**Barre de progression (pendant l'exécution) :** s'affiche sous la carte concernée, avec track de fond neutre et fill coloré animé. En dark, spinner animé. En light, barre de progression.
-
----
-
-## 15. Règles de design générales
-
-### Hiérarchie visuelle
-Toujours trois niveaux dans une vue : titre, données principales, métadonnées. Jamais de texte à poids identique sur toute une page.
-
-### Espacement
-- Gap entre cards : 10–14 px
-- Padding interne d'une card : 16–18 px
-- Padding cellule tableau : 0 vertical (hauteur fixe), 14 px horizontal
-
-### Border-radius
-| Composant | Radius |
-|---|---|
-| Fenêtre principale | 12 px |
-| Card / bloc | 8–10 px |
-| Bouton | 6–7 px |
-| Badge | 4–5 px |
-| Icône d'équipement | 9–10 px |
-| Icône de navigation | 8 px |
-| Avatar / placeholder | 8 px |
-
-### Transparences (dark uniquement)
-Privilégier les couleurs semi-transparentes sur fond sombre plutôt que des couleurs opaques interpolées. Cela garantit la cohérence si le fond change.
-
-### Ce qu'on ne fait pas
-- Pas de bordures à 1 px (toujours 0.5 px)
-- Pas de couleurs plein opaque pour les fonds de zones secondaires en dark
-- Pas de labels répétés dans un tableau quand une légende globale suffit (voir badges d'emplacement)
-- Pas d'ombre portée (`box-shadow` / `DropShadow`) — les bordures et les fonds semi-transparents suffisent
-- Pas de gradient dans les fonds
-
----
-
-## 16. Composants Avalonia — Notes d'intégration
-
-### ListBoxItem — indicateur de sélection
-FluentAvalonia ajoute un `Rectangle#SelectionIndicator` (barre violette à gauche). Pour le masquer :
-```xml
-<Style Selector="ListBox.my-class > ListBoxItem:selected /template/ Rectangle#SelectionIndicator">
-    <Setter Property="IsVisible" Value="False"/>
-</Style>
-```
-
-### DataGrid — séparateur de colonne
-Agir sur la propriété source, pas le template :
-```xml
-<Style Selector="DataGridColumnHeader">
-    <Setter Property="AreSeparatorsVisible" Value="False" />
-</Style>
-```
-
-### Bouton Disabled
-Ne pas utiliser `Opacity` global sur le bouton — surcharger les brushes individuellement via `:disabled` dans le `ControlTheme`.
-
-### Tooltip d'erreur
-Utiliser `ToolTip.Tip` natif d'Avalonia pour le message complet. Ne pas implémenter la visibilité manuellement.
-
----
-
-## 17. Écran "Réputations"
-
-Affiche l'ensemble des factions du jeu avec la réputation actuelle du joueur. Chargement déclenché manuellement via le bouton "Charger les données" (section 8).
-
-### 17.1 Structure de l'écran
-
-```
-[ BARRE DE TITRE — commune ]
-[ top-bar : titre "Réputations" | bouton Charger les données ]
-[ barre de recherche ]
-[ grille de cartes faction — 3 colonnes ]
-```
-
-- Grille : `3` colonnes fixes, gap `9 px`
-- Chaque carte contient : avatar/initiales · nom de faction · badge état relationnel · un ou plusieurs scopes de réputation (barre + rang)
-
-### 17.2 Avatar / initiales
-
-L'encadré est **toujours neutre**, indépendant de l'état ou du palier. Si une icône PNG de faction est disponible, elle remplace les initiales sans changer le conteneur.
-
-| Élément | Dark | Light |
-|---|---|---|
-| Fond avatar | `#14FFFFFF` | `#FFF0F0F0` |
-| Bordure avatar | `#1AFFFFFF` | `#FFE0E0E0` |
-| Texte initiales | `#66FFFFFF` | `#FFAAAAAA` |
-| Taille | 30×30 px | 30×30 px |
-| Border-radius | 7 px | 7 px |
-| Police | 10 px / 600 / letter-spacing 0.03em | idem |
-
-### 17.3 Code couleur — État relationnel (bordure gauche de carte)
-
-La bordure gauche de `2 px` (seule exception à la règle des `0.5 px`) encode l'état relationnel. La bordure périphérique de la carte reste à `0.5 px`.
-
-| État | Dark bordure gauche | Dark bordure carte | Light bordure gauche | Light bordure carte |
-|---|---|---|---|---|
-| Allié | `#FF1D9E75` | `#591D9E75` | `#FF1D9E75` | `#401D9E75` |
-| Neutre | `#30FFFFFF` | `#17FFFFFF` | `#FFCCCCCC` | `#FFE4E4E4` |
-| Hostile | `#FFE24B4A` | `#4DE24B4A` | `#FFE24B4A` | `#33E24B4A` |
-| Non chargé | `#14FFFFFF` | `#0AFFFFFF` | `#FFE0E0E0` | `#FFEEEEEE` |
-
-**Badge texte état** (sous le nom de faction, 10 px / 500 / caps) :
-
-| État | Dark | Light |
-|---|---|---|
-| ALLIÉ | `#FF5DCAA5` | `#FF0F6E56` |
-| NEUTRE | `#40FFFFFF` | `#FFAAAAAA` |
-| HOSTILE | `#FFF09595` | `#FFA32D2D` |
-| NON CHARGÉ | `#1FFFFFFF` | `#FFCCCCCC` |
-
-**Fond de carte par état :**
-
-| État | Dark | Light |
-|---|---|---|
-| Allié | `#05FFFFFF` | `#FFFAFAFA` |
-| Neutre | `#05FFFFFF` | `#FFFAFAFA` |
-| Hostile | `#08E24B4A` | `#FFF9F3F3` |
-| Non chargé | `#05FFFFFF` (opacity 0.55) | `#FFFAFAFA` (opacity 0.55) |
-
-### 17.4 Code couleur — Palier de réputation (fill de barre)
-
-Le fill encode le palier atteint, **indépendamment de la faction**. La track reste toujours neutre.
-
-| Palier | Nom générique | Dark fill | Light fill |
-|---|---|---|---|
-| P1 | Not Eligible | `#FF555555` | `#FF888888` |
-| P2 | Applicant | `#FF85B7EB` | `#FF378ADD` |
-| P3 | Trainee | `#FFEF9F27` | `#FFBA7517` |
-| P4 | Jr. Rank | `#FF5DCAA5` | `#FF1D9E75` |
-| P5 | Rank | `#FF1D9E75` | `#FF0F6E56` |
-| P6 | Sr. Rank | `#FFA78BFA` | `#FF534AB7` |
-| P7 | Master | `#FFEF9F27` + outline `1.5 px` | `#FFBA7517` + outline `1.5 px` |
-
-> **Note P7 Master :** même couleur ambre que P3, distingué par un contour de `1.5 px` sur la barre et un texte de rang en gras (500).
-
-**Track (fond de barre) et dimensions :**
-
-| Élément | Dark | Light |
-|---|---|---|
-| Track | `#0FFFFFFF` | `#FFEBEBEB` |
-| Hauteur barre | 4 px | 4 px |
-| Border-radius | 2 px | 2 px |
-
-**Label de scope** (au-dessus de chaque barre, 10 px / 500 / caps) :
-
-| | Dark | Light |
-|---|---|---|
-| Couleur | `#33FFFFFF` | `#FFBBBBBB` |
-
-**Texte de rang** (sous la barre, 10 px / normal) :
-
-| | Dark | Light |
-|---|---|---|
-| Couleur | `#59FFFFFF` | `#FF999999` |
-| Couleur P7 | `#B3FFFFFF` / 500 | `#FF555555` / 500 |
-
-### 17.5 État "Non chargé"
-
-Carte à `opacity: 0.55`, sans barres de progression. Un texte d'aide remplace les scopes.
-
-| Élément | Dark | Light |
-|---|---|---|
-| Texte d'aide | `#1FFFFFFF` — 10 px | `#FFCCCCCC` — 10 px |
-
-### 17.6 Règles de composition
-
-- **Scopes multiples** : s'empilent verticalement dans la carte, séparés par un gap de `6 px`. Chaque scope est indépendant (label + barre + rang).
-- **Pas de couleur par faction** : l'avatar/initiales est toujours gris neutre. La couleur n'encode que l'état et le palier.
-- **Bordure gauche 2 px** : seule exception à la règle générale des `0.5 px`. Justifiée car elle encode une information de premier niveau (état relationnel) et doit être perçue immédiatement dans la grille.
-- **Nombre de colonnes** : 3 colonnes fixes. Si le nombre de factions est important, la grille défile verticalement.
-
-### 17.7 Liste des ranks (scope déplié)
-
-Modélise la relation `1 faction → m scope → n rank`. Chaque scope est cliquable et déplie la liste verticale de tous ses ranks.
-
-**Interaction**
-
-- **Clic sur le scope** → déplie / replie la liste des ranks. Un chevron `›` à gauche du label pivote de 90° (`transition: transform .15s`).
-- Plusieurs scopes peuvent être dépliés simultanément.
-- Le menu contextuel (clic droit) est réservé aux actions (copier / exporter une valeur), jamais à l'affichage de cette liste.
-
-**Sélection du rang courant**
-
-Le rang courant est le dernier rank dont le `threshold ≤ valeur du scope`. Si aucune valeur de réputation n'est disponible, on retombe sur le premier rank (valeur initiale définie dans le scope). Le calcul ne doit jamais être codé en dur côté vue.
-
-```
-rangCourant = dernier rank tel que rank.threshold <= scope.value
-fill (%)    = (value - seuilCourant) / (seuilSuivant - seuilCourant), borné [4 %, 100 %]
-```
-
-> Le fill de la barre représente la progression **à l'intérieur du palier courant**, et non une position absolue sur l'ensemble des paliers.
-
-**Structure d'une ligne de rank**
-
-Grille à 4 colonnes : `[ point 14 px ] [ nom (flex) ] [ seuil (auto) ] [ bonus (auto) ]`, gap `8 px`, padding `4 px 6 px`, border-radius `5 px`, taille de police `10 px`.
-
-| Colonne | Contenu | Police |
-|---|---|---|
-| Point palier | pastille `7×7 px`, couleur du palier (§17.4) | — |
-| Nom du rank | nom complet | 500 |
-| Seuil | valeur numérique du seuil | monospace |
-| Bonus | bonus associé, `—` si aucun | monospace, min-width 34 px, aligné droite |
-
-**Couleurs de la liste**
-
-| Élément | Dark | Light |
-|---|---|---|
-| Séparateur haut de liste | `#0FFFFFFF` (0.5 px) | `#FFECECEC` (0.5 px) |
-| Nom (rank verrouillé) | `#80FFFFFF` | `#FF666666` |
-| Seuil (verrouillé) | `#47FFFFFF` | `#FF999999` |
-| Bonus (verrouillé) | `#40FFFFFF` | `#FFAAAAAA` |
-| Ranks non atteints | `opacity: 0.45` | `opacity: 0.45` |
-
-**Ligne du rang courant (surlignée)**
-
-| Élément | Dark | Light |
-|---|---|---|
-| Fond de ligne | `#1A1D9E75` | `#FFE1F5EE` |
-| Nom | `#FF5DCAA5` | `#FF0F6E56` |
-| Seuil | `#80FFFFFF` | `#FF444444` |
-| Bonus | `#FF5DCAA5` | `#FF0F6E56` |
-
-**Cas P7 Master** : la pastille reçoit un `outline: 1.5 px` de la couleur P7, `outline-offset: 1 px` (cohérent avec §17.4).
-
-### 17.8 Valeur brute et mode Debug
-
-**Valeur brute (toujours visible)**
-
-La valeur numérique du scope est affichée en permanence à droite du label, en monospace atténué — jamais masquée derrière un survol, afin de permettre la comparaison visuelle entre plusieurs scopes.
-
-| Élément | Dark | Light |
-|---|---|---|
-| Valeur brute | `#47FFFFFF` — monospace 10 px | `#FF888888` — monospace 10 px |
-
-**Mode Debug / Expérimentation (toggle global)**
-
-Un interrupteur unique dans la top-bar de l'écran affecte tous les scopes simultanément. Destiné au suivi fin de progression et à l'estimation du split d'XP (partage de missions).
-
-Quand il est actif :
-- La valeur passe de `1240` à `1240 / 2000 (+760)` : valeur courante / seuil du prochain rank / distance restante.
-- Le texte de rang est complété : `Senior Tracker · +15% · reste 760 → Master`.
-- L'état déplié des scopes est préservé lors du basculement du toggle.
-
-| Élément | Dark | Light |
-|---|---|---|
-| Valeur (mode debug) | `#80FFFFFF` | `#FF444444` |
-| Mention « (+reste) » | `#FF5DCAA5` | `#FF0F6E56` |
-
-**Toggle (interrupteur)**
-
-| Élément | Dark | Light |
-|---|---|---|
-| Piste OFF | `#0FFFFFFF` / bordure `#1AFFFFFF` | `#FFEBEBEB` / bordure `#FFD0D0D0` |
-| Curseur OFF | `#35FFFFFF` | `#FFAAAAAA` |
-| Piste ON | `#24A78BFA` / bordure `#52A78BFA` | `#FFEEEDFE` / bordure `#FFAFA9EC` |
-| Curseur ON | `#FFA78BFA` | `#FF534AB7` |
-| Dimensions | 32×18 px, curseur 13 px, course 14 px | idem |
-
----
-
-## 18. Nouvelle charte (refonte)
-
-Validée en novembre 2026 à partir des maquettes de la direction « Inventaire expert ». Écran migré à ce jour : **Objets**. Implémentation : `Style/SxTheme.axaml` (ressources `Sx.*`) et `Components/`.
-
-Un écran migré applique les classes `sx`, sans valeur en dur. **Thème sombre uniquement pour l'instant** : un écran migré force le thème sombre avec `ThemeVariantScope` tant que le thème clair n'est pas dessiné.
-
-### 18.1 Couleurs
+## 2. Couleurs
 
 | Rôle | Ressource | Valeur |
 |---|---|---|
-| Fond | `Sx.BackgroundBrush` | `#FF0B0D12` |
-| Surface (panneaux, cartes) | `Sx.SurfaceBrush` | `#FF12151C` |
-| Relief (survol, champs, bouton secondaire) | `Sx.ReliefBrush` | `#FF1A1E27` |
-| Ligne (bordures, séparateurs) | `Sx.LineBrush` | `#FF2A2F3A` |
+| Fond (fenêtre, entre les blocs) | `Sx.BackgroundBrush` | `#FF0B0D12` |
+| Surface (blocs, panneaux, menu) | `Sx.SurfaceBrush` | `#FF12151C` |
+| Relief (survol, cartes dans un bloc, bouton secondaire) | `Sx.ReliefBrush` | `#FF1A1E27` |
+| Ligne (bordures, séparateurs, piste de barre) | `Sx.LineBrush` | `#FF2A2F3A` |
 | Texte | `Sx.TextBrush` | `#FFF2F4F8` |
-| Secondaire (labels) | `Sx.SecondaryBrush` | `#FFA4ACBA` |
-| Discret (indications) | `Sx.MutedBrush` | `#FF8A93A5` |
+| Secondaire (labels, en-têtes, icônes au repos) | `Sx.SecondaryBrush` | `#FFA4ACBA` |
+| Discret (indications, placeholders, désactivé) | `Sx.MutedBrush` | `#FF8A93A5` |
 | Accent (action, sélection) | `Sx.AccentBrush` | `#FFE8B04A` |
 | Accent survol | `Sx.AccentHoverBrush` | `#D9E8B04A` |
 | Accent doux (fond sélectionné) | `Sx.AccentSoftBrush` | `#24E8B04A` |
-| Accent marqué (icône de filtre actif) | `Sx.AccentStrongBrush` | `#55E8B04A` |
+| Accent marqué (filtre actif, bascule survolée) | `Sx.AccentStrongBrush` | `#55E8B04A` |
 | Sur accent (texte d'un bouton plein) | `Sx.OnAccentBrush` | `#FF0B0D12` |
 
-Tons de badge et de pastille, chacun avec une ressource pleine et une ressource `SoftBrush` à alpha `24` : Succès `#FF4FD1A5`, Attention `#FFF08A4B`, Info `#FF6CB6FF`, Neutre `#FFA4ACBA`, Danger `#FFF2666A`.
+**Tons** de badge et de pastille : une ressource pleine pour le texte et la pastille, une ressource `SoftBrush` à alpha `24` pour le fond.
 
-### 18.2 Typographie
+| Ton | Ressource | Valeur | Usages |
+|---|---|---|---|
+| Succès | `Sx.SuccessBrush` | `#FF4FD1A5` | connecté, rangé, obtenu, Univers persistant, grade A |
+| Attention | `Sx.WarningBrush` | `#FFF08A4B` | en cours, Arena Commander, grade C |
+| Danger | `Sx.DangerBrush` | `#FFF2666A` | détruit, erreur, grades D et E |
+| Info | `Sx.InfoBrush` | `#FF6CB6FF` | région, menu principal, grade B |
+| Neutre | `Sx.NeutralBrush` | `#FFA4ACBA` | non demandé, hors ligne, non chargé, défaut |
 
-Quatre tailles : **20** (titre, 600), **14 ou 13** (texte), **12** (légende, en-tête de colonne), **11** (compteur monospace). Polices : `Sx.FontSans` et `Sx.FontMono` pour les nombres et identifiants. La cible est IBM Plex Sans / Mono ; Inter et Cascadia Mono les remplacent tant que les polices ne sont pas embarquées.
+---
 
-### 18.3 Formes
+## 3. Typographie
 
-- **Angles coupés** (`comp:NotchedBorder`, haut droit et bas gauche) : 7 px pastille d'icône, 9 px petit champ et bouton compact, 11 px champ et bouton, 12 px panneau flottant, 18 px bloc principal.
-- **Puces** (`Button.sx-chip`) : seul élément arrondi, rayon 17 px, hauteur 34 px.
-- **Bordures** : 1 px, couleur Ligne. La règle des 0,5 px ne s'applique pas ici.
-- L'ombre portée du panneau flottant est autorisée ; aucune autre.
+Polices : `Sx.FontSans` pour tout le texte, posée une fois sur la racine de l'écran (`TextElement.FontFamily`) ; `Sx.FontMono` (ou la classe `sx-mono`) pour les nombres, identifiants techniques et compteurs. La cible des maquettes est IBM Plex Sans / Mono ; Inter et Cascadia Mono les remplacent tant que ces polices ne sont pas embarquées.
 
-### 18.4 Composants
+| Taille | Poids | Usage |
+|---|---|---|
+| 30 | 600 | Titre d'un détail (vaisseau, blueprint, mission) et d'une page d'actions |
+| 22 | 500, mono | Valeur en grand dans une carte (montant, pourcentage) |
+| 20 | 600 | Titre d'écran dans un bloc (`TextBlock.sx-title`) |
+| 16 | 600 | Titre de section dans un détail |
+| 14 | 400–500 | Nom mis en avant (vaisseau, ami) |
+| 13 | 400 | Texte courant, cellules, boutons |
+| 12 | 400–600 | Légende (`TextBlock.sx-caption`), en-tête de colonne, badge, sous-titre |
+| 11 | 400, mono | Compteur (`TextBlock.sx-count`) ; aussi le contractant au-dessus d'un titre de mission |
+
+Poids utilisés : 400, 500 (`Medium`), 600 (`SemiBold`). Pas de gras 700.
+
+---
+
+## 4. Formes
+
+**Angles coupés** en haut à droite et en bas à gauche, avec `comp:NotchedBorder` (`CutSize`, `Background`, `BorderBrush`, `StrokeThickness`) :
+
+| Coupe | Usage |
+|---|---|
+| 7 | badge, pastille d'icône 24 px |
+| 9 | ligne de liste, bouton du menu, petit champ, bouton compact |
+| 11 | champ, bouton 44 px, tuile d'icône 56 px |
+| 12 | panneau flottant (filtre de colonne) |
+| 14 | carte dans un bloc (récompense, modificateur, composant) |
+| 18 | bloc principal, menu latéral, carte de page d'actions |
+
+- **Puces** (`Button.sx-chip`) : seul élément arrondi avec la barre de progression, rayon 17, hauteur 34.
+- **Bordures** : 1 px, couleur Ligne. Les blocs et les cartes n'ont pas de contour.
+- **Icônes** : tracés en contour sur une grille de 24 px (`viewBox 0 0 24 24`), trait 1,7 à 2, extrémités et jonctions arrondies, sans remplissage.
+
+---
+
+## 5. Mise en page
+
+- La fenêtre a le fond `Sx.BackgroundBrush`. Chaque écran pose une marge de 12 px et sépare ses blocs de 12 px.
+- Un bloc est un `NotchedBorder` Surface coupe 18.
+- Les écrans suivent trois modèles :
+
+| Modèle | Écrans | Structure |
+|---|---|---|
+| Tableau filtrable | Objets, Mon hangar, Amis, Armes FPS, Réputations | Un bloc : barre d'outils (titre 20, compteur, recherche, boutons ; padding 20 × 14, séparateur), rangées de puces avec un libellé de 72 px, puis le tableau ou la grille de cartes. Panneau de détail à droite (300 à 340 px) pour Objets et Armes FPS. |
+| Liste et détail | Blueprints, Loadout vaisseaux, Missions | Une colonne de liste (280 à 340 px : titre, compteur, recherche, puces, liste à lignes coupées), puis le détail (padding 28 × 26, titre 30, sections espacées de 22 px). Missions ajoute une colonne de catégories de 210 px. |
+| Page d'actions | Extractions, Paramètres | Pas de bloc principal : titre 30 et sous-titre directement sur le fond, sections en casse de phrase, cartes Surface coupe 18 sans contour, contenu limité à 1 120 px. Pastille d'action 44 px coupe 11 en or, boutons `sx primary`, progression `sx-quality` dans la carte. |
+
+- Message d'attente (« Sélectionnez… dans la liste ») : `sx-caption` 13 px dans la zone vide.
+- Grilles de cartes : `UniformGrid` dont le nombre de colonnes suit la largeur (`WidthToColumnsConverter`, largeur minimale en paramètre).
+
+### Menu latéral
+
+- Barre de 64 px, `NotchedBorder` Surface coupe 18, marge 12, padding vertical 14.
+- Logo StarXelem 34 px en haut (`Assets/xelem-logo.png`), puis une icône par écran : bouton de 44 px, coupe 9, icône de 21 px, trait 1,7.
+- Au repos : icône Secondaire. Survol : fond Relief, icône Texte. Écran actif : fond Accent doux, icône Accent.
+- Le nom de l'écran apparaît au survol, dans une infobulle à droite.
+- Chaque page fournit son tracé dans `PageViewModelBase.NavIconData`. Ordre : Objets, Mon hangar, Blueprints, Amis, Loadout vaisseaux, Armes FPS, Missions, Extractions, Réputations, Paramètres (roue crantée). Objets est l'écran d'ouverture.
+
+---
+
+## 6. Composants
 
 | Composant | Classe ou contrôle | Règle |
 |---|---|---|
-| Bouton | `Button.sx`, `.primary`, `.small` | Hauteur 44 px (34 px en `.small`). Un seul `.primary` par barre d'outils. |
-| Champ | `NotchedBorder.sx-field` + `TextBox.sx` | Contour accent au focus. |
-| Filtre rapide | `Button.sx-chip`, `.on` | Compteur monospace dans la puce. Au plus 8 puces, le reste passe par le filtre de colonne. |
-| Tableau | `DataGrid.sx` | Lignes de 34 px, séparateurs horizontaux, sélection en Accent doux. |
+| Bouton | `Button.sx`, `.primary`, `.small` | Hauteur 44 px (34 en `.small`), coupe 11. Un seul `.primary` par barre d'outils. |
 | Bouton bascule | `Button.sx` + `.on` | Fond Accent doux quand le panneau qu'il ouvre est déplié (ex. « Plages » des Armes FPS). Le libellé compte les filtres actifs du panneau replié. |
-| Badge de statut | `NotchedBorder.sx-badge` + `.success`, `.info`, `.warning`, `.danger` | Coupe 7 px, pastille 7 px et libellé 12 px semi-gras dans le ton, fond doux du même ton. Neutre sans classe. |
-| En-tête de colonne | `comp:ColumnHeader` | Voir 18.6. |
+| Champ | `NotchedBorder.sx-field` + `Path.sx-search-icon` + `TextBox.sx` | Fond Fond, contour Ligne, contour Accent au focus. |
+| Filtre rapide | `Button.sx-chip`, `.on` | Compteur `sx-count` dans la puce. La puce « Tous » fait partie de la même collection que les autres. Au plus 8 puces par rangée, le reste passe par le filtre de colonne. |
+| Badge de statut | `NotchedBorder.sx-badge` + `.success`, `.info`, `.warning`, `.danger` | Coupe 7, pastille de 7 px et libellé 12 px semi-gras dans le ton, fond doux du même ton. Neutre sans classe. |
+| Tableau | `DataGrid.sx` | En-têtes de 44 px, lignes de 34 px minimum, séparateurs horizontaux, survol Relief, sélection Accent doux. |
+| En-tête de colonne | `comp:ColumnHeader` | Tri et filtre, voir section 9. |
+| Liste | `ListBox` avec modèle d'élément `NotchedBorder` coupe 9 | Survol Relief, sélection Accent doux et semi-gras. Ligne à deux niveaux possible : légende 11 px au-dessus, ou sous-titre 12 px Discret en dessous. |
+| Tuile d'icône | `NotchedBorder` Neutre doux | 26 px coupe 7 dans une liste, 56 px coupe 11 en tête d'un détail. |
+| Carte | `NotchedBorder` Relief coupe 14 | Padding 16 × 14. Carte de valeur : valeur 22 mono, libellé 13 Secondaire, précision 12 Discret (en Accent quand elle renvoie à une autre section). |
+| Ligne cliquable | `Button` à modèle `NotchedBorder` coupe 9, fond Relief | Survol Accent doux et nom en Accent, infobulle qui dit où mène le clic (ex. blueprints possibles d'une mission). |
+| Case à cocher | `CheckBox.sx-muted` | Coche en Accent, texte 12 Secondaire. |
+| Barre de progression | `ProgressBar.sx-quality` | 4 px, rayon 2, piste Ligne, remplissage Accent. |
+| Paire libellé / valeur | `TextBlock` 12 Secondaire au-dessus, valeur 13 (mono si technique) | Pied de détail (réputation, nom technique), séparé par une ligne. Texte copiable : `SelectableTextBlock` avec police et couleur en ligne. |
+| Chargement | `ui:ProgressRing` sur un voile Surface à 0,75 d'opacité | Libellé `sx-caption` sous l'anneau (« Chargement… », « Filtrage en cours… »). |
 
-### 18.5 Emplacement d'un objet
+---
 
-Une pastille d'icône (`comp:LocationIcon`, 24 px), le nom, puis la destination finale en texte Discret 12 px. L'infobulle et le panneau de détail donnent le chemin complet.
+## 7. Emplacement d'un objet
+
+Une pastille d'icône (`comp:LocationIcon`, 24 px, coupe 7), le nom, puis la destination finale en texte Discret 12 px. L'infobulle et le panneau de détail donnent le chemin complet.
 
 | Catégorie | Icône | Ton |
 |---|---|---|
@@ -682,14 +151,56 @@ Une pastille d'icône (`comp:LocationIcon`, 24 px), le nom, puis la destination 
 | Caisse | Cube | Attention |
 | Autre | Point d'interrogation | Neutre |
 
-### 18.6 Tri et filtre par colonne
+---
+
+## 8. Familles de blueprint
+
+Icône et libellé de l'objet fabriqué : `Models/BlueprintFamily.cs` (`BlueprintFamilyInfo.GetIcon`, `GetTypeLabel`). Familles : Armures, Armes FPS, Armes vaisseau, Composants, Minage, Autres. Le type précis s'écrit « Casque · Armure lourde », « Refroidisseur · S1 · Grade C », « Arme vaisseau · Taille 3 ».
+
+---
+
+## 9. Tri et filtre par colonne
 
 - Le tri et le filtrage sont faits par le ViewModel (`CanUserSortColumns="False"`), pour survivre au rechargement des lignes.
 - Un clic sur le titre trie en ordre croissant, puis décroissant, puis revient à l'ordre d'origine. La flèche n'apparaît que sur la colonne triée.
 - Filtre par valeurs (`ColumnFilterViewModel`) sur les colonnes à valeurs répétées seulement. **Rien de coché signifie tout afficher**, et le filtre s'applique dès le clic.
 - Les valeurs sont triées par ordre alphabétique et en cascade : chacune indique son nombre de lignes selon les autres filtres, et une valeur à zéro disparaît sauf si elle est cochée.
-- Filtre actif : entonnoir en accent et nombre de valeurs cochées. Une puce et le filtre de sa colonne partagent le même état.
+- Filtre actif : entonnoir en Accent et nombre de valeurs cochées. Une puce et le filtre de sa colonne partagent le même état.
 
 ---
 
-*Dernière mise à jour : novembre 2026*
+## 10. Filtrage différé
+
+Tout écran filtrable applique le même fonctionnement, demandé par l'utilisateur après un gel à la première lettre :
+
+- Délai de 300 ms après la dernière frappe, 120 ms après un clic sur une puce ou un tri.
+- Une nouvelle demande annule la précédente (`CancellationTokenSource`).
+- Les critères sont copiés sur le thread d'UI, le calcul tourne hors du thread d'UI (`Task.Run`), puis le résultat est affiché.
+- Pendant le calcul, l'indicateur « Filtrage en cours… » recouvre la liste. Il n'est retiré que par la dernière demande, celle qui n'a pas été annulée.
+
+---
+
+## 11. Pièges Avalonia et FluentAvalonia
+
+- **`ListBoxItem` FluentAvalonia** : largeur minimale de 88 px. Pour un élément plus étroit (menu latéral), remettre `MinWidth` et `MinHeight` à 0.
+- **Modèle de `ListBoxItem`** : ne pas nommer le `ContentPresenter` `PART_ContentPresenter`, sinon les styles de sélection Fluent s'y appliquent.
+- **`Run.Text`** est lié dans les deux sens par défaut : avec un `StringFormat`, il boucle jusqu'au débordement de pile. Mettre `Mode=OneWay`, ou calculer le texte dans le ViewModel.
+- **`SelectableTextBlock`** n'hérite pas des styles `TextBlock.xxx` : poser police, taille et couleur en ligne.
+- **Couleurs Fluent d'un contrôle** (case cochée, curseur) : redéfinir ses ressources avec les valeurs `Sx` dans `Style.Resources`, comme `CheckBox.sx-muted`.
+- **Capture d'écran** : les prévisualisations Avalonia de l'IDE verrouillent `bin/Debug` ; compiler avec `-o` vers un dossier temporaire.
+
+---
+
+## 12. Éléments hors charte
+
+Ces éléments utilisent encore l'ancienne charte (`Style/BlueprintStyles.axaml`, `Style/DefaultResources.axaml`) et n'ont pas de maquette :
+
+- **Barre du haut** de `MainWindow` : sélection de la version du jeu, ouverture d'un `Data.p4k`, état du fichier, indicateur de connexion, bouton de thème. Aucune maquette ne la prévoit.
+- **Fenêtres surgissantes** (`Views/Popup/`) : chargement, message, synchronisation de flotte et d'objets, comparaison d'objets, envoi Orbital Alliance.
+- **`ContainerTabView`**, onglet « Conteneurs » absent du menu.
+
+Tant qu'ils ne sont pas migrés, ne pas supprimer les styles et ressources dont ils dépendent.
+
+---
+
+*Dernière mise à jour : 18 novembre 2026*
