@@ -566,7 +566,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var hasScreenshot = !string.IsNullOrWhiteSpace(AppConfig.ScreenshotPath);
         var hasClose = AppConfig.AutoClose;
 
-        if (!hasScreen && !hasScreenshot && !hasClose && !AppConfig.LoadItems && !AppConfig.LoadShips && !AppConfig.LoadFriends)
+        if (!hasScreen && !hasScreenshot && !hasClose && !AppConfig.LoadItems && !AppConfig.LoadShips && !AppConfig.LoadFriends && !AppConfig.LoadReputations)
             return;
 
         // 1. Navigation vers l'onglet demandé
@@ -664,6 +664,23 @@ public partial class MainWindowViewModel : ViewModelBase
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erreur lors du chargement automatique des amis");
+            }
+        }
+
+        // Rechargement des réputations : celui de la première ouverture de l'onglet peut précéder le chargement du P4K
+        if (AppConfig.LoadReputations)
+        {
+            try
+            {
+                await WaitForP4kReadyAsync();
+                await WaitForDbReadyAsync();
+
+                var reputationsPage = _pages.OfType<ReputationTabViewModel>().First();
+                await Dispatcher.UIThread.InvokeAsync(() => reputationsPage.LoadDataCommand.ExecuteAsync(null));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors du chargement automatique des réputations");
             }
         }
 

@@ -4,7 +4,7 @@ using System.IO;
 namespace StarXelem.Models;
 
 /// <summary>
-/// Configuration CLI statique : --screen, --screenshot, --close, --load-items, --items-report, --load-ships, --ships-report, --load-friends
+/// Configuration CLI statique : --screen, --screenshot, --close, --load-items, --items-report, --load-ships, --ships-report, --load-friends, --load-reputations
 /// </summary>
 static class AppConfig
 {
@@ -21,6 +21,8 @@ static class AppConfig
     public static string? ShipsReportPath { get; set; }
     /// <summary>Lance un vrai chargement de la liste d'amis, comme un clic sur Actualiser.</summary>
     public static bool LoadFriends { get; set; }
+    /// <summary>Recharge les réputations une fois le P4K et la base prêts, comme un clic sur Charger les données.</summary>
+    public static bool LoadReputations { get; set; }
 
     public static void Parse(string[] args)
     {
@@ -57,6 +59,10 @@ static class AppConfig
             else if (arg == "--load-friends")
             {
                 LoadFriends = true;
+            }
+            else if (arg == "--load-reputations")
+            {
+                LoadReputations = true;
             }
             else if (arg == "--close")
             {
