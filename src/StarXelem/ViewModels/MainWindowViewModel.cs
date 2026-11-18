@@ -566,7 +566,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var hasScreenshot = !string.IsNullOrWhiteSpace(AppConfig.ScreenshotPath);
         var hasClose = AppConfig.AutoClose;
 
-        if (!hasScreen && !hasScreenshot && !hasClose && !AppConfig.LoadItems && !AppConfig.LoadShips)
+        if (!hasScreen && !hasScreenshot && !hasClose && !AppConfig.LoadItems && !AppConfig.LoadShips && !AppConfig.LoadFriends)
             return;
 
         // 1. Navigation vers l'onglet demandé
@@ -649,6 +649,21 @@ public partial class MainWindowViewModel : ViewModelBase
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erreur lors du chargement automatique de la flotte");
+            }
+        }
+
+        // Chargement réel de la liste d'amis, avant la capture pour qu'elle montre les données
+        if (AppConfig.LoadFriends)
+        {
+            try
+            {
+                var friendsPage = _pages.OfType<FriendListTabViewModel>().First();
+                var isLoaded = await Dispatcher.UIThread.InvokeAsync(friendsPage.RunAutomatedLoadAsync);
+                _logger.LogInformation("Chargement automatique des amis : {Result}", isLoaded ? "terminé" : "abandonné, pas de connexion au jeu");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors du chargement automatique des amis");
             }
         }
 
