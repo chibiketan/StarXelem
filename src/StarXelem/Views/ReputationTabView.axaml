@@ -2,354 +2,249 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:conv="using:StarXelem.Converters"
-             xmlns:beh="using:StarXelem.Behaviors"
              xmlns:vm="using:StarXelem.ViewModels"
+             xmlns:models="using:StarXelem.Models"
              xmlns:local="clr-namespace:StarXelem"
-             xmlns:fluent="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
-             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
+             xmlns:comp="clr-namespace:StarXelem.Components"
+             xmlns:ui="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
+             mc:Ignorable="d" d:DesignWidth="1300" d:DesignHeight="800"
              d:DataContext="{x:Static local:DesignData.ReputationTabViewModel}"
              x:Class="StarXelem.Views.ReputationTabView"
              x:DataType="vm:ReputationTabViewModel">
     <UserControl.Styles>
-        <Style Selector="Border.reputation-card">
-            <Setter Property="Background" Value="{DynamicResource BackgroundGrade4Brush}" />
-            <Setter Property="BorderThickness" Value="3 0.5 0.5 0.5" />
-            <Setter Property="CornerRadius" Value="8" />
-
-            <Style Selector="^.notloaded" >
-                <Setter Property="BorderBrush" Value="{DynamicResource RepNotLoadedLeftBorderBrush}" />
-
-                <Style Selector="^ > StackPanel">
-                    <Setter Property="Opacity" Value="0.55"></Setter>
-                </Style>
-
-                <Style Selector="^ TextBlock.relationship-color">
-                    <Setter Property="Foreground" Value="{DynamicResource RepNotLoadedStateTextBrush}" />
-                    <Setter Property="FontWeight" Value="ExtraBold" />
-                </Style>
-            </Style>
-
-            <Style Selector="^.ally" >
-                <Setter Property="BorderBrush" Value="{DynamicResource RepAllyLeftBorderBrush}" />
-                <Style Selector="^ TextBlock.relationship-color">
-                    <Setter Property="Foreground" Value="{DynamicResource RepAllyStateTextBrush}" />
-                </Style>
-            </Style>
-            <Style Selector="^.neutral">
-                <Setter Property="BorderBrush" Value="{DynamicResource RepNeutralLeftBorderBrush}" />
-                <Style Selector="^ TextBlock.relationship-color">
-                    <Setter Property="Foreground" Value="{DynamicResource RepNeutralStateTextBrush}" />
-                </Style>
-            </Style>
-            <Style Selector="^.hostile">
-                <Setter Property="BorderBrush" Value="{DynamicResource RepHostileLeftBorderBrush}" />
-                <Style Selector="^ TextBlock.relationship-color">
-                    <Setter Property="Foreground" Value="{DynamicResource RepHostileStateTextBrush}" />
-                </Style>
-            </Style>
-        </Style>
-
- 
-        <!-- Standing list item styles (§17.7) -->
-        <Style Selector="Border.standing-item">
-            <Setter Property="Padding" Value="4,6" />
-            <Setter Property="CornerRadius" Value="5" />
-            <Setter Property="Margin" Value="0,2" />
-
-            <Style Selector="^.current-standing">
-                <Setter Property="Background" Value="{DynamicResource RepCurrentRankBgBrush}" />
-                <Style Selector="^ TextBlock.standing-name">
-                    <Setter Property="Foreground" Value="{DynamicResource RepCurrentRankNameBrush}" />
-                </Style>
-                <Style Selector="^ TextBlock.standing-threshold">
-                    <Setter Property="Foreground" Value="{DynamicResource RepCurrentRankThresholdBrush}" />
-                </Style>
-            </Style>
-
-            <Style Selector="^.locked-standing">
-                <Setter Property="Opacity" Value="0.45" />
-                <Style Selector="^ TextBlock.standing-name">
-                    <Setter Property="Foreground" Value="{DynamicResource RepStandingLockedNameBrush}" />
-                </Style>
-            </Style>
-        </Style>
-        
-        <!-- Modification du template par défaut de l'expander pour ce composant -->
-        <Style Selector="Expander /template/ ToggleButton">
+        <!-- En-tête de portée cliquable : déplie la liste des rangs -->
+        <Style Selector="Button.scope">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
-                <ControlTemplate>
-                    <RelativePanel>
-                        <Border Name="Root" 
-                                RelativePanel.AlignLeftWithPanel="True"
-                                RelativePanel.AlignRightWithPanel="True"
-                                RelativePanel.AlignTopWithPanel="True"
-                                RelativePanel.AlignBottomWithPanel="True"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                MinHeight="{TemplateBinding MinHeight}"
-                                MinWidth="{TemplateBinding MinWidth}"
-                                MaxWidth="{TemplateBinding MaxWidth}"
-                                Width="{TemplateBinding Width}"
-                                HorizontalAlignment="{TemplateBinding HorizontalAlignment}"
-                                Padding="{TemplateBinding Padding}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="{TemplateBinding CornerRadius}"
-                                BackgroundSizing="{TemplateBinding BackgroundSizing}">
-                            <ContentPresenter Name="ContentPresenter"
-                                              Content="{TemplateBinding Content}"
-                                              ContentTemplate="{TemplateBinding ContentTemplate}"
-                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-                                              Foreground="{TemplateBinding Foreground}" />
-                        </Border>
-                        <Border Name="ExpandCollapseChevronBorder"
-                                RelativePanel.AlignLeftWith="Root"
-                                RelativePanel.AlignTopWith="Root"
-                                Margin="16 9 0 0"
-                               >
-                            <TextBlock Name="ExpandCollapseChevron"
-                                       FontFamily="{DynamicResource SymbolThemeFontFamily}"
-                                       FontSize="15"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource ExpanderChevronForeground}"
-                                       RenderTransform="none">
-                                    <TextBlock.Transitions>
-                                        <Transitions>
-                                            <TransformOperationsTransition Duration="00:00:00.167" Property="RenderTransform" />
-                                        </Transitions>
-                                    </TextBlock.Transitions>
-                                </TextBlock>
-                            </Border>
-                    </RelativePanel>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalContentAlignment="Stretch" />
+                    </Border>
                 </ControlTemplate>
             </Setter>
-            
-            <!-- On définit la flèche comme à droite -->
-            <Style Selector="^ /template/ TextBlock#ExpandCollapseChevron">
-                <Setter Property="Text" Value="{StaticResource ExpanderChevronRightGlyph}"></Setter>
-            </Style>
-            <!-- On définit la rotation sur déploiement à 90° et non 180° -->
-            <Style Selector="^[Tag=expanded] /template/ TextBlock#ExpandCollapseChevron">
-                <Setter Property="RenderTransform" Value="rotate(90deg)" />
-            </Style>
+        </Style>
+        <Style Selector="Button.scope Path.chevron">
+            <Setter Property="Width" Value="9" />
+            <Setter Property="Height" Value="9" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Stroke" Value="{DynamicResource Sx.MutedBrush}" />
+            <Setter Property="StrokeThickness" Value="2" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="StrokeJoin" Value="Round" />
+            <Setter Property="Data" Value="M9 6l6 6-6 6" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.scope:pointerover Path.chevron">
+            <Setter Property="Stroke" Value="{DynamicResource Sx.TextBrush}" />
+        </Style>
+        <Style Selector="Button.scope Path.chevron.expanded">
+            <Setter Property="RenderTransform" Value="rotate(90deg)" />
         </Style>
 
-        <!-- Dimming classes for standing text (§17.7) -->
-        <Style Selector="TextBlock.triple-dimming">
-            <Setter Property="Opacity" Value="0.12" />
+        <!-- Liste des rangs d'une portée -->
+        <Style Selector="Border.standing-row">
+            <Setter Property="Padding" Value="8,5" />
         </Style>
-        <Style Selector="TextBlock.double-dimming">
-            <Setter Property="Opacity" Value="0.20" />
+        <Style Selector="Border.standing-row TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
         </Style>
-        <Style Selector="fluent|SymbolIcon.loading">
-            <Style.Animations>
-                <Animation Duration="0:0:1" IterationCount="Infinite">
-                    <KeyFrame Cue="0%">
-                        <Setter Property="RotateTransform.Angle" Value="90" />
-                    </KeyFrame>
-                    <KeyFrame Cue="100%" >
-                        <Setter Property="RotateTransform.Angle" Value="450" />
-                    </KeyFrame>
-                </Animation>
-            </Style.Animations>
+        <Style Selector="Border.standing-row.current">
+            <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
+        </Style>
+        <Style Selector="Border.standing-row.current TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Border.standing-row.locked TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
         </Style>
     </UserControl.Styles>
 
-    <UserControl.Resources>
-        <ResourceDictionary>
-            <conv:EnumToTextConverter x:Key="EnumToTextConverter" />
-            <conv:ToUpperConverter x:Key="ToUpperConverter" />
-            <conv:StandingClassesConverter x:Key="StandingClassesConverter" />
-            <conv:TierToFillBrushConverter x:Key="TierToFillBrushConverter" />
-            <conv:TierToOutlineBrushConverter x:Key="TierToOutlineBrushConverter" />
-            <conv:TierToOutlineThicknessConverter x:Key="TierToOutlineThicknessConverter" />
+    <!-- La nouvelle charte n'existe qu'en thème sombre : l'écran reste sombre même si Windows est en thème clair. -->
+    <ThemeVariantScope RequestedThemeVariant="Dark">
+        <Grid Background="{DynamicResource Sx.BackgroundBrush}" TextElement.FontFamily="{DynamicResource Sx.FontSans}">
 
-        </ResourceDictionary>
-    </UserControl.Resources>
+            <!-- Bloc principal -->
+            <comp:NotchedBorder Margin="12" CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}">
+                <Grid RowDefinitions="Auto,Auto,*">
 
-    <DockPanel LastChildFill="True" Classes="main">
-        <!-- Toolbar Section -->
-        <StackPanel DockPanel.Dock="Top"
-                    Orientation="Horizontal"
-                    Margin="16" 
-                    Spacing="12">
+                    <!-- Barre d'outils -->
+                    <Border Grid.Row="0" BorderBrush="{DynamicResource Sx.LineBrush}" BorderThickness="0,0,0,1" Padding="20,14">
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
+                            <TextBlock Classes="sx-title" Text="Réputations" Margin="0,0,8,0" />
+                            <TextBlock Grid.Column="1" Classes="sx-caption" FontSize="13" Text="{Binding ResultSummary}" />
 
-            <!-- Search Box (Design System Section 9) -->
-            <TextBox Text="{Binding SearchText, Mode=TwoWay}"
-                     Width="300"
-                     Watermark="Rechercher un contracteur..."
-                     VerticalAlignment="Center" />
+                            <comp:NotchedBorder Grid.Column="2" Classes="sx-field" MinWidth="180">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <Path Classes="sx-search-icon" Margin="12,0,0,0" />
+                                    <TextBox Grid.Column="1"
+                                             Classes="sx"
+                                             Height="44"
+                                             Watermark="Rechercher un contractant ou une activité..."
+                                             Text="{Binding SearchText}" />
+                                </Grid>
+                            </comp:NotchedBorder>
 
-            <!-- Load Button (Design System Section 8) -->
-            <Button Classes="btn principal" Command="{Binding LoadDataCommand}"
-                    Padding="11,5"
-                    CornerRadius="7"
-                    VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal" Spacing="2">
-                    <fluent:SymbolIcon Classes.loading="{Binding IsLoading}"  Symbol="ArrowSync">
-                        <fluent:SymbolIcon.RenderTransform>
-                            <RotateTransform Angle="90"/>
-                        </fluent:SymbolIcon.RenderTransform>
-                    </fluent:SymbolIcon>
-                    <!-- <PathIcon Classes.loading="{Binding IsLoading}" Data="{StaticResource Icon.Refresh}" -->
-                    <!--           Width="11" Height="11" /> -->
-                    <TextBlock Text="Charger les données"
-                               VerticalAlignment="Center"
-                               FontSize="11"
-                               FontWeight="500" />
-                </StackPanel>
-            </Button>
-        </StackPanel>
+                            <Button Grid.Column="3" Classes="sx primary" Command="{Binding LoadDataCommand}">Charger les données</Button>
+                        </Grid>
+                    </Border>
 
-        <!-- Main Content -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding FilteredContractors}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <!-- Contractor Card (Design System Section 15) -->
-                        <Border Classes="reputation-card" beh:DynamicClass.Names="{Binding StateClasses}" Width="300" Margin="10">
-                            <StackPanel Margin="16" Spacing="12">
-                                <!-- Header -->
-                                <TextBlock Classes="bold h1"  Text="{Binding Name}"
-                                           HorizontalAlignment="Center"
-                                           Margin="0,0,0,4"/>
-
-                                <!-- Status -->
-                                <TextBlock Classes="bold h2 relationship-color"  Text="{Binding FactionStatus, Converter={StaticResource EnumToTextConverter}}"
-                                           HorizontalAlignment="Center"
-                                           Margin="0,0,0,4"/>
-
-                                <!-- Reputations List -->
-                                <ItemsControl ItemsSource="{Binding Reputations}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel >
-                                                <!-- Scope expander (§17.7) -->
-                                                <Expander IsExpanded="{Binding IsExpanded}"   >
-                                                    <Expander.Header>
-                                                        <StackPanel Spacing="4" Margin="0 5 20 5">
-                                                            <Grid  Margin="20 0 0 0" ColumnDefinitions="*,Auto" ColumnSpacing="5">
-                                                                <TextBlock Text="{Binding DisplayName, Converter={StaticResource ToUpperConverter}}"
-                                                                           Grid.Column="0"
-                                                                           TextTrimming="CharacterEllipsis"
-                                                                           FontWeight="DemiBold"
-                                                                           ToolTip.Tip="{Binding DisplayName}"
-                                                                           Foreground="{DynamicResource RepScopeLabelBrush}" />
-                                                                <TextBlock
-                                                                           Grid.Column="1"
-                                                                           Foreground="{DynamicResource RepRawValueBrush}">
-                                                                    <TextBlock.Text>
-                                                                        <MultiBinding StringFormat="{}{0} / {1}" >
-                                                                            <Binding Path="CurrentValue" />
-                                                                            <Binding Path="CurrentStanding.Max"  />
-                                                                        </MultiBinding>
-                                                                    </TextBlock.Text>
-                                                                </TextBlock>
-                                                            </Grid>
-                                                            
-                                                            <!-- Progress Bar -->
-                                                            <Border BorderBrush="{Binding CurrentStanding.Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
-                                                                    BorderThickness="{Binding CurrentStanding.Tier, Converter={StaticResource TierToOutlineThicknessConverter}}"
-                                                                    CornerRadius="10"
-                                                                    Margin="-1"
-                                                                    Padding="0 0.5 0 -0.5"
-                                                                    >
-                                                                <ProgressBar Value="{Binding CurrentValue}"
-                                                                             Minimum="{Binding CurrentStanding.Min}"
-                                                                             Maximum="{Binding CurrentStanding.Max}"
-                                                                             ToolTip.Tip="{Binding CurrentValue}"
-                                                                             Height="6"
-                                                                             Foreground="{Binding CurrentStanding.Tier, Converter={StaticResource TierToFillBrushConverter}}"
-                                                                             Background="{DynamicResource BackgroundGrade4Brush}"
-                                                                             Margin="1" >
-                                                                    <ProgressBar.Resources>
-                                                                        <x:Double x:Key="ProgressBarTrackHeight">6</x:Double>
-                                                                        <CornerRadius x:Key="ProgressBarTrackCornerRadius">5</CornerRadius>
-                                                                    </ProgressBar.Resources>
-                                                                </ProgressBar>
-                                                            </Border>
-
-                                                            <!-- Min/Max values -->
-                                                            <DockPanel LastChildFill="False">
-                                                                <TextBlock Classes="demi-bold"
-                                                                           Text="{Binding CurrentStanding.DisplayName}"
-                                                                           Foreground="{DynamicResource RepRankTextBrush}"
-                                                                           DockPanel.Dock="Left" />
-                                                            </DockPanel>
-                                                        </StackPanel>
-                                                    </Expander.Header>
-
-                                                    <StackPanel Spacing="0">
-
-                                                        <!-- Separator before standings list (§17.7) -->
-                                                        <Rectangle Height="0.5"
-                                                                   Fill="{DynamicResource RepSeparatorBrush}"
-                                                                   Margin="0,0,0,0" />
-
-                                                        <!-- Standings list (§17.7) -->
-                                                        <ItemsControl ItemsSource="{Binding StandingList}">
-                                                            <ItemsControl.ItemTemplate>
-                                                                <DataTemplate>
-                                                                    <Border>
-                                                                        <beh:DynamicClass.Names>
-                                                                            <MultiBinding Converter="{StaticResource StandingClassesConverter}">
-                                                                                <Binding />
-                                                                                <Binding Path="DataContext" RelativeSource="{RelativeSource FindAncestor, AncestorType=ItemsControl}" />
-                                                                            </MultiBinding>
-                                                                        </beh:DynamicClass.Names>
-                                                                        <Grid Margin="0 1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-                                                                            <!-- Standing dot (§17.4) -->
-                                                                            <Border Width="11" Height="11" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                                    Grid.Column="0"
-                                                                                    BorderBrush="{Binding Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
-                                                                                    BorderThickness="{Binding Tier, Converter={StaticResource TierToOutlineThicknessConverter}}"
-                                                                                    CornerRadius="10"
-                                                                                    Padding="0 0 0 0"
-                                                                            >
-                                                                                <Ellipse Width="7" Height="7"
-                                                                                         Fill="{Binding Tier, Converter={StaticResource TierToFillBrushConverter}}"
-                                                                                         Stroke="{Binding Tier, Converter={StaticResource TierToOutlineBrushConverter}}"
-                                                                                         VerticalAlignment="Center"
-                                                                                          />
-                                                                            </Border>
-                                                                            <!-- Standing name -->
-                                                                            <TextBlock Text="{Binding DisplayName}"
-                                                                                       Grid.Column="1"
-                                                                                       Classes="standing-name"
-                                                                                       ToolTip.Tip="{Binding DisplayName}"
-                                                                                       HorizontalAlignment="Stretch"
-                                                                                       TextTrimming="CharacterEllipsis"
-                                                                                       FontWeight="500"
-                                                                                       Foreground="{DynamicResource RepStandingNameBrush}" />
-                                                                            <!-- Standing threshold (§17.8) -->
-                                                                            <TextBlock Text="{Binding Max}"
-                                                                                       Classes="standing-threshold"
-                                                                                       Grid.Column="2"
-                                                                                       Foreground="{DynamicResource RepStandingLockedThresholdBrush}" />
-                                                                        </Grid>
-                                                                    </Border>
-                                                                </DataTemplate>
-                                                            </ItemsControl.ItemTemplate>
-                                                        </ItemsControl>
-                                                    </StackPanel>
-                                                </Expander>
+                    <!-- Filtres rapides -->
+                    <Border Grid.Row="1"
+                            BorderBrush="{DynamicResource Sx.LineBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="20,12,20,6">
+                        <Grid ColumnDefinitions="72,*">
+                            <TextBlock Classes="sx-caption" Text="État" VerticalAlignment="Top" Margin="0,9,0,0" />
+                            <ItemsControl Grid.Column="1" ItemsSource="{Binding StatusChips}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:FilterChipViewModel">
+                                        <Button Classes="sx-chip" Classes.on="{Binding IsSelected}" Command="{Binding ToggleCommand}">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                                                <TextBlock Classes="sx-count" Text="{Binding Count}" />
                                             </StackPanel>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </Border>
+
+                    <!-- Cartes des contractants -->
+                    <Grid Grid.Row="2">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding FilteredContractors}" Margin="20,16,8,10">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:ContractorModel">
+                                        <comp:NotchedBorder Width="300"
+                                                            Margin="0,0,12,12"
+                                                            CutSize="18"
+                                                            Padding="18,16"
+                                                            VerticalAlignment="Top"
+                                                            Opacity="{Binding CardOpacity}"
+                                                            Background="{DynamicResource Sx.ReliefBrush}">
+                                            <StackPanel Spacing="12">
+                                                <!-- En-tête : nom et relation -->
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                    <TextBlock FontSize="16"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource Sx.TextBrush}"
+                                                               TextWrapping="Wrap"
+                                                               Text="{Binding Name}" />
+                                                    <comp:NotchedBorder Grid.Column="1"
+                                                                        Classes="sx-badge"
+                                                                        Classes.success="{Binding IsFriendly}"
+                                                                        Classes.danger="{Binding IsHostile}"
+                                                                        VerticalAlignment="Top">
+                                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                                            <Ellipse />
+                                                            <TextBlock Text="{Binding FactionStatusLabel}" />
+                                                        </StackPanel>
+                                                    </comp:NotchedBorder>
+                                                </Grid>
+
+                                                <!-- Portées de réputation -->
+                                                <ItemsControl ItemsSource="{Binding Reputations}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="models:ReputationModel">
+                                                            <StackPanel Margin="0,0,0,10">
+                                                                <Button Classes="scope"
+                                                                        Command="{Binding ToggleExpandedCommand}"
+                                                                        IsEnabled="{Binding HasStandings}"
+                                                                        ToolTip.Tip="Afficher les rangs">
+                                                                    <StackPanel>
+                                                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                                                                            <Path Classes="chevron" Classes.expanded="{Binding IsExpanded}" IsVisible="{Binding HasStandings}" />
+                                                                            <TextBlock Grid.Column="1"
+                                                                                       FontSize="12"
+                                                                                       Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                                                       TextTrimming="CharacterEllipsis"
+                                                                                       Text="{Binding DisplayName}" />
+                                                                            <TextBlock Grid.Column="2"
+                                                                                       Classes="sx-mono"
+                                                                                       FontSize="12"
+                                                                                       Foreground="{DynamicResource Sx.TextBrush}"
+                                                                                       Text="{Binding ValueDisplay}" />
+                                                                        </Grid>
+                                                                        <ProgressBar Classes="sx-quality"
+                                                                                     Margin="0,5"
+                                                                                     Minimum="{Binding ProgressMinimum}"
+                                                                                     Maximum="{Binding ProgressMaximum}"
+                                                                                     Value="{Binding ProgressValue}" />
+                                                                        <TextBlock FontSize="12"
+                                                                                   Foreground="{DynamicResource Sx.TextBrush}"
+                                                                                   Text="{Binding CurrentStandingName}" />
+                                                                    </StackPanel>
+                                                                </Button>
+
+                                                                <!-- Rangs de la portée -->
+                                                                <Border IsVisible="{Binding IsExpanded}"
+                                                                        Margin="0,8,0,0"
+                                                                        Padding="0,8,0,0"
+                                                                        BorderBrush="{DynamicResource Sx.LineBrush}"
+                                                                        BorderThickness="0,1,0,0">
+                                                                    <ItemsControl ItemsSource="{Binding StandingRows}">
+                                                                        <ItemsControl.ItemTemplate>
+                                                                            <DataTemplate x:DataType="models:StandingRowModel">
+                                                                                <Border Classes="standing-row"
+                                                                                        Classes.current="{Binding IsCurrent}"
+                                                                                        Classes.locked="{Binding IsLocked}">
+                                                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                                                        <TextBlock TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" Text="{Binding Name}" />
+                                                                                        <TextBlock Grid.Column="1" FontFamily="{DynamicResource Sx.FontMono}" Text="{Binding Threshold}" />
+                                                                                    </Grid>
+                                                                                </Border>
+                                                                            </DataTemplate>
+                                                                        </ItemsControl.ItemTemplate>
+                                                                    </ItemsControl>
+                                                                </Border>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </comp:NotchedBorder>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <TextBlock Classes="sx-caption"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding ShowNoMatch}"
+                                   Text="Aucun contractant ne correspond à ces filtres." />
+
+                        <!-- Indicateur de chargement / filtrage, superposé aux cartes -->
+                        <Grid IsVisible="{Binding IsBusy}" IsHitTestVisible="False">
+                            <Border Background="{DynamicResource Sx.SurfaceBrush}" Opacity="0.75" />
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                                <ui:ProgressRing IsIndeterminate="True" Width="40" Height="40" HorizontalAlignment="Center" />
+                                <TextBlock Classes="sx-caption" HorizontalAlignment="Center" Text="{Binding BusyMessage}" />
                             </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
-    </DockPanel>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </comp:NotchedBorder>
+        </Grid>
+    </ThemeVariantScope>
 </UserControl>
