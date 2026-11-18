@@ -4,119 +4,98 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:StarXelem.ViewModels"
              xmlns:comp="clr-namespace:StarXelem.Components"
-             xmlns:ic="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
              mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="700"
              x:Class="StarXelem.Views.SettingsTabView"
              x:DataType="vm:SettingsTabViewModel">
     <UserControl.Styles>
+        <!-- Titre de page et sous-titre -->
+        <Style Selector="TextBlock.page-title">
+            <Setter Property="FontSize" Value="30" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.page-subtitle">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        </Style>
+
         <!-- Libellé de section -->
         <Style Selector="TextBlock.section-label">
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="Medium" />
-            <Setter Property="LetterSpacing" Value="0.8" />
-            <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+            <Setter Property="Margin" Value="0,10,0,0" />
         </Style>
 
-        <!-- Carte de paramètre : icône, texte, champ et bouton -->
-        <Style Selector="comp|NotchedBorder.action-card">
-            <Setter Property="CutSize" Value="12" />
-            <Setter Property="Padding" Value="18,16" />
+        <!-- Carte de paramètre -->
+        <Style Selector="comp|NotchedBorder.setting-card">
+            <Setter Property="CutSize" Value="18" />
+            <Setter Property="Padding" Value="24,20" />
             <Setter Property="Background" Value="{DynamicResource Sx.SurfaceBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource Sx.LineBrush}" />
-            <Setter Property="StrokeThickness" Value="1" />
         </Style>
-        <Style Selector="comp|NotchedBorder.action-icon">
-            <Setter Property="CutSize" Value="7" />
-            <Setter Property="Width" Value="40" />
-            <Setter Property="Height" Value="40" />
-            <Setter Property="VerticalAlignment" Value="Top" />
-        </Style>
-        <Style Selector="comp|NotchedBorder.action-icon ic|SymbolIcon">
-            <Setter Property="FontSize" Value="18" />
-            <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-        <Style Selector="TextBlock.action-title">
-            <Setter Property="FontSize" Value="14" />
+        <Style Selector="TextBlock.setting-title">
+            <Setter Property="FontSize" Value="16" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
         </Style>
-        <Style Selector="TextBlock.action-desc">
+        <Style Selector="TextBlock.setting-desc">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="LineHeight" Value="19" />
         </Style>
     </UserControl.Styles>
 
     <!-- La nouvelle charte n'existe qu'en thème sombre : l'écran reste sombre même si Windows est en thème clair. -->
     <ThemeVariantScope RequestedThemeVariant="Dark">
         <Grid Background="{DynamicResource Sx.BackgroundBrush}" TextElement.FontFamily="{DynamicResource Sx.FontSans}">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <!-- Contenu étiré jusqu'à 1120 px, aligné à gauche au-delà -->
+                <Grid Margin="32,30,32,32">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MaxWidth="1120" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="page-title" Text="Paramètres" />
+                    <TextBlock Classes="page-subtitle" Text="Configuration de l'application" />
 
-            <!-- Bloc principal -->
-            <comp:NotchedBorder Margin="12" CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}">
-                <Grid RowDefinitions="Auto,*">
+                    <!-- Section : clés API -->
+                    <TextBlock Classes="section-label" Text="Clés API" />
 
-                    <!-- Barre d'outils -->
-                    <Border BorderBrush="{DynamicResource Sx.LineBrush}" BorderThickness="0,0,0,1" Padding="20,14">
-                        <StackPanel Orientation="Horizontal" Spacing="20" MinHeight="44">
-                            <TextBlock Classes="sx-title" Text="Paramètres" />
-                            <TextBlock Classes="sx-caption" FontSize="13" Text="Configuration de l'application" />
-                        </StackPanel>
-                    </Border>
+                    <comp:NotchedBorder Classes="setting-card">
+                        <StackPanel Spacing="12">
+                            <StackPanel Spacing="3">
+                                <TextBlock Classes="setting-title" Text="Clé API" />
+                                <TextBlock Classes="setting-desc" Text="Saisissez votre clé API pour accéder aux services externes." />
+                            </StackPanel>
 
-                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                        <StackPanel Margin="20,18,20,20" Spacing="12" MaxWidth="960" HorizontalAlignment="Left">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <comp:NotchedBorder Classes="sx-field" CutSize="11" MinWidth="320">
+                                    <TextBox Classes="sx revealPasswordButton"
+                                             Height="44"
+                                             Padding="14,0"
+                                             FontSize="14"
+                                             PasswordChar="•"
+                                             FontFamily="{DynamicResource Sx.FontMono}"
+                                             Watermark="Entrez votre clé API…"
+                                             Text="{Binding ApiKey}" />
+                                </comp:NotchedBorder>
 
-                            <!-- Section : clés API -->
-                            <TextBlock Classes="section-label" Text="CLÉS API" />
+                                <Button Grid.Column="1" Classes="sx primary" Command="{Binding SaveApiKeyCommand}">Sauvegarder</Button>
+                            </Grid>
 
-                            <comp:NotchedBorder Classes="action-card">
-                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
-                                    <comp:NotchedBorder Classes="action-icon" Background="{DynamicResource Sx.AccentSoftBrush}">
-                                        <ic:SymbolIcon Symbol="Key" Foreground="{DynamicResource Sx.AccentBrush}" />
-                                    </comp:NotchedBorder>
-
-                                    <StackPanel Grid.Column="1" Spacing="4">
-                                        <TextBlock Classes="action-title" Text="Clé API" />
-                                        <TextBlock Classes="action-desc" Text="Saisissez votre clé API pour accéder aux services externes." />
-
-                                        <Grid Margin="0,10,0,0" ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                                            <comp:NotchedBorder Classes="sx-field" CutSize="11">
-                                                <TextBox Classes="sx revealPasswordButton"
-                                                         Height="44"
-                                                         Padding="12,0"
-                                                         PasswordChar="•"
-                                                         FontFamily="{DynamicResource Sx.FontMono}"
-                                                         Watermark="Entrez votre clé API…"
-                                                         Text="{Binding ApiKey}" />
-                                            </comp:NotchedBorder>
-
-                                            <Button Grid.Column="1" Classes="sx primary" Command="{Binding SaveApiKeyCommand}">
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <ic:SymbolIcon Symbol="Save" FontSize="14" />
-                                                    <TextBlock Text="Sauvegarder" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                            </Button>
-                                        </Grid>
-
-                                        <!-- Confirmation de sauvegarde -->
-                                        <comp:NotchedBorder Classes="sx-badge success"
-                                                            Margin="0,8,0,0"
-                                                            HorizontalAlignment="Left"
-                                                            IsVisible="{Binding Saved}">
-                                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                                <Ellipse />
-                                                <TextBlock Text="Paramètres sauvegardés" />
-                                            </StackPanel>
-                                        </comp:NotchedBorder>
-                                    </StackPanel>
-                                </Grid>
+                            <!-- Confirmation de sauvegarde -->
+                            <comp:NotchedBorder Classes="sx-badge success" HorizontalAlignment="Left" IsVisible="{Binding Saved}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <Ellipse />
+                                    <TextBlock Text="Paramètres sauvegardés" />
+                                </StackPanel>
                             </comp:NotchedBorder>
                         </StackPanel>
-                    </ScrollViewer>
+                    </comp:NotchedBorder>
+                </StackPanel>
                 </Grid>
-            </comp:NotchedBorder>
+            </ScrollViewer>
         </Grid>
     </ThemeVariantScope>
 </UserControl>
