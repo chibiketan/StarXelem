@@ -1,4 +1,10 @@
-﻿## [0.2.7]
+﻿## [0.2.8]
+Version SC : 4.10.3
+
+### Modifié
+- Refonte de l'interface graphique
+
+## [0.2.7]
 Version SC : 4.10.3
 
 ### Modifié
