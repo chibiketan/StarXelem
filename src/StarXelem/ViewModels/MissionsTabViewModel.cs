@@ -2,13 +2,16 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.Logging;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Data;
+using StarXelem.Models;
 using StarXelem.Services;
 
 namespace StarXelem.ViewModels;
@@ -17,6 +20,7 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
 {
     private readonly ILogger<MissionsTabViewModel> _logger;
     private readonly ILocalDatabaseService _localDatabaseService;
+    private readonly IGrpcClientService _clientService;
     public override string Name => "Missions";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Target);
 
@@ -41,10 +45,31 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
     [ObservableProperty] private string _search = "";
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowNoMatch))] private List<MissionItemViewModel> _filteredMissionList = [];
 
-    public MissionsTabViewModel(ILogger<MissionsTabViewModel> logger, ILocalDatabaseService localDatabaseService)
+    public MissionsTabViewModel(ILogger<MissionsTabViewModel> logger, ILocalDatabaseService localDatabaseService, IGrpcClientService clientService)
     {
         _logger = logger;
         _localDatabaseService = localDatabaseService;
+        _clientService = clientService;
+    }
+
+    // Blueprints possédés, lus auprès du jeu s'il est connecté ; null sinon (statut « Obtenu » inconnu).
+    private async Task<HashSet<string>?> LoadObtainedBlueprintIdsAsync()
+    {
+        if (_clientService.Status is not (GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame))
+        {
+            return null;
+        }
+
+        try
+        {
+            var entries = await _clientService.GetBlueprintList().ConfigureAwait(false);
+            return entries.Select(entry => entry.BlueprintId).ToHashSet();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Impossible de lire les blueprints obtenus");
+            return null;
+        }
     }
 
     public bool HasSelection => SelectedMission != null;
@@ -173,6 +198,7 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
             {
                 var sw = Stopwatch.StartNew();
                 var categoriesWithMissions = await _localDatabaseService.GetAllMissionCategoriesWithMissionsAsync().ConfigureAwait(false);
+                var obtainedBlueprintIds = await LoadObtainedBlueprintIdsAsync().ConfigureAwait(false);
                 sw.Stop();
                 _logger.LogTrace("Missions loaded from DB in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
 
@@ -188,7 +214,7 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
 
                     foreach (var mission in missions)
                     {
-                        var missionVm = MapMissionEntity(mission);
+                        var missionVm = MapMissionEntity(mission, obtainedBlueprintIds);
 
                         // Add to contractor map
                         if (mission.Contractor != null)
@@ -268,15 +294,131 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
     /// <summary>
     /// Map a MissionEntity from the database to a MissionItemViewModel for display.
     /// </summary>
-    private MissionItemViewModel MapMissionEntity(MissionEntity mission)
+    // Pools de blueprints de la mission : blueprints triés par nom, chance de tirage calculée sur le poids.
+    private static List<MissionBlueprintPoolViewModel> MapBlueprintPools(
+        IEnumerable<MissionBlueprintPoolEntity>? pools,
+        HashSet<string>? obtainedBlueprintIds)
+    {
+        var result = new List<MissionBlueprintPoolViewModel>();
+        foreach (var pool in pools ?? [])
+        {
+            var entries = pool.Entries.Where(entry => entry.Blueprint != null).ToList();
+            if (entries.Count == 0)
+            {
+                continue;
+            }
+
+            var totalWeight = entries.Sum(entry => entry.Weight);
+            var hasEqualChances = entries.All(entry => Math.Abs(entry.Weight - entries[0].Weight) < 0.0001f);
+            var blueprints = entries
+                .Select(entry =>
+                {
+                    var item = entry.Blueprint!.OutputItem;
+                    var product = item == null ? null : new DbBlueprintProductRow(item.TypeName, item.SubTypeName, item.Size, item.Grade);
+                    return new MissionBlueprintViewModel
+                    {
+                        BlueprintId = entry.BlueprintId,
+                        Name = entry.Blueprint.BlueprintName,
+                        TypeLabel = BlueprintFamilyInfo.GetTypeLabel(product),
+                        Family = BlueprintFamilyInfo.GetFamily(item?.TypeName),
+                        IsObtained = obtainedBlueprintIds?.Contains(entry.BlueprintId) ?? false,
+                        ChanceLabel = hasEqualChances || totalWeight <= 0 ? null : FormatPercent(entry.Weight / totalWeight)
+                    };
+                })
+                .OrderBy(blueprint => blueprint.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+
+            var count = blueprints.Count;
+            var chances = hasEqualChances
+                ? count == 1 ? "obtenu à coup sûr" : $"chances égales, {FormatPercent(1.0 / count)} chacun"
+                : "chances pondérées";
+            result.Add(new MissionBlueprintPoolViewModel
+            {
+                PoolName = pool.PoolName,
+                Blueprints = blueprints,
+                Summary = $"{count} blueprint{(count > 1 ? "s" : "")} · {chances}"
+            });
+        }
+
+        foreach (var pool in result)
+        {
+            pool.ShowHeader = result.Count > 1;
+        }
+
+        return result;
+    }
+
+    // « 4 blueprints · chances égales, 25 % chacun · 1 déjà obtenu » ; avec plusieurs pools, chaque pool porte son propre résumé.
+    private static string FormatBlueprintSummary(List<MissionBlueprintPoolViewModel> pools, bool isObtainedKnown)
+    {
+        if (pools.Count == 0)
+        {
+            return "";
+        }
+
+        var parts = new List<string>();
+        if (pools.Count == 1)
+        {
+            parts.Add(pools[0].Summary);
+        }
+        else
+        {
+            var distinctCount = pools.SelectMany(pool => pool.Blueprints).Select(blueprint => blueprint.BlueprintId).Distinct().Count();
+            parts.Add($"{pools.Count} pools · {distinctCount} blueprints");
+        }
+
+        if (isObtainedKnown)
+        {
+            var obtained = pools.SelectMany(pool => pool.Blueprints).Where(blueprint => blueprint.IsObtained)
+                .Select(blueprint => blueprint.BlueprintId).Distinct().Count();
+            parts.Add(obtained switch
+            {
+                0 => "aucun obtenu",
+                1 => "1 déjà obtenu",
+                _ => $"{obtained} déjà obtenus"
+            });
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    // « 25 % », « 8,3 % » : une décimale seulement quand elle compte.
+    private static string FormatPercent(double ratio)
+    {
+        var percent = Math.Round(ratio * 100, 1);
+        return $"{percent.ToString(percent % 1 == 0 ? "0" : "0.0", CultureInfo.CurrentCulture)} %";
+    }
+
+    // « Jr. Contractor (800) » : rang traduit et seuil en points ; une clé de traduction non résolue est ignorée.
+    private static string? FormatStanding(string? rankName, int? points)
+    {
+        if (points == null)
+        {
+            return null;
+        }
+
+        var value = points.Value.ToString("N0", CultureInfo.CurrentCulture);
+        return string.IsNullOrWhiteSpace(rankName) || rankName.StartsWith('@') ? value : $"{rankName} ({value})";
+    }
+
+    private MissionItemViewModel MapMissionEntity(MissionEntity mission, HashSet<string>? obtainedBlueprintIds)
     {
         var rewards = mission.Rewards?.ToList() ?? [];
+        var blueprintPools = MapBlueprintPools(mission.BlueprintPools, obtainedBlueprintIds);
+        // Avec un seul pool, la carte Blueprint annonce le nombre de blueprints en jeu.
+        var blueprintDetail = blueprintPools.Count == 1 ? $"1 parmi {blueprintPools[0].Blueprints.Count} · liste ci-dessous" : null;
         return new MissionItemViewModel
         {
             Title = mission.Title,
             Description = mission.Description,
             Briefing = FormatBriefing(mission.Description, mission.Tokens),
-            RewardCards = rewards.Select(MissionRewardCardViewModel.FromEntity).OfType<MissionRewardCardViewModel>().ToList(),
+            RewardCards = rewards
+                .OrderBy(MissionRewardCardViewModel.SortRank)
+                .Select(reward => MissionRewardCardViewModel.FromEntity(reward, blueprintDetail))
+                .OfType<MissionRewardCardViewModel>()
+                .ToList(),
+            BlueprintPools = blueprintPools,
+            BlueprintSummary = FormatBlueprintSummary(blueprintPools, obtainedBlueprintIds != null),
             CompletionTags = string.Join(", ", rewards
                 .Where(r => r.RewardType == "ContractResult_CompletionTags")
                 .SelectMany(r => Regex.Matches(r.DisplayValue, "'([^']+)'").Select(match => match.Groups[1].Value))
@@ -300,8 +442,8 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
             {
                 Label = FormatPrerequisiteLabel(p)
             }).ToList() ?? new List<MissionPrerequisiteViewModel>(),
-            MinStanding = null, // TODO: resolve from tokens
-            MaxStanding = mission.MaxStanding?.ToString()
+            MinStanding = FormatStanding(mission.MinStandingDisplayName, mission.MinStandingRaw),
+            MaxStanding = FormatStanding(mission.MaxStandingDisplayName, mission.MaxStanding)
         };
     }
 
@@ -468,8 +610,59 @@ public sealed class MissionItemViewModel
     public bool HasRewards => RewardCards.Count > 0;
     public bool HasObjectives => ObjectiveList is { Count: > 0 };
     public bool HasPrerequisites => PrerequisiteList is { Count: > 0 };
+    /// <summary>Pools de blueprints dont un est tiré en récompense.</summary>
+    public List<MissionBlueprintPoolViewModel> BlueprintPools { get; set; } = [];
+
+    /// <summary>Résumé affiché à côté du titre « Blueprints possibles ».</summary>
+    public string BlueprintSummary { get; set; } = "";
+
+    public bool HasBlueprintPools => BlueprintPools.Count > 0;
+    public bool HasMinStanding => !string.IsNullOrEmpty(MinStanding);
     public bool HasMaxStanding => !string.IsNullOrEmpty(MaxStanding);
     public bool HasCompletionTags => !string.IsNullOrEmpty(CompletionTags);
+}
+
+/// <summary>Pool de blueprints d'une mission : un seul blueprint du pool est tiré.</summary>
+public sealed class MissionBlueprintPoolViewModel
+{
+    public required string PoolName { get; init; }
+    public required List<MissionBlueprintViewModel> Blueprints { get; init; }
+
+    /// <summary>« 4 blueprints · chances égales, 25 % chacun ».</summary>
+    public required string Summary { get; init; }
+
+    /// <summary>Vrai si la mission a plusieurs pools : chacun affiche alors son nom et son résumé.</summary>
+    public bool ShowHeader { get; set; }
+}
+
+/// <summary>Blueprint possible d'une mission ; un clic l'ouvre dans l'écran Blueprints.</summary>
+public sealed class MissionBlueprintViewModel
+{
+    private RelayCommand? _openCommand;
+
+    public required string BlueprintId { get; init; }
+    public required string Name { get; init; }
+
+    /// <summary>Type précis de l'objet fabriqué (« Laser de minage », « Casque · Armure lourde »…).</summary>
+    public required string TypeLabel { get; init; }
+
+    public BlueprintFamily Family { get; init; }
+
+    /// <summary>Icône de la famille ; créée au premier affichage, sur le thread d'UI.</summary>
+    public Geometry Icon => BlueprintFamilyInfo.GetIcon(Family);
+
+    public bool IsObtained { get; init; }
+
+    /// <summary>Chance de tirage quand les poids diffèrent (« 12,5 % »), sinon <c>null</c>.</summary>
+    public string? ChanceLabel { get; init; }
+
+    /// <summary>Ligne sous le nom : type de l'objet, suivi de la chance de tirage si elle diffère des autres.</summary>
+    public string Subtitle => ChanceLabel == null ? TypeLabel : $"{TypeLabel} · {ChanceLabel}";
+
+    public string ToolTip => $"Ouvrir {Name} dans l'écran Blueprints";
+
+    public RelayCommand OpenCommand => _openCommand ??= new RelayCommand(
+        () => WeakReferenceMessenger.Default.Send(new OpenBlueprintMessage(BlueprintId)));
 }
 
 /// <summary>Carte d'une récompense de mission : valeur principale (montant, chance…) et libellé.</summary>
@@ -486,11 +679,25 @@ public sealed partial class MissionRewardCardViewModel
     /// <summary>Texte d'origine, affiché en infobulle.</summary>
     public string? ToolTip { get; init; }
 
+    /// <summary>Carte mise en avant (liseré et précision en accent) : renvoie à la liste des blueprints possibles.</summary>
+    public bool IsHighlighted { get; init; }
+
     public bool HasValue => Value != null;
     public bool HasDetail => !string.IsNullOrEmpty(Detail);
 
+    /// <summary>Rang d'affichage d'une récompense : aUEC, puis blueprint, puis réputation, puis le reste.</summary>
+    public static int SortRank(MissionRewardEntity reward) => reward.RewardType switch
+    {
+        "ContractResult_CalculatedReward" or "ContractResult_Reward" => 0,
+        "BlueprintRewards" => 1,
+        "ContractResult_LegacyReputation" or "ContractResult_CalculatedReputation" => 2,
+        _ => 3
+    };
+
     /// <summary>Carte d'une récompense enregistrée, ou <c>null</c> si elle ne se montre pas en carte (tags de fin de mission).</summary>
-    public static MissionRewardCardViewModel? FromEntity(MissionRewardEntity reward)
+    /// <param name="reward">Récompense enregistrée.</param>
+    /// <param name="blueprintDetail">Précision de la carte Blueprint (« 1 parmi 4 · liste ci-dessous »), sinon « Tirage dans un pool ».</param>
+    public static MissionRewardCardViewModel? FromEntity(MissionRewardEntity reward, string? blueprintDetail = null)
     {
         var text = reward.DisplayValue.Trim();
         return reward.RewardType switch
@@ -499,8 +706,15 @@ public sealed partial class MissionRewardCardViewModel
             "ContractResult_CalculatedReward" or "ContractResult_Reward" => AmountCard(text),
             "ContractResult_LegacyReputation" => ReputationCard(text),
             "BlueprintRewards" => ChanceRegex().Match(text) is { Success: true } chance
-                ? new MissionRewardCardViewModel { Value = $"{chance.Groups[1].Value} %", Label = "Blueprint", Detail = "Tirage dans un pool", ToolTip = text }
-                : new MissionRewardCardViewModel { Label = "Blueprint", ToolTip = text },
+                ? new MissionRewardCardViewModel
+                {
+                    Value = $"{chance.Groups[1].Value} %",
+                    Label = "Blueprint",
+                    Detail = blueprintDetail ?? "Tirage dans un pool",
+                    IsHighlighted = blueprintDetail != null,
+                    ToolTip = text
+                }
+                : new MissionRewardCardViewModel { Label = "Blueprint", Detail = blueprintDetail, IsHighlighted = blueprintDetail != null, ToolTip = text },
             "ContractResult_Item" => ItemCard(reward, text),
             "ContractResult_ScenarioProgress" => LeadingNumberRegex().Match(text) is { Success: true } points
                 ? new MissionRewardCardViewModel { Value = $"+{points.Groups[1].Value}", Label = "Progression de scénario", ToolTip = text }

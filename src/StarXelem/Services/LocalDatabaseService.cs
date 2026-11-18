@@ -4583,7 +4583,34 @@ public class LocalDatabaseService : ILocalDatabaseService
             .Include(m => m.CompletionTags)
                 .ThenInclude(ct => ct.Tag)
             .Include(m => m.BlueprintPools)
+                .ThenInclude(pool => pool.Entries)
+                    .ThenInclude(entry => entry.Blueprint)
+                        .ThenInclude(blueprint => blueprint!.OutputItem)
+            .AsSplitQuery()
             .ToListAsync();
+
+        // Les rangs de réputation sont stockés en clés de traduction (« @RepScope_Contractor_Rank1 ») :
+        // on les remplace par leur libellé, les entités n'étant pas suivies.
+        var standingKeys = missions
+            .SelectMany(m => new[] { m.MinStandingDisplayName, m.MaxStandingDisplayName })
+            .Where(key => !string.IsNullOrEmpty(key))
+            .Distinct()
+            .ToList();
+        var standingNames = await db.LocaleEntries.AsNoTracking()
+            .Where(entry => standingKeys.Contains(entry.Key))
+            .ToDictionaryAsync(entry => entry.Key, entry => entry.Value);
+        foreach (var mission in missions)
+        {
+            if (mission.MinStandingDisplayName != null && standingNames.TryGetValue(mission.MinStandingDisplayName, out var minName))
+            {
+                mission.MinStandingDisplayName = minName;
+            }
+
+            if (mission.MaxStandingDisplayName != null && standingNames.TryGetValue(mission.MaxStandingDisplayName, out var maxName))
+            {
+                mission.MaxStandingDisplayName = maxName;
+            }
+        }
 
         return missions
             .GroupBy(m => m.Category?.Id ?? "Uncategorized")

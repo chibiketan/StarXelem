@@ -54,6 +54,12 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     // Liste complète, remplacée (jamais modifiée) à chaque étape du chargement : le filtrage peut la lire hors du thread d'UI.
     private List<BlueprintViewModel>? _allBlueprints;
 
+    // Blueprint demandé par un autre écran avant la fin du chargement.
+    private string? _pendingBlueprintId;
+
+    // Blueprint à sélectionner dès que la liste filtrée qui le contient est affichée.
+    private string? _selectAfterFilterId;
+
     public BlueprintListTabViewModel(
         ILogger<BlueprintListTabViewModel> logger,
         IGrpcClientService clientService,
@@ -93,6 +99,35 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
 
     /// <summary>Texte de l'indicateur superposé à la liste.</summary>
     public string BusyMessage => IsLoading ? TreatmentStatus : "Filtrage en cours…";
+
+    /// <summary>
+    /// Sélectionne un blueprint demandé depuis un autre écran : les filtres sont levés et la recherche porte sur son nom
+    /// pour qu'il soit visible dans la liste. Si les blueprints ne sont pas encore chargés, la sélection attend la fin du chargement.
+    /// </summary>
+    public void ShowBlueprint(string blueprintId)
+    {
+        _pendingBlueprintId = blueprintId;
+        TrySelectPendingBlueprint();
+    }
+
+    private void TrySelectPendingBlueprint()
+    {
+        var blueprint = _pendingBlueprintId == null ? null : _allBlueprints?.FirstOrDefault(b => b.BlueprintId == _pendingBlueprintId);
+        if (blueprint == null)
+        {
+            return;
+        }
+
+        // La sélection attend l'affichage de la liste filtrée : la ListBox refuse un élément absent de ses lignes
+        // et remettrait la sélection à vide.
+        _pendingBlueprintId = null;
+        _selectAfterFilterId = blueprint.BlueprintId;
+        ShowOnlyObtained = false;
+        ShowOnlyWithMissions = false;
+        _selectedFamilies.Clear();
+        Search = blueprint.Name;
+        ScheduleFilters(TimeSpan.Zero);
+    }
 
     private void OnConnectedStatusChanged(GrpcConnectionStatus status)
     {
@@ -167,6 +202,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                 BuildFamilyChips();
                 IsLoading = false;
                 ScheduleFilters(TimeSpan.Zero);
+                TrySelectPendingBlueprint();
                 SendToOrbitalAllianceCommand.NotifyCanExecuteChanged();
             }).GetTask().ConfigureAwait(false);
         }
@@ -438,6 +474,13 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             var selected = SelectedBluePrint;
             BlueprintList = outcome.Blueprints;
             SelectedBluePrint = selected != null && outcome.Blueprints.Contains(selected) ? selected : null;
+        }
+
+        var requested = _selectAfterFilterId == null ? null : outcome.Blueprints.FirstOrDefault(b => b.BlueprintId == _selectAfterFilterId);
+        if (requested != null)
+        {
+            _selectAfterFilterId = null;
+            SelectedBluePrint = requested;
         }
     }
 

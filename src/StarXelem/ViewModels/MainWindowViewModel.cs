@@ -199,6 +199,14 @@ public partial class MainWindowViewModel : ViewModelBase
         // Abonnement au statut de connexion gRPC
         _grpcClientService.OnStatusChanged += OnGrpcConnectionStatusChanged;
 
+        // Lien vers un blueprint depuis un autre écran (ex : blueprints possibles d'une mission)
+        WeakReferenceMessenger.Default.Register<MainWindowViewModel, OpenBlueprintMessage>(this, (recipient, message) =>
+        {
+            var blueprintsPage = recipient._pages.OfType<BlueprintListTabViewModel>().First();
+            recipient.CurrentPage = blueprintsPage;
+            blueprintsPage.ShowBlueprint(message.BlueprintId);
+        });
+
     }
     
     [ObservableProperty]

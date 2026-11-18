@@ -1,4 +1,4 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -69,6 +69,46 @@
             <Setter Property="Margin" Value="0,0,10,10" />
             <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
         </Style>
+        <Style Selector="TextBlock.reward-detail.accent">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
+        </Style>
+
+        <!-- Blueprints possibles : une ligne cliquable par blueprint, qui l'ouvre dans l'écran Blueprints -->
+        <Style Selector="Button.bp-link">
+            <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <ControlTemplate TargetType="Button">
+                    <comp:NotchedBorder CutSize="9" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalContentAlignment="Stretch"
+                                          VerticalContentAlignment="Center" />
+                    </comp:NotchedBorder>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.bp-link:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
+        </Style>
+        <Style Selector="Button.bp-link:pointerover TextBlock.bp-name">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
+        </Style>
+        <Style Selector="Path.family-icon">
+            <Setter Property="Stroke" Value="{DynamicResource Sx.SecondaryBrush}" />
+            <Setter Property="StrokeThickness" Value="1.7" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="StrokeJoin" Value="Round" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
         <Style Selector="TextBlock.meta-label">
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
@@ -206,13 +246,63 @@
                                                                Foreground="{DynamicResource Sx.SecondaryBrush}"
                                                                TextWrapping="Wrap"
                                                                Text="{Binding Label}" />
-                                                    <TextBlock FontSize="12"
+                                                    <TextBlock Classes="reward-detail"
+                                                               Classes.accent="{Binding IsHighlighted}"
+                                                               FontSize="12"
                                                                Foreground="{DynamicResource Sx.MutedBrush}"
                                                                TextWrapping="Wrap"
                                                                IsVisible="{Binding HasDetail}"
                                                                Text="{Binding Detail}" />
                                                 </StackPanel>
                                             </comp:NotchedBorder>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <!-- Blueprints possibles : contenu des pools tirés en récompense -->
+                            <StackPanel IsVisible="{Binding SelectedMission.HasBlueprintPools, FallbackValue=False}" Spacing="12">
+                                <WrapPanel>
+                                    <TextBlock Classes="section-title" Text="Blueprints possibles" Margin="0,0,12,0" VerticalAlignment="Bottom" />
+                                    <TextBlock Classes="sx-caption" FontSize="13" VerticalAlignment="Bottom" Margin="0,0,0,1"
+                                               Text="{Binding SelectedMission.BlueprintSummary, FallbackValue=''}" />
+                                </WrapPanel>
+                                <ItemsControl ItemsSource="{Binding SelectedMission.BlueprintPools, FallbackValue={x:Null}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:MissionBlueprintPoolViewModel">
+                                            <StackPanel Spacing="8" Margin="0,0,0,8">
+                                                <TextBlock IsVisible="{Binding ShowHeader}" FontSize="12" Foreground="{DynamicResource Sx.MutedBrush}">
+                                                    <Run Text="{Binding PoolName, Mode=OneWay}" FontFamily="{DynamicResource Sx.FontMono}" />
+                                                    <Run Text=" · " />
+                                                    <Run Text="{Binding Summary, Mode=OneWay}" />
+                                                </TextBlock>
+                                                <ItemsControl ItemsSource="{Binding Blueprints}" Margin="0,0,-8,-8">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <UniformGrid Columns="{Binding $parent[ItemsControl].Bounds.Width, Converter={x:Static conv:WidthToColumnsConverter.Instance}, ConverterParameter=280}" />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:MissionBlueprintViewModel">
+                                                            <Button Classes="bp-link" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding ToolTip}">
+                                                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                                                    <Path Classes="family-icon" Width="20" Height="20" Data="{Binding Icon}" />
+                                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                        <TextBlock Classes="bp-name" FontWeight="Medium" TextTrimming="CharacterEllipsis" Text="{Binding Name}" />
+                                                                        <TextBlock FontSize="12" Foreground="{DynamicResource Sx.SecondaryBrush}" TextTrimming="CharacterEllipsis" Text="{Binding Subtitle}" />
+                                                                    </StackPanel>
+                                                                    <comp:NotchedBorder Grid.Column="2" Classes="sx-badge success" IsVisible="{Binding IsObtained}">
+                                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                            <Ellipse />
+                                                                            <TextBlock Text="Obtenu" />
+                                                                        </StackPanel>
+                                                                    </comp:NotchedBorder>
+                                                                </Grid>
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -269,6 +359,10 @@
                             <!-- Informations techniques -->
                             <Border BorderBrush="{DynamicResource Sx.LineBrush}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
                                 <WrapPanel>
+                                    <StackPanel Margin="0,0,32,8" IsVisible="{Binding SelectedMission.HasMinStanding, FallbackValue=False}">
+                                        <TextBlock Classes="meta-label" Text="Réputation requise" />
+                                        <TextBlock Classes="meta-value" Text="{Binding SelectedMission.MinStanding, FallbackValue=''}" />
+                                    </StackPanel>
                                     <StackPanel Margin="0,0,32,8" IsVisible="{Binding SelectedMission.HasMaxStanding, FallbackValue=False}">
                                         <TextBlock Classes="meta-label" Text="Réputation maximale" />
                                         <TextBlock Classes="meta-value" Text="{Binding SelectedMission.MaxStanding, FallbackValue=''}" />
