@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using Grpc.Core;
+using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using Sc.External.Common.Api.V1;
@@ -27,6 +28,9 @@ public class GrpcClientService : IGrpcClientService
     private GetCurrentPlayerResponse? _playerInfo;
     private Metadata? _authHeaders;
     private GrpcChannel? _channel;
+    // Point d'entrée de tous les clients : le canal, éventuellement enveloppé par l'intercepteur de trace (--grpc-trace).
+    private CallInvoker? _callInvoker;
+    private GrpcTraceInterceptor? _traceInterceptor;
     private readonly IP4kService _p4kService;
     private CancellationTokenSource? _pollCts;
     private IFileTailService? _fileTailWatcher;
@@ -69,7 +73,8 @@ public class GrpcClientService : IGrpcClientService
         try
         {
             _channel = GrpcChannel.ForAddress(new Uri(loginData.StarNetwork.ServicesEndpoint));
-            var identityClient = new IdentityService.IdentityServiceClient(_channel);
+            _callInvoker = CreateCallInvoker(_channel);
+            var identityClient = new IdentityService.IdentityServiceClient(_callInvoker);
 
             var currentPlayer = await identityClient.GetCurrentPlayerAsync(new GetCurrentPlayerRequest(), new Metadata { { "Authorization", $"Bearer {loginData.AuthToken}" } }).ConfigureAwait(false);
 
@@ -96,6 +101,18 @@ public class GrpcClientService : IGrpcClientService
         }
     }
 
+    private CallInvoker CreateCallInvoker(GrpcChannel channel)
+    {
+        if (string.IsNullOrEmpty(AppConfig.GrpcTracePath))
+        {
+            return channel.CreateCallInvoker();
+        }
+
+        // Un seul intercepteur par exécution : la numérotation et le dossier restent continus après une reconnexion.
+        _traceInterceptor ??= new GrpcTraceInterceptor(AppConfig.GrpcTracePath, _logger);
+        return channel.Intercept(_traceInterceptor);
+    }
+
     private void SetStatus(GrpcConnectionStatus newStatus, string? errorMessage = null)
     {
         if (Status == newStatus && ErrorMessage == errorMessage)
@@ -114,7 +131,7 @@ public class GrpcClientService : IGrpcClientService
 
     public async Task<IList<SpaceshipModel>> GetSpaceships()
     {
-        var entitlementServiceClient = new ExternalEntitlementService.ExternalEntitlementServiceClient(_channel);
+        var entitlementServiceClient = new ExternalEntitlementService.ExternalEntitlementServiceClient(_callInvoker);
         var result = new List<SpaceshipModel>(50);
         
         // Appel réel
@@ -194,11 +211,11 @@ public class GrpcClientService : IGrpcClientService
 
         var andFilters = new List<EntityFilter>(8);
 
-        // Filtre owner
-        if (itemQueryModel.useConnectedUserOwner || !string.IsNullOrEmpty(itemQueryModel.ownerId))
+        // Filtre owner : seulement pour un propriétaire saisi explicitement. Pour le joueur connecté, le rattachement
+        // STOWED_IN à chaque inventaire le remplace (voir plus bas), afin de remonter aussi les objets sans propriétaire.
+        if (!itemQueryModel.useConnectedUserOwner && !string.IsNullOrEmpty(itemQueryModel.ownerId))
         {
-            ulong ownerId = itemQueryModel.useConnectedUserOwner ? _playerInfo.Player.Geid : ulong.Parse(itemQueryModel.ownerId);
-            andFilters.Add(PropEqULong("ownerId", ownerId));
+            andFilters.Add(PropEqULong("ownerId", ulong.Parse(itemQueryModel.ownerId)));
         }
 
         // Filtre par id d'objet
@@ -208,32 +225,34 @@ public class GrpcClientService : IGrpcClientService
         }
 
         // Filtre par type
+        EntityFilter? typeFilter = null;
         if ((itemQueryModel.TypeList?.Count ?? 0) > 0)
         {
-            andFilters.Add(PropIn("itemTypeEnum", itemQueryModel.TypeList!.Select(t => Int((int)t))));
+            typeFilter = PropIn("itemTypeEnum", itemQueryModel.TypeList!.Select(t => Int((int)t)));
+            andFilters.Add(typeFilter);
         }
 
-        EdgeFilter stowedIn = null;
+        // Filtre des sous-requêtes de contenu de conteneur : rattachement STOWED_IN au conteneur, sans ownerId.
+        // Un objet récupéré (minage, loot…) n'a pas de propriétaire (ownerId = 0) : le filtre propriétaire de la
+        // recherche principale l'éliminerait alors qu'il est bien rangé dans un conteneur du joueur.
+        var containerStowedIn = new EdgeFilter { EdgeType = "STOWED_IN" };
+        var containerFilter = new EntityCompositeFilter { Operator = LogicalOperator.And };
+        containerFilter.Filters.Add(new EntityFilter { EdgeFilter = containerStowedIn });
+        if (typeFilter != null)
+        {
+            containerFilter.Filters.Add(typeFilter);
+        }
 
-        // Filtre par conteneur (STOWED_IN) avec option OR owner
-        // Filtre actif uniquement si pas de owner ou pas d'id direct (sinon la requête mouline sans retourner)
+        // Filtre par inventaire (STOWED_IN) de la requête principale, renseigné avec l'inventaire interrogé à chaque appel :
+        // un filtre groupant plusieurs inventaires ne renvoie rien. Inactif avec un propriétaire explicite ou un id direct
+        // (sinon la requête mouline sans retourner).
+        EdgeFilter? stowedIn = null;
         if ((itemQueryModel.InventoryIdList?.Count ?? 0) > 0
-            && string.IsNullOrEmpty(itemQueryModel.Id) && string.IsNullOrEmpty(itemQueryModel.ownerId)
-            && !itemQueryModel.useConnectedUserOwner
-                )
+            && string.IsNullOrEmpty(itemQueryModel.Id)
+            && (itemQueryModel.useConnectedUserOwner || string.IsNullOrEmpty(itemQueryModel.ownerId)))
         {
             stowedIn = new EdgeFilter { EdgeType = "STOWED_IN" };
-            stowedIn.Values.AddRange(itemQueryModel.InventoryIdList!.Select(id => Str(id)));
-        
-            var or = new EntityCompositeFilter { Operator = LogicalOperator.Or };
-            or.Filters.Add(new EntityFilter { EdgeFilter = stowedIn });
-        
-            if (itemQueryModel.useConnectedUserOwner)
-            {
-                or.Filters.Add(PropEqULong("ownerId", _playerInfo.Player.Geid));
-            }
-        
-            andFilters.Add(new EntityFilter { CompositeFilter = or });
+            andFilters.Add(new EntityFilter { EdgeFilter = stowedIn });
         }
 
         // Filtre par parentUrn
@@ -245,7 +264,7 @@ public class GrpcClientService : IGrpcClientService
         var compositeFilter = new EntityCompositeFilter { Operator = LogicalOperator.And };
         compositeFilter.Filters.AddRange(andFilters);
 
-        var service = new EntityGraphService.EntityGraphServiceClient(_channel);
+        var service = new EntityGraphService.EntityGraphServiceClient(_callInvoker);
 
         var request = new EntityQueryRequest
         {
@@ -348,8 +367,13 @@ public class GrpcClientService : IGrpcClientService
         // 1) Requête principale par conteneur
         foreach (var inventoryId in itemQueryModel.InventoryIdList)
         {
-            await RunPagedQueryAsync(inventoryId).ConfigureAwait(false);
+            if (stowedIn != null)
+            {
+                stowedIn.Values.Clear();
+                stowedIn.Values.Add(Str(inventoryId));
+            }
 
+            await RunPagedQueryAsync(inventoryId).ConfigureAwait(false);
         }
 
         var initialElapsed = totalWatch.Elapsed;
@@ -408,11 +432,9 @@ public class GrpcClientService : IGrpcClientService
 
                 try
                 {
-                    if (null != stowedIn)
-                    {
-                        stowedIn.Values.Clear();
-                        stowedIn.Values.Add(new ScalarValue{ StringValue = $"{containerId}:Container:0"});
-                    }
+                    request.Body.Query.Filter = new EntityFilter { CompositeFilter = containerFilter };
+                    containerStowedIn.Values.Clear();
+                    containerStowedIn.Values.Add(Str($"{containerId}:Container:0"));
                     await RunPagedQueryAsync($"{containerId}:Container:0").ConfigureAwait(false);
                 }
                 catch (RpcException ex)
@@ -467,7 +489,7 @@ public class GrpcClientService : IGrpcClientService
 
     public async Task<IList<EntityStowContext>> GetEntityStowContextByParentUrnList(IList<string> urnList, List<uint> crcTypeList)
     {
-        var service = new EntityGraphService.EntityGraphServiceClient(_channel);
+        var service = new EntityGraphService.EntityGraphServiceClient(_callInvoker);
 
         var request = new GetEntityStowContextsByParentUrnsRequest
         {
@@ -549,7 +571,7 @@ public class GrpcClientService : IGrpcClientService
         
         
         
-        var service = new EntityGraphService.EntityGraphServiceClient(_channel);
+        var service = new EntityGraphService.EntityGraphServiceClient(_callInvoker);
 
         EntityQueryRequest request = new()
         {
@@ -631,7 +653,7 @@ public class GrpcClientService : IGrpcClientService
             }
         };
         
-        var service = new EntityGraphService.EntityGraphServiceClient(_channel);
+        var service = new EntityGraphService.EntityGraphServiceClient(_callInvoker);
 
         EntityQueryRequest request = new()
         {
@@ -698,7 +720,7 @@ public class GrpcClientService : IGrpcClientService
     //     };
     //     filter.Values.AddRange(geidList.Select(x => new ScalarValue { UnsignedBigintValue = x }));
     //     
-    //     var service = new EntityGraphService.EntityGraphServiceClient(_channel);
+    //     var service = new EntityGraphService.EntityGraphServiceClient(_callInvoker);
     //
     //     GetEntityStowContextsRequest request = new()
     //     {
@@ -750,7 +772,7 @@ public class GrpcClientService : IGrpcClientService
     //     };
     //     filter.Values.Add(new ScalarValue {UnsignedBigintValue = ownerId});
     //     
-    //     var service = new EntityGraphService.EntityGraphServiceClient(_channel);
+    //     var service = new EntityGraphService.EntityGraphServiceClient(_callInvoker);
     //
     //     GetEntityStowContextsRequest request = new()
     //     {
@@ -801,7 +823,7 @@ public class GrpcClientService : IGrpcClientService
         };
         filter.Values.Add(new ScalarValue {UnsignedBigintValue = _playerInfo?.Player.Geid ?? 0});
 
-        var service = new EntityGraphService.EntityGraphServiceClient(_channel);
+        var service = new EntityGraphService.EntityGraphServiceClient(_callInvoker);
 
         
         InventoryQueryRequest request = new()
@@ -868,7 +890,7 @@ public class GrpcClientService : IGrpcClientService
             }
         };
         
-        var service = new EntityGraphService.EntityGraphServiceClient(_channel);
+        var service = new EntityGraphService.EntityGraphServiceClient(_callInvoker);
         await semaphoreSlim.WaitAsync();
         GetInventoriesResponse response;
         try
@@ -886,7 +908,7 @@ public class GrpcClientService : IGrpcClientService
     
     public async Task TestRequest()
     {
-        var service = new Sc.External.Services.BlueprintLibrary.V1.BlueprintLibraryService.BlueprintLibraryServiceClient(_channel);
+        var service = new Sc.External.Services.BlueprintLibrary.V1.BlueprintLibraryService.BlueprintLibraryServiceClient(_callInvoker);
         var request = new QueryBlueprintEntriesRequest
         {
             Query = new Query
@@ -919,7 +941,7 @@ public class GrpcClientService : IGrpcClientService
 
     public async Task<List<VersionedReputation>> QueryReputationsAsync()
     {
-        var service = new Sc.External.Services.Reputation.V1.ReputationService.ReputationServiceClient(_channel);
+        var service = new Sc.External.Services.Reputation.V1.ReputationService.ReputationServiceClient(_callInvoker);
         
         var response = await service.QueryReputationsAsync(new QueryReputationsRequest
         {
@@ -938,7 +960,7 @@ public class GrpcClientService : IGrpcClientService
 
     public async Task<List<BlueprintEntry>> GetBlueprintList()
     {
-        var service = new BlueprintLibraryService.BlueprintLibraryServiceClient(_channel);
+        var service = new BlueprintLibraryService.BlueprintLibraryServiceClient(_callInvoker);
         var request = new QueryBlueprintEntriesRequest
         {
             Query = new Query
@@ -978,7 +1000,7 @@ public class GrpcClientService : IGrpcClientService
         
         
         using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-        var service = new IdentityService.IdentityServiceClient(_channel);
+        var service = new IdentityService.IdentityServiceClient(_callInvoker);
         await semaphoreSlim.WaitAsync(cts.Token);
         try
         {
@@ -1019,7 +1041,7 @@ public class GrpcClientService : IGrpcClientService
         };
         filter.Values.Add(new ScalarValue {StringValue = id});
         
-        var service = new EntityGraphService.EntityGraphServiceClient(_channel);
+        var service = new EntityGraphService.EntityGraphServiceClient(_callInvoker);
 
         GetInventoriesRequest request = new()
         {
@@ -1044,7 +1066,7 @@ public class GrpcClientService : IGrpcClientService
     
     public async Task<IList<Contact>> GetFriendList()
     {
-        var service = new ContactsService.ContactsServiceClient(_channel);
+        var service = new ContactsService.ContactsServiceClient(_callInvoker);
         await semaphoreSlim.WaitAsync();
         try
         {
@@ -1064,7 +1086,7 @@ public class GrpcClientService : IGrpcClientService
         
         request.AccountId = accountId;
         
-        var service = new ContactsService.ContactsServiceClient(_channel);
+        var service = new ContactsService.ContactsServiceClient(_callInvoker);
         await semaphoreSlim.WaitAsync();
         try
         {
@@ -1085,7 +1107,7 @@ public class GrpcClientService : IGrpcClientService
         //
         // request.PlayerUrn = accountId.ToString();
         //
-        // var service = new PresenceService.PresenceServiceClient(_channel);
+        // var service = new PresenceService.PresenceServiceClient(_callInvoker);
         // await semaphoreSlim.WaitAsync();
         // try
         // {
@@ -1209,6 +1231,7 @@ public class GrpcClientService : IGrpcClientService
         {
             _channel.Dispose();
             _channel = null;
+            _callInvoker = null;
         }
     }
 }

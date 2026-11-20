@@ -4,7 +4,7 @@ using System.IO;
 namespace StarXelem.Models;
 
 /// <summary>
-/// Configuration CLI statique : --screen, --screenshot, --close, --load-items, --items-report, --load-ships, --ships-report, --load-friends, --load-reputations
+/// Configuration CLI statique : --screen, --screenshot, --close, --load-items, --items-report, --load-ships, --ships-report, --load-friends, --load-reputations, --grpc-trace
 /// </summary>
 static class AppConfig
 {
@@ -23,6 +23,8 @@ static class AppConfig
     public static bool LoadFriends { get; set; }
     /// <summary>Recharge les réputations une fois le P4K et la base prêts, comme un clic sur Charger les données.</summary>
     public static bool LoadReputations { get; set; }
+    /// <summary>Dossier où écrire chaque requête gRPC et sa réponse ; aucune trace n'est écrite si absent.</summary>
+    public static string? GrpcTracePath { get; set; }
 
     public static void Parse(string[] args)
     {
@@ -63,6 +65,10 @@ static class AppConfig
             else if (arg == "--load-reputations")
             {
                 LoadReputations = true;
+            }
+            else if (arg == "--grpc-trace" && i + 1 < args.Length)
+            {
+                GrpcTracePath = Path.GetFullPath(args[++i]);
             }
             else if (arg == "--close")
             {

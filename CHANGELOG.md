@@ -1,4 +1,13 @@
-﻿## [0.2.8]
+﻿## [0.2.9]
+Version SC : 4.10.3
+
+### Ajouté
+- Ajout de l'option `--grpc-trace <dossier>` pour enregistrer les requêtes et réponses gRPC afin de les analyser
+
+### Corrigé
+- Correction de la récupération des objets sans propriétaire (ressources minées, objets récupérés) rangés dans un conteneur ou un inventaire du joueur
+
+## [0.2.8]
 Version SC : 4.10.3
 
 ### Modifié
