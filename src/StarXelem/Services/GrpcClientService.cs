@@ -211,11 +211,11 @@ public class GrpcClientService : IGrpcClientService
 
         var andFilters = new List<EntityFilter>(8);
 
-        // Filtre owner
-        if (itemQueryModel.useConnectedUserOwner || !string.IsNullOrEmpty(itemQueryModel.ownerId))
+        // Filtre owner : seulement pour un propriétaire saisi explicitement. Pour le joueur connecté, le rattachement
+        // STOWED_IN à chaque inventaire le remplace (voir plus bas), afin de remonter aussi les objets sans propriétaire.
+        if (!itemQueryModel.useConnectedUserOwner && !string.IsNullOrEmpty(itemQueryModel.ownerId))
         {
-            ulong ownerId = itemQueryModel.useConnectedUserOwner ? _playerInfo.Player.Geid : ulong.Parse(itemQueryModel.ownerId);
-            andFilters.Add(PropEqULong("ownerId", ownerId));
+            andFilters.Add(PropEqULong("ownerId", ulong.Parse(itemQueryModel.ownerId)));
         }
 
         // Filtre par id d'objet
@@ -243,27 +243,16 @@ public class GrpcClientService : IGrpcClientService
             containerFilter.Filters.Add(typeFilter);
         }
 
-        EdgeFilter stowedIn = null;
-
-        // Filtre par conteneur (STOWED_IN) avec option OR owner
-        // Filtre actif uniquement si pas de owner ou pas d'id direct (sinon la requête mouline sans retourner)
+        // Filtre par inventaire (STOWED_IN) de la requête principale, renseigné avec l'inventaire interrogé à chaque appel :
+        // un filtre groupant plusieurs inventaires ne renvoie rien. Inactif avec un propriétaire explicite ou un id direct
+        // (sinon la requête mouline sans retourner).
+        EdgeFilter? stowedIn = null;
         if ((itemQueryModel.InventoryIdList?.Count ?? 0) > 0
-            && string.IsNullOrEmpty(itemQueryModel.Id) && string.IsNullOrEmpty(itemQueryModel.ownerId)
-            && !itemQueryModel.useConnectedUserOwner
-                )
+            && string.IsNullOrEmpty(itemQueryModel.Id)
+            && (itemQueryModel.useConnectedUserOwner || string.IsNullOrEmpty(itemQueryModel.ownerId)))
         {
             stowedIn = new EdgeFilter { EdgeType = "STOWED_IN" };
-            stowedIn.Values.AddRange(itemQueryModel.InventoryIdList!.Select(id => Str(id)));
-        
-            var or = new EntityCompositeFilter { Operator = LogicalOperator.Or };
-            or.Filters.Add(new EntityFilter { EdgeFilter = stowedIn });
-        
-            if (itemQueryModel.useConnectedUserOwner)
-            {
-                or.Filters.Add(PropEqULong("ownerId", _playerInfo.Player.Geid));
-            }
-        
-            andFilters.Add(new EntityFilter { CompositeFilter = or });
+            andFilters.Add(new EntityFilter { EdgeFilter = stowedIn });
         }
 
         // Filtre par parentUrn
@@ -378,8 +367,13 @@ public class GrpcClientService : IGrpcClientService
         // 1) Requête principale par conteneur
         foreach (var inventoryId in itemQueryModel.InventoryIdList)
         {
-            await RunPagedQueryAsync(inventoryId).ConfigureAwait(false);
+            if (stowedIn != null)
+            {
+                stowedIn.Values.Clear();
+                stowedIn.Values.Add(Str(inventoryId));
+            }
 
+            await RunPagedQueryAsync(inventoryId).ConfigureAwait(false);
         }
 
         var initialElapsed = totalWatch.Elapsed;
