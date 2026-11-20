@@ -1,4 +1,14 @@
-﻿## [0.2.9]
+﻿## [0.3.0]
+Version SC : 4.10.3
+
+### Modifié
+- Migration de l'interface vers Avalonia 12 (FluentAvaloniaUI 3, FluentIcons 2.1, AsyncImageLoader 4)
+- Mise à jour des bibliothèques .NET (Entity Framework Core, Microsoft.Extensions) en 10.0.15 et de ClosedXML en 0.105.1
+
+### Sécurité
+- Correction de vulnérabilités dans des dépendances (SQLite embarqué via SQLitePCLRaw, Tmds.DBus.Protocol)
+
+## [0.2.9]
 Version SC : 4.10.3
 
 ### Ajouté
