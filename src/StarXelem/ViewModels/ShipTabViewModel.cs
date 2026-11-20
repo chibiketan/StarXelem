@@ -10,11 +10,13 @@ using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Sc.External.Services.Entitlement.V1;
+using Sc.External.Services.Entitygraph.V1;
 using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Models;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
+using StarXelem.Services.ShipLoadout;
 using StarXelem.ViewModels.Popup;
 
 namespace StarXelem.ViewModels;
@@ -26,6 +28,7 @@ public partial class ShipTabViewModel : PageViewModelBase
     private readonly ILocalDatabaseService _localDatabaseService;
     private readonly ILocationService _locationService;
     private readonly IAllianceOrbitalService _allianceOrbitalService;
+    private readonly IShipLoadoutService _shipLoadoutService;
     private readonly ILogger<ShipTabViewModel> _logger;
     public override string Name => "Mon hangar";
     protected override string NavIconData => "M3 11l9-8 9 8v10H3zM9 21v-7h6v7";
@@ -40,10 +43,19 @@ public partial class ShipTabViewModel : PageViewModelBase
     /// <summary>Indique si la synchronisation de flotte est en cours.</summary>
     [ObservableProperty] private bool _isSyncing;
 
+    /// <summary>Fiche loadout ouverte par-dessus le tableau, ou <c>null</c> quand le tableau est affiché.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLoadoutOpen))]
+    private OwnedShipLoadoutViewModel? _loadoutDetail;
+
+    /// <summary>Vrai quand la fiche loadout remplace le tableau.</summary>
+    public bool IsLoadoutOpen => LoadoutDetail != null;
+
     public ShipTabViewModel(IGrpcClientService clientService, IP4kService p4kService, ILocalDatabaseService localDatabaseService, ILocationService locationService, IAllianceOrbitalService allianceOrbitalService,
-        ILogger<ShipTabViewModel> logger)
+        IShipLoadoutService shipLoadoutService, ILogger<ShipTabViewModel> logger)
     {
         _logger = logger;
+        _shipLoadoutService = shipLoadoutService;
         _clientService = clientService;
         _p4KService = p4kService;
         _localDatabaseService = localDatabaseService;
@@ -112,14 +124,17 @@ public partial class ShipTabViewModel : PageViewModelBase
         // Dans ce cas la (inventoryId d'un autre joueur) alors l'ASOP affiche "captured", comment reproduire ce comportement ?
         // Erreur : Unhandled exception. Grpc.Core.RpcException: Status(StatusCode="PermissionDenied", Detail="Cannot access inventories owned by another player")
         var spaceshipEntityList = await _clientService.QueryGraphBySearch(queryParameters);
+        var attachedByParent = IndexAttachedEntities(spaceshipEntityList);
 
         foreach (var spaceship in spaceships)
         {
-            var spaceshipEntity = spaceshipEntityList.FirstOrDefault(e => e.EntityNodeProperties!.ParentUrn == spaceship.Entitlement.Urn);
-            
+            var spaceshipEntity = spaceshipEntityList.FirstOrDefault(e => e.EntityNodeProperties!.ParentUrn == spaceship.Entitlement.Urn
+                && e.EntityNodeProperties.ItemTypeEnum == (int)EItemType.NOITEM_Vehicle);
+
             if (null != spaceshipEntity)
             {
                 spaceship.EntityProperties = spaceshipEntity;
+                spaceship.AttachedEntities = CollectAttachedEntities(spaceshipEntity, attachedByParent);
             }
         }
         
@@ -140,6 +155,73 @@ public partial class ShipTabViewModel : PageViewModelBase
         Spaceships = Task.FromResult(spaceships);
         IsLoading = false;
         await Dispatcher.UIThread.InvokeAsync(() => SendFleetToOrbitalAllianceCommand.NotifyCanExecuteChanged());
+    }
+
+    /// <summary>Ouvre la fiche loadout du vaisseau ; la liste de gauche reprend les vaisseaux du tableau, dans le même ordre.</summary>
+    [RelayCommand]
+    private void OpenLoadout(SpaceshipModel? ship)
+    {
+        if (ship == null)
+        {
+            return;
+        }
+
+        var ships = DisplayedShips.Contains(ship) ? DisplayedShips.ToList() : _allShips.ToList();
+        LoadoutDetail = new OwnedShipLoadoutViewModel(_shipLoadoutService, ships, ship, () => LoadoutDetail = null, _logger);
+    }
+
+    /// <summary>Range les objets montés (arête ATTACHED_TO) par identifiant de leur porteur.</summary>
+    private static Dictionary<ulong, List<EntityItemQueryResult>> IndexAttachedEntities(IEnumerable<EntityItemQueryResult> entities)
+    {
+        var byParent = new Dictionary<ulong, List<EntityItemQueryResult>>();
+        foreach (var entity in entities)
+        {
+            if (entity.EntityEdge is { Type: EntityEdgeType.AttachedTo, End.HasEntityId: true } edge)
+            {
+                if (!byParent.TryGetValue(edge.End.EntityId, out var children))
+                {
+                    children = [];
+                    byParent[edge.End.EntityId] = children;
+                }
+
+                children.Add(entity);
+            }
+        }
+
+        return byParent;
+    }
+
+    /// <summary>
+    /// Parcourt l'arbre des objets montés depuis le vaisseau. Un véhicule embarqué (moto, snub) a son propre loadout : on s'arrête à lui.
+    /// </summary>
+    private static List<EntityItemQueryResult> CollectAttachedEntities(EntityItemQueryResult root, Dictionary<ulong, List<EntityItemQueryResult>> byParent)
+    {
+        var result = new List<EntityItemQueryResult>();
+        var visited = new HashSet<ulong> { root.EntityNodeProperties!.Geid };
+        var pending = new Stack<ulong>();
+        pending.Push(root.EntityNodeProperties.Geid);
+
+        while (pending.Count > 0)
+        {
+            if (!byParent.TryGetValue(pending.Pop(), out var children))
+            {
+                continue;
+            }
+
+            foreach (var child in children)
+            {
+                var geid = child.EntityNodeProperties!.Geid;
+                if (child.EntityNodeProperties.ItemTypeEnum == (int)EItemType.NOITEM_Vehicle || !visited.Add(geid))
+                {
+                    continue;
+                }
+
+                result.Add(child);
+                pending.Push(geid);
+            }
+        }
+
+        return result;
     }
 
     private ulong StowLocationToGeid(string urn)

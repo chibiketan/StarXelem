@@ -30,8 +30,11 @@
 
         <Grid Background="{DynamicResource Sx.BackgroundBrush}" TextElement.FontFamily="{DynamicResource Sx.FontSans}">
 
+            <!-- Fiche loadout d'un vaisseau, à la place du tableau -->
+            <ContentControl Content="{Binding LoadoutDetail}" IsVisible="{Binding IsLoadoutOpen}" />
+
             <!-- Bloc principal -->
-            <comp:NotchedBorder Margin="12" CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}">
+            <comp:NotchedBorder Margin="12" CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}" IsVisible="{Binding !IsLoadoutOpen}">
                 <Grid RowDefinitions="Auto,Auto,*">
 
                     <!-- Barre d'outils -->
@@ -92,6 +95,7 @@
                     <Grid Grid.Row="2">
                         <DataGrid Classes="sx"
                                   ItemsSource="{Binding DisplayedShips}"
+                                  DoubleTapped="OnShipGridDoubleTapped"
                                   IsReadOnly="True"
                                   AutoGenerateColumns="False"
                                   CanUserSortColumns="False"
@@ -186,6 +190,22 @@
                                                      Fill="{DynamicResource Sx.SuccessBrush}"
                                                      IsVisible="{Binding IsRealPurchase}"
                                                      ToolTip.Tip="Acheté au store" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Accès à la fiche loadout (aussi par double-clic sur la ligne) -->
+                                <DataGridTemplateColumn Width="120">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:SpaceshipModel">
+                                            <Button Classes="sx small"
+                                                    Margin="0,0,12,0"
+                                                    HorizontalAlignment="Right"
+                                                    VerticalAlignment="Center"
+                                                    ToolTip.Tip="Voir les composants et armes de ce vaisseau"
+                                                    Command="{Binding $parent[UserControl].((vm:ShipTabViewModel)DataContext).OpenLoadoutCommand, FallbackValue={x:Null}}"
+                                                    CommandParameter="{Binding}"
+                                                    Content="Loadout ›" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>

@@ -653,6 +653,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 var shipsPage = _pages.OfType<ShipTabViewModel>().First();
                 var isLoaded = await Dispatcher.UIThread.InvokeAsync(() => shipsPage.RunAutomatedLoadAsync(AppConfig.ShipsReportPath));
                 _logger.LogInformation("Chargement automatique de la flotte : {Result}", isLoaded ? "terminé" : "abandonné, pas de connexion au jeu");
+
+                if (isLoaded && AppConfig.OpenLoadoutShip is { } shipName)
+                {
+                    var isOpened = await Dispatcher.UIThread.InvokeAsync(() => shipsPage.RunAutomatedOpenLoadoutAsync(shipName));
+                    _logger.LogInformation("Ouverture automatique du loadout « {Ship} » : {Result}", shipName, isOpened ? "faite" : "aucun vaisseau ne correspond");
+                }
             }
             catch (Exception ex)
             {

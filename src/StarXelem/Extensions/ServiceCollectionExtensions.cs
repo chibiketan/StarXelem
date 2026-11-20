@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using StarXelem.Data;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
+using StarXelem.Services.ShipLoadout;
 using StarXelem.ViewModels;
 using StarXelem.ViewModels.Popup;
 
@@ -49,6 +50,7 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<BlueprintListTabViewModel>();
             services.AddSingleton<ILocalDatabaseService, DesignLocalDatabaseService>();
             services.AddSingleton<ISettingsService, DesignSettingsService>();
+            services.AddSingleton<IShipLoadoutService, DesignShipLoadoutService>();
         }
         else
         {
@@ -65,6 +67,7 @@ public static class ServiceCollectionExtensions
                     sp.GetRequiredService<IDbContextFactory>(),
                     autoRebuild: false));
             services.AddSingleton<ISettingsService, RegistrySettingsService>();
+            services.AddSingleton<IShipLoadoutService, ShipLoadoutService>();
         }
 
         // Les services indépendants du mode design

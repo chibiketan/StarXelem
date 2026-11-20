@@ -4,7 +4,7 @@ using System.IO;
 namespace StarXelem.Models;
 
 /// <summary>
-/// Configuration CLI statique : --screen, --screenshot, --close, --load-items, --items-report, --load-ships, --ships-report, --load-friends, --load-reputations, --grpc-trace
+/// Configuration CLI statique : --screen, --screenshot, --close, --load-items, --items-report, --load-ships, --ships-report, --open-loadout, --load-friends, --load-reputations, --grpc-trace
 /// </summary>
 static class AppConfig
 {
@@ -19,6 +19,8 @@ static class AppConfig
     public static bool LoadShips { get; set; }
     /// <summary>Fichier JSON où écrire le détail des vaisseaux une fois le chargement terminé.</summary>
     public static string? ShipsReportPath { get; set; }
+    /// <summary>Après le chargement de Mon hangar, ouvre la fiche loadout du premier vaisseau dont le nom contient ce texte.</summary>
+    public static string? OpenLoadoutShip { get; set; }
     /// <summary>Lance un vrai chargement de la liste d'amis, comme un clic sur Actualiser.</summary>
     public static bool LoadFriends { get; set; }
     /// <summary>Recharge les réputations une fois le P4K et la base prêts, comme un clic sur Charger les données.</summary>
@@ -56,6 +58,11 @@ static class AppConfig
             else if (arg == "--ships-report" && i + 1 < args.Length)
             {
                 ShipsReportPath = Path.GetFullPath(args[++i]);
+                LoadShips = true;
+            }
+            else if (arg == "--open-loadout" && i + 1 < args.Length)
+            {
+                OpenLoadoutShip = args[++i];
                 LoadShips = true;
             }
             else if (arg == "--load-friends")
