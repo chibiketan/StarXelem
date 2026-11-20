@@ -1,6 +1,10 @@
 ﻿# TODO list
 
+## Ecran mon hangar
+- Ajouter une vue pour voir le loadout des vaisseaux
+
 ## Ecran liste des BP
+- Ajouter les informations sur les éléments détenus sil'inventaire est déjà chargé pour savoir si on peut le craft ou non
 - Dans la liste des missions accrochées à un pool, trouver une mise en perspective des missions inactives/pas prêtes
 - Permettre la navigation vers les missions en cliquant sur le nom
 
