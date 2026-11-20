@@ -121,7 +121,7 @@ Poids : 400 → `Normal`, 500 → `Medium`, 600 → `SemiBold`. Pas de 700.
 | case à cocher | `CheckBox Classes="sx-muted"` (coche en accent or) |
 | barre de progression 4 px | `ProgressBar Classes="sx-quality"` |
 | icône SVG en contour | `Path` avec `Data` = le `d` du SVG, `Stroke`, `StrokeThickness` = `stroke-width`, `StrokeLineCap="Round"`, `StrokeJoin="Round"`, `Stretch="Uniform"`, taille fixe |
-| chargement | `ui:ProgressRing IsIndeterminate="True"` sur un voile Surface à 0,75 d'opacité |
+| chargement | `ui:FAProgressRing IsIndeterminate="True"` sur un voile Surface à 0,75 d'opacité |
 
 ---
 

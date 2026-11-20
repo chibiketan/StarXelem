@@ -15,6 +15,7 @@
 
 ## Rules
 
+- Toujours compiler StarXelem en mode non incrémental : `dotnet build src\StarXelem.sln --no-incremental`. En compilation incrémentale, l'étape de compilation XAML d'Avalonia (AVLN) peut être sautée : une première compilation renvoie les erreurs AXAML, puis la suivante affiche « 0 erreur » alors que le XAML est toujours invalide (vécu lors de la migration Avalonia 12 : 123 erreurs AVLN2000 sur ui:ProgressRing masquées). Ne considérer une compilation comme valide qu'avec --no-incremental, et chercher les erreurs avec le motif « error AVLN » en plus de « error CS ».
 - Les messages de commit doivent TOUJOURS utiliser le format GitHub (conventional commits) et être écrits en français.
 
 Format : `type(scope): description`

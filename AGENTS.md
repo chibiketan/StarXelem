@@ -2,13 +2,13 @@
 
 ## Commands
 
-- **Build**: `dotnet build src\StarXelem\StarXelem.csproj`
+- **Build**: `dotnet build src\StarXelem.sln --no-incremental` — always non-incremental: an incremental build can skip Avalonia's XAML compilation and report "0 errors" while AXAML errors (`error AVLN…`) are still there.
 - **CLI DB rebuild test**: `dotnet run --project src\StarXelem.cli.testdb\StarXelem.cli.testdb.csproj`
 - **No tests**: project has no automated test suite. Verify by building and running.
 
 ## Architecture
 
-- **App**: Avalonia 11 desktop app (FluentAvalonia, MVVM via CommunityToolkit.Mvvm). Entry: `src/StarXelem/Program.cs` → `App.axaml.cs`.
+- **App**: Avalonia 12 desktop app (FluentAvaloniaUI 3, MVVM via CommunityToolkit.Mvvm). Entry: `src/StarXelem/Program.cs` → `App.axaml.cs`.
 - **Two projects**: `StarXelem` (Avalonia app), `StarXelem.cli.testdb` (standalone CLI for DB rebuild testing).
 - **Game data**: `StarBreaker.*` DLLs in `libs/` parse Star Citizen `.p4k` archives. Referenced via `<Reference>` with `HintPath`, not NuGet.
 - **DB**: EF Core SQLite at `%LOCALAPPDATA%\StarXelem\database.db`. Rebuilt entirely on P4K change (not migrated — full wipe + recreate).

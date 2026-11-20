@@ -11,9 +11,9 @@ read the image file to verify UI changes.
 
 ## Prerequisites
 
-1. **Build the project first** (or ensure it is up to date):
+1. **Build the project first**, always non-incremental (an incremental build can skip Avalonia's XAML compilation and hide AXAML errors):
    ```
-   dotnet build src\StarXelem\StarXelem.csproj
+   dotnet build src\StarXelem\StarXelem.csproj --no-incremental
    ```
 
 2. **A P4K file must be available.** The app needs a Star Citizen `Data.p4k`
@@ -69,10 +69,10 @@ read the image file to verify UI changes.
 ### 1. Build the project
 
 ```powershell
-dotnet build src\StarXelem\StarXelem.csproj
+dotnet build src\StarXelem\StarXelem.csproj --no-incremental
 ```
 
-Verify: `StarXelem -> ...\bin\Debug\net10.0\StarXelem.dll` with 0 errors.
+Verify: `StarXelem -> ...\bin\Debug\net10.0\StarXelem.dll` with 0 errors (look for both `error CS` and `error AVLN`).
 
 ### 2. Run with screenshot arguments
 

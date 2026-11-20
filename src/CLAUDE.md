@@ -9,13 +9,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-**StarXelem** is a Windows desktop application (Avalonia 11 + FluentAvalonia) for browsing Star Citizen game data. It reads game archives (`.p4k` files) and communicates with the game's gRPC backend.
+**StarXelem** is a Windows desktop application (Avalonia 12 + FluentAvalonia 3) for browsing Star Citizen game data. It reads game archives (`.p4k` files) and communicates with the game's gRPC backend.
 
 There are no automated tests in this project.
 
 ### Technology Stack
 
-- **UI:** Avalonia 11 with Fluent theme (FluentAvalonia) — XAML-based cross-platform UI
+- **UI:** Avalonia 12 with Fluent theme (FluentAvaloniaUI 3) — XAML-based cross-platform UI. FluentAvaloniaUI 3 types are `FA`-prefixed (`ui:FAProgressRing`, not `ui:ProgressRing`); use `PlaceholderText` instead of the obsolete `Watermark` on `TextBox`
 - **Pattern:** MVVM via `CommunityToolkit.Mvvm` (`[ObservableProperty]`, `[RelayCommand]` source generators)
 - **DI:** `Microsoft.Extensions.DependencyInjection`
 - **Game data:** `StarBreaker.*` DLLs in `libs/` — P4K archive parsing, DataCore (DCB files), gRPC definitions

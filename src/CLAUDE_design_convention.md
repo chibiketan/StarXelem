@@ -132,7 +132,7 @@ Poids utilisés : 400, 500 (`Medium`), 600 (`SemiBold`). Pas de gras 700.
 | Case à cocher | `CheckBox.sx-muted` | Coche en Accent, texte 12 Secondaire. |
 | Barre de progression | `ProgressBar.sx-quality` | 4 px, rayon 2, piste Ligne, remplissage Accent. |
 | Paire libellé / valeur | `TextBlock` 12 Secondaire au-dessus, valeur 13 (mono si technique) | Pied de détail (réputation, nom technique), séparé par une ligne. Texte copiable : `SelectableTextBlock` avec police et couleur en ligne. |
-| Chargement | `ui:ProgressRing` sur un voile Surface à 0,75 d'opacité | Libellé `sx-caption` sous l'anneau (« Chargement… », « Filtrage en cours… »). |
+| Chargement | `ui:FAProgressRing` sur un voile Surface à 0,75 d'opacité | Libellé `sx-caption` sous l'anneau (« Chargement… », « Filtrage en cours… »). |
 
 ---
 
