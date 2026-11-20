@@ -77,7 +77,7 @@
                                              FontSize="14"
                                              PasswordChar="•"
                                              FontFamily="{DynamicResource Sx.FontMono}"
-                                             Watermark="Entrez votre clé API…"
+                                             PlaceholderText="Entrez votre clé API…"
                                              Text="{Binding ApiKey}" />
                                 </comp:NotchedBorder>
 

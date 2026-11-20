@@ -41,7 +41,7 @@
                                              Grid.Column="1"
                                              Classes="sx"
                                              Height="36"
-                                             Watermark="Chercher dans les valeurs"
+                                             PlaceholderText="Chercher dans les valeurs"
                                              Text="{Binding SearchText}" />
                                 </Grid>
                             </comp:NotchedBorder>
