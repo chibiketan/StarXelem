@@ -159,7 +159,7 @@
                             <TextBox Grid.Column="1"
                                      Classes="sx"
                                      Height="44"
-                                     Watermark="Rechercher une mission..."
+                                     PlaceholderText="Rechercher une mission..."
                                      Text="{Binding Search}" />
                         </Grid>
                     </comp:NotchedBorder>
@@ -193,7 +193,7 @@
                         <Grid IsVisible="{Binding IsBusy}" IsHitTestVisible="False">
                             <Border Background="{DynamicResource Sx.SurfaceBrush}" Opacity="0.75" />
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Margin="12,0">
-                                <ui:ProgressRing IsIndeterminate="True" Width="40" Height="40" HorizontalAlignment="Center" />
+                                <ui:FAProgressRing IsIndeterminate="True" Width="40" Height="40" HorizontalAlignment="Center" />
                                 <TextBlock Classes="sx-caption" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding BusyMessage}" />
                             </StackPanel>
                         </Grid>

@@ -308,9 +308,9 @@
     <Style Selector="TextBox.sx:pointerover, TextBox.sx:focus">
         <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
     </Style>
-    <Style Selector="TextBox.sx /template/ TextBlock#PART_Watermark,
-                     TextBox.sx:pointerover /template/ TextBlock#PART_Watermark,
-                     TextBox.sx:focus /template/ TextBlock#PART_Watermark">
+    <Style Selector="TextBox.sx /template/ TextBlock#PART_Placeholder,
+                     TextBox.sx:pointerover /template/ TextBlock#PART_Placeholder,
+                     TextBox.sx:focus /template/ TextBlock#PART_Placeholder">
         <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
     </Style>
     <Style Selector="CheckBox.sx-muted">
