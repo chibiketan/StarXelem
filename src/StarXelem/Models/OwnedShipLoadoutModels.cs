@@ -6,6 +6,12 @@ public enum OwnedShipLoadoutSource
     /// <summary>Objets réellement montés, lus sur le compte du joueur.</summary>
     Real,
 
+    /// <summary>
+    /// Dernier loadout sauvegardé à l'ASOP (snapshot CUSTOMIZED, sinon DEFAULT) : le vaisseau est livré mais absent de l'univers (détruit, rangé
+    /// hors de portée). Les ports que le snapshot ne suit pas sont complétés par l'équipement d'origine.
+    /// </summary>
+    Saved,
+
     /// <summary>Équipement de série du Data.p4k : le vaisseau n'a pas été retrouvé dans l'univers.</summary>
     Origin
 }

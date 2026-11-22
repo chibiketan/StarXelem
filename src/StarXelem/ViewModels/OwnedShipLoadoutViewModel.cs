@@ -23,7 +23,7 @@ public partial class OwnedShipLoadoutViewModel : ViewModelBase
     [ObservableProperty] private SpaceshipModel? _selectedShip;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasLoadout), nameof(IsRealSource), nameof(IsOriginSource), nameof(SourceLabel), nameof(ComponentCount),
+    [NotifyPropertyChangedFor(nameof(HasLoadout), nameof(IsRealSource), nameof(IsSavedSource), nameof(IsOriginSource), nameof(IsComparedSource), nameof(SourceLabel), nameof(ComponentCount),
         nameof(WeaponCount), nameof(MissileCount), nameof(ModifiedCount), nameof(HasModified), nameof(ShowNoEquipment))]
     private OwnedShipLoadoutModel? _loadout;
 
@@ -54,8 +54,18 @@ public partial class OwnedShipLoadoutViewModel : ViewModelBase
 
     public bool HasLoadout => Loadout != null;
     public bool IsRealSource => Loadout?.Source == OwnedShipLoadoutSource.Real;
+    public bool IsSavedSource => Loadout?.Source == OwnedShipLoadoutSource.Saved;
     public bool IsOriginSource => Loadout?.Source == OwnedShipLoadoutSource.Origin;
-    public string SourceLabel => IsRealSource ? "Loadout réel" : "Loadout d'origine";
+
+    /// <summary>Vrai si le loadout affiché est comparé à l'origine (réel ou sauvegardé) : le filtre des écarts a un sens.</summary>
+    public bool IsComparedSource => IsRealSource || IsSavedSource;
+
+    public string SourceLabel => Loadout?.Source switch
+    {
+        OwnedShipLoadoutSource.Real => "Loadout réel",
+        OwnedShipLoadoutSource.Saved => "Loadout sauvegardé (ASOP)",
+        _ => "Loadout d'origine"
+    };
     public int ComponentCount => Loadout?.ComponentCount ?? 0;
     public int WeaponCount => Loadout?.WeaponCount ?? 0;
     public int MissileCount => Loadout?.MissileCount ?? 0;

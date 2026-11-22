@@ -154,7 +154,7 @@
                                                  VerticalAlignment="Center"
                                                  Fill="{DynamicResource Sx.MutedBrush}"
                                                  IsVisible="{Binding !HasRealLoadout}"
-                                                 ToolTip.Tip="Vaisseau non retrouvé : loadout d'origine" />
+                                                 ToolTip.Tip="Vaisseau non retrouvé dans l'univers : loadout sauvegardé ou d'origine" />
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
@@ -190,7 +190,7 @@
                                                 </StackPanel>
                                             </comp:NotchedBorder>
                                             <comp:NotchedBorder Classes="sx-badge"
-                                                                Classes.info="{Binding IsRealSource}"
+                                                                Classes.info="{Binding IsComparedSource}"
                                                                 IsVisible="{Binding HasLoadout}">
                                                 <StackPanel Orientation="Horizontal" Spacing="7">
                                                     <Ellipse />
@@ -204,14 +204,25 @@
                                               Classes="sx-muted"
                                               VerticalAlignment="Top"
                                               Margin="0,8,0,0"
-                                              IsVisible="{Binding IsRealSource}"
+                                              IsVisible="{Binding IsComparedSource}"
                                               IsEnabled="{Binding HasModified}"
                                               ToolTip.Tip="N'afficher que les composants et armes qui diffèrent de l'équipement d'origine"
                                               Content="Écarts seulement"
                                               IsChecked="{Binding ShowDifferencesOnly}" />
                                 </Grid>
 
-                                <!-- Loadout d'origine : le vaisseau n'a pas été retrouvé dans l'univers -->
+                                <!-- Loadout sauvegardé : le vaisseau est livré mais absent de l'univers -->
+                                <comp:NotchedBorder CutSize="10"
+                                                    Padding="16,12"
+                                                    Background="{DynamicResource Sx.InfoSoftBrush}"
+                                                    IsVisible="{Binding IsSavedSource}">
+                                    <TextBlock TextWrapping="Wrap"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource Sx.TextBrush}"
+                                               Text="Ce vaisseau n'a pas été retrouvé dans l'univers : voici le dernier loadout sauvegardé à l'ASOP, celui qu'il aura à sa prochaine récupération. Les emplacements que la sauvegarde ne suit pas sont complétés par l'équipement d'origine." />
+                                </comp:NotchedBorder>
+
+                                <!-- Loadout d'origine : vaisseau jamais demandé, ou sauvegarde indisponible -->
                                 <comp:NotchedBorder CutSize="10"
                                                     Padding="16,12"
                                                     Background="{DynamicResource Sx.InfoSoftBrush}"
@@ -219,7 +230,7 @@
                                     <TextBlock TextWrapping="Wrap"
                                                FontSize="13"
                                                Foreground="{DynamicResource Sx.TextBrush}"
-                                               Text="Ce vaisseau n'a pas été retrouvé dans l'univers (détruit, non demandé ou inaccessible) : voici son équipement d'origine, tel qu'il est livré." />
+                                               Text="Aucun loadout sauvegardé pour ce vaisseau (jamais demandé, ou serveur indisponible) : voici son équipement d'origine, tel qu'il est livré." />
                                 </comp:NotchedBorder>
 
                                 <!-- Chiffres clés -->

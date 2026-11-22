@@ -6,6 +6,7 @@ using StarBreaker.Common;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Data;
 using StarXelem.Models;
+using EntitlementV2 = Sc.External.Services.Entitlement.V2;
 
 namespace StarXelem.Services.ShipLoadout;
 
@@ -39,16 +40,20 @@ public sealed class ShipLoadoutService : IShipLoadoutService
     /// <summary>Types dont on lit la description : les autres objets (portes, sièges…) ne servent qu'à parcourir l'arbre.</summary>
     private static readonly HashSet<EItemType> DescribedTypes = [.. ComponentTypes, .. GunTypes, .. LauncherTypes, .. MissileTypes, .. MountTypes];
 
+    private const string EntityClassUrnPrefix = "urn:sc:global:entityclass:uuid:";
+
     private readonly IP4kService _p4kService;
     private readonly IScItemRepository _scItemRepository;
+    private readonly IGrpcClientService _grpcClientService;
     private readonly ILogger<ShipLoadoutService> _logger;
     private readonly ShipComponentDescriber _describer;
     private IReadOnlyDictionary<string, uint>? _crcByShortName;
 
-    public ShipLoadoutService(IP4kService p4kService, IScItemRepository scItemRepository, ILogger<ShipLoadoutService> logger)
+    public ShipLoadoutService(IP4kService p4kService, IScItemRepository scItemRepository, IGrpcClientService grpcClientService, ILogger<ShipLoadoutService> logger)
     {
         _p4kService = p4kService;
         _scItemRepository = scItemRepository;
+        _grpcClientService = grpcClientService;
         _logger = logger;
         _describer = new ShipComponentDescriber(p4kService);
     }
@@ -58,7 +63,6 @@ public sealed class ShipLoadoutService : IShipLoadoutService
 
     private async Task<OwnedShipLoadoutModel> BuildLoadoutAsync(SpaceshipModel ship, CancellationToken token)
     {
-        var source = ship.HasRealLoadout ? OwnedShipLoadoutSource.Real : OwnedShipLoadoutSource.Origin;
         var shipCrc = Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([new CigGuid(ship.Entitlement.EntityClassGuid)]));
         var shipDefinition = (await _p4kService.GetEntityType(shipCrc, DescriptionDepth).ConfigureAwait(false))?.Data as EntityClassDefinition;
 
@@ -66,17 +70,154 @@ public sealed class ShipLoadoutService : IShipLoadoutService
         token.ThrowIfCancellationRequested();
         var originEntries = Flatten(origin);
 
-        if (source == OwnedShipLoadoutSource.Origin)
+        if (ship.HasRealLoadout)
         {
-            return CreateModel(source, originEntries, null);
+            var originPortNames = new Dictionary<uint, string>();
+            CollectPortNames(origin, originPortNames);
+            var real = await BuildRealNodesAsync(ship, shipDefinition, originPortNames, token).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+            return CreateModel(OwnedShipLoadoutSource.Real, Flatten(real), originEntries);
         }
 
-        var originPortNames = new Dictionary<uint, string>();
-        CollectPortNames(origin, originPortNames);
-        var real = await BuildRealNodesAsync(ship, shipDefinition, originPortNames, token).ConfigureAwait(false);
+        // Un vaisseau jamais demandé n'a pas de snapshot : inutile d'interroger le serveur.
+        if (ship.Entitlement.Status == EntitlementV2.EntitlementStatus.Delivered
+            && await BuildSavedLoadoutAsync(ship, originEntries, token).ConfigureAwait(false) is { } saved)
+        {
+            return saved;
+        }
+
+        return CreateModel(OwnedShipLoadoutSource.Origin, originEntries, null);
+    }
+
+    /* ========================================================================
+     * Loadout sauvegardé à l'ASOP (snapshots du service entitlement)
+     * ======================================================================== */
+
+    /// <summary>
+    /// Loadout sauvegardé : snapshot CUSTOMIZED, sinon DEFAULT, ou <c>null</c> si le serveur n'en renvoie aucun. Les ports que les snapshots
+    /// ne suivent pas (les composants de l'Idris, par exemple, absents des deux slots) sont repris de l'origine ; un port suivi par le snapshot
+    /// DEFAULT mais absent du snapshot CUSTOMIZED est considéré comme vidé.
+    /// </summary>
+    private async Task<OwnedShipLoadoutModel?> BuildSavedLoadoutAsync(SpaceshipModel ship, FlatLoadout origin, CancellationToken token)
+    {
+        IList<EntitlementV2.SnapshotWithEntitlement> records;
+        try
+        {
+            records = await _grpcClientService.GetShipSnapshots(ship.Entitlement.Urn, token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Lecture du loadout sauvegardé impossible pour {Urn}", ship.Entitlement.Urn);
+            return null;
+        }
+
+        var customized = records.Where(record => record.Snapshot?.SlotId == EntitlementV2.SnapshotSlotId.Customized).ToList();
+        var defaults = records.Where(record => record.Snapshot?.SlotId == EntitlementV2.SnapshotSlotId.Default).ToList();
+        var shownRecords = customized.Count > 0 ? customized : defaults;
+        if (shownRecords.Count == 0)
+        {
+            return null;
+        }
+
+        var saved = Flatten(await BuildSnapshotNodesAsync(shownRecords, token).ConfigureAwait(false));
+        var tracked = ReferenceEquals(shownRecords, defaults) || defaults.Count == 0
+            ? saved
+            : Flatten(await BuildSnapshotNodesAsync(defaults, token).ConfigureAwait(false));
         token.ThrowIfCancellationRequested();
 
-        return CreateModel(source, Flatten(real), originEntries);
+        foreach (var (key, entry) in origin.Components.Where(pair => !saved.Components.ContainsKey(pair.Key) && !tracked.Components.ContainsKey(pair.Key)))
+        {
+            saved.Components[key] = entry;
+        }
+
+        foreach (var (key, entry) in origin.Weapons.Where(pair => !saved.Weapons.ContainsKey(pair.Key) && !tracked.Weapons.ContainsKey(pair.Key)))
+        {
+            saved.Weapons[key] = entry;
+        }
+
+        return CreateModel(OwnedShipLoadoutSource.Saved, saved, origin);
+    }
+
+    /// <summary>Arbre de ports reconstruit à partir des chemins <c>attach_path</c> (noms de ports en clair depuis le vaisseau).</summary>
+    private async Task<List<LoadoutNode>> BuildSnapshotNodesAsync(IEnumerable<EntitlementV2.SnapshotWithEntitlement> records, CancellationToken token)
+    {
+        var roots = new List<LoadoutNode>();
+        var byPath = new Dictionary<string, LoadoutNode>(StringComparer.Ordinal);
+
+        // Les parents avant leurs enfants ; l'enregistrement racine (chemin vide) est le vaisseau lui-même.
+        foreach (var record in records.Where(record => record.Snapshot is { AttachPath.Count: > 0 and <= MaxDepth }).OrderBy(record => record.Snapshot.AttachPath.Count))
+        {
+            token.ThrowIfCancellationRequested();
+            var path = record.Snapshot.AttachPath;
+            List<LoadoutNode> siblings;
+            if (path.Count == 1)
+            {
+                siblings = roots;
+            }
+            else if (byPath.TryGetValue(string.Join('/', path.Take(path.Count - 1)), out var parent))
+            {
+                siblings = parent.Children;
+            }
+            else
+            {
+                // Parent absent ou véhicule embarqué écarté : toute la branche est ignorée.
+                continue;
+            }
+
+            if (SnapshotClassCrc(record) is not { } classCrc)
+            {
+                continue;
+            }
+
+            var entityRecord = await _p4kService.GetEntityType(classCrc, DescriptionDepth).ConfigureAwait(false);
+            var definition = entityRecord?.Data as EntityClassDefinition;
+            // Un véhicule embarqué (le Skylark du Centaurus) a son propre loadout, comme pour l'arbre d'origine.
+            if (definition?.Components.OfType<VehicleComponentParams>().Any() == true)
+            {
+                continue;
+            }
+
+            var portName = path[^1];
+            var attachType = definition?.Components.OfType<SAttachableComponentParams>().FirstOrDefault()?.AttachDef?.Type;
+            var node = new LoadoutNode(portName, PortCrc(portName), classCrc)
+            {
+                Description = definition != null && attachType is { } type && DescribedTypes.Contains(type)
+                    ? await DescribeAsync(definition, entityRecord!.RecordName).ConfigureAwait(false)
+                    : null
+            };
+            siblings.Add(node);
+            byPath[string.Join('/', path)] = node;
+        }
+
+        return roots;
+    }
+
+    /// <summary>
+    /// CRC de la classe d'un objet de snapshot : lue sur son entitlement, ou dans l'URN quand l'objet n'en a pas
+    /// (<c>urn:sc:global:entityclass:uuid:&lt;guid&gt;</c>, cas des fusibles).
+    /// </summary>
+    private uint? SnapshotClassCrc(EntitlementV2.SnapshotWithEntitlement record)
+    {
+        var guid = record.Entitlement?.EntityClassGuid;
+        if (string.IsNullOrEmpty(guid) && record.Snapshot.ItemUrn.StartsWith(EntityClassUrnPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            guid = record.Snapshot.ItemUrn[EntityClassUrnPrefix.Length..];
+        }
+
+        if (string.IsNullOrEmpty(guid))
+        {
+            return null;
+        }
+
+        try
+        {
+            return Crc32c.FromSpan(MemoryMarshal.Cast<CigGuid, byte>([new CigGuid(guid)]));
+        }
+        catch (Exception ex) when (ex is FormatException or ArgumentException)
+        {
+            _logger.LogDebug("GUID de classe invalide dans un snapshot : {Guid}", guid);
+            return null;
+        }
     }
 
     /* ========================================================================

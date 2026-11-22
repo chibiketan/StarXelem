@@ -16,6 +16,12 @@ public interface IGrpcClientService
 
     Task InitClient(P4kFileModel p4kFile);
     Task<IList<SpaceshipModel>> GetSpaceships();
+
+    /// <summary>
+    /// Loadouts sauvegardés à l'ASOP pour un vaisseau (slots DEFAULT et CUSTOMIZED) : un enregistrement par objet installé, avec son chemin de ports.
+    /// Vide pour un vaisseau jamais demandé.
+    /// </summary>
+    Task<IList<Sc.External.Services.Entitlement.V2.SnapshotWithEntitlement>> GetShipSnapshots(string entitlementUrn, CancellationToken token = default);
     Task<IList<EntityItemQueryResult>> QueryGraphBySearch(ItemQueryModel queryModel);
     Task<IList<EntityNodeProperties>> QueryGraphByParentUrnList(IList<string> parentUrnList);
     Task<IList<EntityNodeProperties>> QueryGraphByGeidListWithoutOwner(IList<ulong> geidList);

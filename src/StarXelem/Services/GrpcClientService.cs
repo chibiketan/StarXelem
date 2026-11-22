@@ -160,6 +160,32 @@ public class GrpcClientService : IGrpcClientService
         Console.WriteLine($"{DateTime.Now} après la requête, {result.Count} résultats");
         return result;
     }
+
+    public async Task<IList<SnapshotWithEntitlement>> GetShipSnapshots(string entitlementUrn, CancellationToken token = default)
+    {
+        var entitlementServiceClient = new ExternalEntitlementService.ExternalEntitlementServiceClient(_callInvoker);
+        var request = new QuerySnapshotsWithEntitlementsStreamRequest { Filter = new SnapshotFilter() };
+        request.Filter.EntitlementUrn.Add(entitlementUrn);
+        var result = new List<SnapshotWithEntitlement>();
+
+        await semaphoreSlim.WaitAsync(token);
+        try
+        {
+            using var response = entitlementServiceClient.QuerySnapshotsWithEntitlementsStream(request, _authHeaders, deadline: DateTime.UtcNow.AddSeconds(20),
+                cancellationToken: token);
+
+            while (await response.ResponseStream.MoveNext(token))
+            {
+                result.AddRange(response.ResponseStream.Current.Results);
+            }
+        }
+        finally
+        {
+            semaphoreSlim.Release();
+        }
+
+        return result;
+    }
     
     public async Task<IList<EntityItemQueryResult>> QueryGraphBySearch(ItemQueryModel itemQueryModel)
     {
