@@ -10,10 +10,14 @@ Version SC : 4.10.3
 - Calcul des propriétés de l'objet fabriqué à la qualité choisie sur une piste de qualité, en additionnant les modificateurs des composants qui partagent une propriété
 - Ajout d'un badge Prêt / Partiel dans la liste des blueprints et d'un filtre « Fabricables »
 - Ajout d'un bouton « Charger mes objets » sur l'écran des blueprints, qui ouvre l'écran des objets et lance le chargement
+- Ajout d'une colonne « Contenu » triable dans la liste des objets : quantité réellement contenue par un conteneur de ressource (64 cSCU dans une caisse de 1 SCU)
+- Signalement des objets craftés dans la liste des objets par une marque « Craft », avec leurs valeurs améliorées et les matériaux utilisés dans le détail
+- Ajout d'une case « Masquer les objets « <= PLACEHOLDER => » », cochée par défaut, dans la liste des objets
 
 ### Corrigé
 - Correction de l'affichage du nom personnalisé des vaisseaux, désormais lu dans la configuration de l'entité
 - Correction de l'affichage des petites quantités de ressource : 1 cSCU s'affichait 10000 µSCU
+- Les puces de type de la liste des objets sans aucun objet après filtrage sont désormais masquées
 
 ### Modifié
 - Migration de l'interface vers Avalonia 12 (FluentAvaloniaUI 3, FluentIcons 2.1, AsyncImageLoader 4)
