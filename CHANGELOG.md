@@ -2,29 +2,26 @@
 Version SC : 4.10.3
 
 ### Ajouté
-- Ajout d'une fiche loadout pour chaque vaisseau possédé, accessible depuis Mon hangar : composants, armes, équipement de minage et comparaison avec le loadout d'origine (filtre « Écarts seulement »)
-- Affichage du loadout sauvegardé à l'ASOP pour les vaisseaux qui ne sont pas dans l'univers (détruits ou pas encore récupérés à ce patch), complété par le loadout d'origine pour les emplacements non sauvegardés
-- Signalement des objets craftés dans la fiche loadout, avec leurs valeurs améliorées et les matériaux utilisés en infobulle
-- Ajout des options CLI `--snapshots=<urn>` et `--resolve-guids=<guids>` à la sonde gRPC pour analyser les loadouts sauvegardés
-- Confrontation des blueprints aux matériaux possédés, une fois les objets chargés : bilan du blueprint sélectionné (fabrications possibles, quantité utilisable, qualité moyenne et qualité max des lots), lots groupés par qualité et par emplacement, lots sous la qualité minimale exclus
+- Ajout d'une fiche loadout pour chaque vaisseau possédé, accessible depuis Mon hangar
+- Confrontation des blueprints aux matériaux possédés, une fois les objets chargés : bilan du blueprint sélectionné
 - Calcul des propriétés de l'objet fabriqué à la qualité choisie sur une piste de qualité, en additionnant les modificateurs des composants qui partagent une propriété
 - Ajout d'un badge Prêt / Partiel dans la liste des blueprints et d'un filtre « Fabricables »
 - Ajout d'un bouton « Charger mes objets » sur l'écran des blueprints, qui ouvre l'écran des objets et lance le chargement
-- Ajout d'une colonne « Contenu » triable dans la liste des objets : quantité réellement contenue par un conteneur de ressource (64 cSCU dans une caisse de 1 SCU)
-- Signalement des objets craftés dans la liste des objets par une marque « Craft », avec leurs valeurs améliorées et les matériaux utilisés dans le détail
-- Ajout d'une case « Masquer les objets « <= PLACEHOLDER => » », cochée par défaut, dans la liste des objets
+- Ajout d'une colonne « Contenu » triable dans la liste des objets
+- Signalement des objets craftés dans la liste des objets par une marque « Craft »
+- Ajout d'une case « Masquer les objets « <= PLACEHOLDER => » » dans la liste des objets
 
 ### Corrigé
-- Correction de l'affichage du nom personnalisé des vaisseaux, désormais lu dans la configuration de l'entité
+- Correction de l'affichage du nom personnalisé des vaisseaux
 - Correction de l'affichage des petites quantités de ressource : 1 cSCU s'affichait 10000 µSCU
 - Les puces de type de la liste des objets sans aucun objet après filtrage sont désormais masquées
 
 ### Modifié
-- Migration de l'interface vers Avalonia 12 (FluentAvaloniaUI 3, FluentIcons 2.1, AsyncImageLoader 4)
+- Migration de l'interface vers Avalonia 12
 - Mise à jour des bibliothèques .NET (Entity Framework Core, Microsoft.Extensions) en 10.0.15 et de ClosedXML en 0.105.1
 
 ### Sécurité
-- Correction de vulnérabilités dans des dépendances (SQLite embarqué via SQLitePCLRaw, Tmds.DBus.Protocol)
+- Correction de vulnérabilités dans des dépendances
 
 ## [0.2.9]
 Version SC : 4.10.3
