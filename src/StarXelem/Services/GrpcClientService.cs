@@ -164,7 +164,9 @@ public class GrpcClientService : IGrpcClientService
     public async Task<IList<SnapshotWithEntitlement>> GetShipSnapshots(string entitlementUrn, CancellationToken token = default)
     {
         var entitlementServiceClient = new ExternalEntitlementService.ExternalEntitlementServiceClient(_callInvoker);
-        var request = new QuerySnapshotsWithEntitlementsStreamRequest { Filter = new SnapshotFilter() };
+        // Les propriétés persistantes portent les données de craft de chaque objet (variable « Crafting.PersistentItemData ») ;
+        // le serveur ne les renvoie que sur demande.
+        var request = new QuerySnapshotsWithEntitlementsStreamRequest { Filter = new SnapshotFilter(), IncludePersistentProperties = true };
         request.Filter.EntitlementUrn.Add(entitlementUrn);
         var result = new List<SnapshotWithEntitlement>();
 

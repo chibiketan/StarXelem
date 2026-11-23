@@ -107,6 +107,15 @@
         <Style Selector="Border.table-row TextBlock.mono">
             <Setter Property="FontFamily" Value="{DynamicResource Sx.FontMono}" />
         </Style>
+        <!-- Marqueur d'objet crafté : or de la charte, valeurs améliorées en infobulle -->
+        <Style Selector="comp|NotchedBorder.sx-badge.craft">
+            <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
+            <Setter Property="Cursor" Value="Help" />
+        </Style>
+        <Style Selector="comp|NotchedBorder.sx-badge.craft TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
         <Style Selector="TextBlock.removed">
             <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
             <Setter Property="FontStyle" Value="Italic" />
@@ -278,12 +287,21 @@
                                                             <DataTemplate x:DataType="models:OwnedShipComponentModel">
                                                                 <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10" Margin="0,6" Background="Transparent"
                                                                       ToolTip.Tip="{Binding Tooltip}">
-                                                                    <TextBlock FontWeight="Medium"
-                                                                               VerticalAlignment="Center"
-                                                                               Foreground="{DynamicResource Sx.TextBrush}"
-                                                                               TextTrimming="CharacterEllipsis"
-                                                                               Classes.removed="{Binding IsRemoved}"
-                                                                               Text="{Binding DisplayName}" />
+                                                                    <DockPanel>
+                                                                        <comp:NotchedBorder DockPanel.Dock="Right"
+                                                                                            Classes="sx-badge craft"
+                                                                                            Margin="8,0,0,0"
+                                                                                            IsVisible="{Binding IsCrafted}"
+                                                                                            ToolTip.Tip="{Binding Crafted.Tooltip, FallbackValue=''}">
+                                                                            <TextBlock Text="Craft" />
+                                                                        </comp:NotchedBorder>
+                                                                        <TextBlock FontWeight="Medium"
+                                                                                   VerticalAlignment="Center"
+                                                                                   Foreground="{DynamicResource Sx.TextBrush}"
+                                                                                   TextTrimming="CharacterEllipsis"
+                                                                                   Classes.removed="{Binding IsRemoved}"
+                                                                                   Text="{Binding DisplayName}" />
+                                                                    </DockPanel>
                                                                     <TextBlock Grid.Column="1"
                                                                                VerticalAlignment="Center"
                                                                                Foreground="{DynamicResource Sx.SecondaryBrush}"
@@ -339,7 +357,14 @@
                                                             <TextBlock Classes="mono muted small" Text="{Binding PortName}" />
                                                         </StackPanel>
                                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                            <TextBlock Classes="name" Classes.removed="{Binding IsRemoved}" Text="{Binding EquipmentName}" />
+                                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                <TextBlock Classes="name" Classes.removed="{Binding IsRemoved}" Text="{Binding EquipmentName}" />
+                                                                <comp:NotchedBorder Classes="sx-badge craft"
+                                                                                    IsVisible="{Binding IsCrafted}"
+                                                                                    ToolTip.Tip="{Binding Crafted.Tooltip, FallbackValue=''}">
+                                                                    <TextBlock Text="Craft" />
+                                                                </comp:NotchedBorder>
+                                                            </StackPanel>
                                                             <TextBlock Classes="muted small" IsVisible="{Binding HasMount}" Text="{Binding MountLabel, StringFormat='sur {0}'}" />
                                                         </StackPanel>
                                                         <TextBlock Grid.Column="2" Classes="mono" Text="{Binding SizeLabel}" />

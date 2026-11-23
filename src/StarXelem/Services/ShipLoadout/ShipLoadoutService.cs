@@ -50,6 +50,7 @@ public sealed class ShipLoadoutService : IShipLoadoutService
     private readonly IGrpcClientService _grpcClientService;
     private readonly ILogger<ShipLoadoutService> _logger;
     private readonly ShipComponentDescriber _describer;
+    private readonly CraftedItemReader _craftedReader;
     private IReadOnlyDictionary<string, uint>? _crcByShortName;
 
     public ShipLoadoutService(IP4kService p4kService, IScItemRepository scItemRepository, IGrpcClientService grpcClientService, ILogger<ShipLoadoutService> logger)
@@ -59,6 +60,7 @@ public sealed class ShipLoadoutService : IShipLoadoutService
         _grpcClientService = grpcClientService;
         _logger = logger;
         _describer = new ShipComponentDescriber(p4kService);
+        _craftedReader = new CraftedItemReader(p4kService);
     }
 
     public Task<OwnedShipLoadoutModel> GetLoadoutAsync(SpaceshipModel ship, CancellationToken token = default) =>
@@ -185,7 +187,9 @@ public sealed class ShipLoadoutService : IShipLoadoutService
             {
                 Description = definition != null && attachType is { } type && DescribedTypes.Contains(type)
                     ? await DescribeAsync(definition, entityRecord!.RecordName).ConfigureAwait(false)
-                    : null
+                    : null,
+                // Variables persistantes de l'objet, présentes car la requête demande IncludePersistentProperties.
+                Crafted = await _craftedReader.ReadAsync(record.Entitlement?.PersistentProperties?.Variables, attachType, definition).ConfigureAwait(false)
             };
             // Un intermédiaire déjà créé faute d'enregistrement prend la place qui lui revient, avec ses enfants.
             if (byPath.TryGetValue(pathKey, out var placeholder))
@@ -382,7 +386,8 @@ public sealed class ShipLoadoutService : IShipLoadoutService
 
             var node = new LoadoutNode(portName, portCrc, properties.ClassGuidCrc)
             {
-                Description = isDescribed && definition != null ? await DescribeAsync(definition, record!.RecordName).ConfigureAwait(false) : null
+                Description = isDescribed && definition != null ? await DescribeAsync(definition, record!.RecordName).ConfigureAwait(false) : null,
+                Crafted = await _craftedReader.ReadAsync(child.EntitySnapshot?.Variables, (EItemType)properties.ItemTypeEnum, definition).ConfigureAwait(false)
             };
             node.Children.AddRange(await BuildRealChildrenAsync(properties.Geid, definition, byParent, originPortNames, depth + 1, token).ConfigureAwait(false));
             nodes.Add(node);
@@ -525,7 +530,8 @@ public sealed class ShipLoadoutService : IShipLoadoutService
             Grade = isRemoved ? string.Empty : description.Grade,
             IsModified = isModified,
             IsRemoved = isRemoved,
-            OriginName = reference?.Node.Description?.DisplayName
+            OriginName = reference?.Node.Description?.DisplayName,
+            Crafted = isRemoved ? null : entry.Node.Crafted
         };
 
         return (description.Type, model);
@@ -571,7 +577,8 @@ public sealed class ShipLoadoutService : IShipLoadoutService
             IsMissile = isMissile,
             IsModified = isModified,
             IsRemoved = isRemoved,
-            OriginName = reference?.Node.Description?.DisplayName
+            OriginName = reference?.Node.Description?.DisplayName,
+            Crafted = isRemoved ? null : entry.Node.Crafted
         };
     }
 
@@ -590,6 +597,10 @@ public sealed class ShipLoadoutService : IShipLoadoutService
         public uint PortCrc { get; } = portCrc;
         public uint ClassCrc { get; } = classCrc;
         public ShipComponentDescription? Description { get; init; }
+
+        /// <summary>Données de craft (loadouts réel et sauvegardé uniquement), ou <c>null</c> si l'objet n'est pas crafté.</summary>
+        public CraftedItemInfo? Crafted { get; init; }
+
         public List<LoadoutNode> Children { get; } = [];
     }
 

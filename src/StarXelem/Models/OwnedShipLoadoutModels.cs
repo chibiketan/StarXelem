@@ -16,9 +16,44 @@ public enum OwnedShipLoadoutSource
     Origin
 }
 
+/// <summary>Valeur améliorée d'un objet crafté : nom localisé de la propriété et valeur prête à afficher (« +32,92 % »).</summary>
+public record CraftedModifier(string Name, string ValueLabel);
+
+/// <summary>Matériau utilisé pour crafter un objet, avec sa qualité (sur 1000).</summary>
+public record CraftedMaterial(string Name, int Quality);
+
+/// <summary>Données de craft d'un objet (variable persistante « Crafting.PersistentItemData »).</summary>
+public record CraftedItemInfo(int Tier, IReadOnlyList<CraftedModifier> Modifiers, IReadOnlyList<CraftedMaterial> Materials)
+{
+    /// <summary>Infobulle du marqueur « Craft » : valeurs améliorées, puis matériaux.</summary>
+    public string Tooltip
+    {
+        get
+        {
+            var lines = new List<string> { "Objet crafté" };
+            lines.AddRange(Modifiers.Count > 0
+                ? Modifiers.Select(modifier => $"{modifier.Name} : {modifier.ValueLabel}")
+                : ["Aucune valeur améliorée"]);
+            if (Materials.Count > 0)
+            {
+                lines.Add(string.Empty);
+                lines.Add("Matériaux :");
+                lines.AddRange(Materials.Select(material => $"{material.Name} (qualité {material.Quality})"));
+            }
+
+            return string.Join('\n', lines);
+        }
+    }
+}
+
 /// <summary>Composant d'un vaisseau possédé, avec son écart éventuel par rapport au loadout d'origine.</summary>
 public class OwnedShipComponentModel : P4kShipComponentModel
 {
+    /// <summary>Données de craft, ou <c>null</c> si l'objet n'est pas crafté.</summary>
+    public CraftedItemInfo? Crafted { get; init; }
+
+    public bool IsCrafted => Crafted != null;
+
     /// <summary>Vrai si le composant diffère de celui d'origine sur ce port.</summary>
     public bool IsModified { get; init; }
 
@@ -71,6 +106,11 @@ public class OwnedShipWeaponRow
 
     /// <summary>Équipement d'origine sur ce port, pour l'infobulle d'une ligne modifiée.</summary>
     public string? OriginName { get; init; }
+
+    /// <summary>Données de craft de l'équipement, ou <c>null</c> s'il n'est pas crafté.</summary>
+    public CraftedItemInfo? Crafted { get; init; }
+
+    public bool IsCrafted => Crafted != null;
 
     public bool HasMount => !string.IsNullOrEmpty(MountLabel);
     public string SizeLabel => Size > 0 ? $"S{Size}" : "—";
