@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Google.Protobuf;
@@ -59,6 +59,12 @@ internal static class EntityQueryProbe
                 return 1;
             }
 
+            var snapshotUrn = Opt(args, "snapshots");
+            if (snapshotUrn is not null)
+            {
+                return await SnapshotProbe.RunAsync(connection.Channel, connection.Headers, snapshotUrn, Opt(args, "out"));
+            }
+
             var requests = BuildRequests(args, connection.PlayerGeid);
             var allPages = Has(args, "all-pages");
             var dumpResponse = Has(args, "dump-response");
@@ -96,7 +102,7 @@ internal static class EntityQueryProbe
 
     /* ---- Connexion : même chaîne que GrpcClientService.InitClient ---- */
 
-    private sealed record Connection(EntityGraphService.EntityGraphServiceClient Service, Metadata Headers, ulong PlayerGeid);
+    private sealed record Connection(EntityGraphService.EntityGraphServiceClient Service, Metadata Headers, ulong PlayerGeid, GrpcChannel Channel);
 
     private static async Task<Connection?> ConnectAsync(string p4kPath)
     {
@@ -132,7 +138,7 @@ internal static class EntityQueryProbe
             };
 
             Console.WriteLine($"Joueur connecté : geid {currentPlayer.Player.Geid}");
-            return new Connection(new EntityGraphService.EntityGraphServiceClient(channel), headers, currentPlayer.Player.Geid);
+            return new Connection(new EntityGraphService.EntityGraphServiceClient(channel), headers, currentPlayer.Player.Geid, channel);
         }
         catch (RpcException ex)
         {
