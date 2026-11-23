@@ -40,6 +40,32 @@ public partial class ShipTabViewModel
         return true;
     }
 
+    /// <summary>
+    /// Ouvre la fiche loadout du premier vaisseau dont le nom ou le modèle contient <paramref name="shipName"/> (option <c>--open-loadout</c>)
+    /// et attend la fin du chargement de son loadout. À appeler depuis le thread d'UI, après <see cref="RunAutomatedLoadAsync"/>.
+    /// </summary>
+    /// <returns><c>true</c> si un vaisseau correspond.</returns>
+    public async Task<bool> RunAutomatedOpenLoadoutAsync(string shipName)
+    {
+        Dispatcher.UIThread.VerifyAccess();
+
+        var ship = _allShips.FirstOrDefault(s => s.Name.Contains(shipName, StringComparison.CurrentCultureIgnoreCase)
+                                                 || s.Shipname.Contains(shipName, StringComparison.CurrentCultureIgnoreCase));
+        if (ship == null)
+        {
+            return false;
+        }
+
+        OpenLoadout(ship);
+        var deadline = DateTime.UtcNow + AutomationConnectionTimeout;
+        while (LoadoutDetail is { IsLoadingLoadout: true } && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(200);
+        }
+
+        return true;
+    }
+
     private static async Task WriteShipsReportAsync(IEnumerable<Models.SpaceshipModel> ships, string path)
     {
         var rows = ships.Select(ship => new

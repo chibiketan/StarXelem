@@ -37,6 +37,9 @@ public class DesignGrpcClientService : IGrpcClientService
         })};
     }
 
+    public Task<IList<SnapshotWithEntitlement>> GetShipSnapshots(string entitlementUrn, CancellationToken token = default) =>
+        Task.FromResult<IList<SnapshotWithEntitlement>>([]);
+
     public Task<IList<EntityItemQueryResult>> QueryGraphBySearch(ItemQueryModel queryModel)
     {
         return Task.FromResult<IList<EntityItemQueryResult>>(new List<EntityItemQueryResult>());

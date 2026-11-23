@@ -6,6 +6,7 @@ using Sc.External.Services.Entitlement.V2;
 using Sc.External.Services.Entitygraph.V1;
 using StarXelem.Models;
 using StarXelem.Services;
+using StarXelem.Services.ShipLoadout;
 using StarXelem.ViewModels;
 using StarXelem.ViewModels.Popup;
 
@@ -27,6 +28,9 @@ public static class DesignData
     public static FpsWeaponsTabViewModel FpsWeaponsTabViewModel { get; } = App.Current.Services.GetRequiredService<FpsWeaponsTabViewModel>();
     public static MissionsTabViewModel MissionsTabViewModel { get; } = App.Current.Services.GetRequiredService<MissionsTabViewModel>();
     public static ReputationTabViewModel ReputationTabViewModel { get; } = App.Current.Services.GetRequiredService<ReputationTabViewModel>();
+
+    /// <summary>Fiche loadout d'exemple : vaisseaux de Mon hangar et loadout fictif.</summary>
+    public static OwnedShipLoadoutViewModel OwnedShipLoadoutViewModel => new(new DesignShipLoadoutService(), ShipTabViewModel.Spaceships?.Result.ToList() ?? [], ShipTabViewModel.Spaceships!.Result[0], () => { });
 
 
     static DesignData()

@@ -1,0 +1,404 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels"
+             xmlns:models="clr-namespace:StarXelem.Models"
+             xmlns:local="clr-namespace:StarXelem"
+             xmlns:conv="clr-namespace:StarXelem.Converters"
+             xmlns:comp="clr-namespace:StarXelem.Components"
+             xmlns:ui="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
+             mc:Ignorable="d" d:DesignWidth="1300" d:DesignHeight="800"
+             x:DataType="vm:OwnedShipLoadoutViewModel"
+             d:DataContext="{x:Static local:DesignData.OwnedShipLoadoutViewModel}"
+             x:Class="StarXelem.Views.OwnedShipLoadoutView">
+    <UserControl.Styles>
+        <!-- Liste des vaisseaux : lignes à angles coupés, sélection en accent doux (repris de l'écran Loadout vaisseaux) -->
+        <Style Selector="ListBox.ship-list">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="ListBox.ship-list ListBoxItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="Padding" Value="12,9" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <ControlTemplate TargetType="ListBoxItem">
+                    <comp:NotchedBorder CutSize="9" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalContentAlignment="Stretch" />
+                    </comp:NotchedBorder>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ListBox.ship-list ListBoxItem:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+        </Style>
+        <Style Selector="ListBox.ship-list ListBoxItem:selected">
+            <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
+        </Style>
+
+        <!-- Cartes : chiffres clés et types de composants -->
+        <Style Selector="comp|NotchedBorder.card">
+            <Setter Property="CutSize" Value="14" />
+            <Setter Property="Padding" Value="18,14" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+        </Style>
+        <Style Selector="TextBlock.card-title">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+        <Style Selector="TextBlock.stat-value">
+            <Setter Property="FontFamily" Value="{DynamicResource Sx.FontMono}" />
+            <Setter Property="FontSize" Value="26" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.stat-value.highlight">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.WarningBrush}" />
+        </Style>
+
+        <!-- Tableau armes et missiles -->
+        <Style Selector="TextBlock.section-title">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="Margin" Value="0,6,0,2" />
+        </Style>
+        <Style Selector="Border.table-head">
+            <Setter Property="BorderBrush" Value="{DynamicResource Sx.LineBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="0,11" />
+        </Style>
+        <Style Selector="Border.table-head TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        </Style>
+        <Style Selector="Border.table-row">
+            <Setter Property="BorderBrush" Value="{DynamicResource Sx.LineBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="MinHeight" Value="48" />
+            <Setter Property="Padding" Value="0,6" />
+        </Style>
+        <Style Selector="Border.table-row TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style Selector="Border.table-row TextBlock.name">
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+        <Style Selector="Border.table-row TextBlock.muted">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        </Style>
+        <Style Selector="Border.table-row TextBlock.small">
+            <Setter Property="FontSize" Value="11" />
+        </Style>
+        <Style Selector="Border.table-row TextBlock.mono">
+            <Setter Property="FontFamily" Value="{DynamicResource Sx.FontMono}" />
+        </Style>
+        <!-- Marqueur d'objet crafté : or de la charte, valeurs améliorées en infobulle -->
+        <Style Selector="comp|NotchedBorder.sx-badge.craft">
+            <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
+            <Setter Property="Cursor" Value="Help" />
+        </Style>
+        <Style Selector="comp|NotchedBorder.sx-badge.craft TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.removed">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+            <Setter Property="FontStyle" Value="Italic" />
+        </Style>
+    </UserControl.Styles>
+
+    <!-- La charte n'existe qu'en thème sombre : l'écran reste sombre même si Windows est en thème clair. -->
+    <ThemeVariantScope RequestedThemeVariant="Dark">
+        <Grid Background="{DynamicResource Sx.BackgroundBrush}" TextElement.FontFamily="{DynamicResource Sx.FontSans}">
+            <Grid ColumnDefinitions="300,*" ColumnSpacing="12" Margin="12">
+
+                <!-- Mes vaisseaux -->
+                <comp:NotchedBorder CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}" Padding="14,14,14,14">
+                    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="12">
+                        <Button Classes="sx-link" HorizontalAlignment="Left" Command="{Binding CloseCommand}" ToolTip.Tip="Revenir au tableau du hangar">
+                            <TextBlock Text="‹ Mon hangar" />
+                        </Button>
+                        <StackPanel Grid.Row="1" Margin="6,0" Spacing="2">
+                            <TextBlock Classes="sx-title" Text="Mes vaisseaux" />
+                            <TextBlock Classes="sx-caption" Text="{Binding Ships.Count, StringFormat='{}{0} vaisseaux'}" />
+                        </StackPanel>
+                        <ListBox Grid.Row="2" Classes="ship-list" ItemsSource="{Binding Ships}" SelectedItem="{Binding SelectedShip}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:SpaceshipModel">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Background="Transparent">
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock FontWeight="Medium" TextTrimming="CharacterEllipsis" Text="{Binding Shipname}" />
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       IsVisible="{Binding HasCustomName}"
+                                                       Text="{Binding Name, StringFormat='« {0} »'}" />
+                                        </StackPanel>
+                                        <!-- Point vert : loadout réel connu ; gris : seul le loadout d'origine est disponible -->
+                                        <Ellipse Grid.Column="1"
+                                                 Width="7"
+                                                 Height="7"
+                                                 VerticalAlignment="Center"
+                                                 Fill="{DynamicResource Sx.SuccessBrush}"
+                                                 IsVisible="{Binding HasRealLoadout}"
+                                                 ToolTip.Tip="Loadout réel disponible" />
+                                        <Ellipse Grid.Column="1"
+                                                 Width="7"
+                                                 Height="7"
+                                                 VerticalAlignment="Center"
+                                                 Fill="{DynamicResource Sx.MutedBrush}"
+                                                 IsVisible="{Binding !HasRealLoadout}"
+                                                 ToolTip.Tip="Vaisseau non retrouvé dans l'univers : loadout sauvegardé ou d'origine" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </comp:NotchedBorder>
+
+                <!-- Fiche du vaisseau sélectionné -->
+                <comp:NotchedBorder Grid.Column="1" CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}">
+                    <Grid>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="28,26" Spacing="16">
+
+                                <!-- En-tête : nom, statut, provenance du loadout, filtre des écarts -->
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                                    <StackPanel Spacing="10">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock FontSize="30"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource Sx.TextBrush}"
+                                                       TextWrapping="Wrap"
+                                                       Text="{Binding ShipTitle}" />
+                                            <TextBlock Classes="sx-mono" FontSize="12" Foreground="{DynamicResource Sx.SecondaryBrush}" Text="{Binding ShipSubtitle}" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <comp:NotchedBorder Classes="sx-badge"
+                                                                Classes.success="{Binding SelectedShip.IsStowed, FallbackValue=False}"
+                                                                Classes.warning="{Binding SelectedShip.IsUnstowed, FallbackValue=False}"
+                                                                Classes.danger="{Binding SelectedShip.IsDestroyed, FallbackValue=False}">
+                                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                                    <Ellipse />
+                                                    <TextBlock Text="{Binding SelectedShip.DisplayState, FallbackValue=''}" />
+                                                </StackPanel>
+                                            </comp:NotchedBorder>
+                                            <comp:NotchedBorder Classes="sx-badge"
+                                                                Classes.info="{Binding IsComparedSource}"
+                                                                IsVisible="{Binding HasLoadout}">
+                                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                                    <Ellipse />
+                                                    <TextBlock Text="{Binding SourceLabel}" />
+                                                </StackPanel>
+                                            </comp:NotchedBorder>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <CheckBox Grid.Column="1"
+                                              Classes="sx-muted"
+                                              VerticalAlignment="Top"
+                                              Margin="0,8,0,0"
+                                              IsVisible="{Binding IsComparedSource}"
+                                              IsEnabled="{Binding HasModified}"
+                                              ToolTip.Tip="N'afficher que les composants et armes qui diffèrent de l'équipement d'origine"
+                                              Content="Écarts seulement"
+                                              IsChecked="{Binding ShowDifferencesOnly}" />
+                                </Grid>
+
+                                <!-- Loadout sauvegardé : le vaisseau est livré mais absent de l'univers -->
+                                <comp:NotchedBorder CutSize="10"
+                                                    Padding="16,12"
+                                                    Background="{DynamicResource Sx.InfoSoftBrush}"
+                                                    IsVisible="{Binding IsSavedSource}">
+                                    <TextBlock TextWrapping="Wrap"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource Sx.TextBrush}"
+                                               Text="Ce vaisseau n'a pas été retrouvé dans l'univers : voici le dernier loadout sauvegardé à l'ASOP, celui qu'il aura à sa prochaine récupération. Les emplacements que la sauvegarde ne suit pas sont complétés par l'équipement d'origine." />
+                                </comp:NotchedBorder>
+
+                                <!-- Loadout d'origine : vaisseau jamais demandé, ou sauvegarde indisponible -->
+                                <comp:NotchedBorder CutSize="10"
+                                                    Padding="16,12"
+                                                    Background="{DynamicResource Sx.InfoSoftBrush}"
+                                                    IsVisible="{Binding IsOriginSource}">
+                                    <TextBlock TextWrapping="Wrap"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource Sx.TextBrush}"
+                                               Text="Aucun loadout sauvegardé pour ce vaisseau (jamais demandé, ou serveur indisponible) : voici son équipement d'origine, tel qu'il est livré." />
+                                </comp:NotchedBorder>
+
+                                <!-- Chiffres clés -->
+                                <UniformGrid Columns="4" Margin="0,0,-12,-12" IsVisible="{Binding HasLoadout}">
+                                    <comp:NotchedBorder Classes="card">
+                                        <StackPanel>
+                                            <TextBlock Classes="card-title" Text="Composants" />
+                                            <TextBlock Classes="stat-value" Text="{Binding ComponentCount}" />
+                                        </StackPanel>
+                                    </comp:NotchedBorder>
+                                    <comp:NotchedBorder Classes="card">
+                                        <StackPanel>
+                                            <TextBlock Classes="card-title" Text="Armes" />
+                                            <TextBlock Classes="stat-value" Text="{Binding WeaponCount}" />
+                                        </StackPanel>
+                                    </comp:NotchedBorder>
+                                    <comp:NotchedBorder Classes="card">
+                                        <StackPanel>
+                                            <TextBlock Classes="card-title" Text="Lanceurs et missiles" />
+                                            <TextBlock Classes="stat-value" Text="{Binding MissileCount}" />
+                                        </StackPanel>
+                                    </comp:NotchedBorder>
+                                    <comp:NotchedBorder Classes="card" ToolTip.Tip="Ports dont l'équipement diffère de celui d'origine">
+                                        <StackPanel>
+                                            <TextBlock Classes="card-title" Text="Modifiés" />
+                                            <TextBlock Classes="stat-value" Classes.highlight="{Binding HasModified}" Text="{Binding ModifiedCount}" />
+                                        </StackPanel>
+                                    </comp:NotchedBorder>
+                                </UniformGrid>
+
+                                <!-- Composants : une carte par type, autant de colonnes de 320 px que la largeur le permet -->
+                                <ItemsControl ItemsSource="{Binding ComponentSections}" Margin="0,0,-12,-12">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="{Binding $parent[ItemsControl].Bounds.Width, Converter={x:Static conv:WidthToColumnsConverter.Instance}, ConverterParameter=320}" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="models:OwnedShipComponentSection">
+                                            <comp:NotchedBorder Classes="card">
+                                                <StackPanel>
+                                                    <TextBlock Classes="card-title" Text="{Binding Title}" />
+                                                    <ItemsControl ItemsSource="{Binding Components}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="models:OwnedShipComponentModel">
+                                                                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10" Margin="0,6" Background="Transparent"
+                                                                      ToolTip.Tip="{Binding Tooltip}">
+                                                                    <DockPanel>
+                                                                        <comp:NotchedBorder DockPanel.Dock="Right"
+                                                                                            Classes="sx-badge craft"
+                                                                                            Margin="8,0,0,0"
+                                                                                            IsVisible="{Binding IsCrafted}"
+                                                                                            ToolTip.Tip="{Binding Crafted.Tooltip, FallbackValue=''}">
+                                                                            <TextBlock Text="Craft" />
+                                                                        </comp:NotchedBorder>
+                                                                        <TextBlock FontWeight="Medium"
+                                                                                   VerticalAlignment="Center"
+                                                                                   Foreground="{DynamicResource Sx.TextBrush}"
+                                                                                   TextTrimming="CharacterEllipsis"
+                                                                                   Classes.removed="{Binding IsRemoved}"
+                                                                                   Text="{Binding DisplayName}" />
+                                                                    </DockPanel>
+                                                                    <TextBlock Grid.Column="1"
+                                                                               VerticalAlignment="Center"
+                                                                               Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                                               Text="{Binding DetailLabel}" />
+                                                                    <comp:NotchedBorder Grid.Column="2"
+                                                                                        Classes="sx-badge"
+                                                                                        Classes.success="{Binding IsGradeA}"
+                                                                                        Classes.info="{Binding IsGradeB}"
+                                                                                        Classes.warning="{Binding IsGradeC}"
+                                                                                        Classes.danger="{Binding IsGradeLow}"
+                                                                                        IsVisible="{Binding HasGrade}"
+                                                                                        ToolTip.Tip="Grade">
+                                                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                                                            <Ellipse />
+                                                                            <TextBlock Text="{Binding Grade}" />
+                                                                        </StackPanel>
+                                                                    </comp:NotchedBorder>
+                                                                    <comp:NotchedBorder Grid.Column="3"
+                                                                                        Classes="sx-badge warning"
+                                                                                        IsVisible="{Binding IsModified}">
+                                                                        <TextBlock Text="Modifié" />
+                                                                    </comp:NotchedBorder>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </comp:NotchedBorder>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Armes et missiles, par point d'emport -->
+                                <StackPanel IsVisible="{Binding HasWeapons}">
+                                    <TextBlock Classes="section-title" Text="Armes et missiles" />
+                                    <Border Classes="table-head">
+                                        <Grid ColumnDefinitions="2*,3*,60,2*,90,90" ColumnSpacing="12">
+                                            <TextBlock Text="Point d'emport" />
+                                            <TextBlock Grid.Column="1" Text="Équipement" />
+                                            <TextBlock Grid.Column="2" Text="Taille" />
+                                            <TextBlock Grid.Column="3" Text="Type" />
+                                            <TextBlock Grid.Column="4" Text="Dégâts" ToolTip.Tip="Dégâts par tir" />
+                                            <TextBlock Grid.Column="5" Text="Écart" />
+                                        </Grid>
+                                    </Border>
+                                    <ItemsControl ItemsSource="{Binding Weapons}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="models:OwnedShipWeaponRow">
+                                                <Border Classes="table-row" Background="Transparent" ToolTip.Tip="{Binding Tooltip}">
+                                                    <Grid ColumnDefinitions="2*,3*,60,2*,90,90" ColumnSpacing="12">
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding HardpointName}" />
+                                                            <TextBlock Classes="mono muted small" Text="{Binding PortName}" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                <TextBlock Classes="name" Classes.removed="{Binding IsRemoved}" Text="{Binding EquipmentName}" />
+                                                                <comp:NotchedBorder Classes="sx-badge craft"
+                                                                                    IsVisible="{Binding IsCrafted}"
+                                                                                    ToolTip.Tip="{Binding Crafted.Tooltip, FallbackValue=''}">
+                                                                    <TextBlock Text="Craft" />
+                                                                </comp:NotchedBorder>
+                                                            </StackPanel>
+                                                            <TextBlock Classes="muted small" IsVisible="{Binding HasMount}" Text="{Binding MountLabel, StringFormat='sur {0}'}" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="2" Classes="mono" Text="{Binding SizeLabel}" />
+                                                        <TextBlock Grid.Column="3" Classes="muted" Text="{Binding TypeDisplay}" />
+                                                        <TextBlock Grid.Column="4" Classes="mono" Text="{Binding DamageLabel}" />
+                                                        <comp:NotchedBorder Grid.Column="5"
+                                                                            Classes="sx-badge warning"
+                                                                            HorizontalAlignment="Left"
+                                                                            VerticalAlignment="Center"
+                                                                            IsVisible="{Binding IsModified}">
+                                                            <TextBlock Text="Modifié" />
+                                                        </comp:NotchedBorder>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+
+                                <TextBlock Classes="sx-caption" FontSize="13" IsVisible="{Binding ShowNoEquipment}" Text="{Binding NoEquipmentMessage}" />
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- Chargement du loadout -->
+                        <Grid IsVisible="{Binding IsLoadingLoadout}" IsHitTestVisible="False">
+                            <Border Background="{DynamicResource Sx.SurfaceBrush}" Opacity="0.75" />
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                                <ui:FAProgressRing IsIndeterminate="True" Width="40" Height="40" HorizontalAlignment="Center" />
+                                <TextBlock Classes="sx-caption" HorizontalAlignment="Center" Text="Lecture du loadout…" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </comp:NotchedBorder>
+            </Grid>
+        </Grid>
+    </ThemeVariantScope>
+</UserControl>

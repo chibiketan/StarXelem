@@ -7,7 +7,11 @@ namespace StarXelem.Models;
 
 public class SpaceshipModel
 {
-    public string Name => !IsNameValid(Entitlement.Metadata.Name) ? "" : Entitlement.Metadata.Name;
+    /// <summary>
+    /// Nom donné par le joueur, ou chaîne vide. Le serveur le transmet dans <c>EntityConfiguration.Params[].CustomName</c> ;
+    /// <c>Metadata.Name</c> ne contient plus que le nom technique, mais reste lu en repli pour les anciens droits.
+    /// </summary>
+    public string Name => GetCustomName();
     public string? PackageSource => Entitlement.Metadata.SourceSku;
     public string Shipname { get; set; }
     public bool IsRealPurchase => Entitlement.Metadata.RealMoney;
@@ -42,6 +46,15 @@ public class SpaceshipModel
     public EntityItemQueryResult? EntityProperties { get; set; }
     public EntityStowContext? StowContext { get; set; }
 
+    /// <summary>
+    /// Objets montés sur ce vaisseau, à toute profondeur (arêtes ATTACHED_TO depuis <see cref="EntityProperties"/>), sans les véhicules
+    /// embarqués. Vide si le vaisseau n'a pas été retrouvé dans l'univers (détruit, non demandé, inventaire inaccessible).
+    /// </summary>
+    public IReadOnlyList<EntityItemQueryResult> AttachedEntities { get; set; } = [];
+
+    /// <summary>Vrai si le loadout réel du vaisseau est connu.</summary>
+    public bool HasRealLoadout => EntityProperties != null;
+
     public SpaceshipModel(Entitlement entitlement)
     {
         Entitlement = entitlement;
@@ -59,6 +72,22 @@ public class SpaceshipModel
             EntitlementStatus.Packaged => SpaceshipState.UNCLAIMED,
             _ => SpaceshipState.UNKNOWN
         };
+    }
+
+    private string GetCustomName()
+    {
+        var customName = Entitlement.EntityConfiguration?.Params
+            .Where(parameter => parameter.HasCustomName)
+            .Select(parameter => parameter.CustomName.Trim())
+            .FirstOrDefault(name => name.Length > 0);
+
+        if (customName != null)
+        {
+            return customName;
+        }
+
+        var metadataName = Entitlement.Metadata?.Name ?? string.Empty;
+        return IsNameValid(metadataName) ? metadataName : string.Empty;
     }
 
     private bool IsNameValid(string entitlementName)

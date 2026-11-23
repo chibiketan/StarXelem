@@ -1,6 +1,15 @@
 ﻿## [0.3.0]
 Version SC : 4.10.3
 
+### Ajouté
+- Ajout d'une fiche loadout pour chaque vaisseau possédé, accessible depuis Mon hangar : composants, armes, équipement de minage et comparaison avec le loadout d'origine (filtre « Écarts seulement »)
+- Affichage du loadout sauvegardé à l'ASOP pour les vaisseaux qui ne sont pas dans l'univers (détruits ou pas encore récupérés à ce patch), complété par le loadout d'origine pour les emplacements non sauvegardés
+- Signalement des objets craftés dans la fiche loadout, avec leurs valeurs améliorées et les matériaux utilisés en infobulle
+- Ajout des options CLI `--snapshots=<urn>` et `--resolve-guids=<guids>` à la sonde gRPC pour analyser les loadouts sauvegardés
+
+### Corrigé
+- Correction de l'affichage du nom personnalisé des vaisseaux, désormais lu dans la configuration de l'entité
+
 ### Modifié
 - Migration de l'interface vers Avalonia 12 (FluentAvaloniaUI 3, FluentIcons 2.1, AsyncImageLoader 4)
 - Mise à jour des bibliothèques .NET (Entity Framework Core, Microsoft.Extensions) en 10.0.15 et de ClosedXML en 0.105.1

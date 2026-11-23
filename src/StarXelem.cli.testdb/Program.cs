@@ -71,6 +71,13 @@ async Task RunAsync()
 
     await p4kService.OpenP4k(p4kPath, p4kProgress, fsProgress);
 
+    var resolveGuids = args.FirstOrDefault(a => a.StartsWith("--resolve-guids=", StringComparison.Ordinal));
+    if (resolveGuids is not null)
+    {
+        await GuidProbe.RunAsync(p4kService, resolveGuids["--resolve-guids=".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries), depth: 2);
+        return;
+    }
+
     if (probeFps)
     {
         var probeTag = positionalArgs.Length > 1 ? positionalArgs[1] : "hdgw_rifle_ballistic_01";
