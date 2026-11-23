@@ -79,6 +79,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IScItemRepository, ScItemRepository>();
         services.AddSingleton<IFpsWeaponRepository, FpsWeaponRepository>();
         services.AddSingleton<ILocaleEntryRepository, LocaleEntryRepository>();
+        // Matériaux possédés : chargés par l'écran Objets, comparés aux coûts par l'écran Blueprints
+        services.AddSingleton<IOwnedMaterialService, OwnedMaterialService>();
 
         // Service API externe pour la communication avec Alliance Orbital (profil utilisateur)
         services.AddSingleton<IAllianceOrbitalService, AllianceOrbitalService>();

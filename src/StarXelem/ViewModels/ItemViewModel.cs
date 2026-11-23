@@ -58,6 +58,12 @@ public partial class ItemViewModel : ViewModelBase
     public ushort? ContentQuality => _contentQuality;
 
     public ulong? ContentQuantity => _contentQuantity;
+
+    /// <summary>Classe de l'objet (RecordId de ScItems), ou null si elle est absente de la base locale.</summary>
+    public string? ClassRecordId => _scItem?.RecordId;
+
+    /// <summary>Ressource contenue d'après la classe de l'objet, ou null.</summary>
+    public string? ContainedResourceRef => _scItem?.ContainedResourceRef;
     public AttachmentType? EdgeAttachmentType => _entityNodeProperties.EntityEdge?.Properties?.AttachmentType;
 
 //    public string? TypeGuid => _entityClassProperties?.Guid;

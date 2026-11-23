@@ -7,5 +7,7 @@ namespace StarXelem.Constants;
 /// </summary>
 public static class DatabaseConstants
 {
-    public const int DatabaseVersion = 6;
+    // 7 : ScItems.ContainedResourceRef (ressource contenue, pour relier l'inventaire aux coûts des blueprints).
+    // 8 : qualité minimale des coûts « ressource » (seuls les coûts « objet » la lisaient).
+    public const int DatabaseVersion = 8;
 }

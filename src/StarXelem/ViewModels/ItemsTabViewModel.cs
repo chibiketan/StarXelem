@@ -134,15 +134,25 @@ public partial class ItemsTabViewModel : PageViewModelBase
     private const int DisplayBatchSize = 20;
 
     private readonly ILogger<ItemsTabViewModel> _logger;
+    private readonly IOwnedMaterialService _ownedMaterialService;
+    // Heure du dernier chargement, reprise à la republication des matériaux une fois les emplacements résolus.
+    private DateTime _itemsLoadedAt;
 
     public bool IsBusy => IsLoading || IsFiltering;
     public string BusyMessage => IsLoading
         ? (string.IsNullOrWhiteSpace(TreatmentStatus) ? "Chargement des objets…" : TreatmentStatus)
         : "Filtrage en cours…";
 
-    public ItemsTabViewModel(IGrpcClientService clientService, IScItemRepository scItemRepository, ILocaleEntryRepository localeEntryRepository, ILocationService locationService, ILogger<ItemsTabViewModel> logger)
+    public ItemsTabViewModel(
+        IGrpcClientService clientService,
+        IScItemRepository scItemRepository,
+        ILocaleEntryRepository localeEntryRepository,
+        ILocationService locationService,
+        IOwnedMaterialService ownedMaterialService,
+        ILogger<ItemsTabViewModel> logger)
     {
         _logger = logger;
+        _ownedMaterialService = ownedMaterialService;
         _clientService = clientService;
         _scItemRepository = scItemRepository;
         _localeEntryRepository = localeEntryRepository;
@@ -320,6 +330,9 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
         ConfigureColumnFilters(result);
 
+        _itemsLoadedAt = DateTime.Now;
+        PublishOwnedMaterials(result, _itemsLoadedAt, areLocationsResolved: false);
+
         _unfilteredItemList = Task.FromResult<IList<ItemViewModel>>(result);
         IsLoading = false;
 
@@ -406,6 +419,12 @@ public partial class ItemsTabViewModel : PageViewModelBase
         }
 
         LocationFilter.SetOptions(options);
+
+        if (isComplete)
+        {
+            // Les emplacements des lots sont désormais connus : l'écran Blueprints peut les afficher.
+            PublishOwnedMaterials(items, _itemsLoadedAt, areLocationsResolved: true);
+        }
 
         if (isComplete || !IsFiltering)
         {

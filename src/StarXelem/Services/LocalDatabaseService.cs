@@ -2688,6 +2688,7 @@ public class LocalDatabaseService : ILocalDatabaseService
                         CostName = costName,
                         ResourceRef = resourceRef,
                         ResourceAmount = (decimal)rawQuantity,
+                        MinQuality = resourceCost.minQuality,
                         ResourceName = resourceName
                     };
                     db.BlueprintRecipeCosts.Add(entity);
@@ -3067,6 +3068,30 @@ public class LocalDatabaseService : ILocalDatabaseService
         _logger.LogInformation("SCItems processing completed in {Elapsed}ms.", start.ElapsedMilliseconds);
     }
 
+    /// <summary>
+    /// Ressource d'un conteneur : l'entrée la plus lourde de sa composition par défaut, sinon sa seule ressource autorisée.
+    /// Retourne null pour un conteneur générique, qui accepte plusieurs ressources.
+    /// </summary>
+    private static string? GetContainedResourceRef(ResourceContainer? container)
+    {
+        if (container == null)
+        {
+            return null;
+        }
+
+        var resource = container.defaultComposition?
+            .Where(entry => entry?.entry != null)
+            .OrderByDescending(entry => entry.weight)
+            .FirstOrDefault()?.entry;
+
+        if (resource == null && container.inclusiveResources is { Length: 1 })
+        {
+            resource = container.inclusiveResources[0];
+        }
+
+        return resource?.selfId.ToString();
+    }
+
     private ScItemEntity BuildScItemEntity(
         DataCoreTypedRecord record,
         EntityClassDefinition entityClass,
@@ -3121,6 +3146,7 @@ public class LocalDatabaseService : ILocalDatabaseService
             LocaleNameKey = itemDef.Localization.Name,
             LocaleDescKey = itemDef.Localization.Description,
             DisplayLocaleKey = purchasableParams?.displayName,
+            ContainedResourceRef = GetContainedResourceRef(components.OfType<ResourceContainer>().FirstOrDefault()),
             ManufacturerId = manufacturerId,
             Mass = physicsParams?.PhysType?.Mass,
             Health = healthParams?.Health,
