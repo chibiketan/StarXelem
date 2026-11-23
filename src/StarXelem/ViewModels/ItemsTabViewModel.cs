@@ -112,6 +112,10 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     // Au-delà, les puces prendraient trop de place : les valeurs restantes sont accessibles par le filtre de colonne.
     private const int MaxChipCount = 8;
+    private const string PlaceholderName = "<= PLACEHOLDER =>";
+
+    /// <summary>Masque les objets nommés « &lt;= PLACEHOLDER =&gt; » (demande d'utilisateurs) : actif par défaut.</summary>
+    [ObservableProperty] private bool _hidePlaceholders = true;
     private const int LocationResolutionParallelism = 16;
     private static readonly TimeSpan LocationRefreshInterval = TimeSpan.FromMilliseconds(1500);
 
@@ -546,6 +550,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     partial void OnNameFilterChanged(string value) => ScheduleFilters(NameFilterDelay);
 
+    partial void OnHidePlaceholdersChanged(bool value) => ScheduleFilters(TypeFilterDelay);
+
     partial void OnLocationListChanged(Task<IList<FilterLocationOptionModel>?>? value)
     {
         ReloadLocationListCommand.NotifyCanExecuteChanged();
@@ -573,6 +579,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         // Copie de l'état des filtres : le calcul qui suit ne doit lire aucune propriété du ViewModel.
         var criteria = new ItemFilterCriteria(
             Needle: string.IsNullOrWhiteSpace(NameFilter) ? null : NameFilter.Trim(),
+            HidePlaceholders: HidePlaceholders,
             Types: TypeFilter.GetSelectedKeys(),
             SubType: _selectedSubType,
             Locations: LocationFilter.GetSelectedKeys(),
@@ -626,7 +633,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     private async Task<ItemFilterOutcome> ComputeFilterOutcomeAsync(IList<ItemViewModel> items, ItemFilterCriteria criteria, CancellationToken token)
     {
         // Le nom passe par la base locale : on ne le résout que si le filtre ou le tri en a besoin.
-        var needsName = criteria.Needle != null || criteria.SortColumn == ItemSortColumn.Name;
+        var needsName = criteria.Needle != null || criteria.HidePlaceholders || criteria.SortColumn == ItemSortColumn.Name;
         var rows = new List<ItemFilterRow>(items.Count);
         foreach (var item in items)
         {
@@ -635,7 +642,10 @@ public partial class ItemsTabViewModel : PageViewModelBase
             rows.Add(new ItemFilterRow(item, name, _resolvedLocations.GetValueOrDefault(item.Id)));
         }
 
-        var matchingText = rows.Where(row => MatchesNeedle(row, criteria.Needle)).ToList();
+        var matchingText = rows
+            .Where(row => !criteria.HidePlaceholders || !IsPlaceholderName(row.Name))
+            .Where(row => MatchesNeedle(row, criteria.Needle))
+            .ToList();
         bool InTypes(ItemFilterRow row) => criteria.Types == null || criteria.Types.Contains(row.Item.ItemType.ToString());
         bool InSubType(ItemFilterRow row) => criteria.SubType == null || row.Item.ItemSubType == criteria.SubType;
         bool InLocations(ItemFilterRow row) => criteria.Locations == null || (row.Location != null && criteria.Locations.Contains(row.Location.Key));
@@ -652,6 +662,9 @@ public partial class ItemsTabViewModel : PageViewModelBase
             CountByKey(subTypeBase, row => row.Item.ItemSubType.ToString()),
             CountByKey(locationBase.Where(row => row.Location != null), row => row.Location!.Key));
     }
+
+    /// <summary>Libellé générique du jeu pour les objets sans nom (cheveux, sourcils, pièces techniques…).</summary>
+    private static bool IsPlaceholderName(string name) => name.Contains(PlaceholderName, StringComparison.OrdinalIgnoreCase);
 
     private static bool MatchesNeedle(ItemFilterRow row, string? needle)
     {
@@ -719,10 +732,12 @@ public partial class ItemsTabViewModel : PageViewModelBase
         ResultSummary = $"{outcome.Items.Count} sur {outcome.TotalCount} éléments";
     }
 
-    // Les puces suivent la fréquence au chargement : elles ne changent pas de place pendant que l'utilisateur filtre.
+    // Les puces suivent l'ordre de fréquence au chargement. Celles qui n'ont plus aucun objet après filtrage sont masquées, sauf si elles
+    // sont sélectionnées (pour pouvoir les décocher) ; les suivantes prennent leur place.
     private List<ChipState> BuildTypeChipStates(IReadOnlyDictionary<string, int> counts)
     {
         var keys = _typesByFrequency
+            .Where(key => counts.GetValueOrDefault(key) > 0 || TypeFilter.IsSelected(key))
             .Where((key, index) => index < MaxChipCount || TypeFilter.IsSelected(key))
             .ToList();
         var states = new List<ChipState> { new(null, "Tout", counts.Values.Sum(), !TypeFilter.HasSelection) };
@@ -846,6 +861,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     private sealed record ItemFilterCriteria(
         string? Needle,
+        bool HidePlaceholders,
         HashSet<string>? Types,
         EItemSubType? SubType,
         HashSet<string>? Locations,

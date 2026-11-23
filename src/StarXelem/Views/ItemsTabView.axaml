@@ -197,6 +197,15 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </Grid>
+                            <Grid ColumnDefinitions="72,*">
+                                <TextBlock Classes="sx-caption" Text="Affichage" VerticalAlignment="Center" />
+                                <CheckBox Grid.Column="1"
+                                          Classes="sx-muted"
+                                          Margin="0,0,0,4"
+                                          ToolTip.Tip="Objets sans nom propre dans le jeu (cheveux, sourcils, pièces techniques…)"
+                                          IsChecked="{Binding HidePlaceholders}"
+                                          Content="Masquer les objets « &lt;= PLACEHOLDER =&gt; »" />
+                            </Grid>
                         </StackPanel>
                     </Border>
 
