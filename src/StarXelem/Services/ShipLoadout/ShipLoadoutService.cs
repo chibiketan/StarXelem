@@ -28,17 +28,20 @@ public sealed class ShipLoadoutService : IShipLoadoutService
         (EItemType.Shield, "Bouclier", "Boucliers"),
         (EItemType.Radar, "Radar", "Radars"),
         (EItemType.QuantumDrive, "Réacteur quantique", "Réacteurs quantiques"),
-        (EItemType.JumpDrive, "Moteur de saut", "Moteurs de saut")
+        (EItemType.JumpDrive, "Moteur de saut", "Moteurs de saut"),
+        // Seuls les sacs de minage sont retenus parmi les conteneurs (voir IsShownComponent).
+        (EItemType.Container, "Sac de minage", "Sacs de minage")
     ];
 
     private static readonly HashSet<EItemType> ComponentTypes = ComponentSections.Select(section => section.Type).ToHashSet();
+    private static readonly HashSet<EItemType> ModuleTypes = [EItemType.MiningModifier];
     private static readonly HashSet<EItemType> GunTypes = [EItemType.WeaponGun, EItemType.WeaponMining];
     private static readonly HashSet<EItemType> LauncherTypes = [EItemType.MissileLauncher, EItemType.BombLauncher];
     private static readonly HashSet<EItemType> MissileTypes = [EItemType.Missile, EItemType.Bomb];
     private static readonly HashSet<EItemType> MountTypes = [EItemType.Turret, EItemType.TurretBase, EItemType.WeaponMount, EItemType.UtilityTurret];
 
     /// <summary>Types dont on lit la description : les autres objets (portes, sièges…) ne servent qu'à parcourir l'arbre.</summary>
-    private static readonly HashSet<EItemType> DescribedTypes = [.. ComponentTypes, .. GunTypes, .. LauncherTypes, .. MissileTypes, .. MountTypes];
+    private static readonly HashSet<EItemType> DescribedTypes = [.. ComponentTypes, .. GunTypes, .. LauncherTypes, .. MissileTypes, .. MountTypes, .. ModuleTypes];
 
     private const string EntityClassUrnPrefix = "urn:sc:global:entityclass:uuid:";
 
@@ -81,7 +84,7 @@ public sealed class ShipLoadoutService : IShipLoadoutService
 
         // Un vaisseau jamais demandé n'a pas de snapshot : inutile d'interroger le serveur.
         if (ship.Entitlement.Status == EntitlementV2.EntitlementStatus.Delivered
-            && await BuildSavedLoadoutAsync(ship, originEntries, token).ConfigureAwait(false) is { } saved)
+            && await BuildSavedLoadoutAsync(ship, origin, originEntries, token).ConfigureAwait(false) is { } saved)
         {
             return saved;
         }
@@ -94,11 +97,13 @@ public sealed class ShipLoadoutService : IShipLoadoutService
      * ======================================================================== */
 
     /// <summary>
-    /// Loadout sauvegardé : snapshot CUSTOMIZED, sinon DEFAULT, ou <c>null</c> si le serveur n'en renvoie aucun. Les ports que les snapshots
-    /// ne suivent pas (les composants de l'Idris, par exemple, absents des deux slots) sont repris de l'origine ; un port suivi par le snapshot
-    /// DEFAULT mais absent du snapshot CUSTOMIZED est considéré comme vidé.
+    /// Loadout sauvegardé : snapshot CUSTOMIZED, sinon DEFAULT, ou <c>null</c> si le serveur n'en renvoie aucun. Tout port absent du snapshot
+    /// est repris de l'origine, jamais marqué vide : les composants de l'Idris manquent des deux slots, les sacs du MOLE et le support de vie du
+    /// Centaurus figurent en DEFAULT mais pas en CUSTOMIZED, et la récupération à l'ASOP remplit les ports vides avec l'équipement par défaut
+    /// (code d'erreur FindEmptyItemPortsFailed relevé dans le binaire).
     /// </summary>
-    private async Task<OwnedShipLoadoutModel?> BuildSavedLoadoutAsync(SpaceshipModel ship, FlatLoadout origin, CancellationToken token)
+    private async Task<OwnedShipLoadoutModel?> BuildSavedLoadoutAsync(SpaceshipModel ship, IReadOnlyList<LoadoutNode> originNodes, FlatLoadout origin,
+        CancellationToken token)
     {
         IList<EntitlementV2.SnapshotWithEntitlement> records;
         try
@@ -119,18 +124,18 @@ public sealed class ShipLoadoutService : IShipLoadoutService
             return null;
         }
 
-        var saved = Flatten(await BuildSnapshotNodesAsync(shownRecords, token).ConfigureAwait(false));
-        var tracked = ReferenceEquals(shownRecords, defaults) || defaults.Count == 0
-            ? saved
-            : Flatten(await BuildSnapshotNodesAsync(defaults, token).ConfigureAwait(false));
+        var originByPath = new Dictionary<string, LoadoutNode>(StringComparer.Ordinal);
+        IndexByPath(originNodes, string.Empty, originByPath);
+
+        var saved = Flatten(await BuildSnapshotNodesAsync(shownRecords, originByPath, token).ConfigureAwait(false));
         token.ThrowIfCancellationRequested();
 
-        foreach (var (key, entry) in origin.Components.Where(pair => !saved.Components.ContainsKey(pair.Key) && !tracked.Components.ContainsKey(pair.Key)))
+        foreach (var (key, entry) in origin.Components.Where(pair => !saved.Components.ContainsKey(pair.Key)))
         {
             saved.Components[key] = entry;
         }
 
-        foreach (var (key, entry) in origin.Weapons.Where(pair => !saved.Weapons.ContainsKey(pair.Key) && !tracked.Weapons.ContainsKey(pair.Key)))
+        foreach (var (key, entry) in origin.Weapons.Where(pair => !saved.Weapons.ContainsKey(pair.Key)))
         {
             saved.Weapons[key] = entry;
         }
@@ -139,30 +144,26 @@ public sealed class ShipLoadoutService : IShipLoadoutService
     }
 
     /// <summary>Arbre de ports reconstruit à partir des chemins <c>attach_path</c> (noms de ports en clair depuis le vaisseau).</summary>
-    private async Task<List<LoadoutNode>> BuildSnapshotNodesAsync(IEnumerable<EntitlementV2.SnapshotWithEntitlement> records, CancellationToken token)
+    private async Task<List<LoadoutNode>> BuildSnapshotNodesAsync(IEnumerable<EntitlementV2.SnapshotWithEntitlement> records,
+        IReadOnlyDictionary<string, LoadoutNode> originByPath, CancellationToken token)
     {
         var roots = new List<LoadoutNode>();
         var byPath = new Dictionary<string, LoadoutNode>(StringComparer.Ordinal);
+        var skippedVehicles = new List<string>();
 
         // Les parents avant leurs enfants ; l'enregistrement racine (chemin vide) est le vaisseau lui-même.
         foreach (var record in records.Where(record => record.Snapshot is { AttachPath.Count: > 0 and <= MaxDepth }).OrderBy(record => record.Snapshot.AttachPath.Count))
         {
             token.ThrowIfCancellationRequested();
             var path = record.Snapshot.AttachPath;
-            List<LoadoutNode> siblings;
-            if (path.Count == 1)
+            var pathKey = string.Join('/', path);
+            // Branche d'un véhicule embarqué écarté : ignorée en entier.
+            if (skippedVehicles.Any(vehicle => pathKey.StartsWith(vehicle + "/", StringComparison.Ordinal)))
             {
-                siblings = roots;
-            }
-            else if (byPath.TryGetValue(string.Join('/', path.Take(path.Count - 1)), out var parent))
-            {
-                siblings = parent.Children;
-            }
-            else
-            {
-                // Parent absent ou véhicule embarqué écarté : toute la branche est ignorée.
                 continue;
             }
+
+            var siblings = GetOrCreateParent(path.Take(path.Count - 1).ToList());
 
             if (SnapshotClassCrc(record) is not { } classCrc)
             {
@@ -174,6 +175,7 @@ public sealed class ShipLoadoutService : IShipLoadoutService
             // Un véhicule embarqué (le Skylark du Centaurus) a son propre loadout, comme pour l'arbre d'origine.
             if (definition?.Components.OfType<VehicleComponentParams>().Any() == true)
             {
+                skippedVehicles.Add(pathKey);
                 continue;
             }
 
@@ -185,11 +187,51 @@ public sealed class ShipLoadoutService : IShipLoadoutService
                     ? await DescribeAsync(definition, entityRecord!.RecordName).ConfigureAwait(false)
                     : null
             };
+            // Un intermédiaire déjà créé faute d'enregistrement prend la place qui lui revient, avec ses enfants.
+            if (byPath.TryGetValue(pathKey, out var placeholder))
+            {
+                siblings.Remove(placeholder);
+                node.Children.AddRange(placeholder.Children);
+            }
+
             siblings.Add(node);
-            byPath[string.Join('/', path)] = node;
+            byPath[pathKey] = node;
         }
 
         return roots;
+
+        // Certains intermédiaires n'ont pas d'enregistrement (bras minier du Prospector, tourelles de l'Idris) : un nœud les remplace pour que
+        // le chemin des enfants reste celui de l'arbre d'origine. Il reprend l'objet d'origine du même port, pour garder le libellé du support.
+        List<LoadoutNode> GetOrCreateParent(IReadOnlyList<string> parentPath)
+        {
+            if (parentPath.Count == 0)
+            {
+                return roots;
+            }
+
+            var key = string.Join('/', parentPath);
+            if (!byPath.TryGetValue(key, out var parent))
+            {
+                var portName = parentPath[^1];
+                var originNode = originByPath.GetValueOrDefault(string.Concat(parentPath.Select(name => $"/{PortCrc(name):x8}")));
+                parent = new LoadoutNode(portName, PortCrc(portName), originNode?.ClassCrc ?? 0) { Description = originNode?.Description };
+                GetOrCreateParent(parentPath.Take(parentPath.Count - 1).ToList()).Add(parent);
+                byPath[key] = parent;
+            }
+
+            return parent.Children;
+        }
+    }
+
+    /// <summary>Indexe un arbre par chemin de CRC de ports, au format des clés de <see cref="Flatten"/>.</summary>
+    private static void IndexByPath(IEnumerable<LoadoutNode> nodes, string parentKey, Dictionary<string, LoadoutNode> index)
+    {
+        foreach (var node in nodes)
+        {
+            var key = $"{parentKey}/{node.PortCrc:x8}";
+            index.TryAdd(key, node);
+            IndexByPath(node.Children, key, index);
+        }
     }
 
     /// <summary>
@@ -385,13 +427,16 @@ public sealed class ShipLoadoutService : IShipLoadoutService
                 var top = hardpoint ?? node;
                 var type = node.Description?.Type;
 
-                if (type is { } componentType && ComponentTypes.Contains(componentType))
+                if (IsShownComponent(node))
                 {
                     flat.Components[key] = new FlatEntry(node, top, mounts, [], node.ClassCrc.ToString());
                 }
                 else if (type is { } gunType && GunTypes.Contains(gunType))
                 {
-                    flat.Weapons[key] = new FlatEntry(node, top, mounts, [], node.ClassCrc.ToString());
+                    // Modules d'une tête de minage : affichés avec elle, et changer de module est un écart.
+                    var modules = Descendants(node).Where(child => child.Description?.Type is { } t && ModuleTypes.Contains(t)).ToList();
+                    var signature = string.Join(",", modules.Select(module => module.ClassCrc).Order().Prepend(node.ClassCrc));
+                    flat.Weapons[key] = new FlatEntry(node, top, mounts, [], signature, modules);
                 }
                 else if (type is { } launcherType && LauncherTypes.Contains(launcherType))
                 {
@@ -411,6 +456,19 @@ public sealed class ShipLoadoutService : IShipLoadoutService
             }
         }
     }
+
+    /// <summary>
+    /// Composant affiché en carte : types de <see cref="ComponentSections"/>, et parmi les conteneurs les seuls sacs de minage actifs. Les sacs
+    /// repliés (<c>…_collapsed</c>, ports <c>hardpoint_stored_pod_*</c> du Prospector) font partie du modèle et portent le même nom.
+    /// </summary>
+    private static bool IsShownComponent(LoadoutNode node) => node.Description?.Type switch
+    {
+        EItemType.Container => node.Description.TechnicalName is { } name
+                               && name.Contains("ShipMining_Pod", StringComparison.OrdinalIgnoreCase)
+                               && !name.EndsWith("_collapsed", StringComparison.OrdinalIgnoreCase),
+        { } type => ComponentTypes.Contains(type),
+        null => false
+    };
 
     private static IEnumerable<LoadoutNode> Descendants(LoadoutNode node) =>
         node.Children.SelectMany(child => Descendants(child).Prepend(child));
@@ -489,6 +547,13 @@ public sealed class ShipLoadoutService : IShipLoadoutService
                 typeLabel = $"{typeLabel} · {guidance}";
             }
         }
+        else if (entry.Modules is { Count: > 0 } modules)
+        {
+            var moduleLabel = string.Join(", ", modules
+                .GroupBy(module => module.Description?.DisplayName ?? "?")
+                .Select(group => group.Count() > 1 ? $"{group.Count()} × {group.Key}" : group.Key));
+            typeLabel = string.IsNullOrEmpty(description.WeaponType) ? moduleLabel : $"{description.WeaponType} · {moduleLabel}";
+        }
         else
         {
             typeLabel = description.WeaponType;
@@ -533,7 +598,7 @@ public sealed class ShipLoadoutService : IShipLoadoutService
     /// de ses missiles) : deux entrées de même chemin et de signatures différentes forment un écart.
     /// </summary>
     private sealed record FlatEntry(LoadoutNode Node, LoadoutNode Hardpoint, IReadOnlyList<LoadoutNode> Mounts, IReadOnlyList<LoadoutNode> Missiles,
-        string Signature);
+        string Signature, IReadOnlyList<LoadoutNode>? Modules = null);
 
     /// <summary>Composants et armes indexés par chemin de port.</summary>
     private sealed class FlatLoadout
