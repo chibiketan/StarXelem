@@ -107,15 +107,6 @@
         <Style Selector="Border.table-row TextBlock.mono">
             <Setter Property="FontFamily" Value="{DynamicResource Sx.FontMono}" />
         </Style>
-        <!-- Marqueur d'objet crafté : or de la charte, valeurs améliorées en infobulle -->
-        <Style Selector="comp|NotchedBorder.sx-badge.craft">
-            <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
-            <Setter Property="Cursor" Value="Help" />
-        </Style>
-        <Style Selector="comp|NotchedBorder.sx-badge.craft TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
         <Style Selector="TextBlock.removed">
             <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
             <Setter Property="FontStyle" Value="Italic" />

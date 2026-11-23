@@ -3,11 +3,16 @@
 ## global
 - [X] 20/11/2026 : Passer à avalonia 12
 
+## Ecran liste d'objet
+- [X] 23/11/2026 : Ajouter les informations sur les objets craft
+- [X] 23/11/2026 : Ajouter une case à cocher, active par défaut, pour masquer les objets nommés « <= PLACEHOLDER => » (demande d'utilisateurs)
+
+
 ## Ecran mon hangar
-- [ ] Ajouter une vue pour voir le loadout des vaisseaux
+- [X] Ajouter une vue pour voir le loadout des vaisseaux
 
 ## Ecran liste des BP
-- [ ] Ajouter les informations sur les éléments détenus si l'inventaire est déjà chargé pour savoir si on peut le craft ou non
+- [X] Ajouter les informations sur les éléments détenus si l'inventaire est déjà chargé pour savoir si on peut le craft ou non
 - [ ] Dans la liste des missions accrochées à un pool, trouver une mise en perspective des missions inactives/pas prêtes
 - [ ] Permettre la navigation vers les missions en cliquant sur le nom
 

@@ -14,6 +14,7 @@ using StarXelem.Data;
 using StarXelem.Models;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
+using StarXelem.Services.ShipLoadout;
 using DateTime = System.DateTime;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -102,6 +103,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
     public ColumnHeaderViewModel TypeColumn { get; }
     public ColumnHeaderViewModel LocationColumn { get; }
     public ColumnHeaderViewModel QuantityColumn { get; }
+    /// <summary>Quantité réellement contenue par un conteneur de ressource (64 cSCU dans une caisse de 1 SCU).</summary>
+    public ColumnHeaderViewModel ContentColumn { get; }
     public ColumnHeaderViewModel QualityColumn { get; }
     public ObservableCollection<FilterChipViewModel> TypeChips { get; } = new();
     public ObservableCollection<FilterChipViewModel> SubTypeChips { get; } = new();
@@ -109,6 +112,10 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     // Au-delà, les puces prendraient trop de place : les valeurs restantes sont accessibles par le filtre de colonne.
     private const int MaxChipCount = 8;
+    private const string PlaceholderName = "<= PLACEHOLDER =>";
+
+    /// <summary>Masque les objets nommés « &lt;= PLACEHOLDER =&gt; » (demande d'utilisateurs) : actif par défaut.</summary>
+    [ObservableProperty] private bool _hidePlaceholders = true;
     private const int LocationResolutionParallelism = 16;
     private static readonly TimeSpan LocationRefreshInterval = TimeSpan.FromMilliseconds(1500);
 
@@ -135,6 +142,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     private readonly ILogger<ItemsTabViewModel> _logger;
     private readonly IOwnedMaterialService _ownedMaterialService;
+    private readonly IP4kService _p4kService;
+    private readonly CraftedItemReader _craftedReader;
     // Heure du dernier chargement, reprise à la republication des matériaux une fois les emplacements résolus.
     private DateTime _itemsLoadedAt;
 
@@ -149,9 +158,12 @@ public partial class ItemsTabViewModel : PageViewModelBase
         ILocaleEntryRepository localeEntryRepository,
         ILocationService locationService,
         IOwnedMaterialService ownedMaterialService,
+        IP4kService p4kService,
         ILogger<ItemsTabViewModel> logger)
     {
         _logger = logger;
+        _p4kService = p4kService;
+        _craftedReader = new CraftedItemReader(p4kService);
         _ownedMaterialService = ownedMaterialService;
         _clientService = clientService;
         _scItemRepository = scItemRepository;
@@ -163,6 +175,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         TypeColumn = CreateColumn("Type", ItemSortColumn.Type, TypeFilter);
         LocationColumn = CreateColumn("Emplacement", ItemSortColumn.Location, LocationFilter);
         QuantityColumn = CreateColumn("Qté", ItemSortColumn.Quantity);
+        ContentColumn = CreateColumn("Contenu", ItemSortColumn.Content);
         QualityColumn = CreateColumn("Qualité", ItemSortColumn.Quality);
         TypeFilter.SelectionChanged += (_, _) =>
         {
@@ -537,6 +550,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     partial void OnNameFilterChanged(string value) => ScheduleFilters(NameFilterDelay);
 
+    partial void OnHidePlaceholdersChanged(bool value) => ScheduleFilters(TypeFilterDelay);
+
     partial void OnLocationListChanged(Task<IList<FilterLocationOptionModel>?>? value)
     {
         ReloadLocationListCommand.NotifyCanExecuteChanged();
@@ -564,6 +579,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         // Copie de l'état des filtres : le calcul qui suit ne doit lire aucune propriété du ViewModel.
         var criteria = new ItemFilterCriteria(
             Needle: string.IsNullOrWhiteSpace(NameFilter) ? null : NameFilter.Trim(),
+            HidePlaceholders: HidePlaceholders,
             Types: TypeFilter.GetSelectedKeys(),
             SubType: _selectedSubType,
             Locations: LocationFilter.GetSelectedKeys(),
@@ -617,7 +633,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     private async Task<ItemFilterOutcome> ComputeFilterOutcomeAsync(IList<ItemViewModel> items, ItemFilterCriteria criteria, CancellationToken token)
     {
         // Le nom passe par la base locale : on ne le résout que si le filtre ou le tri en a besoin.
-        var needsName = criteria.Needle != null || criteria.SortColumn == ItemSortColumn.Name;
+        var needsName = criteria.Needle != null || criteria.HidePlaceholders || criteria.SortColumn == ItemSortColumn.Name;
         var rows = new List<ItemFilterRow>(items.Count);
         foreach (var item in items)
         {
@@ -626,7 +642,10 @@ public partial class ItemsTabViewModel : PageViewModelBase
             rows.Add(new ItemFilterRow(item, name, _resolvedLocations.GetValueOrDefault(item.Id)));
         }
 
-        var matchingText = rows.Where(row => MatchesNeedle(row, criteria.Needle)).ToList();
+        var matchingText = rows
+            .Where(row => !criteria.HidePlaceholders || !IsPlaceholderName(row.Name))
+            .Where(row => MatchesNeedle(row, criteria.Needle))
+            .ToList();
         bool InTypes(ItemFilterRow row) => criteria.Types == null || criteria.Types.Contains(row.Item.ItemType.ToString());
         bool InSubType(ItemFilterRow row) => criteria.SubType == null || row.Item.ItemSubType == criteria.SubType;
         bool InLocations(ItemFilterRow row) => criteria.Locations == null || (row.Location != null && criteria.Locations.Contains(row.Location.Key));
@@ -643,6 +662,9 @@ public partial class ItemsTabViewModel : PageViewModelBase
             CountByKey(subTypeBase, row => row.Item.ItemSubType.ToString()),
             CountByKey(locationBase.Where(row => row.Location != null), row => row.Location!.Key));
     }
+
+    /// <summary>Libellé générique du jeu pour les objets sans nom (cheveux, sourcils, pièces techniques…).</summary>
+    private static bool IsPlaceholderName(string name) => name.Contains(PlaceholderName, StringComparison.OrdinalIgnoreCase);
 
     private static bool MatchesNeedle(ItemFilterRow row, string? needle)
     {
@@ -670,7 +692,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
             ItemSortColumn.Type => SortByText(rows, row => row.Item.ItemTypeLabel, criteria.SortDescending),
             ItemSortColumn.Location => SortByLocation(rows, criteria.SortDescending),
             ItemSortColumn.Quantity => SortByNumber(rows, row => row.Item.StackSize, criteria.SortDescending),
-            ItemSortColumn.Quality => SortByNumber(rows, row => (uint?)row.Item.ContentQuality, criteria.SortDescending),
+            ItemSortColumn.Content => SortByNumber(rows, row => row.Item.ContentQuantity, criteria.SortDescending),
+            ItemSortColumn.Quality => SortByNumber(rows, row => row.Item.ContentQuality, criteria.SortDescending),
             _ => rows
         };
     }
@@ -691,7 +714,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     }
 
     // Une ligne sans valeur reste en fin de tableau, quel que soit le sens du tri.
-    private static IEnumerable<ItemFilterRow> SortByNumber(IEnumerable<ItemFilterRow> rows, Func<ItemFilterRow, uint?> key, bool descending)
+    private static IEnumerable<ItemFilterRow> SortByNumber(IEnumerable<ItemFilterRow> rows, Func<ItemFilterRow, ulong?> key, bool descending)
     {
         var withoutValueLast = rows.OrderBy(row => key(row) == null);
         return descending ? withoutValueLast.ThenByDescending(key) : withoutValueLast.ThenBy(key);
@@ -709,10 +732,12 @@ public partial class ItemsTabViewModel : PageViewModelBase
         ResultSummary = $"{outcome.Items.Count} sur {outcome.TotalCount} éléments";
     }
 
-    // Les puces suivent la fréquence au chargement : elles ne changent pas de place pendant que l'utilisateur filtre.
+    // Les puces suivent l'ordre de fréquence au chargement. Celles qui n'ont plus aucun objet après filtrage sont masquées, sauf si elles
+    // sont sélectionnées (pour pouvoir les décocher) ; les suivantes prennent leur place.
     private List<ChipState> BuildTypeChipStates(IReadOnlyDictionary<string, int> counts)
     {
         var keys = _typesByFrequency
+            .Where(key => counts.GetValueOrDefault(key) > 0 || TypeFilter.IsSelected(key))
             .Where((key, index) => index < MaxChipCount || TypeFilter.IsSelected(key))
             .ToList();
         var states = new List<ChipState> { new(null, "Tout", counts.Values.Sum(), !TypeFilter.HasSelection) };
@@ -830,11 +855,13 @@ public partial class ItemsTabViewModel : PageViewModelBase
         Type,
         Location,
         Quantity,
+        Content,
         Quality
     }
 
     private sealed record ItemFilterCriteria(
         string? Needle,
+        bool HidePlaceholders,
         HashSet<string>? Types,
         EItemSubType? SubType,
         HashSet<string>? Locations,
