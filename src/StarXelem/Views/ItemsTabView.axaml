@@ -210,11 +210,30 @@
                                   CanUserSortColumns="False"
                                   CanUserReorderColumns="False">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Width="28*" Foreground="{DynamicResource Sx.TextBrush}" FontWeight="Medium" Binding="{Binding Name^, FallbackValue=Chargement}">
-                                    <DataGridTextColumn.Header>
+                                <DataGridTemplateColumn Width="28*">
+                                    <DataGridTemplateColumn.Header>
                                         <comp:ColumnHeader DataContext="{Binding NameColumn}" />
-                                    </DataGridTextColumn.Header>
-                                </DataGridTextColumn>
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:ItemViewModel">
+                                            <DockPanel Margin="12,0,10,0" VerticalAlignment="Center">
+                                                <!-- Objet crafté : valeurs améliorées en infobulle, détail complet dans le panneau latéral -->
+                                                <comp:NotchedBorder DockPanel.Dock="Right"
+                                                                    Classes="sx-badge craft"
+                                                                    Margin="8,0,0,0"
+                                                                    IsVisible="{Binding IsCrafted}"
+                                                                    ToolTip.Tip="{Binding Crafted^.Tooltip, FallbackValue='Objet crafté'}">
+                                                    <TextBlock Text="Craft" />
+                                                </comp:NotchedBorder>
+                                                <TextBlock VerticalAlignment="Center"
+                                                           FontWeight="Medium"
+                                                           Foreground="{DynamicResource Sx.TextBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Text="{Binding Name^, FallbackValue=Chargement}" />
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Width="15*" Binding="{Binding ItemTypeLabel}">
                                     <DataGridTextColumn.Header>
                                         <comp:ColumnHeader DataContext="{Binding TypeColumn}" />
@@ -264,6 +283,25 @@
                                                        HorizontalAlignment="Right"
                                                        Margin="0,0,10,0"
                                                        Text="{Binding StackSize}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <!-- Quantité réellement contenue par un conteneur de ressource (64 cSCU dans une caisse de 1 SCU) -->
+                                <DataGridTemplateColumn Width="11*">
+                                    <DataGridTemplateColumn.Header>
+                                        <comp:ColumnHeader Classes="right" DataContext="{Binding ContentColumn}" />
+                                    </DataGridTemplateColumn.Header>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:ItemViewModel">
+                                            <Panel Margin="0,0,10,0" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                <TextBlock Classes="sx-mono"
+                                                           Foreground="{DynamicResource Sx.TextBrush}"
+                                                           IsVisible="{Binding ContentQuantity, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                           Text="{Binding ContentQuantity, Converter={StaticResource MicroScuConverter}}" />
+                                                <TextBlock Foreground="{DynamicResource Sx.MutedBrush}"
+                                                           IsVisible="{Binding ContentQuantity, Converter={x:Static ObjectConverters.IsNull}}"
+                                                           Text="—" />
+                                            </Panel>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -388,6 +426,58 @@
                                 <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Quantité du contenu" />
                                 <TextBlock Grid.Column="1" FontFamily="{DynamicResource Sx.FontMono}" FontSize="13" Text="{Binding ContentQuantity, Converter={StaticResource MicroScuConverter}}" />
                             </Grid>
+
+                            <!-- Données de craft : valeurs améliorées puis matériaux utilisés, avec leur qualité -->
+                            <StackPanel Margin="0,8,0,16" IsVisible="{Binding IsCrafted}">
+                                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
+                                    <comp:NotchedBorder Classes="sx-badge craft" Cursor="Arrow">
+                                        <TextBlock Text="Craft" />
+                                    </comp:NotchedBorder>
+                                    <TextBlock Classes="sx-caption" VerticalAlignment="Center" Text="Objet fabriqué" />
+                                </StackPanel>
+                                <TextBlock Classes="sx-caption"
+                                           IsVisible="{Binding Crafted^, Converter={x:Static ObjectConverters.IsNull}, FallbackValue=True}"
+                                           Text="Lecture des données de craft…" />
+                                <StackPanel DataContext="{Binding Crafted^}"
+                                            IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                    <TextBlock x:DataType="models:CraftedItemInfo" Classes="sx-caption" Margin="0,0,0,8" Text="Valeurs améliorées" />
+                                    <TextBlock x:DataType="models:CraftedItemInfo"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource Sx.MutedBrush}"
+                                               Margin="0,0,0,10"
+                                               IsVisible="{Binding !Modifiers.Count}"
+                                               Text="Aucune valeur améliorée" />
+                                    <ItemsControl x:DataType="models:CraftedItemInfo" ItemsSource="{Binding Modifiers}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="models:CraftedModifier">
+                                                <Grid Classes="detail-row" ColumnDefinitions="*,Auto">
+                                                    <TextBlock FontSize="13" Foreground="{DynamicResource Sx.SecondaryBrush}" TextWrapping="Wrap" Text="{Binding Name}" />
+                                                    <TextBlock Grid.Column="1" FontFamily="{DynamicResource Sx.FontMono}" FontSize="13" Text="{Binding ValueLabel}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock x:DataType="models:CraftedItemInfo"
+                                               Classes="sx-caption"
+                                               Margin="0,8,0,8"
+                                               IsVisible="{Binding !!Materials.Count}"
+                                               Text="Matériaux utilisés" />
+                                    <ItemsControl x:DataType="models:CraftedItemInfo" ItemsSource="{Binding Materials}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="models:CraftedMaterial">
+                                                <Grid Classes="detail-row" ColumnDefinitions="*,Auto">
+                                                    <TextBlock FontSize="13" Foreground="{DynamicResource Sx.SecondaryBrush}" TextWrapping="Wrap" Text="{Binding Name}" />
+                                                    <TextBlock Grid.Column="1"
+                                                               FontFamily="{DynamicResource Sx.FontMono}"
+                                                               FontSize="13"
+                                                               Text="{Binding Quality, StringFormat='qualité {0}'}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </StackPanel>
+
                             <Grid Classes="detail-row" ColumnDefinitions="Auto,*">
                                 <TextBlock Classes="sx-caption" VerticalAlignment="Top" Text="Identifiant" />
                                 <TextBlock Grid.Column="1" FontFamily="{DynamicResource Sx.FontMono}" FontSize="12" Text="{Binding Id}" />

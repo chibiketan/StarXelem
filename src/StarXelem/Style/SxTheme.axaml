@@ -199,6 +199,15 @@
     <Style Selector="comp|NotchedBorder.sx-badge.danger Ellipse">
         <Setter Property="Fill" Value="{DynamicResource Sx.DangerBrush}" />
     </Style>
+    <!-- Marqueur d'objet crafté (écran Objets, loadout) : or de la charte, valeurs améliorées en infobulle -->
+    <Style Selector="comp|NotchedBorder.sx-badge.craft">
+        <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
+        <Setter Property="Cursor" Value="Help" />
+    </Style>
+    <Style Selector="comp|NotchedBorder.sx-badge.craft TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
 
     <!-- Boutons d'en-tête de colonne et liens -->
     <Style Selector="Button.sx-sort, Button.sx-filter, Button.sx-link">

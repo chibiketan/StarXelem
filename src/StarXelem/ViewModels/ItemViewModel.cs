@@ -29,6 +29,8 @@ public partial class ItemViewModel : ViewModelBase
     [ObservableProperty] private ItemLocationDisplay? _locationDisplay;
     private ushort? _contentQuality;
     private ulong? _contentQuantity;
+    private bool _isCrafted;
+    private readonly Lazy<Task<CraftedItemInfo?>> _crafted;
 
     public ulong Id => _entityNodeProperties.EntityNodeProperties.Geid;
     public ulong OwnerId => _entityNodeProperties.EntityNodeProperties.OwnerId;
@@ -57,7 +59,14 @@ public partial class ItemViewModel : ViewModelBase
 
     public ushort? ContentQuality => _contentQuality;
 
+    /// <summary>Quantité réellement contenue, en µSCU (variable « rsrccntr.map »), ou null si l'objet n'est pas un conteneur de ressource.</summary>
     public ulong? ContentQuantity => _contentQuantity;
+
+    /// <summary>Vrai si l'objet porte la variable « Crafting.PersistentItemData ».</summary>
+    public bool IsCrafted => _isCrafted;
+
+    /// <summary>Données de craft décodées (valeurs améliorées, matériaux), lues à la première demande ; null si l'objet n'est pas crafté.</summary>
+    public Task<CraftedItemInfo?> Crafted => _crafted.Value;
 
     /// <summary>Classe de l'objet (RecordId de ScItems), ou null si elle est absente de la base locale.</summary>
     public string? ClassRecordId => _scItem?.RecordId;
@@ -89,6 +98,9 @@ public partial class ItemViewModel : ViewModelBase
         }));
         _owner = new Lazy<Task<string>>(() => _playerNames.GetOrAdd(OwnerId, GetOwner));
         ExtractQuality();
+        _crafted = new Lazy<Task<CraftedItemInfo?>>(() => _isCrafted
+            ? _parent.ReadCraftedInfoAsync(entityItemResult)
+            : Task.FromResult<CraftedItemInfo?>(null));
     }
 
     private async Task<string?> GetLocaleValue()
@@ -172,9 +184,11 @@ public partial class ItemViewModel : ViewModelBase
                         Debug.WriteLine($"La donnée est trop petite pour la qualité, id {_entityNodeProperties.EntityNodeProperties?.Geid}");
                     }
 
-                    if (snapshotVariable.Snapshot.Length >= 9)
+                    // Entrée : clé u32, qualité u16, puis quantité i64 en µSCU (64 cSCU dans une caisse de 1 SCU de minerai).
+                    if (snapshotVariable.Snapshot.Length >= 1 + 6 + 8)
                     {
-                        _contentQuantity = BinaryPrimitives.ReadUInt32LittleEndian(snapshotVariable.Snapshot.Span[(1 + 6)..]);
+                        var quantity = BinaryPrimitives.ReadInt64LittleEndian(snapshotVariable.Snapshot.Span[(1 + 6)..]);
+                        _contentQuantity = quantity >= 0 ? (ulong)quantity : null;
                     }
                     else
                     {
@@ -185,7 +199,8 @@ public partial class ItemViewModel : ViewModelBase
                     // Contenu des sacs de minage, extraire ?
                     break;
                 case SnapshotVariableNameCrc.DonneesCraft:
-                    // Valeurs de craft, extraire ?
+                    // Le décodage (valeurs améliorées, matériaux) passe par DataCore : il n'est fait qu'à l'affichage du détail.
+                    _isCrafted = true;
                     break;
                 case SnapshotVariableNameCrc.QualiteCraft:
                     break;

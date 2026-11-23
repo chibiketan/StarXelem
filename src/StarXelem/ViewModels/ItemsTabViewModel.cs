@@ -14,6 +14,7 @@ using StarXelem.Data;
 using StarXelem.Models;
 using StarXelem.Services;
 using StarXelem.Services.LocationService;
+using StarXelem.Services.ShipLoadout;
 using DateTime = System.DateTime;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -102,6 +103,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
     public ColumnHeaderViewModel TypeColumn { get; }
     public ColumnHeaderViewModel LocationColumn { get; }
     public ColumnHeaderViewModel QuantityColumn { get; }
+    /// <summary>Quantité réellement contenue par un conteneur de ressource (64 cSCU dans une caisse de 1 SCU).</summary>
+    public ColumnHeaderViewModel ContentColumn { get; }
     public ColumnHeaderViewModel QualityColumn { get; }
     public ObservableCollection<FilterChipViewModel> TypeChips { get; } = new();
     public ObservableCollection<FilterChipViewModel> SubTypeChips { get; } = new();
@@ -135,6 +138,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
     private readonly ILogger<ItemsTabViewModel> _logger;
     private readonly IOwnedMaterialService _ownedMaterialService;
+    private readonly IP4kService _p4kService;
+    private readonly CraftedItemReader _craftedReader;
     // Heure du dernier chargement, reprise à la republication des matériaux une fois les emplacements résolus.
     private DateTime _itemsLoadedAt;
 
@@ -149,9 +154,12 @@ public partial class ItemsTabViewModel : PageViewModelBase
         ILocaleEntryRepository localeEntryRepository,
         ILocationService locationService,
         IOwnedMaterialService ownedMaterialService,
+        IP4kService p4kService,
         ILogger<ItemsTabViewModel> logger)
     {
         _logger = logger;
+        _p4kService = p4kService;
+        _craftedReader = new CraftedItemReader(p4kService);
         _ownedMaterialService = ownedMaterialService;
         _clientService = clientService;
         _scItemRepository = scItemRepository;
@@ -163,6 +171,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         TypeColumn = CreateColumn("Type", ItemSortColumn.Type, TypeFilter);
         LocationColumn = CreateColumn("Emplacement", ItemSortColumn.Location, LocationFilter);
         QuantityColumn = CreateColumn("Qté", ItemSortColumn.Quantity);
+        ContentColumn = CreateColumn("Contenu", ItemSortColumn.Content);
         QualityColumn = CreateColumn("Qualité", ItemSortColumn.Quality);
         TypeFilter.SelectionChanged += (_, _) =>
         {
@@ -670,7 +679,8 @@ public partial class ItemsTabViewModel : PageViewModelBase
             ItemSortColumn.Type => SortByText(rows, row => row.Item.ItemTypeLabel, criteria.SortDescending),
             ItemSortColumn.Location => SortByLocation(rows, criteria.SortDescending),
             ItemSortColumn.Quantity => SortByNumber(rows, row => row.Item.StackSize, criteria.SortDescending),
-            ItemSortColumn.Quality => SortByNumber(rows, row => (uint?)row.Item.ContentQuality, criteria.SortDescending),
+            ItemSortColumn.Content => SortByNumber(rows, row => row.Item.ContentQuantity, criteria.SortDescending),
+            ItemSortColumn.Quality => SortByNumber(rows, row => row.Item.ContentQuality, criteria.SortDescending),
             _ => rows
         };
     }
@@ -691,7 +701,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
     }
 
     // Une ligne sans valeur reste en fin de tableau, quel que soit le sens du tri.
-    private static IEnumerable<ItemFilterRow> SortByNumber(IEnumerable<ItemFilterRow> rows, Func<ItemFilterRow, uint?> key, bool descending)
+    private static IEnumerable<ItemFilterRow> SortByNumber(IEnumerable<ItemFilterRow> rows, Func<ItemFilterRow, ulong?> key, bool descending)
     {
         var withoutValueLast = rows.OrderBy(row => key(row) == null);
         return descending ? withoutValueLast.ThenByDescending(key) : withoutValueLast.ThenBy(key);
@@ -830,6 +840,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         Type,
         Location,
         Quantity,
+        Content,
         Quality
     }
 
