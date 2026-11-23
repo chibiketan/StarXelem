@@ -29,6 +29,12 @@ public class ScItemEntity
 
     public string? DisplayLocaleKey { get; set; }
 
+    /// <summary>
+    /// Ressource contenue par l'objet (selfId du <c>ResourceType</c> de son composant <c>ResourceContainer</c>), ou null.
+    /// Relie un objet de l'inventaire (ex. caisse d'aluminium) au coût « Resource » d'un blueprint.
+    /// </summary>
+    public string? ContainedResourceRef { get; set; }
+
     public string? ManufacturerId { get; set; }
 
     [ForeignKey("ManufacturerId")]

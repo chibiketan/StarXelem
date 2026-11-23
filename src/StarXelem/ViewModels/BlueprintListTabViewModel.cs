@@ -30,11 +30,14 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
 
     private const string ObtainedChipKey = "obtained";
     private const string MissionChipKey = "missions";
+    private const string CraftableChipKey = "craftable";
 
     private readonly ILogger<BlueprintListTabViewModel> _logger;
 
     private readonly IGrpcClientService _clientService;
     private readonly ILocalDatabaseService _localDatabaseService;
+    private readonly IOwnedMaterialService _ownedMaterialService;
+    private CancellationTokenSource? _craftStatusCts;
     private CancellationTokenSource? _filterCts;
     private readonly HashSet<BlueprintFamily> _selectedFamilies = new();
 
@@ -43,6 +46,9 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Copy);
     [ObservableProperty] public IList<BlueprintViewModel>? _blueprintList;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasSelection))] public BlueprintViewModel? _selectedBluePrint;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasCraft))] private BlueprintCraftViewModel? _selectedCraft;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowLoadItemsBanner))] private bool _hasOwnedInventory;
+    [ObservableProperty] private bool _showOnlyCraftable;
     [ObservableProperty, NotifyCanExecuteChangedFor(nameof(LoadItemListCommand)), NotifyPropertyChangedFor(nameof(IsBusy), nameof(BusyMessage))]
     private bool _isLoading = false;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsBusy), nameof(BusyMessage), nameof(ShowNoMatch))] private bool _isFiltering;
@@ -65,17 +71,103 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     public BlueprintListTabViewModel(
         ILogger<BlueprintListTabViewModel> logger,
         IGrpcClientService clientService,
-        ILocalDatabaseService localDatabaseService)
+        ILocalDatabaseService localDatabaseService,
+        IOwnedMaterialService ownedMaterialService)
     {
         _logger = logger;
         _clientService = clientService;
         _localDatabaseService = localDatabaseService;
+        _ownedMaterialService = ownedMaterialService;
 
         ObtainedChip = new FilterChipViewModel(ObtainedChipKey, "Obtenus", ToggleChip);
         MissionChip = new FilterChipViewModel(MissionChipKey, "De mission", ToggleChip);
+        CraftableChip = new FilterChipViewModel(CraftableChipKey, "Fabricables", ToggleChip);
 
         IsGrpcConnected = _clientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame;
         _clientService.OnStatusChanged += (sender, status) => { OnConnectedStatusChanged(status); };
+        HasOwnedInventory = _ownedMaterialService.Current != null;
+        _ownedMaterialService.InventoryChanged += (_, _) => Dispatcher.UIThread.Post(OnInventoryChanged);
+    }
+
+    /// <summary>Puce « Fabricables » : ne garde que les blueprints dont tous les matériaux sont possédés.</summary>
+    public FilterChipViewModel CraftableChip { get; }
+
+    /// <summary>Vrai si les matériaux possédés sont confrontés au blueprint sélectionné.</summary>
+    public bool HasCraft => SelectedCraft != null;
+
+    /// <summary>Vrai tant que les objets ne sont pas chargés : invite à les charger depuis l'écran Objets.</summary>
+    public bool ShowLoadItemsBanner => !HasOwnedInventory;
+
+    /// <summary>Ouvre l'écran Objets et lance le chargement de l'inventaire.</summary>
+    [RelayCommand]
+    private void OpenItems() => WeakReferenceMessenger.Default.Send(new OpenItemsMessage(true));
+
+    partial void OnSelectedBluePrintChanged(BlueprintViewModel? value) => RebuildSelectedCraft();
+
+    partial void OnShowOnlyCraftableChanged(bool value) => ScheduleFilters(SelectionFilterDelay);
+
+    private void RebuildSelectedCraft()
+    {
+        var inventory = _ownedMaterialService.Current;
+        SelectedCraft = SelectedBluePrint != null && inventory != null && SelectedBluePrint.CategoryList.Any(category => category.MaterialList.Count > 0)
+            ? new BlueprintCraftViewModel(SelectedBluePrint, inventory)
+            : null;
+    }
+
+    private void OnInventoryChanged()
+    {
+        HasOwnedInventory = _ownedMaterialService.Current != null;
+        if (!HasOwnedInventory)
+        {
+            ShowOnlyCraftable = false;
+        }
+
+        RebuildSelectedCraft();
+        RefreshCraftStatuses();
+    }
+
+    /// <summary>
+    /// Recalcule hors du thread d'UI le statut de fabrication de tous les blueprints, puis l'applique et relance le filtrage
+    /// pour mettre à jour la puce « Fabricables ». À appeler depuis le thread d'UI.
+    /// </summary>
+    private void RefreshCraftStatuses()
+    {
+        _craftStatusCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _craftStatusCts = cts;
+        var blueprints = _allBlueprints ?? new List<BlueprintViewModel>();
+        var inventory = _ownedMaterialService.Current;
+        _ = RunCraftStatusesAsync(blueprints, inventory, cts.Token);
+    }
+
+    private async Task RunCraftStatusesAsync(List<BlueprintViewModel> blueprints, OwnedMaterialInventory? inventory, CancellationToken token)
+    {
+        try
+        {
+            var statuses = await Task.Run(() => blueprints.Select(blueprint => BlueprintStockCalculator.ComputeCraftStatus(inventory, blueprint)).ToArray(), token);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                for (var i = 0; i < blueprints.Count; i++)
+                {
+                    blueprints[i].CraftStatus = statuses[i];
+                }
+
+                ScheduleFilters(TimeSpan.Zero);
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Remplacé par un calcul plus récent.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erreur lors du calcul des blueprints fabricables");
+        }
     }
 
     /// <summary>Puce « Obtenus » : ne garde que les blueprints possédés (nécessite la connexion au jeu).</summary>
@@ -126,6 +218,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         _selectAfterFilterId = blueprint.BlueprintId;
         ShowOnlyObtained = false;
         ShowOnlyWithMissions = false;
+        ShowOnlyCraftable = false;
         _selectedFamilies.Clear();
         Search = blueprint.Name;
         ScheduleFilters(TimeSpan.Zero);
@@ -204,6 +297,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                 BuildFamilyChips();
                 IsLoading = false;
                 ScheduleFilters(TimeSpan.Zero);
+                RefreshCraftStatuses();
                 TrySelectPendingBlueprint();
                 SendToOrbitalAllianceCommand.NotifyCanExecuteChanged();
             }).GetTask().ConfigureAwait(false);
@@ -223,64 +317,12 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         DbBlueprintRow row,
         HashSet<string>? obtainedIds)
     {
-        var categories = await Task.WhenAll(row.Costs.Select(async cost =>
+        var categories = await Task.WhenAll(row.Costs.Select(cost => Task.FromResult(new BlueprintCategoryModel
         {
-            var materials = new List<BlueprintMaterialModel>();
-            var modifiers = new List<BlueprintStatModelBase>();
-
-            if (cost.CostType == "Resource" && !string.IsNullOrEmpty(cost.ResourceRef))
-            {
-                materials.Add(new BlueprintResourceModel
-                {
-                    Name = cost.ResourceName ?? cost.ResourceRef,
-                    QuantityInScu = (float)(cost.ResourceAmount ?? 0m)
-                });
-            }
-            else if (cost.CostType == "Item" && !string.IsNullOrEmpty(cost.ItemEntityClassRef))
-            {
-                materials.Add(new BlueprintItemModel
-                {
-                    Name = cost.ItemName ?? cost.ItemEntityClassRef,
-                    QuantityCount = cost.ItemCount ?? 1
-                });
-            }
-
-            foreach (var mod in cost.Modifiers)
-            {
-                if (mod.RangeType == "Linear")
-                {
-                    modifiers.Add(new BlueprintStatLinearModel
-                    {
-                        Name = mod.PropertyName,
-                        Min = (float)mod.ModifierStart,
-                        Max = (float)mod.ModifierEnd
-                    });
-                }
-                else if (mod.RangeType == "Additive")
-                {
-                    modifiers.Add(new BlueprintStatAdditiveModel
-                    {
-                        Name = mod.PropertyName,
-                        Bands = new List<BlueprintStatBandModel>
-                        {
-                            new BlueprintStatBandModel
-                            {
-                                StartQuality = mod.StartQuality,
-                                EndQuality = mod.EndQuality,
-                                Value = (int)mod.ModifierStart
-                            }
-                        }
-                    });
-                }
-            }
-
-            return new BlueprintCategoryModel
-            {
-                Name = cost.CostName,
-                MaterialList = materials,
-                StatModifierList = modifiers
-            };
-        }));
+            Name = cost.CostName,
+            MaterialList = MapMaterials(cost),
+            StatModifierList = MapModifiers(cost.Modifiers)
+        })));
 
         var missionPools = row.MissionPools
             .GroupBy(mp => mp.PoolName)
@@ -305,6 +347,73 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             Family = BlueprintFamilyInfo.GetFamily(row.Product?.TypeName),
             TypeLabel = BlueprintFamilyInfo.GetTypeLabel(row.Product)
         };
+    }
+
+    private static List<BlueprintMaterialModel> MapMaterials(DbBlueprintCostRow cost)
+    {
+        if (cost.CostType == "Resource" && !string.IsNullOrEmpty(cost.ResourceRef))
+        {
+            return
+            [
+                new BlueprintResourceModel
+                {
+                    Name = cost.ResourceName ?? cost.ResourceRef,
+                    QuantityInScu = (float)(cost.ResourceAmount ?? 0m),
+                    ResourceRef = cost.ResourceRef,
+                    MinQuality = cost.MinQuality
+                }
+            ];
+        }
+
+        if (cost.CostType == "Item" && !string.IsNullOrEmpty(cost.ItemEntityClassRef))
+        {
+            return
+            [
+                new BlueprintItemModel
+                {
+                    Name = cost.ItemName ?? cost.ItemEntityClassRef,
+                    QuantityCount = cost.ItemCount ?? 1,
+                    ItemClassRef = cost.ItemEntityClassRef,
+                    MinQuality = cost.MinQuality
+                }
+            ];
+        }
+
+        return [];
+    }
+
+    // Une propriété peut avoir plusieurs plages de qualité : elles forment un seul modificateur.
+    private static List<BlueprintStatModelBase> MapModifiers(IEnumerable<DbBlueprintModifierRow> modifiers)
+    {
+        var result = new List<BlueprintStatModelBase>();
+        foreach (var group in modifiers.GroupBy(mod => (mod.PropertyName, mod.RangeType)))
+        {
+            var ranges = group.OrderBy(mod => mod.StartQuality).ToList();
+            if (group.Key.RangeType == "Linear")
+            {
+                result.Add(new BlueprintStatLinearModel
+                {
+                    Name = group.Key.PropertyName,
+                    Min = (float)ranges[0].ModifierStart,
+                    Max = (float)ranges[^1].ModifierEnd,
+                    Ranges = ranges
+                        .Select(mod => new BlueprintLinearRange(mod.StartQuality, mod.EndQuality, (float)mod.ModifierStart, (float)mod.ModifierEnd))
+                        .ToList()
+                });
+            }
+            else if (group.Key.RangeType == "Additive")
+            {
+                result.Add(new BlueprintStatAdditiveModel
+                {
+                    Name = group.Key.PropertyName,
+                    Bands = ranges
+                        .Select(mod => new BlueprintStatBandModel { StartQuality = mod.StartQuality, EndQuality = mod.EndQuality, Value = (int)mod.ModifierStart })
+                        .ToList()
+                });
+            }
+        }
+
+        return result;
     }
 
     [RelayCommand(CanExecute = nameof(CanClearSearch))]
@@ -349,6 +458,9 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             case MissionChipKey:
                 ShowOnlyWithMissions = !ShowOnlyWithMissions;
                 break;
+            case CraftableChipKey when HasOwnedInventory || ShowOnlyCraftable:
+                ShowOnlyCraftable = !ShowOnlyCraftable;
+                break;
         }
     }
 
@@ -389,6 +501,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             string.IsNullOrWhiteSpace(Search) ? null : Search.Trim(),
             ShowOnlyObtained,
             ShowOnlyWithMissions,
+            ShowOnlyCraftable,
             _selectedFamilies.Count == 0 ? null : _selectedFamilies.ToHashSet());
 
         IsFiltering = true;
@@ -434,20 +547,23 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         bool MatchesObtained(BlueprintViewModel blueprint) => !criteria.OnlyObtained || blueprint.IsObtained;
         bool MatchesMissions(BlueprintViewModel blueprint) => !criteria.OnlyWithMissions || blueprint.HasMissions;
         bool MatchesFamily(BlueprintViewModel blueprint) => criteria.Families == null || criteria.Families.Contains(blueprint.Family);
+        bool MatchesCraftable(BlueprintViewModel blueprint) => !criteria.OnlyCraftable || blueprint.CraftStatus == BlueprintCraftStatus.Ready;
 
         // Chaque puce compte selon les autres filtres, pas le sien.
-        var obtainedCount = searched.Count(blueprint => blueprint.IsObtained && MatchesMissions(blueprint) && MatchesFamily(blueprint));
-        var missionCount = searched.Count(blueprint => blueprint.HasMissions && MatchesObtained(blueprint) && MatchesFamily(blueprint));
+        var obtainedCount = searched.Count(blueprint => blueprint.IsObtained && MatchesMissions(blueprint) && MatchesFamily(blueprint) && MatchesCraftable(blueprint));
+        var missionCount = searched.Count(blueprint => blueprint.HasMissions && MatchesObtained(blueprint) && MatchesFamily(blueprint) && MatchesCraftable(blueprint));
+        var craftableCount = searched.Count(blueprint =>
+            blueprint.CraftStatus == BlueprintCraftStatus.Ready && MatchesObtained(blueprint) && MatchesMissions(blueprint) && MatchesFamily(blueprint));
         var familyCounts = searched
-            .Where(blueprint => MatchesObtained(blueprint) && MatchesMissions(blueprint))
+            .Where(blueprint => MatchesObtained(blueprint) && MatchesMissions(blueprint) && MatchesCraftable(blueprint))
             .GroupBy(blueprint => blueprint.Family)
             .ToDictionary(group => group.Key, group => group.Count());
 
         var rows = searched
-            .Where(blueprint => MatchesObtained(blueprint) && MatchesMissions(blueprint) && MatchesFamily(blueprint))
+            .Where(blueprint => MatchesObtained(blueprint) && MatchesMissions(blueprint) && MatchesFamily(blueprint) && MatchesCraftable(blueprint))
             .ToList();
 
-        return new BlueprintFilterOutcome(rows, obtainedCount, missionCount, familyCounts);
+        return new BlueprintFilterOutcome(rows, obtainedCount, missionCount, craftableCount, familyCounts);
     }
 
     private void DisplayResult(BlueprintFilterOutcome outcome, CancellationToken token)
@@ -461,6 +577,8 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         ObtainedChip.IsSelected = ShowOnlyObtained;
         MissionChip.Count = outcome.MissionCount;
         MissionChip.IsSelected = ShowOnlyWithMissions;
+        CraftableChip.Count = outcome.CraftableCount;
+        CraftableChip.IsSelected = ShowOnlyCraftable;
         foreach (var chip in FamilyChips)
         {
             var family = Enum.Parse<BlueprintFamily>(chip.Key!);
@@ -499,13 +617,14 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     }
 
     /// <summary>État des filtres au moment de la demande, lu par le calcul hors du thread d'UI.</summary>
-    private sealed record BlueprintFilterCriteria(IReadOnlyList<BlueprintViewModel> Blueprints, string? Needle, bool OnlyObtained, bool OnlyWithMissions, HashSet<BlueprintFamily>? Families);
+    private sealed record BlueprintFilterCriteria(IReadOnlyList<BlueprintViewModel> Blueprints, string? Needle, bool OnlyObtained, bool OnlyWithMissions, bool OnlyCraftable, HashSet<BlueprintFamily>? Families);
 
     /// <summary>Résultat d'un filtrage : lignes à afficher et compteurs des puces.</summary>
     private sealed record BlueprintFilterOutcome(
         List<BlueprintViewModel> Blueprints,
         int ObtainedCount,
         int MissionCount,
+        int CraftableCount,
         IReadOnlyDictionary<BlueprintFamily, int> FamilyCounts);
 }
 
@@ -554,12 +673,28 @@ public class BlueprintCategoryModel
 public abstract class BlueprintMaterialModel
 {
     public required string Name { get; set; }
+
+    /// <summary>Qualité minimale exigée (0 à 1000) : les lots en dessous ne comptent pas.</summary>
+    public int? MinQuality { get; set; }
+
+    /// <summary>Quantité requise, en SCU pour une ressource ou en nombre d'éléments pour un objet.</summary>
+    public abstract double RequiredQuantity { get; }
+
+    /// <summary>Vrai pour une ressource mesurée en SCU, faux pour un objet compté à l'unité.</summary>
+    public abstract bool IsMeasuredInScu { get; }
 }
 
 /// <summary>Ressource brute mesurée en SCU (ex : Fer, Cuivre).</summary>
 public class BlueprintResourceModel : BlueprintMaterialModel
 {
     public required float QuantityInScu { get; set; }
+
+    /// <summary>selfId du <c>ResourceType</c> demandé.</summary>
+    public string? ResourceRef { get; set; }
+
+    public override double RequiredQuantity => QuantityInScu;
+
+    public override bool IsMeasuredInScu => true;
 }
 
 /// <summary>Objet spécifique mesuré en quantité physique (ex : minerai Sadaryx x4).</summary>
@@ -568,22 +703,70 @@ public class BlueprintItemModel : BlueprintMaterialModel
     /// <summary>Nombre d'objets physiques requis (pas de SCU).</summary>
     public required int QuantityCount { get; set; }
 
+    /// <summary>Classe d'objet demandée (RecordId de ScItems).</summary>
+    public string? ItemClassRef { get; set; }
+
     /// <summary>Quantité affichée, accordée au nombre (ex : « 1 unité », « 4 unités »).</summary>
     public string QuantityLabel => QuantityCount > 1 ? $"{QuantityCount} unités" : $"{QuantityCount} unité";
+
+    public override double RequiredQuantity => QuantityCount;
+
+    public override bool IsMeasuredInScu => false;
 }
 
 public abstract class BlueprintStatModelBase
 {
     public required string Name { get; set; }
+
+    /// <summary>Vrai pour un modificateur additif entier (valeur par plage), faux pour un multiplicateur.</summary>
+    public abstract bool IsAdditive { get; }
+
+    /// <summary>Valeur du modificateur à une qualité (0 à 1000).</summary>
+    public abstract double ValueAt(int quality);
+
+    /// <summary>Valeur formatée : pourcentage pour un multiplicateur, entier signé pour un additif.</summary>
+    public string FormatValue(double value) => IsAdditive
+        ? FormatSigned((int)Math.Round(value))
+        : (value * 100).ToString("0.#", CultureInfo.CurrentCulture) + "%";
+
+    /// <summary>Écart à la valeur neutre (100 % ou 0), signé : « −9,8 % », « +1 ».</summary>
+    public string FormatDelta(double value) => IsAdditive
+        ? FormatSigned((int)Math.Round(value))
+        : (value >= 1 ? "+" : "−") + Math.Abs((value - 1) * 100).ToString("0.#", CultureInfo.CurrentCulture) + " %";
+
+    protected static string FormatSigned(int value) => value > 0 ? $"+{value}" : value.ToString(CultureInfo.CurrentCulture);
 }
+
+/// <summary>Plage de qualité d'un multiplicateur linéaire : la valeur varie de <see cref="Start"/> à <see cref="End"/>.</summary>
+public sealed record BlueprintLinearRange(int StartQuality, int EndQuality, float Start, float End);
 
 public class BlueprintStatLinearModel : BlueprintStatModelBase
 {
     public required float Min { get; set; }
     public required float Max { get; set; }
 
+    /// <summary>Plages du multiplicateur ; vide pour un modèle construit à la main (Min à Q0, Max à Q1000).</summary>
+    public List<BlueprintLinearRange> Ranges { get; set; } = new();
+
     /// <summary>Plage du modificateur, de la qualité minimale à la maximale (ex : « 120% – 80% »).</summary>
     public string RangeDisplay => $"{FormatPercent(Min)} – {FormatPercent(Max)}";
+
+    public override bool IsAdditive => false;
+
+    public override double ValueAt(int quality)
+    {
+        if (Ranges.Count == 0)
+        {
+            return Min + (Max - Min) * Math.Clamp(quality, 0, 1000) / 1000d;
+        }
+
+        // Hors de toute plage, la valeur de la plage la plus proche s'applique.
+        var range = Ranges.FirstOrDefault(r => quality >= r.StartQuality && quality <= r.EndQuality)
+                    ?? (quality < Ranges.Min(r => r.StartQuality) ? Ranges.MinBy(r => r.StartQuality)! : Ranges.MaxBy(r => r.EndQuality)!);
+        var span = range.EndQuality - range.StartQuality;
+        var ratio = span <= 0 ? 0 : Math.Clamp((quality - range.StartQuality) / (double)span, 0, 1);
+        return range.Start + (range.End - range.Start) * ratio;
+    }
 
     private static string FormatPercent(float ratio) => (ratio * 100).ToString("0.#", CultureInfo.CurrentCulture) + "%";
 }
@@ -603,6 +786,15 @@ public class BlueprintStatAdditiveModel : BlueprintStatModelBase
 
     /// <summary>Valeur par plage de qualité (ex : « 0-500 : -1 · 500-1000 : +1 »).</summary>
     public string RangeDisplay => string.Join(" · ", Bands.Select(band => $"{band.QualityLabel} : {band.FormattedValue}"));
+
+    public override bool IsAdditive => true;
+
+    public override double ValueAt(int quality)
+    {
+        var band = Bands.FirstOrDefault(b => quality >= b.StartQuality && quality <= b.EndQuality)
+                   ?? (Bands.Count == 0 ? null : quality < Bands.Min(b => b.StartQuality) ? Bands.MinBy(b => b.StartQuality) : Bands.MaxBy(b => b.EndQuality));
+        return band?.Value ?? 0;
+    }
 }
 
 public partial class BlueprintViewModel : ViewModelBase
@@ -619,6 +811,23 @@ public partial class BlueprintViewModel : ViewModelBase
 
     /// <summary>True si le joueur possède déjà ce Blueprint (via gRPC).</summary>
     public bool IsObtained { get; set; }
+
+    /// <summary>Possibilité de fabriquer le blueprint avec les objets possédés.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasCraftStatus), nameof(CraftStatusLabel), nameof(CraftStatusTone), nameof(IsCraftReady))]
+    private BlueprintCraftStatus _craftStatus;
+
+    /// <summary>Vrai si le badge Prêt / Partiel s'affiche dans la liste.</summary>
+    public bool HasCraftStatus => CraftStatus is BlueprintCraftStatus.Ready or BlueprintCraftStatus.Partial;
+
+    /// <summary>Badge de la liste : « Prêt » ou « Partiel ».</summary>
+    public string CraftStatusLabel => CraftStatus == BlueprintCraftStatus.Ready ? "Prêt" : "Partiel";
+
+    /// <summary>Ton du badge de la liste.</summary>
+    public string CraftStatusTone => CraftStatus == BlueprintCraftStatus.Ready ? "success" : "warning";
+
+    /// <summary>Vrai si tous les matériaux sont réunis : badge vert.</summary>
+    public bool IsCraftReady => CraftStatus == BlueprintCraftStatus.Ready;
 
     /// <summary>Liste des pools de mission qui récompensent ce Blueprint.</summary>
     public List<MissionPoolGroup> MissionPools { get; set; } = new();

@@ -48,6 +48,9 @@ public sealed class HumanScuConverter : IValueConverter
                     return value?.ToString();
             }
 
+            // Une quantité lue en float (0,01 devient 0,0099999998) tomberait sous le seuil des cSCU :
+            // on arrondit au µSCU, la plus petite unité affichée, avant de choisir l'unité.
+            scu = Math.Round(scu, 6);
             decimal absScu = Math.Abs(scu);
 
             if (absScu >= 1m || scu == 0)

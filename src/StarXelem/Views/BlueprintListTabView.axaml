@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:ic="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
              xmlns:vm="clr-namespace:StarXelem.ViewModels"
+             xmlns:models="clr-namespace:StarXelem.Models"
              xmlns:local="clr-namespace:StarXelem"
              xmlns:conv="clr-namespace:StarXelem.Converters"
              xmlns:comp="clr-namespace:StarXelem.Components"
@@ -132,6 +133,83 @@
             <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
             <Setter Property="HorizontalAlignment" Value="Right" />
         </Style>
+
+        <!-- Matériaux possédés : tuiles du bilan -->
+        <Style Selector="comp|NotchedBorder.craft-tile">
+            <Setter Property="CutSize" Value="12" />
+            <Setter Property="Padding" Value="16,12" />
+            <Setter Property="Background" Value="{DynamicResource Sx.ReliefBrush}" />
+        </Style>
+        <Style Selector="TextBlock.tile-label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+        </Style>
+        <Style Selector="TextBlock.tile-value">
+            <Setter Property="FontFamily" Value="{DynamicResource Sx.FontMono}" />
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
+        </Style>
+        <Style Selector="TextBlock.tile-hint">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style Selector="comp|NotchedBorder.craft-badge">
+            <Setter Property="Padding" Value="7,2" />
+        </Style>
+        <Style Selector="comp|NotchedBorder.craft-badge TextBlock">
+            <Setter Property="FontSize" Value="11" />
+        </Style>
+
+        <!-- Matériaux possédés : tableau du bilan -->
+        <Style Selector="Grid.bilan-row">
+            <Setter Property="ColumnSpacing" Value="10" />
+            <Setter Property="MinHeight" Value="34" />
+        </Style>
+        <Style Selector="Grid.bilan-row TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.TextBrush}" />
+        </Style>
+        <Style Selector="Grid.bilan-row.header">
+            <Setter Property="MinHeight" Value="26" />
+        </Style>
+        <Style Selector="Grid.bilan-row.header TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+        </Style>
+        <Style Selector="Grid.bilan-row TextBlock.num">
+            <Setter Property="FontFamily" Value="{DynamicResource Sx.FontMono}" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+        </Style>
+        <Style Selector="Grid.bilan-row TextBlock.muted">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+        </Style>
+        <Style Selector="Grid.bilan-row TextBlock.covers">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SuccessBrush}" />
+        </Style>
+        <Style Selector="TextBlock.accent">
+            <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
+        </Style>
+        <Style Selector="Border.min-tag">
+            <Setter Property="Background" Value="{DynamicResource Sx.NeutralSoftBrush}" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="Padding" Value="5,1" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.min-tag TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource Sx.FontMono}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.SecondaryBrush}" />
+        </Style>
+        <Style Selector="Grid.value-row TextBlock.contrib">
+            <Setter Property="FontFamily" Value="{DynamicResource Sx.FontMono}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource Sx.MutedBrush}" />
+        </Style>
     </UserControl.Styles>
 
     <!-- La nouvelle charte n'existe qu'en thème sombre : l'écran reste sombre même si Windows est en thème clair. -->
@@ -181,6 +259,17 @@
                                 <TextBlock Classes="sx-count" Text="{Binding MissionChip.Count}" />
                             </StackPanel>
                         </Button>
+                        <Button Classes="sx-chip"
+                                Classes.on="{Binding CraftableChip.IsSelected}"
+                                Command="{Binding CraftableChip.ToggleCommand}"
+                                IsEnabled="{Binding HasOwnedInventory}"
+                                ToolTip.Tip="Blueprints dont tous les matériaux sont possédés (nécessite le chargement des objets)">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Ellipse Width="7" Height="7" Fill="{DynamicResource Sx.AccentBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding CraftableChip.Label}" VerticalAlignment="Center" />
+                                <TextBlock Classes="sx-count" Text="{Binding CraftableChip.Count}" />
+                            </StackPanel>
+                        </Button>
                     </WrapPanel>
 
                     <!-- Familles d'objet : cumulables, rien de coché = tout afficher -->
@@ -220,9 +309,18 @@
                                             <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
                                             <TextBlock Classes="type-label" Text="{Binding TypeLabel}" TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
-                                        <Border Grid.Column="2" Classes="obtained-mark" IsVisible="{Binding IsObtained}" ToolTip.Tip="Obtenu">
-                                            <Path Classes="check" />
-                                        </Border>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <comp:NotchedBorder Classes="sx-badge craft-badge"
+                                                                Classes.success="{Binding IsCraftReady}"
+                                                                Classes.warning="{Binding !IsCraftReady}"
+                                                                IsVisible="{Binding HasCraftStatus}"
+                                                                ToolTip.Tip="Matériaux possédés : tous réunis (Prêt) ou en partie (Partiel)">
+                                                <TextBlock Text="{Binding CraftStatusLabel}" />
+                                            </comp:NotchedBorder>
+                                            <Border Classes="obtained-mark" IsVisible="{Binding IsObtained}" ToolTip.Tip="Obtenu">
+                                                <Path Classes="check" />
+                                            </Border>
+                                        </StackPanel>
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
@@ -322,8 +420,235 @@
 
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasSelection}">
                         <StackPanel Margin="28,8,28,26" Spacing="14">
-                            <!-- Composants : matériaux à gauche, modificateurs à droite -->
-                            <ItemsControl ItemsSource="{Binding SelectedBluePrint.CategoryList, FallbackValue={x:Null}}">
+                            <!-- Objets non chargés : invite à les charger pour confronter les matériaux possédés au blueprint -->
+                            <comp:NotchedBorder Classes="part-card" IsVisible="{Binding ShowLoadItemsBanner}">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="18">
+                                    <StackPanel Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Sx.TextBrush}" Text="Matériaux possédés" />
+                                        <TextBlock Classes="sx-caption" TextWrapping="Wrap"
+                                                   Text="Chargez vos objets pour savoir si vous avez de quoi fabriquer ce blueprint, et à quelle qualité." />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Classes="sx" VerticalAlignment="Center" Command="{Binding OpenItemsCommand}"
+                                            ToolTip.Tip="Ouvre l'écran Objets et lance le chargement (nécessite la connexion au jeu)">
+                                        Charger mes objets
+                                    </Button>
+                                </Grid>
+                            </comp:NotchedBorder>
+
+                            <!-- Bilan des matériaux possédés -->
+                            <StackPanel Spacing="14"
+                                        DataContext="{Binding SelectedCraft}"
+                                        x:DataType="vm:BlueprintCraftViewModel"
+                                        IsVisible="{Binding Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
+                                    <TextBlock FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource Sx.TextBrush}" Text="Matériaux possédés" />
+                                    <comp:NotchedBorder Grid.Column="1" Classes="sx-badge"
+                                                        Classes.success="{Binding IsToneSuccess}"
+                                                        Classes.info="{Binding IsToneInfo}"
+                                                        Classes.warning="{Binding IsToneWarning}"
+                                                        Classes.danger="{Binding IsToneDanger}">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <Ellipse />
+                                            <TextBlock Text="{Binding StatusLabel}" />
+                                        </StackPanel>
+                                    </comp:NotchedBorder>
+                                    <TextBlock Grid.Column="2" Classes="sx-caption" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" Text="{Binding FreshnessLabel}" ToolTip.Tip="{Binding FreshnessLabel}" />
+                                </Grid>
+
+                                <UniformGrid Columns="4" ColumnSpacing="10">
+                                    <comp:NotchedBorder Classes="craft-tile">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Classes="tile-label" Text="Fabrications possibles" />
+                                            <TextBlock Classes="tile-value" Text="{Binding CraftCountLabel}" />
+                                            <TextBlock Classes="tile-hint" Text="{Binding LimitingMaterialLabel}" />
+                                        </StackPanel>
+                                    </comp:NotchedBorder>
+                                    <comp:NotchedBorder Classes="craft-tile">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Classes="tile-label" Text="Matériaux réunis" />
+                                            <TextBlock Classes="tile-value" Text="{Binding CoveredLabel}" />
+                                            <TextBlock Classes="tile-hint" Text="avec ou sans mélange" />
+                                        </StackPanel>
+                                    </comp:NotchedBorder>
+                                    <comp:NotchedBorder Classes="craft-tile">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Classes="tile-label" Text="Emplacements" />
+                                            <TextBlock Classes="tile-value" Text="{Binding PlaceCount}" />
+                                            <TextBlock Classes="tile-hint" Text="où se trouvent les lots utilisables" />
+                                        </StackPanel>
+                                    </comp:NotchedBorder>
+                                    <comp:NotchedBorder Classes="craft-tile">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Classes="tile-label" Text="Propriétés cumulées" />
+                                            <TextBlock Classes="tile-value" Text="{Binding CumulativeCount}" />
+                                            <TextBlock Classes="tile-hint" Text="portées par plusieurs composants" />
+                                        </StackPanel>
+                                    </comp:NotchedBorder>
+                                </UniformGrid>
+
+                                <!-- Tableau : une ligne par matériau -->
+                                <comp:NotchedBorder Classes="part-card" Padding="16,12">
+                                    <StackPanel Spacing="2">
+                                        <Grid Classes="bilan-row header" ColumnDefinitions="1.1*,1.6*,90,90,90,110,80,120">
+                                            <TextBlock Text="Composant" />
+                                            <TextBlock Grid.Column="1" Text="Matériau" />
+                                            <TextBlock Grid.Column="2" Classes="num" Text="Requis" />
+                                            <TextBlock Grid.Column="3" Classes="num" Text="Utilisable" />
+                                            <TextBlock Grid.Column="4" Classes="num" Text="Qualité moy." ToolTip.Tip="Qualité obtenue en mélangeant tout le stock utilisable" />
+                                            <TextBlock Grid.Column="5" Classes="num" Text="Qualité max" ToolTip.Tip="Quantité / qualité du meilleur lot" />
+                                            <TextBlock Grid.Column="6" Classes="num" Text="Retenue" ToolTip.Tip="Qualité choisie sur la piste du composant" />
+                                            <TextBlock Grid.Column="7" Margin="14,0,0,0" Text="Statut" />
+                                        </Grid>
+                                        <ItemsControl ItemsSource="{Binding Materials}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:MaterialStockViewModel">
+                                                    <Grid Classes="bilan-row" ColumnDefinitions="1.1*,1.6*,90,90,90,110,80,120">
+                                                        <TextBlock Classes="muted" Text="{Binding CategoryName}" TextTrimming="CharacterEllipsis" />
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                            <Border Classes="min-tag" IsVisible="{Binding HasMinQuality}">
+                                                                <TextBlock Text="{Binding MinQualityLabel}" />
+                                                            </Border>
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="2" Classes="num" Text="{Binding RequiredLabel}" />
+                                                        <TextBlock Grid.Column="3" Classes="num" Text="{Binding UsableLabel}" />
+                                                        <TextBlock Grid.Column="4" Classes="num" Text="{Binding AverageQualityLabel}" />
+                                                        <StackPanel Grid.Column="5" Orientation="Horizontal" HorizontalAlignment="Right" ToolTip.Tip="{Binding BestToolTip}">
+                                                            <TextBlock Classes="num" Classes.covers="{Binding BestCoversNeed}" Text="{Binding BestQuantityLabel}" />
+                                                            <TextBlock Classes="num muted" Text=" / " IsVisible="{Binding HasBestGroup}" />
+                                                            <TextBlock Classes="num" Text="{Binding BestQualityLabel}" IsVisible="{Binding HasBestGroup}" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="6" Classes="num accent" Text="{Binding SelectedQualityLabel}" />
+                                                        <comp:NotchedBorder Grid.Column="7" Classes="sx-badge" Margin="14,0,0,0"
+                                                                            Classes.success="{Binding IsEnough}"
+                                                                            Classes.info="{Binding IsNeedsMix}"
+                                                                            Classes.warning="{Binding IsInsufficient}"
+                                                                            Classes.danger="{Binding IsMissing}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                                <Ellipse />
+                                                                <TextBlock Text="{Binding StatusLabel}" />
+                                                            </StackPanel>
+                                                        </comp:NotchedBorder>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </comp:NotchedBorder>
+
+                                <!-- Propriétés finales : modificateurs des composants sommés à la qualité retenue -->
+                                <comp:NotchedBorder Classes="part-card" IsVisible="{Binding HasFinalProperties}">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Sx.TextBrush}" Text="Propriétés finales" />
+                                        <TextBlock Classes="sx-caption" Margin="0,0,0,4" TextWrapping="Wrap"
+                                                   Text="À la qualité retenue pour chaque composant ; une propriété portée par plusieurs composants additionne leurs écarts." />
+                                        <ItemsControl ItemsSource="{Binding FinalProperties}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:CraftFinalPropertyViewModel">
+                                                    <Grid Classes="value-row" ColumnDefinitions="1.2*,2*,Auto" ColumnSpacing="14">
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <TextBlock Classes="name" Text="{Binding Name}" VerticalAlignment="Center" />
+                                                            <comp:NotchedBorder Classes="sx-badge info craft-badge" IsVisible="{Binding IsCumulative}">
+                                                                <TextBlock Text="{Binding ComponentCountLabel}" />
+                                                            </comp:NotchedBorder>
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1" Classes="contrib" Text="{Binding ContributionsLabel}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ContributionsLabel}" />
+                                                        <TextBlock Grid.Column="2" Classes="value" Classes.accent="{Binding IsComplete}" Text="{Binding ResultLabel}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </comp:NotchedBorder>
+
+                                <!-- Composants : stock par qualité à gauche, propriétés à la qualité retenue à droite -->
+                                <ItemsControl ItemsSource="{Binding Categories}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Spacing="14" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:CraftCategoryViewModel">
+                                            <comp:NotchedBorder Classes="part-card">
+                                                <Grid ColumnDefinitions="3*,2*" ColumnSpacing="28">
+                                                    <StackPanel Spacing="10">
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource Sx.TextBrush}" Text="{Binding Name}" />
+                                                            <TextBlock Grid.Column="1" Classes="sx-mono accent" Text="{Binding QualityLabel}"
+                                                                       ToolTip.Tip="Qualité retenue pour ce composant" />
+                                                        </Grid>
+                                                        <ItemsControl ItemsSource="{Binding Materials}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="vm:MaterialStockViewModel">
+                                                                    <StackPanel Spacing="8">
+                                                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                                <TextBlock FontSize="13" Foreground="{DynamicResource Sx.SecondaryBrush}" VerticalAlignment="Center" Text="{Binding Name}" />
+                                                                                <TextBlock Classes="sx-mono" FontSize="12" Foreground="{DynamicResource Sx.MutedBrush}" VerticalAlignment="Center"
+                                                                                           Text="{Binding UsableOverRequiredLabel}" />
+                                                                            </StackPanel>
+                                                                            <comp:NotchedBorder Grid.Column="1" Classes="sx-badge craft-badge"
+                                                                                                Classes.success="{Binding IsEnough}"
+                                                                                                Classes.info="{Binding IsNeedsMix}"
+                                                                                                Classes.warning="{Binding IsInsufficient}"
+                                                                                                Classes.danger="{Binding IsMissing}">
+                                                                                <TextBlock Text="{Binding StatusLabel}" />
+                                                                            </comp:NotchedBorder>
+                                                                        </Grid>
+                                                                        <comp:QualityTrack IsVisible="{Binding HasTrackPoints}"
+                                                                                           Points="{Binding TrackPoints}"
+                                                                                           MinQuality="{Binding MinQualityValue}"
+                                                                                           SelectedQuality="{Binding SelectedQuality}"
+                                                                                           ToolTip.Tip="Cliquez sur un lot pour calculer les propriétés à sa qualité" />
+                                                                        <TextBlock Classes="sx-caption" IsVisible="{Binding HasNoLot}" Text="Aucun lot possédé." />
+                                                                        <TextBlock Classes="sx-caption" Text="{Binding UnknownQualityLabel}"
+                                                                                   IsVisible="{Binding UnknownQualityLabel, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                                                        <!-- Répartition du lot retenu par emplacement -->
+                                                                        <ItemsControl ItemsSource="{Binding SelectedPlaces}" IsVisible="{Binding HasSelectedPlaces}">
+                                                                            <ItemsControl.ItemTemplate>
+                                                                                <DataTemplate x:DataType="models:MaterialPlace">
+                                                                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Margin="0,3">
+                                                                                        <Panel Width="24" Height="24">
+                                                                                            <comp:LocationIcon DataContext="{Binding Location}" IsVisible="{Binding $parent[Panel].((models:MaterialPlace)DataContext).HasLocation}" />
+                                                                                        </Panel>
+                                                                                        <TextBlock Grid.Column="1" FontSize="13" VerticalAlignment="Center" Foreground="{DynamicResource Sx.SecondaryBrush}"
+                                                                                                   TextTrimming="CharacterEllipsis" Text="{Binding Name}" ToolTip.Tip="{Binding Location.FullText, FallbackValue=''}" />
+                                                                                        <TextBlock Grid.Column="2" Classes="sx-mono" FontSize="12" VerticalAlignment="Center" Text="{Binding QuantityLabel}" />
+                                                                                    </Grid>
+                                                                                </DataTemplate>
+                                                                            </ItemsControl.ItemTemplate>
+                                                                        </ItemsControl>
+                                                                    </StackPanel>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+
+                                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Stats}" VerticalAlignment="Top" Margin="0,30,0,0">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="vm:CraftStatViewModel">
+                                                                <StackPanel Margin="0,4" Spacing="4">
+                                                                    <Grid Classes="value-row" Margin="0" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                                        <TextBlock Classes="name" Text="{Binding Name}" />
+                                                                        <TextBlock Grid.Column="1" Classes="value accent" Text="{Binding ValueLabel}" />
+                                                                    </Grid>
+                                                                    <ProgressBar Classes="sx-quality" Maximum="100" Value="{Binding Position}" IsVisible="{Binding ShowGauge}" />
+                                                                    <TextBlock Classes="sx-caption" FontSize="11" Text="{Binding RangeLabel}" />
+                                                                </StackPanel>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Grid>
+                                            </comp:NotchedBorder>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <!-- Composants : matériaux à gauche, modificateurs à droite (sans objets chargés) -->
+                            <ItemsControl ItemsSource="{Binding SelectedBluePrint.CategoryList, FallbackValue={x:Null}}" IsVisible="{Binding !HasCraft}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <StackPanel Spacing="14" />

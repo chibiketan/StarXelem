@@ -207,6 +207,17 @@ public partial class MainWindowViewModel : ViewModelBase
             blueprintsPage.ShowBlueprint(message.BlueprintId);
         });
 
+        // Chargement des objets demandé depuis l'écran Blueprints, pour confronter les matériaux possédés aux blueprints
+        WeakReferenceMessenger.Default.Register<MainWindowViewModel, OpenItemsMessage>(this, (recipient, message) =>
+        {
+            var itemsPage = recipient._pages.OfType<ItemsTabViewModel>().First();
+            recipient.CurrentPage = itemsPage;
+            if (message.LoadItems && itemsPage.LoadItemListCommand.CanExecute(null))
+            {
+                itemsPage.LoadItemListCommand.Execute(null);
+            }
+        });
+
     }
     
     [ObservableProperty]
