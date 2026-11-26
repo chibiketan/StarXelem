@@ -1,4 +1,10 @@
-﻿## [0.3.0]
+﻿## [0.3.1]
+Version SC : 4.10.3
+
+### Ajouté
+- Un clic sur le logo affiche ou masque le nom des écrans dans le menu latéral ; ce choix est conservé au redémarrage
+
+## [0.3.0]
 Version SC : 4.10.3
 
 ### Ajouté
