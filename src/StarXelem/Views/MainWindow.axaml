@@ -88,13 +88,15 @@
                         <Setter Property="Background" Value="Transparent" />
                         <Setter Property="BorderThickness" Value="0" />
                         <Setter Property="Padding" Value="0" />
-                        <Setter Property="HorizontalAlignment" Value="Center" />
+                        <!-- Disposition identique dans les deux modes : replié (64 px), la marge laisse 44 px aux éléments,
+                             les icônes restent donc à la même place pendant l'animation de largeur -->
+                        <Setter Property="HorizontalAlignment" Value="Stretch" />
+                        <Setter Property="Margin" Value="10,0" />
                     </Style>
                     <Style Selector="ListBox.sx-nav ListBoxItem">
                         <!-- Le thème FluentAvalonia impose 88 px de large minimum aux éléments de liste -->
                         <Setter Property="MinWidth" Value="0" />
                         <Setter Property="MinHeight" Value="0" />
-                        <Setter Property="Width" Value="44" />
                         <Setter Property="Height" Value="44" />
                         <Setter Property="Margin" Value="0,0,0,6" />
                         <Setter Property="Padding" Value="0" />
@@ -120,6 +122,50 @@
                         <Setter Property="Background" Value="{DynamicResource Sx.AccentSoftBrush}" />
                         <Setter Property="Foreground" Value="{DynamicResource Sx.AccentBrush}" />
                     </Style>
+                    <!-- Mode « icône + texte » : le menu s'élargit et affiche le nom de chaque écran -->
+                    <Style Selector="comp|NotchedBorder.nav-pane">
+                        <Setter Property="Width" Value="64" />
+                        <Setter Property="Transitions">
+                            <Transitions>
+                                <DoubleTransition Property="Width" Duration="0:0:0.2" Easing="CubicEaseOut" />
+                            </Transitions>
+                        </Setter>
+                    </Style>
+                    <Style Selector="comp|NotchedBorder.nav-pane.expanded">
+                        <Setter Property="Width" Value="210" />
+                    </Style>
+                    <!-- Le nom apparaît en fondu pendant l'élargissement du menu -->
+                    <Style Selector="TextBlock.nav-label">
+                        <Setter Property="Opacity" Value="0" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                        <Setter Property="Margin" Value="0,0,10,0" />
+                        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                        <Setter Property="Transitions">
+                            <Transitions>
+                                <DoubleTransition Property="Opacity" Duration="0:0:0.2" Easing="CubicEaseOut" />
+                            </Transitions>
+                        </Setter>
+                    </Style>
+                    <Style Selector="comp|NotchedBorder.nav-pane.expanded TextBlock.nav-label">
+                        <Setter Property="Opacity" Value="1" />
+                    </Style>
+                    <!-- Le nom étant affiché, l'infobulle devient inutile -->
+                    <Style Selector="comp|NotchedBorder.nav-pane.expanded Panel.nav-entry">
+                        <Setter Property="ToolTip.ServiceEnabled" Value="False" />
+                    </Style>
+                    <Style Selector="Button.nav-toggle">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="HorizontalAlignment" Value="Center" />
+                        <Setter Property="Cursor" Value="Hand" />
+                    </Style>
+                    <Style Selector="Button.nav-toggle:pointerover /template/ ContentPresenter">
+                        <Setter Property="Background" Value="Transparent" />
+                    </Style>
+                    <Style Selector="Button.nav-toggle:pressed /template/ ContentPresenter">
+                        <Setter Property="Background" Value="Transparent" />
+                    </Style>
                     <Style Selector="Path.nav-icon">
                         <Setter Property="Width" Value="21" />
                         <Setter Property="Height" Value="21" />
@@ -132,26 +178,36 @@
                     </Style>
                 </Grid.Styles>
 
-                <comp:NotchedBorder CutSize="18" Width="64" Margin="12,12,0,12" Padding="0,14" Background="{DynamicResource Sx.SurfaceBrush}">
+                <comp:NotchedBorder Classes="nav-pane" Classes.expanded="{Binding IsNavExpanded}"
+                                    CutSize="18" Margin="12,12,0,12" Padding="0,14" Background="{DynamicResource Sx.SurfaceBrush}">
                     <DockPanel>
-                        <Image DockPanel.Dock="Top"
-                               Source="/Assets/xelem-logo.png"
-                               Width="34" Height="34"
-                               Margin="0,0,0,12"
-                               RenderOptions.BitmapInterpolationMode="HighQuality"
-                               ToolTip.Tip="StarXelem" />
+                        <!-- Le logo bascule le menu entre « icône seule » et « icône + texte » -->
+                        <Button DockPanel.Dock="Top"
+                                Classes="nav-toggle"
+                                Margin="0,0,0,12"
+                                Command="{Binding ToggleNavCommand}"
+                                ToolTip.Tip="Afficher / masquer le nom des écrans"
+                                ToolTip.Placement="Right"
+                                AutomationProperties.Name="Afficher / masquer le nom des écrans">
+                            <Image Source="/Assets/xelem-logo.png"
+                                   Width="34" Height="34"
+                                   RenderOptions.BitmapInterpolationMode="HighQuality" />
+                        </Button>
                         <ListBox Classes="sx-nav" ItemsSource="{Binding Pages}" SelectedItem="{Binding CurrentPage}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:PageViewModelBase">
-                                    <Panel Background="Transparent"
-                                           ToolTip.Tip="{Binding Name}"
-                                           ToolTip.Placement="Right"
-                                           ToolTip.ShowDelay="150"
-                                           AutomationProperties.Name="{Binding Name}">
+                                    <Grid Classes="nav-entry"
+                                          ColumnDefinitions="44,*"
+                                          Background="Transparent"
+                                          ToolTip.Tip="{Binding Name}"
+                                          ToolTip.Placement="Right"
+                                          ToolTip.ShowDelay="150"
+                                          AutomationProperties.Name="{Binding Name}">
                                         <Path Classes="nav-icon"
                                               Stroke="{Binding $parent[ListBoxItem].Foreground}"
                                               Data="{Binding NavIcon}" />
-                                    </Panel>
+                                        <TextBlock Grid.Column="1" Classes="nav-label" Text="{Binding Name}" />
+                                    </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>

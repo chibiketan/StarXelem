@@ -33,6 +33,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly ILocalDatabaseService _localDatabaseService;
     private const string P4kFolderSettingName = "P4KFolder";
     private const string SelectedP4kSettingName = "SelectedP4KPath";
+    private const string NavExpandedSettingName = "NavExpanded";
 
     [ObservableProperty]
     private Task<IList<P4kFileModel>> _installedEnvs;
@@ -106,7 +107,34 @@ public partial class MainWindowViewModel : ViewModelBase
         
         WeakReferenceMessenger.Default.Send(new ThemeChangedMessage());
     }
-    
+
+    /// <summary>
+    /// Indique si le menu latéral affiche le nom des écrans à côté de leur icône (sinon icône seule).
+    /// </summary>
+    [ObservableProperty]
+    private bool _isNavExpanded;
+
+    [RelayCommand]
+    private void ToggleNav()
+    {
+        IsNavExpanded = !IsNavExpanded;
+    }
+
+    partial void OnIsNavExpandedChanged(bool value)
+    {
+        _ = _settingsService.SetAsync(NavExpandedSettingName, value.ToString());
+    }
+
+    // Restaure le mode d'affichage du menu latéral enregistré lors de la dernière fermeture
+    private async Task LoadNavExpandedAsync()
+    {
+        var savedValue = await _settingsService.GetAsync(NavExpandedSettingName);
+        if (bool.TryParse(savedValue, out var isExpanded))
+        {
+            IsNavExpanded = isExpanded;
+        }
+    }
+
     public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IP4kService p4kService, IGrpcClientService grpcClientService, ISettingsService settingsService, PopupViewModel popupViewModel, ILocalDatabaseService localDatabaseService)
     {
         _logger = logger;
@@ -115,6 +143,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _settingsService = settingsService;
         _localDatabaseService = localDatabaseService;
         PopupViewModel = popupViewModel;
+        _ = LoadNavExpandedAsync();
         _installedEnvs = p4kService.FindInstalledFiles();
         InstalledEnvs.ContinueWith(async x =>
         {
