@@ -377,6 +377,8 @@ public partial class MainWindowViewModel : ViewModelBase
             UpdateP4kStatus("Chargement terminé");
             // On termine par attendre l'initialisation du client gRPC
             await RunRebuildWithPopupAsync().ConfigureAwait(false);
+            // La base locale est prête : les objets du dernier chargement peuvent être réaffichés sans attendre le jeu.
+            await _pages.OfType<ItemsTabViewModel>().First().RestoreCachedItemsAsync().ConfigureAwait(false);
             await initClientTask;
         }
         catch (OperationCanceledException)

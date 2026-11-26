@@ -69,7 +69,10 @@
                                 </Grid>
                             </comp:NotchedBorder>
 
-                            <TextBlock Grid.Column="2" Classes="sx-caption" Text="{Binding ResultSummary}" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10">
+                                <comp:DataFreshnessBadge DataContext="{Binding Freshness}" />
+                                <TextBlock Classes="sx-caption" VerticalAlignment="Center" Text="{Binding ResultSummary}" />
+                            </StackPanel>
 
                             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8">
                                 <CheckBox Classes="sx-muted" Content="Debug" IsChecked="{Binding IsInDebugMode}" />
@@ -80,7 +83,7 @@
                                 <Button Classes="sx"
                                         ToolTip.Tip="Synchroniser la liste d'objets avec Orbital Alliance"
                                         Command="{Binding SendItemlistToOrbitalAllianceCommand}">Synchroniser</Button>
-                                <Button Classes="sx primary" Command="{Binding LoadItemListCommand}">Charger</Button>
+                                <Button Classes="sx primary" Command="{Binding LoadItemListCommand}" Content="{Binding LoadButtonLabel}" />
                             </StackPanel>
                         </Grid>
                     </Border>

@@ -51,6 +51,7 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<ILocalDatabaseService, DesignLocalDatabaseService>();
             services.AddSingleton<ISettingsService, DesignSettingsService>();
             services.AddSingleton<IShipLoadoutService, DesignShipLoadoutService>();
+            services.AddSingleton<IGrpcDataCache, DesignGrpcDataCache>();
         }
         else
         {
@@ -68,6 +69,7 @@ public static class ServiceCollectionExtensions
                     autoRebuild: false));
             services.AddSingleton<ISettingsService, RegistrySettingsService>();
             services.AddSingleton<IShipLoadoutService, ShipLoadoutService>();
+            services.AddSingleton<IGrpcDataCache, GrpcDataCache>();
         }
 
         // Les services indépendants du mode design

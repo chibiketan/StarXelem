@@ -82,7 +82,11 @@ public partial class ItemViewModel : ViewModelBase
     private readonly Lazy<Task<string?>> _name;
     public Task<string?> Name => _name.Value;
     
-    public ItemViewModel(ILocaleEntryRepository localeRepository, ILocationService locationService, IGrpcClientService grpcClientService, ItemsTabViewModel parent, EntityItemQueryResult entityItemResult, ScItemEntity? scItem = null)
+    /// <param name="knownLocation">
+    /// Emplacement déjà résolu (relu du cache) : il est repris tel quel, sans interroger le serveur, injoignable quand le jeu est fermé.
+    /// </param>
+    public ItemViewModel(ILocaleEntryRepository localeRepository, ILocationService locationService, IGrpcClientService grpcClientService, ItemsTabViewModel parent,
+        EntityItemQueryResult entityItemResult, ScItemEntity? scItem = null, ResolvedLocation? knownLocation = null)
     {
         _localeRepository = localeRepository;
         _locationService = locationService;
@@ -91,11 +95,13 @@ public partial class ItemViewModel : ViewModelBase
         _entityNodeProperties = entityItemResult;
         _scItem = scItem;
         _name = new Lazy<Task<string?>>(GetLocaleValue);
-        _location = new Lazy<Task<ResolvedLocation?>>(() => GetLocation().ContinueWith(t =>
-        {
-            OnPropertyChanged(nameof(Location));
-            return t.Result;
-        }));
+        _location = knownLocation != null
+            ? new Lazy<Task<ResolvedLocation?>>(Task.FromResult<ResolvedLocation?>(knownLocation))
+            : new Lazy<Task<ResolvedLocation?>>(() => GetLocation().ContinueWith(t =>
+            {
+                OnPropertyChanged(nameof(Location));
+                return t.Result;
+            }));
         _owner = new Lazy<Task<string>>(() => _playerNames.GetOrAdd(OwnerId, GetOwner));
         ExtractQuality();
         _crafted = new Lazy<Task<CraftedItemInfo?>>(() => _isCrafted

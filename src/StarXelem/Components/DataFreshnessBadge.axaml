@@ -1,0 +1,18 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:StarXelem.ViewModels"
+             xmlns:comp="clr-namespace:StarXelem.Components"
+             x:DataType="vm:DataFreshnessViewModel"
+             x:Class="StarXelem.Components.DataFreshnessBadge"
+             IsVisible="{Binding HasData}">
+    <comp:NotchedBorder Classes="sx-badge"
+                        Classes.success="{Binding IsUpToDate}"
+                        Classes.info="{Binding IsRecentCache}"
+                        Classes.warning="{Binding IsStale}"
+                        ToolTip.Tip="{Binding ToolTip}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <Ellipse />
+            <TextBlock Text="{Binding Label}" />
+        </StackPanel>
+    </comp:NotchedBorder>
+</UserControl>
