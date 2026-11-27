@@ -79,7 +79,10 @@
                     <Border Grid.Row="0" BorderBrush="{DynamicResource Sx.LineBrush}" BorderThickness="0,0,0,1" Padding="20,14">
                         <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
                             <TextBlock Classes="sx-title" Text="Réputations" Margin="0,0,8,0" />
-                            <TextBlock Grid.Column="1" Classes="sx-caption" FontSize="13" Text="{Binding ResultSummary}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                                <comp:DataFreshnessBadge DataContext="{Binding Freshness}" />
+                                <TextBlock Classes="sx-caption" FontSize="13" VerticalAlignment="Center" Text="{Binding ResultSummary}" />
+                            </StackPanel>
 
                             <comp:NotchedBorder Grid.Column="2" Classes="sx-field" MinWidth="180">
                                 <Grid ColumnDefinitions="Auto,*">

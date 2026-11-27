@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using Avalonia.Threading;
@@ -29,6 +30,7 @@ public partial class ShipTabViewModel : PageViewModelBase
     private readonly ILocationService _locationService;
     private readonly IAllianceOrbitalService _allianceOrbitalService;
     private readonly IShipLoadoutService _shipLoadoutService;
+    private readonly IGrpcDataCache _dataCache;
     private readonly ILogger<ShipTabViewModel> _logger;
     public override string Name => "Mon hangar";
     protected override string NavIconData => "M3 11l9-8 9 8v10H3zM9 21v-7h6v7";
@@ -52,7 +54,7 @@ public partial class ShipTabViewModel : PageViewModelBase
     public bool IsLoadoutOpen => LoadoutDetail != null;
 
     public ShipTabViewModel(IGrpcClientService clientService, IP4kService p4kService, ILocalDatabaseService localDatabaseService, ILocationService locationService, IAllianceOrbitalService allianceOrbitalService,
-        IShipLoadoutService shipLoadoutService, ILogger<ShipTabViewModel> logger)
+        IShipLoadoutService shipLoadoutService, IGrpcDataCache dataCache, ILogger<ShipTabViewModel> logger)
     {
         _logger = logger;
         _shipLoadoutService = shipLoadoutService;
@@ -61,12 +63,14 @@ public partial class ShipTabViewModel : PageViewModelBase
         _localDatabaseService = localDatabaseService;
         _locationService = locationService;
         _allianceOrbitalService = allianceOrbitalService;
+        _dataCache = dataCache;
         InitializeDisplay();
+        InitializeCache();
 
         _p4KService.SelectedP4KFileChanged += OnSelectedP4KFileChanged;
-        _clientService.OnStatusChanged += (sender, _) => LoadShipNotifyCanExecuteChanged();
+        _clientService.OnStatusChanged += (sender, status) => OnConnectionStatusChanged(status);
     }
-    
+
     [RelayCommand(CanExecute = nameof(CanLoadShipList))]
     public async Task LoadShipList()
     {
@@ -74,26 +78,11 @@ public partial class ShipTabViewModel : PageViewModelBase
         _locationService.ClearCache();
         TreatmentStatus = "Appel RSI";
         var spaceships = await _clientService.GetSpaceships();
+        var fetchedAt = DateTimeOffset.Now;
         // Chargement des informations de classes sur les vaisseaux
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement classes des vaisseaux");
+        await ApplyShipClassesAsync(spaceships);
 
-        foreach (var spaceship in spaceships)
-        {
-            var guid = spaceship.Entitlement.EntityClassGuid;
-            var shipEntity = await _localDatabaseService.GetShipByGuidAsync(guid);
-
-            if (shipEntity != null)
-            {
-                spaceship.ClassRecordName = shipEntity.TechnicalName;
-                spaceship.Shipname = shipEntity.LocalizedName;
-            }
-            else
-            {
-                spaceship.ClassRecordName = guid;
-                spaceship.Shipname = guid;
-            }
-        }
-        
         // récupérer les instances de vaisseaux
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Récupération des instances de vaisseaux");
         var spaceshipUrnList = spaceships.Select(v => v.Entitlement.Urn).ToList();
@@ -152,6 +141,9 @@ public partial class ShipTabViewModel : PageViewModelBase
         }
         
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Terminé");
+        _ = SaveShipsToCacheAsync(spaceships, fetchedAt);
+        _displayedAccountKey = _clientService.CurrentPlayerGeid?.ToString(CultureInfo.InvariantCulture);
+        Freshness.Update(fetchedAt, isFromCache: false);
         Spaceships = Task.FromResult(spaceships);
         IsLoading = false;
         await Dispatcher.UIThread.InvokeAsync(() => SendFleetToOrbitalAllianceCommand.NotifyCanExecuteChanged());
@@ -239,18 +231,6 @@ public partial class ShipTabViewModel : PageViewModelBase
     {
         // Le fichier a été modifié, on change tout, reconnexion en prime
         LoadShipListCommand.NotifyCanExecuteChanged();
-    }
-
-    private void LoadShipNotifyCanExecuteChanged()
-    {
-        if (Dispatcher.UIThread.CheckAccess())
-        {
-            loadShipListCommand?.NotifyCanExecuteChanged();
-        }
-        else
-        {
-            Dispatcher.UIThread.Post(LoadShipNotifyCanExecuteChanged);
-        }
     }
 
     /// <summary>

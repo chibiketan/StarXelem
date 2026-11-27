@@ -76,6 +76,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IBlueprintMappingService, BlueprintMappingService>();
         services.AddSingleton<IMissionMappingService, MissionMappingService>();
         services.AddSingleton<IReputationService, ReputationService>();
+        services.AddSingleton<IObtainedBlueprintService, ObtainedBlueprintService>();
         services.AddSingleton<IDbContextFactory, DbContextFactory>();
         services.AddSingleton<ILocationRepository, LocationRepository>();
         services.AddSingleton<IScItemRepository, ScItemRepository>();

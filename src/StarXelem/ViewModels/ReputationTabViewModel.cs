@@ -50,6 +50,9 @@ public partial class ReputationTabViewModel : PageViewModelBase
         _logger = logger;
     }
 
+    /// <summary>Date des réputations du joueur et provenance (jeu ou cache).</summary>
+    public DataFreshnessViewModel Freshness { get; } = new();
+
     /// <summary>Puces d'état de la relation, cumulables ; « Tous » retire le filtre.</summary>
     public ObservableCollection<FilterChipViewModel> StatusChips { get; } = new();
 
@@ -78,8 +81,9 @@ public partial class ReputationTabViewModel : PageViewModelBase
         IsLoading = true;
         try
         {
-            var contractors = await _reputationService.GetSynchronizedReputationsAsync();
-            _allContractors = contractors ?? new List<ContractorModel>();
+            var result = await _reputationService.GetSynchronizedReputationsAsync();
+            _allContractors = result.Contractors;
+            Freshness.Update(result.FetchedAt, result.IsFromCache);
             BuildStatusChips();
             ScheduleFilters(TimeSpan.Zero);
         }

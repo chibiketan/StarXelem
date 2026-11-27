@@ -8,16 +8,13 @@ using StarXelem.Services;
 
 namespace StarXelem.ViewModels;
 
-public partial class ItemsTabViewModel
+public partial class ItemsTabViewModel : ICachedDataPage
 {
     private const string ItemsDatasetKey = "items";
     private const string LocationsDatasetKey = "items.locations";
 
-    /// <summary>
-    /// Réaffiche les objets du dernier chargement enregistré, s'il y en a un, sans interroger le jeu. Sans effet si des objets
-    /// ont déjà été chargés depuis le jeu pendant cette session. À appeler une fois la base locale prête.
-    /// </summary>
-    public Task RestoreCachedItemsAsync()
+    /// <inheritdoc />
+    public Task RestoreCachedDataAsync()
     {
         return Dispatcher.UIThread.InvokeAsync(RestoreCachedItemsCoreAsync);
     }

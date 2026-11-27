@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -21,6 +21,7 @@ public partial class ExtractionTabViewModel : PageViewModelBase
     private readonly IP4kService _p4kService;
     private readonly ILocalDatabaseService _localDatabaseService;
     private readonly IGrpcClientService _grpcClientService;
+    private readonly IObtainedBlueprintService _obtainedBlueprintService;
     private readonly ILogger<ExtractionTabViewModel> _logger;
 
     public override string Name => "Extractions";
@@ -48,11 +49,13 @@ public partial class ExtractionTabViewModel : PageViewModelBase
     [ObservableProperty] private bool _includeObtainedBlueprints = false;
     [ObservableProperty] private bool _isGrpcConnected = false;
 
-    public ExtractionTabViewModel(IP4kService p4kService, ILocalDatabaseService localDatabaseService, IGrpcClientService grpcClientService, ILogger<ExtractionTabViewModel> logger)
+    public ExtractionTabViewModel(IP4kService p4kService, ILocalDatabaseService localDatabaseService, IGrpcClientService grpcClientService,
+        IObtainedBlueprintService obtainedBlueprintService, ILogger<ExtractionTabViewModel> logger)
     {
         _p4kService = p4kService;
         _localDatabaseService = localDatabaseService;
         _grpcClientService = grpcClientService;
+        _obtainedBlueprintService = obtainedBlueprintService;
         _logger = logger;
         
         _p4kService.SelectedP4KFileChanged += (sender, model) => OnSelectedP4KFileChanged();
@@ -310,8 +313,8 @@ public partial class ExtractionTabViewModel : PageViewModelBase
                 if (IncludeObtainedBlueprints && IsGrpcConnected)
                 {
                     UpdateStatusMessage("Chargement des BP obtenus depuis le jeu...");
-                    var grpcBps = await _grpcClientService.GetBlueprintList().ConfigureAwait(false);
-                    obtainedIds = grpcBps.Select(e => e.BlueprintId).ToHashSet();
+                    var obtained = await _obtainedBlueprintService.GetObtainedAsync().ConfigureAwait(false);
+                    obtainedIds = obtained?.Ids.ToHashSet();
                 }
 
                 (titleSuffixMap, descAppendMap) = await _localDatabaseService.GetBlueprintRewardMapsAsync(obtainedIds);

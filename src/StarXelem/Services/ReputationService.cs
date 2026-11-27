@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Sc.External.Services.Reputation.V1;
 using StarBreaker.DataCoreGenerated;
 using StarXelem.Models;
 
@@ -10,24 +12,28 @@ namespace StarXelem.Services;
 
 public class ReputationService : IReputationService
 {
+    private const string DatasetKey = "reputations";
+
     private readonly IP4kService _p4kService;
     private readonly IGrpcClientService _grpcClientService;
+    private readonly IGrpcDataCache _dataCache;
     private readonly ILogger<ReputationService> _logger;
 
-    public ReputationService(IP4kService p4kService, IGrpcClientService grpcClientService, ILogger<ReputationService> logger)
+    public ReputationService(IP4kService p4kService, IGrpcClientService grpcClientService, IGrpcDataCache dataCache, ILogger<ReputationService> logger)
     {
         _p4kService = p4kService;
         _grpcClientService = grpcClientService;
+        _dataCache = dataCache;
         _logger = logger;
     }
 
-    public async Task<List<ContractorModel>> GetSynchronizedReputationsAsync()
+    public async Task<ReputationResult> GetSynchronizedReputationsAsync()
     {
         // 1. Retrieve static data from P4K
         var factionReputationRecordList = await _p4kService.GetAllFactionReputations().ConfigureAwait(false);
 
         // 2. Retrieve player data from gRPC
-        var playerReputations = await _grpcClientService.QueryReputationsAsync().ConfigureAwait(false);
+        var (playerReputations, fetchedAt, isFromCache) = await GetPlayerReputationsAsync().ConfigureAwait(false);
 
         var contractorMap = new Dictionary<ulong, ContractorModel>();
 
@@ -193,7 +199,56 @@ public class ReputationService : IReputationService
         }
 
         // 4. Sort alphabetically by name
-        return contractorMap.Values.OrderBy(c => c.Name).ToList();
+        return new ReputationResult(contractorMap.Values.OrderBy(c => c.Name).ToList(), fetchedAt, isFromCache);
+    }
+
+    /// <summary>
+    /// Réputations du joueur : lues auprès du jeu s'il est connecté, puis enregistrées ; relues du cache sinon, ou si le jeu ne répond pas.
+    /// Sans cache, l'appel au jeu est tenté et son erreur remonte, comme avant la mise en cache.
+    /// </summary>
+    private async Task<(List<VersionedReputation> Reputations, DateTimeOffset FetchedAt, bool IsFromCache)> GetPlayerReputationsAsync()
+    {
+        Exception? failure = null;
+        if (_grpcClientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame)
+        {
+            try
+            {
+                return await FetchPlayerReputationsAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Impossible de lire les réputations auprès du jeu, recherche dans le cache");
+                failure = ex;
+            }
+        }
+
+        var cached = await _dataCache.LoadAsync(DatasetKey).ConfigureAwait(false);
+        if (cached != null)
+        {
+            try
+            {
+                return (GrpcCachePayload.ReadMessages(cached.Data, VersionedReputation.Parser), cached.FetchedAt, true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Réputations illisibles dans le cache");
+            }
+        }
+
+        if (failure != null)
+        {
+            ExceptionDispatchInfo.Capture(failure).Throw();
+        }
+
+        return await FetchPlayerReputationsAsync().ConfigureAwait(false);
+    }
+
+    private async Task<(List<VersionedReputation> Reputations, DateTimeOffset FetchedAt, bool IsFromCache)> FetchPlayerReputationsAsync()
+    {
+        var reputations = await _grpcClientService.QueryReputationsAsync().ConfigureAwait(false);
+        var fetchedAt = DateTimeOffset.Now;
+        await _dataCache.SaveAsync(DatasetKey, GrpcCachePayload.WriteMessages(reputations), fetchedAt).ConfigureAwait(false);
+        return (reputations, fetchedAt, false);
     }
 
     private static string TransformRecordName(string typeName)

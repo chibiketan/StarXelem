@@ -224,6 +224,7 @@
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Classes="sx-title" Text="Blueprints" />
                             <TextBlock Classes="sx-caption" Text="{Binding ResultSummary}" />
+                            <comp:DataFreshnessBadge HorizontalAlignment="Left" Margin="0,4,0,0" DataContext="{Binding Freshness}" />
                         </StackPanel>
                         <Button Grid.Column="1" Classes="sx primary" Command="{Binding LoadItemListCommand}">Charger</Button>
                     </Grid>
@@ -243,7 +244,7 @@
                         <Button Classes="sx-chip"
                                 Classes.on="{Binding ObtainedChip.IsSelected}"
                                 Command="{Binding ObtainedChip.ToggleCommand}"
-                                IsEnabled="{Binding IsGrpcConnected}"
+                                IsEnabled="{Binding HasObtainedData}"
                                 ToolTip.Tip="Nécessite la connexion au jeu">
                             <StackPanel Orientation="Horizontal" Spacing="7">
                                 <Ellipse Width="7" Height="7" Fill="{DynamicResource Sx.SuccessBrush}" VerticalAlignment="Center" />

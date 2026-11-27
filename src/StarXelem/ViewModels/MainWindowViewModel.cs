@@ -353,7 +353,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private CancellationTokenSource? _cts;
     private LoadingPopupContentViewModel? _rebuildPopupContent;
-    // Terminée quand le premier chargement du P4K est fini, cache des objets relu compris (ou en échec) : attendue par --screenshot.
+    // Terminée quand le premier chargement du P4K est fini, caches des écrans relus compris (ou en échec) : attendue par --screenshot.
     private readonly TaskCompletionSource _startupDataLoaded = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private async void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)
@@ -379,8 +379,11 @@ public partial class MainWindowViewModel : ViewModelBase
             UpdateP4kStatus("Chargement terminé");
             // On termine par attendre l'initialisation du client gRPC
             await RunRebuildWithPopupAsync().ConfigureAwait(false);
-            // La base locale est prête : les objets du dernier chargement peuvent être réaffichés sans attendre le jeu.
-            await _pages.OfType<ItemsTabViewModel>().First().RestoreCachedItemsAsync().ConfigureAwait(false);
+            // La base locale est prête : les données du dernier chargement peuvent être réaffichées sans attendre le jeu.
+            foreach (var page in Pages.OfType<ICachedDataPage>())
+            {
+                await page.RestoreCachedDataAsync().ConfigureAwait(false);
+            }
             _startupDataLoaded.TrySetResult();
             await initClientTask;
         }
@@ -756,7 +759,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 // Attendre que la DB soit prête
                 await WaitForDbReadyAsync();
 
-                // Attendre la relecture des données enregistrées (objets), sinon la capture montre un tableau vide
+                // Attendre la relecture des données enregistrées des écrans, sinon la capture montre des écrans vides
                 await WaitForStartupDataAsync();
 
                 // Délai pour que la navigation soit rendue dans l'UI
