@@ -21,4 +21,11 @@ public class OwnedMaterialService : IOwnedMaterialService
         Volatile.Write(ref _current, inventory);
         InventoryChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <inheritdoc />
+    public void Clear()
+    {
+        Volatile.Write(ref _current, null);
+        InventoryChanged?.Invoke(this, EventArgs.Empty);
+    }
 }

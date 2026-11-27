@@ -144,8 +144,19 @@ public partial class ItemsTabViewModel : PageViewModelBase
     private readonly IOwnedMaterialService _ownedMaterialService;
     private readonly IP4kService _p4kService;
     private readonly CraftedItemReader _craftedReader;
+    private readonly IGrpcDataCache _dataCache;
     // Heure du dernier chargement, reprise à la republication des matériaux une fois les emplacements résolus.
     private DateTime _itemsLoadedAt;
+    // Date de récupération des objets affichés côté serveur : les emplacements enregistrés doivent correspondre au même chargement.
+    private DateTimeOffset _itemsFetchedAt;
+    // Compte du joueur auquel appartiennent les objets relus du cache.
+    private string? _displayedAccountKey;
+
+    /// <summary>Date de récupération des objets affichés et leur provenance (jeu ou dernier chargement enregistré).</summary>
+    public DataFreshnessViewModel Freshness { get; } = new();
+
+    /// <summary>Libellé du bouton de chargement : « Actualiser » quand des objets sont déjà affichés.</summary>
+    public string LoadButtonLabel => Freshness.HasData ? "Actualiser" : "Charger";
 
     public bool IsBusy => IsLoading || IsFiltering;
     public string BusyMessage => IsLoading
@@ -159,9 +170,18 @@ public partial class ItemsTabViewModel : PageViewModelBase
         ILocationService locationService,
         IOwnedMaterialService ownedMaterialService,
         IP4kService p4kService,
+        IGrpcDataCache dataCache,
         ILogger<ItemsTabViewModel> logger)
     {
         _logger = logger;
+        _dataCache = dataCache;
+        Freshness.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(DataFreshnessViewModel.HasData))
+            {
+                OnPropertyChanged(nameof(LoadButtonLabel));
+            }
+        };
         _p4kService = p4kService;
         _craftedReader = new CraftedItemReader(p4kService);
         _ownedMaterialService = ownedMaterialService;
@@ -217,6 +237,7 @@ public partial class ItemsTabViewModel : PageViewModelBase
         loadItemListCommand?.NotifyCanExecuteChanged();
         if (status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame)
         {
+            ClearCachedItemsOfAnotherAccount();
             ReloadLocationList();
         }
         else
@@ -325,25 +346,30 @@ public partial class ItemsTabViewModel : PageViewModelBase
 
         var loadWatch = Stopwatch.StartNew();
         var itemList = await _clientService.QueryGraphBySearch(searchQuery);
+        var fetchedAt = DateTimeOffset.Now;
         var queryTime = loadWatch.Elapsed;
         // La plupart des parents d'objets attachés sont dans ce résultat : autant de requêtes serveur en moins.
         _locationService.AddKnownEntities(itemList);
         var knownEntitiesTime = loadWatch.Elapsed - queryTime;
 
+        // Hors mode debug, la liste est celle de tout le compte : c'est elle qu'on réaffichera au prochain lancement.
+        if (!useSearchCriteria)
+        {
+            _ = SaveToCacheAsync(ItemsDatasetKey, () => GrpcCachePayload.WriteItems(itemList), fetchedAt);
+        }
+
         // récupérer les instances de vaisseaux
         await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Terminé");
         var rowsStart = loadWatch.Elapsed;
-        var result = new List<ItemViewModel>();
-        foreach (var item in itemList)
-        {
-            var scItem = await _scItemRepository.GetByCrc32Async(item.EntityNodeProperties.ClassGuidCrc);
-            result.Add(new ItemViewModel(_localeEntryRepository, _locationService, _clientService, this, item, scItem));
-        }
+        var result = await BuildRowsAsync(itemList, knownLocations: null);
         var rowsTime = loadWatch.Elapsed - rowsStart;
 
         ConfigureColumnFilters(result);
 
-        _itemsLoadedAt = DateTime.Now;
+        _itemsFetchedAt = fetchedAt;
+        _itemsLoadedAt = fetchedAt.LocalDateTime;
+        _displayedAccountKey = _clientService.CurrentPlayerGeid?.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        Freshness.Update(fetchedAt, isFromCache: false);
         PublishOwnedMaterials(result, _itemsLoadedAt, areLocationsResolved: false);
 
         _unfilteredItemList = Task.FromResult<IList<ItemViewModel>>(result);
@@ -360,11 +386,12 @@ public partial class ItemsTabViewModel : PageViewModelBase
         // Les emplacements arrivent ensuite, en tâche de fond : le tableau est utilisable sans les attendre.
         var locationCts = new CancellationTokenSource();
         _locationResolutionCts = locationCts;
-        _locationResolutionTask = ResolveLocationsAsync(result, locationCts.Token);
+        _locationResolutionTask = ResolveLocationsAsync(result, locationCts.Token, saveToCache: !useSearchCriteria);
     }
     
-    private async Task ResolveLocationsAsync(IReadOnlyList<ItemViewModel> items, CancellationToken token)
+    private async Task ResolveLocationsAsync(IReadOnlyList<ItemViewModel> items, CancellationToken token, bool saveToCache)
     {
+        var fetchedAt = _itemsFetchedAt;
         var stopwatch = Stopwatch.StartNew();
         LocationResolutionTotal = Math.Max(1, items.Count);
         ResolvedLocationCount = 0;
@@ -392,6 +419,13 @@ public partial class ItemsTabViewModel : PageViewModelBase
             await worker;
             await RefreshLocationResultsAsync(items, isComplete: true);
             _logger.LogInformation("{Count} emplacements résolus en {Elapsed}", items.Count, stopwatch.Elapsed);
+
+            if (saveToCache)
+            {
+                // Sans eux, des objets relus jeu fermé n'auraient pas d'emplacement : leur résolution interroge le serveur.
+                var locations = new Dictionary<ulong, ResolvedLocation>(_resolvedLocations);
+                _ = SaveToCacheAsync(LocationsDatasetKey, () => GrpcCachePayload.WriteJson(new CachedItemLocations(fetchedAt, locations)), fetchedAt);
+            }
         }
         catch (OperationCanceledException)
         {

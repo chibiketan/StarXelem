@@ -20,7 +20,7 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
 {
     private readonly ILogger<MissionsTabViewModel> _logger;
     private readonly ILocalDatabaseService _localDatabaseService;
-    private readonly IGrpcClientService _clientService;
+    private readonly IObtainedBlueprintService _obtainedBlueprintService;
     public override string Name => "Missions";
     protected override string NavIconData => "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z";
     public override IVisualSourceViewModel Icon => new FluentIconVisualViewModel(FluentIcons.Common.Symbol.Target);
@@ -46,25 +46,20 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
     [ObservableProperty] private string _search = "";
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowNoMatch))] private List<MissionItemViewModel> _filteredMissionList = [];
 
-    public MissionsTabViewModel(ILogger<MissionsTabViewModel> logger, ILocalDatabaseService localDatabaseService, IGrpcClientService clientService)
+    public MissionsTabViewModel(ILogger<MissionsTabViewModel> logger, ILocalDatabaseService localDatabaseService, IObtainedBlueprintService obtainedBlueprintService)
     {
         _logger = logger;
         _localDatabaseService = localDatabaseService;
-        _clientService = clientService;
+        _obtainedBlueprintService = obtainedBlueprintService;
     }
 
-    // Blueprints possédés, lus auprès du jeu s'il est connecté ; null sinon (statut « Obtenu » inconnu).
-    private async Task<HashSet<string>?> LoadObtainedBlueprintIdsAsync()
+    // Blueprints possédés, lus auprès du jeu s'il est connecté, sinon relus du cache ; null si inconnus (statut « Obtenu » inconnu).
+    private async Task<IReadOnlySet<string>?> LoadObtainedBlueprintIdsAsync()
     {
-        if (_clientService.Status is not (GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame))
-        {
-            return null;
-        }
-
         try
         {
-            var entries = await _clientService.GetBlueprintList().ConfigureAwait(false);
-            return entries.Select(entry => entry.BlueprintId).ToHashSet();
+            var obtained = await _obtainedBlueprintService.GetObtainedAsync().ConfigureAwait(false);
+            return obtained?.Ids;
         }
         catch (Exception ex)
         {
@@ -298,7 +293,7 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
     // Pools de blueprints de la mission : blueprints triés par nom, chance de tirage calculée sur le poids.
     private static List<MissionBlueprintPoolViewModel> MapBlueprintPools(
         IEnumerable<MissionBlueprintPoolEntity>? pools,
-        HashSet<string>? obtainedBlueprintIds)
+        IReadOnlySet<string>? obtainedBlueprintIds)
     {
         var result = new List<MissionBlueprintPoolViewModel>();
         foreach (var pool in pools ?? [])
@@ -402,7 +397,7 @@ public sealed partial class MissionsTabViewModel : PageViewModelBase
         return string.IsNullOrWhiteSpace(rankName) || rankName.StartsWith('@') ? value : $"{rankName} ({value})";
     }
 
-    private MissionItemViewModel MapMissionEntity(MissionEntity mission, HashSet<string>? obtainedBlueprintIds)
+    private MissionItemViewModel MapMissionEntity(MissionEntity mission, IReadOnlySet<string>? obtainedBlueprintIds)
     {
         var rewards = mission.Rewards?.ToList() ?? [];
         var blueprintPools = MapBlueprintPools(mission.BlueprintPools, obtainedBlueprintIds);

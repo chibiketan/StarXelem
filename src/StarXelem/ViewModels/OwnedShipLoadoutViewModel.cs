@@ -63,6 +63,7 @@ public partial class OwnedShipLoadoutViewModel : ViewModelBase
     public string SourceLabel => Loadout?.Source switch
     {
         OwnedShipLoadoutSource.Real => "Loadout réel",
+        OwnedShipLoadoutSource.Saved when Loadout.CachedAt is { } cachedAt => $"Loadout sauvegardé (ASOP) · données du {cachedAt.LocalDateTime:dd/MM à HH:mm}",
         OwnedShipLoadoutSource.Saved => "Loadout sauvegardé (ASOP)",
         _ => "Loadout d'origine"
     };

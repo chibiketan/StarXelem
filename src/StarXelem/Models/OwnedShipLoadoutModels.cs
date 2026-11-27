@@ -126,6 +126,11 @@ public class OwnedShipLoadoutModel
     public required IReadOnlyList<OwnedShipComponentSection> ComponentSections { get; init; }
     public required IReadOnlyList<OwnedShipWeaponRow> Weapons { get; init; }
 
+    /// <summary>
+    /// Date de récupération du loadout sauvegardé quand il a été relu du cache faute de réponse du jeu, ou <c>null</c> s'il vient du jeu.
+    /// </summary>
+    public DateTimeOffset? CachedAt { get; init; }
+
     /// <summary>Nombre de composants montés (hors ports vides).</summary>
     public int ComponentCount => ComponentSections.Sum(section => section.Components.Count(component => !component.IsRemoved));
 

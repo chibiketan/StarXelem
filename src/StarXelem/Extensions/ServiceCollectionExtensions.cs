@@ -51,6 +51,7 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<ILocalDatabaseService, DesignLocalDatabaseService>();
             services.AddSingleton<ISettingsService, DesignSettingsService>();
             services.AddSingleton<IShipLoadoutService, DesignShipLoadoutService>();
+            services.AddSingleton<IGrpcDataCache, DesignGrpcDataCache>();
         }
         else
         {
@@ -68,12 +69,14 @@ public static class ServiceCollectionExtensions
                     autoRebuild: false));
             services.AddSingleton<ISettingsService, RegistrySettingsService>();
             services.AddSingleton<IShipLoadoutService, ShipLoadoutService>();
+            services.AddSingleton<IGrpcDataCache, GrpcDataCache>();
         }
 
         // Les services indépendants du mode design
         services.AddSingleton<IBlueprintMappingService, BlueprintMappingService>();
         services.AddSingleton<IMissionMappingService, MissionMappingService>();
         services.AddSingleton<IReputationService, ReputationService>();
+        services.AddSingleton<IObtainedBlueprintService, ObtainedBlueprintService>();
         services.AddSingleton<IDbContextFactory, DbContextFactory>();
         services.AddSingleton<ILocationRepository, LocationRepository>();
         services.AddSingleton<IScItemRepository, ScItemRepository>();

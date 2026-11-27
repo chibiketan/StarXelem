@@ -220,11 +220,12 @@
             <!-- Liste des blueprints -->
             <comp:NotchedBorder CutSize="18" Background="{DynamicResource Sx.SurfaceBrush}" Padding="14,18,14,14">
                 <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="12">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="6,0">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" Margin="6,0">
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Classes="sx-title" Text="Blueprints" />
                             <TextBlock Classes="sx-caption" Text="{Binding ResultSummary}" />
                         </StackPanel>
+                        <comp:DataFreshnessBadge Grid.Row="1" Grid.ColumnSpan="2" HorizontalAlignment="Left" Margin="0,6,0,0" DataContext="{Binding Freshness}" />
                         <Button Grid.Column="1" Classes="sx primary" Command="{Binding LoadItemListCommand}">Charger</Button>
                     </Grid>
 
@@ -243,7 +244,7 @@
                         <Button Classes="sx-chip"
                                 Classes.on="{Binding ObtainedChip.IsSelected}"
                                 Command="{Binding ObtainedChip.ToggleCommand}"
-                                IsEnabled="{Binding IsGrpcConnected}"
+                                IsEnabled="{Binding HasObtainedData}"
                                 ToolTip.Tip="Nécessite la connexion au jeu">
                             <StackPanel Orientation="Horizontal" Spacing="7">
                                 <Ellipse Width="7" Height="7" Fill="{DynamicResource Sx.SuccessBrush}" VerticalAlignment="Center" />

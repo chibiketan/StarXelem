@@ -353,7 +353,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private CancellationTokenSource? _cts;
     private LoadingPopupContentViewModel? _rebuildPopupContent;
-    
+    // Terminée quand le premier chargement du P4K est fini, caches des écrans relus compris (ou en échec) : attendue par --screenshot.
+    private readonly TaskCompletionSource _startupDataLoaded = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     private async void OnSelectedP4KFileChanged(Object? sender, P4kFileModel? e)
     {
         if (null != _cts)
@@ -377,16 +379,24 @@ public partial class MainWindowViewModel : ViewModelBase
             UpdateP4kStatus("Chargement terminé");
             // On termine par attendre l'initialisation du client gRPC
             await RunRebuildWithPopupAsync().ConfigureAwait(false);
+            // La base locale est prête : les données du dernier chargement peuvent être réaffichées sans attendre le jeu.
+            foreach (var page in Pages.OfType<ICachedDataPage>())
+            {
+                await page.RestoreCachedDataAsync().ConfigureAwait(false);
+            }
+            _startupDataLoaded.TrySetResult();
             await initClientTask;
         }
         catch (OperationCanceledException)
         {
             UpdateP4kStatus("Chargement annulé");
+            _startupDataLoaded.TrySetResult();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erreur lors du chargement du P4K");
             UpdateP4kStatus("Erreur lors du chargement");
+            _startupDataLoaded.TrySetResult();
             // Affiche un message d'erreur à l'utilisateur avec le détail technique (sans stacktrace)
             var fullMessage = BuildExceptionMessage(ex);
             try
@@ -749,6 +759,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 // Attendre que la DB soit prête
                 await WaitForDbReadyAsync();
 
+                // Attendre la relecture des données enregistrées des écrans, sinon la capture montre des écrans vides
+                await WaitForStartupDataAsync();
+
                 // Délai pour que la navigation soit rendue dans l'UI
                 await Task.Delay(500).ConfigureAwait(false);
 
@@ -853,6 +866,25 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>
     /// Attend que la DB soit prête (NeedsRebuildCheckAsync == false), timeout 5s.
     /// </summary>
+    private async Task WaitForStartupDataAsync()
+    {
+        // Sans P4K (aucun fichier trouvé, erreur, annulation), aucune relecture ne viendra : inutile d'attendre. Un P4K encore en
+        // chargement, lui, est attendu : la relecture du cache le suit.
+        var state = _p4kService.FileLoadState;
+        if (state is P4kService.P4kFileLoadState.Error or P4kService.P4kFileLoadState.Cancelled
+            || (state == P4kService.P4kFileLoadState.NotLoaded && _p4kService.SelectedP4KFile == null))
+        {
+            return;
+        }
+
+        // Le chargement du P4K et la reconstruction éventuelle de la base précèdent la relecture du cache : délai large.
+        var completed = await Task.WhenAny(_startupDataLoaded.Task, Task.Delay(TimeSpan.FromSeconds(60))).ConfigureAwait(false);
+        if (completed != _startupDataLoaded.Task)
+        {
+            _logger.LogWarning("Capture faite sans attendre la fin du chargement des données enregistrées (délai dépassé)");
+        }
+    }
+
     private async Task WaitForDbReadyAsync()
     {
         try

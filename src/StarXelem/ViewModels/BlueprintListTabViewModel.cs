@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -21,7 +21,7 @@ namespace StarXelem.ViewModels;
 /// Écran Blueprints : liste filtrable à gauche, détail du blueprint sélectionné à droite.
 /// Le filtrage reprend le fonctionnement des autres écrans : différé, calculé hors du thread d'UI.
 /// </summary>
-public partial class BlueprintListTabViewModel : PageViewModelBase
+public partial class BlueprintListTabViewModel : PageViewModelBase, ICachedDataPage
 {
     // Délai d'inactivité de la saisie avant de filtrer : une frappe rapide ne déclenche qu'un seul filtrage.
     private static readonly TimeSpan SearchFilterDelay = TimeSpan.FromMilliseconds(300);
@@ -37,6 +37,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     private readonly IGrpcClientService _clientService;
     private readonly ILocalDatabaseService _localDatabaseService;
     private readonly IOwnedMaterialService _ownedMaterialService;
+    private readonly IObtainedBlueprintService _obtainedBlueprintService;
     private CancellationTokenSource? _craftStatusCts;
     private CancellationTokenSource? _filterCts;
     private readonly HashSet<BlueprintFamily> _selectedFamilies = new();
@@ -57,6 +58,9 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     [ObservableProperty] private bool _showOnlyObtained;
     [ObservableProperty] private bool _showOnlyWithMissions;
     [ObservableProperty] private bool _isGrpcConnected;
+
+    /// <summary>Vrai si les blueprints obtenus sont connus, lus auprès du jeu ou relus du cache : la puce « Obtenus » a un sens.</summary>
+    [ObservableProperty] private bool _hasObtainedData;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ResultSummary), nameof(ShowNoMatch))] private int _filteredCount;
 
     // Liste complète, remplacée (jamais modifiée) à chaque étape du chargement : le filtrage peut la lire hors du thread d'UI.
@@ -72,12 +76,14 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         ILogger<BlueprintListTabViewModel> logger,
         IGrpcClientService clientService,
         ILocalDatabaseService localDatabaseService,
-        IOwnedMaterialService ownedMaterialService)
+        IOwnedMaterialService ownedMaterialService,
+        IObtainedBlueprintService obtainedBlueprintService)
     {
         _logger = logger;
         _clientService = clientService;
         _localDatabaseService = localDatabaseService;
         _ownedMaterialService = ownedMaterialService;
+        _obtainedBlueprintService = obtainedBlueprintService;
 
         ObtainedChip = new FilterChipViewModel(ObtainedChipKey, "Obtenus", ToggleChip);
         MissionChip = new FilterChipViewModel(MissionChipKey, "De mission", ToggleChip);
@@ -88,6 +94,9 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         HasOwnedInventory = _ownedMaterialService.Current != null;
         _ownedMaterialService.InventoryChanged += (_, _) => Dispatcher.UIThread.Post(OnInventoryChanged);
     }
+
+    /// <summary>Date des blueprints obtenus et provenance (jeu ou cache).</summary>
+    public DataFreshnessViewModel Freshness { get; } = new();
 
     /// <summary>Puce « Fabricables » : ne garde que les blueprints dont tous les matériaux sont possédés.</summary>
     public FilterChipViewModel CraftableChip { get; }
@@ -229,7 +238,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         Dispatcher.UIThread.Post(() =>
         {
             IsGrpcConnected = status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame;
-            if (!IsGrpcConnected)
+            if (!IsGrpcConnected && !HasObtainedData)
             {
                 ShowOnlyObtained = false;
             }
@@ -240,7 +249,8 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
 
     protected override async Task OnFirstShowAsync()
     {
-        await LoadItemList().ConfigureAwait(false);
+        // À l'ouverture, les blueprints obtenus enregistrés suffisent : le bouton « Charger » interroge le jeu.
+        await LoadBlueprintsAsync(forceRefresh: false).ConfigureAwait(false);
     }
 
     public bool CanLoadItemList()
@@ -248,8 +258,24 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         return !IsLoading;
     }
 
+    /// <summary>Recharge les blueprints et relit auprès du jeu les blueprints obtenus.</summary>
     [RelayCommand(CanExecute = nameof(CanLoadItemList))]
-    public async Task LoadItemList()
+    public Task LoadItemList() => LoadBlueprintsAsync(forceRefresh: true);
+
+    /// <inheritdoc />
+    public Task RestoreCachedDataAsync()
+    {
+        // Écran ouvert avant le choix du Data.p4k : son premier chargement n'a pas pu lire les blueprints obtenus enregistrés.
+        return Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            if (IsLoaded && !IsLoading && !HasObtainedData)
+            {
+                await LoadBlueprintsAsync(forceRefresh: false);
+            }
+        });
+    }
+
+    private async Task LoadBlueprintsAsync(bool forceRefresh)
     {
         try
         {
@@ -261,13 +287,22 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
                 ScheduleFilters(TimeSpan.Zero);
             }).GetTask().ConfigureAwait(false);
 
-            HashSet<string>? obtainedIds = null;
-            if (IsGrpcConnected)
+            await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement des BP obtenus…");
+            var obtained = await _obtainedBlueprintService.GetObtainedAsync(forceRefresh).ConfigureAwait(false);
+            var obtainedIds = obtained?.Ids;
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement des BP obtenus…");
-                var grpcBps = await _clientService.GetBlueprintList().ConfigureAwait(false);
-                obtainedIds = grpcBps.Select(e => e.BlueprintId).ToHashSet();
-            }
+                HasObtainedData = obtained != null;
+                if (obtained == null)
+                {
+                    ShowOnlyObtained = false;
+                    Freshness.Clear();
+                }
+                else
+                {
+                    Freshness.Update(obtained.FetchedAt, obtained.IsFromCache);
+                }
+            });
 
             const int BatchSize = 200;
             var loaded = new List<BlueprintViewModel>();
@@ -315,7 +350,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
 
     private async Task<BlueprintViewModel> MapRowToViewModelAsync(
         DbBlueprintRow row,
-        HashSet<string>? obtainedIds)
+        IReadOnlySet<string>? obtainedIds)
     {
         var categories = await Task.WhenAll(row.Costs.Select(cost => Task.FromResult(new BlueprintCategoryModel
         {
@@ -452,7 +487,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
     {
         switch (key)
         {
-            case ObtainedChipKey when IsGrpcConnected || ShowOnlyObtained:
+            case ObtainedChipKey when HasObtainedData || ShowOnlyObtained:
                 ShowOnlyObtained = !ShowOnlyObtained;
                 break;
             case MissionChipKey:

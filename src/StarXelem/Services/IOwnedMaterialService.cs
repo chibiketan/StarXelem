@@ -16,4 +16,7 @@ public interface IOwnedMaterialService
     /// <summary>Remplace l'instantané courant.</summary>
     /// <param name="inventory">Nouvel instantané.</param>
     void Publish(OwnedMaterialInventory inventory);
+
+    /// <summary>Retire l'instantané courant (objets d'un autre compte, par exemple).</summary>
+    void Clear();
 }

@@ -44,20 +44,24 @@ public sealed class ShipLoadoutService : IShipLoadoutService
     private static readonly HashSet<EItemType> DescribedTypes = [.. ComponentTypes, .. GunTypes, .. LauncherTypes, .. MissileTypes, .. MountTypes, .. ModuleTypes];
 
     private const string EntityClassUrnPrefix = "urn:sc:global:entityclass:uuid:";
+    private const string SnapshotsDatasetPrefix = "ship-snapshots:";
 
     private readonly IP4kService _p4kService;
     private readonly IScItemRepository _scItemRepository;
     private readonly IGrpcClientService _grpcClientService;
+    private readonly IGrpcDataCache _dataCache;
     private readonly ILogger<ShipLoadoutService> _logger;
     private readonly ShipComponentDescriber _describer;
     private readonly CraftedItemReader _craftedReader;
     private IReadOnlyDictionary<string, uint>? _crcByShortName;
 
-    public ShipLoadoutService(IP4kService p4kService, IScItemRepository scItemRepository, IGrpcClientService grpcClientService, ILogger<ShipLoadoutService> logger)
+    public ShipLoadoutService(IP4kService p4kService, IScItemRepository scItemRepository, IGrpcClientService grpcClientService, IGrpcDataCache dataCache,
+        ILogger<ShipLoadoutService> logger)
     {
         _p4kService = p4kService;
         _scItemRepository = scItemRepository;
         _grpcClientService = grpcClientService;
+        _dataCache = dataCache;
         _logger = logger;
         _describer = new ShipComponentDescriber(p4kService);
         _craftedReader = new CraftedItemReader(p4kService);
@@ -107,14 +111,9 @@ public sealed class ShipLoadoutService : IShipLoadoutService
     private async Task<OwnedShipLoadoutModel?> BuildSavedLoadoutAsync(SpaceshipModel ship, IReadOnlyList<LoadoutNode> originNodes, FlatLoadout origin,
         CancellationToken token)
     {
-        IList<EntitlementV2.SnapshotWithEntitlement> records;
-        try
+        var (records, cachedAt) = await GetSnapshotsAsync(ship.Entitlement.Urn, token).ConfigureAwait(false);
+        if (records == null)
         {
-            records = await _grpcClientService.GetShipSnapshots(ship.Entitlement.Urn, token).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogWarning(ex, "Lecture du loadout sauvegardé impossible pour {Urn}", ship.Entitlement.Urn);
             return null;
         }
 
@@ -142,7 +141,46 @@ public sealed class ShipLoadoutService : IShipLoadoutService
             saved.Weapons[key] = entry;
         }
 
-        return CreateModel(OwnedShipLoadoutSource.Saved, saved, origin);
+        return CreateModel(OwnedShipLoadoutSource.Saved, saved, origin, cachedAt);
+    }
+
+    /// <summary>
+    /// Snapshots du vaisseau : lus auprès du jeu s'il est connecté, puis enregistrés ; relus du cache sinon, ou si le jeu ne répond pas.
+    /// La date n'est renseignée que pour des snapshots relus du cache.
+    /// </summary>
+    private async Task<(IList<EntitlementV2.SnapshotWithEntitlement>? Records, DateTimeOffset? CachedAt)> GetSnapshotsAsync(string urn,
+        CancellationToken token)
+    {
+        var datasetKey = SnapshotsDatasetPrefix + urn;
+        if (_grpcClientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame)
+        {
+            try
+            {
+                var records = await _grpcClientService.GetShipSnapshots(urn, token).ConfigureAwait(false);
+                await _dataCache.SaveAsync(datasetKey, GrpcCachePayload.WriteMessages(records), DateTimeOffset.Now, token).ConfigureAwait(false);
+                return (records, null);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Lecture du loadout sauvegardé impossible pour {Urn}, recherche dans le cache", urn);
+            }
+        }
+
+        var cached = await _dataCache.LoadAsync(datasetKey, token).ConfigureAwait(false);
+        if (cached == null)
+        {
+            return (null, null);
+        }
+
+        try
+        {
+            return (GrpcCachePayload.ReadMessages(cached.Data, EntitlementV2.SnapshotWithEntitlement.Parser), cached.FetchedAt);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Loadout sauvegardé illisible dans le cache pour {Urn}", urn);
+            return (null, null);
+        }
     }
 
     /// <summary>Arbre de ports reconstruit à partir des chemins <c>attach_path</c> (noms de ports en clair depuis le vaisseau).</summary>
@@ -478,7 +516,7 @@ public sealed class ShipLoadoutService : IShipLoadoutService
     private static IEnumerable<LoadoutNode> Descendants(LoadoutNode node) =>
         node.Children.SelectMany(child => Descendants(child).Prepend(child));
 
-    private static OwnedShipLoadoutModel CreateModel(OwnedShipLoadoutSource source, FlatLoadout shown, FlatLoadout? origin)
+    private static OwnedShipLoadoutModel CreateModel(OwnedShipLoadoutSource source, FlatLoadout shown, FlatLoadout? origin, DateTimeOffset? cachedAt = null)
     {
         var components = shown.Components.Select(pair =>
         {
@@ -509,6 +547,7 @@ public sealed class ShipLoadoutService : IShipLoadoutService
         return new OwnedShipLoadoutModel
         {
             Source = source,
+            CachedAt = cachedAt,
             ComponentSections = sections,
             Weapons = weapons
                 .OrderBy(row => row.IsMissile)
