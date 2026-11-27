@@ -13,7 +13,7 @@ namespace StarXelem.ViewModels;
 /// Écran Réputations : une carte par contractant, filtrable par nom et par état de la relation.
 /// Le filtrage reprend le fonctionnement des autres écrans : différé, calculé hors du thread d'UI et affiché par paquets.
 /// </summary>
-public partial class ReputationTabViewModel : PageViewModelBase
+public partial class ReputationTabViewModel : PageViewModelBase, ICachedDataPage
 {
     // Délai d'inactivité de la saisie avant de filtrer : une frappe rapide ne déclenche qu'un seul filtrage.
     private static readonly TimeSpan SearchFilterDelay = TimeSpan.FromMilliseconds(300);
@@ -70,18 +70,31 @@ public partial class ReputationTabViewModel : PageViewModelBase
 
     partial void OnSearchTextChanged(string value) => ScheduleFilters(SearchFilterDelay);
 
-    protected override async Task OnFirstShowAsync()
-    {
-        await LoadDataCommand.ExecuteAsync(null);
-    }
+    // À l'ouverture, les réputations enregistrées suffisent : le bouton « Charger les données » interroge le jeu.
+    protected override Task OnFirstShowAsync() => LoadReputationsAsync(forceRefresh: false);
 
     [RelayCommand]
-    private async Task LoadData()
+    private Task LoadData() => LoadReputationsAsync(forceRefresh: true);
+
+    /// <inheritdoc />
+    public Task RestoreCachedDataAsync()
+    {
+        // Écran ouvert avant le choix du Data.p4k : son premier chargement n'a pu lire ni le cache ni les factions.
+        return Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            if (IsLoaded && !IsLoading && _allContractors.Count == 0)
+            {
+                await LoadReputationsAsync(forceRefresh: false);
+            }
+        });
+    }
+
+    private async Task LoadReputationsAsync(bool forceRefresh)
     {
         IsLoading = true;
         try
         {
-            var result = await _reputationService.GetSynchronizedReputationsAsync();
+            var result = await _reputationService.GetSynchronizedReputationsAsync(forceRefresh);
             _allContractors = result.Contractors;
             Freshness.Update(result.FetchedAt, result.IsFromCache);
             BuildStatusChips();

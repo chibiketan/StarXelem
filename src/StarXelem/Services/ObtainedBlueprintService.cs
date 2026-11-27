@@ -23,8 +23,13 @@ public sealed class ObtainedBlueprintService : IObtainedBlueprintService
     }
 
     /// <inheritdoc />
-    public async Task<ObtainedBlueprints?> GetObtainedAsync(CancellationToken token = default)
+    public async Task<ObtainedBlueprints?> GetObtainedAsync(bool forceRefresh = false, CancellationToken token = default)
     {
+        if (!forceRefresh && await LoadCachedAsync(token).ConfigureAwait(false) is { } cachedFirst)
+        {
+            return cachedFirst;
+        }
+
         if (_grpcClientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame)
         {
             try
@@ -40,6 +45,12 @@ public sealed class ObtainedBlueprintService : IObtainedBlueprintService
             }
         }
 
+        // Sans actualisation forcée, le cache a déjà été consulté : il est vide.
+        return forceRefresh ? await LoadCachedAsync(token).ConfigureAwait(false) : null;
+    }
+
+    private async Task<ObtainedBlueprints?> LoadCachedAsync(CancellationToken token)
+    {
         var cached = await _dataCache.LoadAsync(DatasetKey, token).ConfigureAwait(false);
         if (cached == null)
         {

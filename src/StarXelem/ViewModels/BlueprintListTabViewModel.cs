@@ -21,7 +21,7 @@ namespace StarXelem.ViewModels;
 /// Écran Blueprints : liste filtrable à gauche, détail du blueprint sélectionné à droite.
 /// Le filtrage reprend le fonctionnement des autres écrans : différé, calculé hors du thread d'UI.
 /// </summary>
-public partial class BlueprintListTabViewModel : PageViewModelBase
+public partial class BlueprintListTabViewModel : PageViewModelBase, ICachedDataPage
 {
     // Délai d'inactivité de la saisie avant de filtrer : une frappe rapide ne déclenche qu'un seul filtrage.
     private static readonly TimeSpan SearchFilterDelay = TimeSpan.FromMilliseconds(300);
@@ -249,7 +249,8 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
 
     protected override async Task OnFirstShowAsync()
     {
-        await LoadItemList().ConfigureAwait(false);
+        // À l'ouverture, les blueprints obtenus enregistrés suffisent : le bouton « Charger » interroge le jeu.
+        await LoadBlueprintsAsync(forceRefresh: false).ConfigureAwait(false);
     }
 
     public bool CanLoadItemList()
@@ -257,8 +258,24 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
         return !IsLoading;
     }
 
+    /// <summary>Recharge les blueprints et relit auprès du jeu les blueprints obtenus.</summary>
     [RelayCommand(CanExecute = nameof(CanLoadItemList))]
-    public async Task LoadItemList()
+    public Task LoadItemList() => LoadBlueprintsAsync(forceRefresh: true);
+
+    /// <inheritdoc />
+    public Task RestoreCachedDataAsync()
+    {
+        // Écran ouvert avant le choix du Data.p4k : son premier chargement n'a pas pu lire les blueprints obtenus enregistrés.
+        return Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            if (IsLoaded && !IsLoading && !HasObtainedData)
+            {
+                await LoadBlueprintsAsync(forceRefresh: false);
+            }
+        });
+    }
+
+    private async Task LoadBlueprintsAsync(bool forceRefresh)
     {
         try
         {
@@ -271,7 +288,7 @@ public partial class BlueprintListTabViewModel : PageViewModelBase
             }).GetTask().ConfigureAwait(false);
 
             await Dispatcher.UIThread.InvokeAsync(() => TreatmentStatus = "Chargement des BP obtenus…");
-            var obtained = await _obtainedBlueprintService.GetObtainedAsync().ConfigureAwait(false);
+            var obtained = await _obtainedBlueprintService.GetObtainedAsync(forceRefresh).ConfigureAwait(false);
             var obtainedIds = obtained?.Ids;
             await Dispatcher.UIThread.InvokeAsync(() =>
             {

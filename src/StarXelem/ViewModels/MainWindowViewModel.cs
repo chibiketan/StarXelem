@@ -868,13 +868,16 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     private async Task WaitForStartupDataAsync()
     {
-        // Sans P4K chargé (aucun fichier trouvé, erreur), aucune relecture ne viendra : inutile d'attendre.
-        if (_p4kService.FileLoadState != P4kService.P4kFileLoadState.CacheLoaded)
+        // Sans P4K (aucun fichier trouvé, erreur, annulation), aucune relecture ne viendra : inutile d'attendre. Un P4K encore en
+        // chargement, lui, est attendu : la relecture du cache le suit.
+        var state = _p4kService.FileLoadState;
+        if (state is P4kService.P4kFileLoadState.Error or P4kService.P4kFileLoadState.Cancelled
+            || (state == P4kService.P4kFileLoadState.NotLoaded && _p4kService.SelectedP4KFile == null))
         {
             return;
         }
 
-        // La reconstruction éventuelle de la base précède la relecture du cache : délai large.
+        // Le chargement du P4K et la reconstruction éventuelle de la base précèdent la relecture du cache : délai large.
         var completed = await Task.WhenAny(_startupDataLoaded.Task, Task.Delay(TimeSpan.FromSeconds(60))).ConfigureAwait(false);
         if (completed != _startupDataLoaded.Task)
         {

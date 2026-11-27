@@ -6,12 +6,13 @@ namespace StarXelem.Services;
 public interface IObtainedBlueprintService
 {
     /// <summary>
-    /// Lit les blueprints obtenus auprès du jeu s'il est connecté et les enregistre ; sinon, ou si le jeu ne répond pas, relit le dernier
-    /// chargement enregistré.
+    /// Blueprints obtenus : le dernier chargement enregistré s'il existe ; sinon, ou si <paramref name="forceRefresh"/> est vrai, lecture
+    /// auprès du jeu s'il est connecté, puis enregistrement. Si le jeu ne répond pas, le cache reste la solution de repli.
     /// </summary>
+    /// <param name="forceRefresh">Vrai pour interroger le jeu même si un chargement est enregistré (actualisation demandée).</param>
     /// <param name="token">Jeton d'annulation.</param>
     /// <returns>Les identifiants des blueprints obtenus, ou <c>null</c> si ni le jeu ni le cache ne les fournissent.</returns>
-    Task<ObtainedBlueprints?> GetObtainedAsync(CancellationToken token = default);
+    Task<ObtainedBlueprints?> GetObtainedAsync(bool forceRefresh = false, CancellationToken token = default);
 }
 
 /// <summary>Identifiants des blueprints obtenus, avec leur date de récupération et leur provenance.</summary>

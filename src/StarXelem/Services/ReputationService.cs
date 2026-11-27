@@ -27,13 +27,13 @@ public class ReputationService : IReputationService
         _logger = logger;
     }
 
-    public async Task<ReputationResult> GetSynchronizedReputationsAsync()
+    public async Task<ReputationResult> GetSynchronizedReputationsAsync(bool forceRefresh = false)
     {
         // 1. Retrieve static data from P4K
         var factionReputationRecordList = await _p4kService.GetAllFactionReputations().ConfigureAwait(false);
 
         // 2. Retrieve player data from gRPC
-        var (playerReputations, fetchedAt, isFromCache) = await GetPlayerReputationsAsync().ConfigureAwait(false);
+        var (playerReputations, fetchedAt, isFromCache) = await GetPlayerReputationsAsync(forceRefresh).ConfigureAwait(false);
 
         var contractorMap = new Dictionary<ulong, ContractorModel>();
 
@@ -203,11 +203,17 @@ public class ReputationService : IReputationService
     }
 
     /// <summary>
-    /// Réputations du joueur : lues auprès du jeu s'il est connecté, puis enregistrées ; relues du cache sinon, ou si le jeu ne répond pas.
-    /// Sans cache, l'appel au jeu est tenté et son erreur remonte, comme avant la mise en cache.
+    /// Réputations du joueur : le dernier chargement enregistré s'il existe ; sinon, ou si <paramref name="forceRefresh"/> est vrai, lecture
+    /// auprès du jeu s'il est connecté, puis enregistrement. Si le jeu ne répond pas, le cache reste la solution de repli. Sans cache,
+    /// l'appel au jeu est tenté et son erreur remonte, comme avant la mise en cache.
     /// </summary>
-    private async Task<(List<VersionedReputation> Reputations, DateTimeOffset FetchedAt, bool IsFromCache)> GetPlayerReputationsAsync()
+    private async Task<(List<VersionedReputation> Reputations, DateTimeOffset FetchedAt, bool IsFromCache)> GetPlayerReputationsAsync(bool forceRefresh)
     {
+        if (!forceRefresh && await LoadCachedPlayerReputationsAsync().ConfigureAwait(false) is { } cachedFirst)
+        {
+            return cachedFirst;
+        }
+
         Exception? failure = null;
         if (_grpcClientService.Status is GrpcConnectionStatus.Connected or GrpcConnectionStatus.InGame)
         {
@@ -222,17 +228,10 @@ public class ReputationService : IReputationService
             }
         }
 
-        var cached = await _dataCache.LoadAsync(DatasetKey).ConfigureAwait(false);
-        if (cached != null)
+        // Sans actualisation forcée, le cache a déjà été consulté : il est vide.
+        if (forceRefresh && await LoadCachedPlayerReputationsAsync().ConfigureAwait(false) is { } cached)
         {
-            try
-            {
-                return (GrpcCachePayload.ReadMessages(cached.Data, VersionedReputation.Parser), cached.FetchedAt, true);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Réputations illisibles dans le cache");
-            }
+            return cached;
         }
 
         if (failure != null)
@@ -241,6 +240,25 @@ public class ReputationService : IReputationService
         }
 
         return await FetchPlayerReputationsAsync().ConfigureAwait(false);
+    }
+
+    private async Task<(List<VersionedReputation> Reputations, DateTimeOffset FetchedAt, bool IsFromCache)?> LoadCachedPlayerReputationsAsync()
+    {
+        var cached = await _dataCache.LoadAsync(DatasetKey).ConfigureAwait(false);
+        if (cached == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return (GrpcCachePayload.ReadMessages(cached.Data, VersionedReputation.Parser), cached.FetchedAt, true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Réputations illisibles dans le cache");
+            return null;
+        }
     }
 
     private async Task<(List<VersionedReputation> Reputations, DateTimeOffset FetchedAt, bool IsFromCache)> FetchPlayerReputationsAsync()
